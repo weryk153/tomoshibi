@@ -1,0 +1,107 @@
+# ignore the user configuration file
+conf.yaml
+# 設定檔的備份也是使用者的東西——而且會夾帶端點、路徑、金鑰欄位。
+conf.yaml.bak*
+
+# 模型製作的工作區。那是做 Live2D 的中間產物（PSD 拆層腳本、試驗版本、
+# 上百 MB 的貼圖），跟執行這個 app 無關，而且往往牽涉到有版權的角色素材。
+/assets/live2d-work/
+
+# Bundled background images ship with the app (AI-generated generic scenes).
+# Exclude any image with unclear or third-party IP licensing.
+/backgrounds/future-gadget-lab.jpg
+
+# 只附帶 Live2D 官方的免費範例。任何有版權的角色美術（同人模型、動畫角色）
+# 都不進版控——那是 NOTICE 裡「Not included — bring your own」那一條的實作，
+# 不是偏好問題。自己本機要用什麼放進 live2d-models/ 就好，不會被追蹤。
+# ignore non-default live2d models
+/live2d-models/*
+!/live2d-models/mao_pro
+!/live2d-models/haru
+!/live2d-models/hiyori
+
+# ignore non-default character configs
+/characters/*
+!/characters/README.md
+/personas/*
+!/personas/README.md
+# but all of the defaults are already tracked, so no need to un-ignore them
+
+# ignore avatars
+avatars/*
+
+# macOS system files
+.DS_Store
+
+# Python files
+__pycache__/
+*.pyc
+lab.py
+.idea
+
+# Virtual environment
+.venv
+.conda
+conda
+
+# Sensitive data
+.env
+api_keys.py
+src/open_llm_vtuber/llm/user_credentials.json
+
+# Database files
+memory.db
+memory.db.bk
+
+# Logs
+server.log
+logs/*
+*.log
+
+# Cache and models
+cache/*
+generated_images/
+src/open_llm_vtuber/tts/asset
+src/open_llm_vtuber/tts/config
+src/open_llm_vtuber/asr/models*
+!src/open_llm_vtuber/asr/models/silero_vad.onnx
+asset
+models/*
+!models/piper_voice
+models/piper_voice/*
+
+
+# Legacy and specific directories
+legacy/
+chat_history/
+knowledge_base/
+submodules/MeloTTS
+openapi_assistants.json
+openapi_memgpt.json
+
+# memory log
+mem.json
+conf.yaml.backup
+
+*.exe
+
+tmp/
+private/
+mcp_servers.json
+
+.vscode/
+# runtime artifacts
+conf.yaml.bak
+# 帶時戳的備份（character_route 與手動改設定時各會留一份）
+conf.yaml.bak.*
+*.bak
+prompts/utils/proactive_topics.json
+prompts/utils/seen_news.json
+prompts/utils/proactive_speak_prompt.txt
+
+# Electron 外殼
+
+# 前端原始碼的建置產物
+frontend-src/node_modules/
+frontend-src/dist/
+frontend-src/out/

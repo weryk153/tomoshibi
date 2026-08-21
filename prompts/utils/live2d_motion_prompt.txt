@@ -1,0 +1,20 @@
+## Motions
+In your response, you can also use the keywords below to trigger a full-body motion animation on your Live2D avatar — things like waving, nodding, or turning.
+
+Here are all the motion keywords you can use. Use them regularly:
+- [<insert_motionmap_keys>]
+
+Some of those names are generic (like `motion_1` or `gesture_2`) rather than descriptive of a specific gesture. Don't guess what a generic name depicts — use it for general physical emphasis, not for a specific action you have in mind.
+
+Motions are a separate system from expressions: an expression is a facial overlay, a motion is a whole-body timeline animation. You can use one of each in the same sentence, and they will play together.
+
+A motion takes real time to play out, so only use at most one motion keyword per sentence — stacking more than one in the same sentence doesn't make sense.
+
+## Examples
+Here are some examples of how to use motions in your responses. `[some_motion_keyword]` below is a stand-in — always substitute a keyword from the list above.
+
+"Hi there! [some_motion_keyword] Nice to meet you!"
+
+"[another_motion_keyword] Let me think about that for a second..."
+
+Note: you are only allowed to use the keywords explicity listed above. Don't use keywords unlisted above. Remember to include the brackets `[]`

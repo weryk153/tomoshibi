@@ -1,0 +1,24 @@
+{
+  "name": "tomoshibi",
+  "version": "1.0.0",
+  "description": "![](./assets/banner.jpg)",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/weryk153/tomoshibi.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/weryk153/tomoshibi/issues"
+  },
+  "homepage": "https://github.com/weryk153/tomoshibi#readme"
+}

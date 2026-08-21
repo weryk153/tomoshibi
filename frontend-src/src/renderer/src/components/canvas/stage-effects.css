@@ -1,0 +1,536 @@
+.stage-fx {
+  --fx-gold: #ffd37a;
+  --fx-amber: #ff8a3d;
+  --fx-crimson: #d11f4d;
+  --fx-void: #05030a;
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  overflow: hidden;
+  pointer-events: none;
+  isolation: isolate;
+  font-family: "Palatino Linotype", "Noto Serif TC", Georgia, serif;
+}
+
+.stage-fx__void,
+.stage-fx__vignette,
+.stage-fx__speed-lines,
+.stage-fx__flash,
+.stage-fx__impact {
+  position: absolute;
+  inset: 0;
+}
+
+.stage-fx__void {
+  background:
+    radial-gradient(circle at 50% 66%, rgb(118 15 45 / 74%), transparent 36%),
+    radial-gradient(circle at 50% 60%, #24102f 0%, var(--fx-void) 62%);
+  animation: stage-fx-void var(--fx-duration) both;
+}
+
+.stage-fx__vignette {
+  z-index: 12;
+  box-shadow:
+    inset 0 0 14vmin 5vmin rgb(0 0 0 / 92%),
+    inset 0 0 3vmin 0.4vmin rgb(255 177 93 / 24%);
+  animation: stage-fx-vignette var(--fx-duration) both;
+}
+
+.stage-fx__speed-lines {
+  z-index: 2;
+  opacity: 0;
+  background: repeating-conic-gradient(
+    from 8deg at 50% 58%,
+    transparent 0deg 4.2deg,
+    rgb(255 211 122 / 18%) 4.25deg 4.55deg,
+    transparent 4.6deg 8.4deg
+  );
+  transform: scale(1.8);
+  animation: stage-fx-speed-lines var(--fx-duration) both;
+}
+
+.stage-fx__webgl {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+
+.stage-fx__cutin {
+  position: absolute;
+  z-index: 8;
+  top: 14%;
+  left: -12%;
+  width: 124%;
+  height: 29%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff9e8;
+  background:
+    linear-gradient(90deg, transparent 0 8%, rgb(8 5 15 / 95%) 20% 78%, transparent 92%),
+    linear-gradient(105deg, transparent 0 35%, rgb(209 31 77 / 48%) 36% 63%, transparent 64%);
+  border-block: 1px solid rgb(255 211 122 / 72%);
+  clip-path: polygon(0 20%, 100% 0, 94% 80%, 5% 100%);
+  opacity: 0;
+  transform: translateX(-26%) skewX(-7deg);
+  animation: stage-fx-cutin var(--fx-duration) both;
+}
+
+.stage-fx__cutin-rule {
+  position: absolute;
+  width: 68%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--fx-gold), transparent);
+  transform: translateY(6.3vmin);
+}
+
+.stage-fx__cutin-copy {
+  display: grid;
+  gap: 0.35rem;
+  text-align: center;
+  text-shadow:
+    0 0 0.5rem rgb(255 174 91 / 80%),
+    0 0 1.5rem rgb(209 31 77 / 80%);
+}
+
+.stage-fx__cutin-copy strong {
+  font-size: clamp(1.2rem, 4.6vmin, 3.8rem);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.18em;
+}
+
+.stage-fx__eyebrow {
+  color: var(--fx-gold);
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: clamp(0.58rem, 1.25vmin, 0.9rem);
+  font-weight: 800;
+  letter-spacing: 0.48em;
+}
+
+.stage-fx__sigil {
+  position: absolute;
+  z-index: 5;
+  left: 50%;
+  top: 58%;
+  width: min(68vmin, 70%);
+  aspect-ratio: 1;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.25) rotate(-35deg);
+  filter:
+    drop-shadow(0 0 0.7rem rgb(255 211 122 / 95%))
+    drop-shadow(0 0 2.5rem rgb(209 31 77 / 75%));
+  animation: stage-fx-sigil var(--fx-duration) cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.stage-fx__ring {
+  position: absolute;
+  inset: 0;
+  border: 2px solid var(--fx-gold);
+  border-radius: 50%;
+}
+
+.stage-fx__ring::before,
+.stage-fx__ring::after {
+  content: "";
+  position: absolute;
+  inset: 8%;
+  border: 1px dashed rgb(255 211 122 / 80%);
+  border-radius: 50%;
+}
+
+.stage-fx__ring::after {
+  inset: 22%;
+  border-style: solid;
+  clip-path: polygon(50% 0, 59% 40%, 100% 50%, 59% 60%, 50% 100%, 41% 60%, 0 50%, 41% 40%);
+  background: rgb(255 138 61 / 9%);
+}
+
+.stage-fx__ring--outer {
+  animation: stage-fx-spin 5.4s linear infinite;
+}
+
+.stage-fx__ring--middle {
+  inset: 13%;
+  border-style: dotted;
+  animation: stage-fx-spin-reverse 3.7s linear infinite;
+}
+
+.stage-fx__ring--inner {
+  inset: 28%;
+  border-width: 1px;
+  animation: stage-fx-spin 2.4s linear infinite;
+}
+
+.stage-fx__sigil-core {
+  position: absolute;
+  inset: 37%;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: clamp(2rem, 9vmin, 7rem);
+  animation: stage-fx-core-pulse 0.62s ease-in-out infinite alternate;
+}
+
+.stage-fx__particles,
+.stage-fx__shards {
+  position: absolute;
+  z-index: 6;
+  inset: 0;
+}
+
+.stage-fx__particles i {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: var(--particle-size);
+  height: var(--particle-size);
+  border-radius: 50%;
+  background: #fff6d6;
+  box-shadow: 0 0 0.55rem var(--fx-gold);
+  opacity: 0;
+  animation: stage-fx-particle 2.4s var(--particle-delay) ease-out both;
+  animation-delay: calc(2.2s + var(--particle-delay));
+}
+
+.stage-fx__shards i {
+  position: absolute;
+  z-index: 7;
+  left: 50%;
+  top: 68%;
+  width: clamp(2px, 0.3vmin, 5px);
+  height: 46vmin;
+  opacity: 0;
+  background: linear-gradient(transparent, #fff 38%, var(--fx-gold) 52%, transparent 80%);
+  filter: drop-shadow(0 0 0.45rem var(--fx-amber));
+  transform-origin: 50% 100%;
+  animation: stage-fx-shard 1.25s ease-out both;
+  animation-delay: calc(3.75s + var(--shard-delay));
+}
+
+.stage-fx__slash {
+  position: absolute;
+  z-index: 10;
+  left: -20%;
+  top: 51%;
+  width: 140%;
+  height: 0.55vmin;
+  min-height: 3px;
+  opacity: 0;
+  background: #fff;
+  box-shadow:
+    0 0 0.6rem #fff,
+    0 0 1.5rem var(--fx-gold),
+    0 0 4rem 1rem var(--fx-crimson);
+  transform-origin: center;
+}
+
+.stage-fx__slash--one {
+  animation: stage-fx-slash-one var(--fx-duration) both;
+}
+
+.stage-fx__slash--two {
+  animation: stage-fx-slash-two var(--fx-duration) both;
+}
+
+.stage-fx__impact {
+  z-index: 9;
+  left: 50%;
+  top: 55%;
+  width: 5vmin;
+  height: 5vmin;
+  margin: -2.5vmin;
+  border: 1px solid #fff;
+  border-radius: 50%;
+  opacity: 0;
+  box-shadow:
+    0 0 1rem #fff,
+    0 0 5rem 2rem var(--fx-gold),
+    0 0 10rem 5rem var(--fx-crimson);
+  animation: stage-fx-impact var(--fx-duration) both;
+}
+
+.stage-fx__flash {
+  z-index: 20;
+  background: #fffdf3;
+  opacity: 0;
+  mix-blend-mode: screen;
+}
+
+.stage-fx__flash--opening {
+  animation: stage-fx-opening-flash var(--fx-duration) both;
+}
+
+.stage-fx__flash--impact {
+  animation: stage-fx-impact-flash var(--fx-duration) both;
+}
+
+.stage-fx--character-entrance .stage-fx__void {
+  background:
+    linear-gradient(100deg, transparent 0 48%, rgb(112 217 232 / 9%) 49% 51%, transparent 52%),
+    radial-gradient(circle at 50% 64%, rgb(181 34 73 / 42%), transparent 34%),
+    radial-gradient(circle at 50% 60%, #11172a 0%, var(--fx-void) 68%);
+}
+
+.stage-fx--character-entrance .stage-fx__speed-lines {
+  background: repeating-linear-gradient(
+    0deg,
+    transparent 0 7px,
+    rgb(112 217 232 / 16%) 8px,
+    transparent 9px 14px
+  );
+  transform: scale(1);
+  animation-name: stage-fx-scan-lines;
+}
+
+.stage-fx--character-entrance .stage-fx__cutin {
+  top: 12%;
+  height: 25%;
+  background:
+    linear-gradient(90deg, transparent 0 8%, rgb(7 9 17 / 96%) 22% 78%, transparent 92%),
+    linear-gradient(100deg, transparent 0 46%, rgb(112 217 232 / 18%) 47% 53%, transparent 54%);
+  clip-path: polygon(0 8%, 100% 0, 96% 88%, 4% 100%);
+}
+
+.stage-fx--character-entrance .stage-fx__ring {
+  border-color: var(--fx-glow);
+}
+
+.stage-fx--character-entrance .stage-fx__ring::before,
+.stage-fx--character-entrance .stage-fx__ring::after {
+  border-color: rgb(112 217 232 / 78%);
+}
+
+.stage-fx--character-entrance .stage-fx__shards,
+.stage-fx--character-entrance .stage-fx__slash {
+  display: none;
+}
+
+.stage-fx--character-entrance .stage-fx__impact {
+  box-shadow:
+    0 0 0.8rem #fff,
+    0 0 2.4rem 0.8rem var(--fx-glow),
+    0 0 5rem 1.6rem var(--fx-crimson);
+}
+
+.stage-fx--character-entrance .stage-fx__flash--impact {
+  opacity: 0;
+  animation-name: stage-fx-identification-flash;
+}
+
+.stage-fx--scale-accent .stage-fx__void,
+.stage-fx--scale-accent .stage-fx__vignette,
+.stage-fx--scale-accent .stage-fx__speed-lines,
+.stage-fx--scale-accent .stage-fx__cutin,
+.stage-fx--scale-accent .stage-fx__shards,
+.stage-fx--scale-accent .stage-fx__slash,
+.stage-fx--scale-accent .stage-fx__impact,
+.stage-fx--scale-accent .stage-fx__flash {
+  display: none;
+}
+
+.stage-fx--scale-accent .stage-fx__sigil {
+  left: 58%;
+  top: 52%;
+  width: min(25vmin, 28%);
+  filter:
+    drop-shadow(0 0 0.35rem rgb(255 211 122 / 70%))
+    drop-shadow(0 0 1.1rem rgb(112 217 232 / 52%));
+  animation-name: stage-fx-accent-sigil;
+}
+
+.stage-fx--scale-accent .stage-fx__particles i {
+  animation-name: stage-fx-accent-particle;
+}
+
+[data-stage-effect="cinematicBurst"] #live2d-internal-wrapper {
+  transform-origin: 50% 70%;
+  animation: stage-fx-camera var(--fx-duration) both;
+}
+
+[data-stage-effect="characterEntrance"] #live2d-internal-wrapper {
+  transform-origin: 50% 70%;
+  animation: stage-fx-entrance-camera var(--fx-duration) both;
+}
+
+[data-stage-effect-scale="accent"] #live2d-internal-wrapper {
+  animation: none;
+}
+
+@keyframes stage-fx-void {
+  0% { opacity: 0; }
+  4%, 88% { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+@keyframes stage-fx-vignette {
+  0%, 4%, 100% { opacity: 0; }
+  10%, 87% { opacity: 1; }
+}
+
+@keyframes stage-fx-speed-lines {
+  0%, 35%, 100% { opacity: 0; transform: scale(1.8) rotate(0); }
+  44% { opacity: var(--fx-opacity-medium); }
+  70% { opacity: var(--fx-opacity-low); transform: scale(2.9) rotate(5deg); }
+  84% { opacity: 0; transform: scale(3.4) rotate(8deg); }
+}
+
+@keyframes stage-fx-scan-lines {
+  0%, 10%, 100% { opacity: 0; background-position: 0 -20vh; }
+  22% { opacity: var(--fx-opacity-low); }
+  70% { opacity: var(--fx-opacity-medium); background-position: 0 45vh; }
+  90% { opacity: 0; background-position: 0 80vh; }
+}
+
+@keyframes stage-fx-cutin {
+  0%, 7% { opacity: 0; transform: translateX(-28%) skewX(-7deg); }
+  12%, 29% { opacity: 1; transform: translateX(0) skewX(-7deg); }
+  35%, 100% { opacity: 0; transform: translateX(24%) skewX(-7deg); }
+}
+
+@keyframes stage-fx-sigil {
+  0%, 27% { opacity: 0; transform: translate(-50%, -50%) scale(0.25) rotate(-35deg); }
+  38% { opacity: 1; transform: translate(-50%, -50%) scale(1) rotate(0); }
+  66% { opacity: 0.95; transform: translate(-50%, -50%) scale(1.08) rotate(18deg); }
+  75%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.55) rotate(32deg); }
+}
+
+@keyframes stage-fx-accent-sigil {
+  0%, 18% { opacity: 0; transform: translate(-50%, -50%) scale(0.4) rotate(-20deg); }
+  32%, 66% { opacity: 0.85; transform: translate(-50%, -50%) scale(1) rotate(5deg); }
+  88%, 100% { opacity: 0; transform: translate(-50%, -50%) scale(1.2) rotate(18deg); }
+}
+
+@keyframes stage-fx-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes stage-fx-spin-reverse {
+  to { transform: rotate(-360deg); }
+}
+
+@keyframes stage-fx-core-pulse {
+  from { transform: scale(0.78); opacity: 0.65; }
+  to { transform: scale(1.12); opacity: 1; }
+}
+
+@keyframes stage-fx-particle {
+  0% {
+    opacity: 0;
+    transform: rotate(var(--particle-angle)) translateX(5vmin) scale(0.2);
+  }
+  15% { opacity: var(--fx-opacity-high); }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--particle-angle)) translateX(var(--particle-distance)) scale(1.35);
+  }
+}
+
+@keyframes stage-fx-accent-particle {
+  0%, 20% {
+    opacity: 0;
+    transform: rotate(var(--particle-angle)) translateX(2vmin) scale(0.2);
+  }
+  35% { opacity: var(--fx-opacity-medium); }
+  78%, 100% {
+    opacity: 0;
+    transform: rotate(var(--particle-angle)) translateX(var(--particle-distance-accent)) scale(0.8);
+  }
+}
+
+@keyframes stage-fx-shard {
+  0% {
+    opacity: 0;
+    transform: translateX(var(--shard-offset)) rotate(var(--shard-angle)) scaleY(0.05);
+  }
+  18% { opacity: var(--fx-opacity-high); }
+  100% {
+    opacity: 0;
+    transform: translateX(var(--shard-offset)) rotate(var(--shard-angle)) scaleY(1.8);
+  }
+}
+
+@keyframes stage-fx-slash-one {
+  0%, 60% { opacity: 0; transform: rotate(-17deg) scaleX(0); }
+  63% { opacity: 1; transform: rotate(-17deg) scaleX(1); }
+  67%, 100% { opacity: 0; transform: rotate(-17deg) scaleX(1.08); }
+}
+
+@keyframes stage-fx-slash-two {
+  0%, 65% { opacity: 0; transform: rotate(14deg) scaleX(0); }
+  68% { opacity: 1; transform: rotate(14deg) scaleX(1); }
+  72%, 100% { opacity: 0; transform: rotate(14deg) scaleX(1.08); }
+}
+
+@keyframes stage-fx-impact {
+  0%, 66% { opacity: 0; transform: scale(0.05); }
+  68% { opacity: 1; transform: scale(1); }
+  82%, 100% { opacity: 0; transform: scale(28); }
+}
+
+@keyframes stage-fx-opening-flash {
+  0% { opacity: 0.8; }
+  4%, 100% { opacity: 0; }
+}
+
+@keyframes stage-fx-impact-flash {
+  0%, 67% { opacity: 0; }
+  69% { opacity: var(--fx-opacity-high); }
+  75% { opacity: 0.12; }
+  83%, 100% { opacity: 0; }
+}
+
+@keyframes stage-fx-identification-flash {
+  0%, 42% { opacity: 0; }
+  44% { opacity: 0.36; }
+  47%, 100% { opacity: 0; }
+}
+
+@keyframes stage-fx-camera {
+  0%, 8% { transform: scale(1); filter: brightness(1); }
+  16%, 32% { transform: scale(1.08) translateY(1%); filter: brightness(0.66) contrast(1.18); }
+  44% { transform: scale(1.16) translateY(-1%); filter: brightness(0.9) contrast(1.22); }
+  61% { transform: scale(1.2) translate(0, -1.5%); }
+  66% { transform: scale(1.22) translate(var(--fx-shake-small-neg), 0); }
+  67% { transform: scale(1.22) translate(var(--fx-shake-medium), -0.4%); }
+  68% { transform: scale(1.22) translate(var(--fx-shake-large-neg), 0.5%); }
+  69% { transform: scale(1.22) translate(var(--fx-shake-small), -0.2%); }
+  72% { transform: scale(1.17) translate(0, 0); filter: brightness(1.4) contrast(1.25); }
+  88% { transform: scale(1.04); filter: brightness(1); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@keyframes stage-fx-entrance-camera {
+  0%, 8% { transform: scale(0.96); filter: brightness(0.5) saturate(0.75); }
+  18%, 32% { transform: scale(1.02) translateY(1%); filter: brightness(0.72) contrast(1.1); }
+  44%, 68% { transform: scale(1.1) translateY(-0.5%); filter: brightness(0.95) contrast(1.12); }
+  82% { transform: scale(1.06); filter: brightness(1.08); }
+  100% { transform: scale(1); filter: brightness(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-stage-effect="cinematicBurst"] #live2d-internal-wrapper,
+  [data-stage-effect="characterEntrance"] #live2d-internal-wrapper {
+    animation: none;
+  }
+
+  .stage-fx__speed-lines,
+  .stage-fx__webgl,
+  .stage-fx__particles,
+  .stage-fx__shards,
+  .stage-fx__slash {
+    display: none;
+  }
+
+  .stage-fx__cutin,
+  .stage-fx__sigil,
+  .stage-fx__void,
+  .stage-fx__vignette,
+  .stage-fx__flash--impact {
+    animation-duration: 3.1s;
+  }
+}

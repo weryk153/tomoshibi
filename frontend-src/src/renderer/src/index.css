@@ -1,0 +1,97 @@
+/* Tailwind v4，CSS-first 設定（沒有 tailwind.config.js）。
+ *
+ * 共存期間的關鍵一行：這裡刻意「不」匯入 preflight。
+ * 完整的 `@import "tailwindcss"` 會一併帶入 preflight，那是一份全域 reset——
+ * 它會把 Chakra 已經套好的 button/input/heading 樣式整批打掉，而畫面上還有
+ * 十幾個分頁在用 Chakra。等 Chakra 完全移除之後，這裡換回單行 import 就好。
+ *
+ * 分層順序寫在最前面，但要知道它的極限：emotion（Chakra 用的）注入的是無
+ * layer 的樣式，而 CSS 規範裡「無 layer」的優先度高於任何 layer——所以在同一
+ * 個元素上混用時，贏的是 Chakra，不是 Tailwind。已遷移的元件不混用兩者，
+ * 實務上碰不到；但混用時的結果要知道是這樣，不然會debug到懷疑人生。
+ */
+/* 層級順序：Chakra 的四層在前，Tailwind 的在後。
+ *
+ * 這一行不是形式。CSS 的 @layer 順序由「第一次宣告」決定，而這個檔案比 Chakra
+ * 的樣式先載入——只寫 Tailwind 自己的四層的話，Chakra 之後宣告的
+ * `@layer reset,base,tokens,recipes` 會被接在 utilities 後面，於是 Chakra 的
+ * reset 贏過 Tailwind 的 utility。實際症狀：input 吃不到 bg/border/padding，
+ * 看起來像沒有樣式的一條細線，而 class 明明都在、CSS 也確實產出來了。
+ *
+ * 把兩邊的層名一次列完（Chakra 的照它自己的順序排在前面），順序就固定下來，
+ * Chakra 之後那次宣告變成沒有作用的重複宣告。 */
+@layer reset, base, tokens, recipes, theme, components, utilities;
+
+@import 'tailwindcss/theme.css' layer(theme);
+@import 'tailwindcss/utilities.css' layer(utilities);
+
+/* 掃描來源必須自己指定。完整的 `@import "tailwindcss"` 會順帶啟用自動偵測，
+ * 但上面為了跳過 preflight 而改成逐一匯入子檔案，自動偵測就跟著沒了——
+ * 症狀是 CSS 產得出來（20KB 的 theme 變數）卻一條 utility 都沒有，畫面整片
+ * 裸奔而主控台毫無錯誤。
+ *
+ * 只掃 renderer 的原始碼：WebSDK／MotionSync 是 Cubism SDK 的 vendor 程式碼，
+ * 掃它們只是拖慢每次重建。 */
+@source './**/*.{ts,tsx}';
+
+@theme {
+  /* Chakra v3 的預設灰階就是 Tailwind 的 zinc（gray.800 = #27272a = zinc-800），
+   * blue/yellow/red 也逐一對得上，所以那些直接用 Tailwind 內建色階即可，不用
+   * 在這裡重寫一份。只有 whiteAlpha 是 Chakra 自己的，Tailwind 沒有對應物。
+   *
+   * 值是從執行中的 app 讀 --chakra-colors-white-alpha-* 取得的，不是估的——
+   * 遷移中的分頁跟還沒遷移的分頁會並排出現在同一個抽屜裡，差一點就會被看見。
+   */
+  --color-walpha-100: rgba(255, 255, 255, 0.06);
+  --color-walpha-200: rgba(255, 255, 255, 0.08);
+  --color-walpha-300: rgba(255, 255, 255, 0.16);
+  --color-walpha-400: rgba(255, 255, 255, 0.24);
+  --color-walpha-600: rgba(255, 255, 255, 0.48);
+  --color-walpha-800: rgba(255, 255, 255, 0.8);
+}
+
+body,
+html {
+  margin: 0;
+  padding: 0;
+  overflow: visible;
+  background-color: transparent;
+}
+
+/* 抽屜與遮罩的進出動畫。Tailwind 內建只有 spin/ping/pulse/bounce，滑入這種
+ * 位移動畫要自己定義。Ark 的 Dialog 在 Backdrop 與 Content 上都會掛
+ * data-state（open／closed），所以動畫直接綁在那上面，不需要動畫函式庫——
+ * Chakra 版是靠 framer-motion 做的。
+ *
+ * 寫在 @layer 之外（無 layer）是刻意的：@keyframes 不受串接優先度影響，但放進
+ * utilities 層會被 Tailwind 的 tree-shaking 當成沒被用到而移除——class 名稱是
+ * 出現在 animate-[…] 的方括號裡，掃描器認不出那是對 keyframes 的引用。 */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideOutLeft {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+
+@keyframes slideOutRight {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}

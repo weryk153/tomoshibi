@@ -1,0 +1,128 @@
+[
+    {
+        "name": "mao_pro",
+        "description": "",
+        "url": "/live2d-models/mao_pro/runtime/mao_pro.model3.json",
+        "kScale": 0.5,
+        "initialXshift": 0,
+        "initialYshift": 0,
+        "kXOffset": 1150,
+        "idleMotionGroupName": "Idle",
+        "emotionMap": {
+            "neutral": 0,
+            "anger": 2,
+            "disgust": 2,
+            "fear": 1,
+            "joy": 3,
+            "smirk": 3,
+            "sadness": 1,
+            "surprise": 3
+        },
+        "tapMotions": {
+            "HitAreaHead": {
+                "": 1
+            },
+            "HitAreaBody": {
+                "": 1
+            }
+        },
+        "motionMap": {
+            "gesture_1": {
+                "group": "",
+                "index": 0,
+                "label": ""
+            },
+            "gesture_2": {
+                "group": "",
+                "index": 1,
+                "label": ""
+            },
+            "gesture_3": {
+                "group": "",
+                "index": 2,
+                "label": ""
+            },
+            "special_1": {
+                "group": "",
+                "index": 3,
+                "label": ""
+            },
+            "special_2": {
+                "group": "",
+                "index": 4,
+                "label": ""
+            },
+            "special_3": {
+                "group": "",
+                "index": 5,
+                "label": ""
+            }
+        }
+    },
+    {
+        "name": "haru",
+        "description": "自動偵測並註冊的 Live2D 模型",
+        "url": "/live2d-models/haru/Haru.model3.json",
+        "kScale": 0.5,
+        "initialXshift": 0,
+        "initialYshift": 0,
+        "idleMotionGroupName": "Idle",
+        "emotionMap": {
+            "neutral": 0
+        },
+        "tapMotions": {
+            "HitArea": {
+                "TapBody": 1
+            },
+            "HitArea2": {
+                "TapBody": 1
+            }
+        },
+        "motionMap": {
+            "motion_1": {
+                "group": "TapBody",
+                "index": 0,
+                "label": ""
+            },
+            "motion_2": {
+                "group": "TapBody",
+                "index": 1,
+                "label": ""
+            },
+            "motion_3": {
+                "group": "TapBody",
+                "index": 2,
+                "label": ""
+            },
+            "motion_4": {
+                "group": "TapBody",
+                "index": 3,
+                "label": ""
+            }
+        }
+    },
+    {
+        "name": "hiyori",
+        "description": "自動偵測並註冊的 Live2D 模型",
+        "url": "/live2d-models/hiyori/Hiyori.model3.json",
+        "kScale": 0.5,
+        "initialXshift": 0,
+        "initialYshift": 0,
+        "idleMotionGroupName": "Idle",
+        "emotionMap": {
+            "neutral": 0
+        },
+        "tapMotions": {
+            "HitArea": {
+                "TapBody": 1
+            }
+        },
+        "motionMap": {
+            "motion_1": {
+                "group": "TapBody",
+                "index": 0,
+                "label": ""
+            }
+        }
+    }
+]

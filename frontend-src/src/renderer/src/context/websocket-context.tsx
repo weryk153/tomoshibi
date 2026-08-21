@@ -1,0 +1,79 @@
+/* eslint-disable react/jsx-no-constructed-context-values */
+import React, { useContext, useCallback } from 'react';
+import { wsService } from '@/services/websocket-service';
+import { useLocalStorage } from '@/hooks/utils/use-local-storage';
+import { deriveWsUrl, deriveBaseUrl } from '@/services/backend-url';
+
+// 預設值跟著頁面來源走，不寫死 127.0.0.1——網頁版是後端自己 serve 出去的，
+// 所以頁面來源就是後端。寫死的話換一台裝置就指向那台裝置自己（手機上的
+// 127.0.0.1 是手機），而且 https 頁面連 ws:// 會被當成 mixed content 擋掉。
+// 規則與退回條件見 services/backend-url.ts。
+const pageLocation = typeof window === 'undefined' ? undefined : window.location;
+const DEFAULT_WS_URL = deriveWsUrl(pageLocation);
+const DEFAULT_BASE_URL = deriveBaseUrl(pageLocation);
+
+export interface HistoryInfo {
+  uid: string;
+  latest_message: {
+    role: 'human' | 'ai';
+    timestamp: string;
+    content: string;
+  } | null;
+  timestamp: string | null;
+}
+
+interface WebSocketContextProps {
+  sendMessage: (message: object) => void;
+  wsState: string;
+  reconnect: () => void;
+  wsUrl: string;
+  setWsUrl: (url: string) => void;
+  baseUrl: string;
+  setBaseUrl: (url: string) => void;
+}
+
+export const WebSocketContext = React.createContext<WebSocketContextProps>({
+  sendMessage: wsService.sendMessage.bind(wsService),
+  wsState: 'CLOSED',
+  reconnect: () => wsService.connect(DEFAULT_WS_URL),
+  wsUrl: DEFAULT_WS_URL,
+  setWsUrl: () => {},
+  baseUrl: DEFAULT_BASE_URL,
+  setBaseUrl: () => {},
+});
+
+export function useWebSocket() {
+  const context = useContext(WebSocketContext);
+  if (!context) {
+    throw new Error('useWebSocket must be used within a WebSocketProvider');
+  }
+  return context;
+}
+
+export const defaultWsUrl = DEFAULT_WS_URL;
+export const defaultBaseUrl = DEFAULT_BASE_URL;
+
+export function WebSocketProvider({ children }: { children: React.ReactNode }) {
+  const [wsUrl, setWsUrl] = useLocalStorage('wsUrl', DEFAULT_WS_URL);
+  const [baseUrl, setBaseUrl] = useLocalStorage('baseUrl', DEFAULT_BASE_URL);
+  const handleSetWsUrl = useCallback((url: string) => {
+    setWsUrl(url);
+    wsService.connect(url);
+  }, [setWsUrl]);
+
+  const value = {
+    sendMessage: wsService.sendMessage.bind(wsService),
+    wsState: 'CLOSED',
+    reconnect: () => wsService.connect(wsUrl),
+    wsUrl,
+    setWsUrl: handleSetWsUrl,
+    baseUrl,
+    setBaseUrl,
+  };
+
+  return (
+    <WebSocketContext.Provider value={value}>
+      {children}
+    </WebSocketContext.Provider>
+  );
+}

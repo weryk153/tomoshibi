@@ -1,0 +1,42 @@
+name: Frontend checks
+
+on: [push, pull_request]
+
+jobs:
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend-src
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        # 版本從 package.json 的 packageManager 欄位讀，不在這裡再寫死一次。
+
+      - uses: actions/setup-node@v4
+        with:
+          # 單元測試用 `node --test --experimental-strip-types`，需要 Node 22+。
+          node-version: '22'
+          cache: pnpm
+          cache-dependency-path: frontend-src/pnpm-lock.yaml
+
+      - name: Install
+        # --ignore-scripts 跳過相依套件的 postinstall。這裡唯一需要它的是
+        # Electron 下載自己的二進位（~100MB），而下面三項檢查都不需要那顆
+        # 二進位（見 frontend-src/CLAUDE.md）。
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: 兩份 vite 設定的 define 一致
+        # 網頁版走 vite.config.ts、桌面版走 electron.vite.config.ts，兩份各自
+        # 獨立。__APP_VERSION__ 曾經只加進其中一份，桌面版因此一打開設定就整片
+        # 黑（about.tsx ReferenceError + Chakra Tabs 會一次掛載所有分頁），而
+        # 瀏覽器完全正常，所以拖到使用者開桌面版才發現。
+        run: pnpm run check:defines
+
+      - name: i18n 鍵集一致且都存在
+        run: pnpm run check:i18n
+
+      - name: 單元測試
+        run: pnpm test
