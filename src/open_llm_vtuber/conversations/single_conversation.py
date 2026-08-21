@@ -41,6 +41,24 @@ _BG_MEMORY_TASKS: set = set()
 _TURN_COUNTS: "dict[tuple[str, str], int]" = {}
 
 
+def _effective_output_language(context: ServiceContext) -> str:
+    """這一輪要用哪個語言輸出：角色自己的設定優先，沒設就用玩家層級的。
+
+    跟 service_context 建立 agent 時算的是同一件事（reply_language 退回
+    player_language），只是那裡的結果進了 agent，這裡的結果要拿去 normalize
+    每一則句子的字形變體，所以句子串流當下得再算一次。
+
+    YAML 的空欄位讀出來是 ''，不是 None，所以要當成「沒設」而不是「設成空的」。
+    """
+    character = getattr(context, "character_config", None)
+    system = getattr(context, "system_config", None)
+    return str(
+        getattr(character, "reply_language", "")
+        or getattr(system, "player_language", "")
+        or ""
+    )
+
+
 async def process_single_conversation(
     context: ServiceContext,
     websocket_send: WebSocketSend,
