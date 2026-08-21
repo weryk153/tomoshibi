@@ -7,9 +7,11 @@ conf.yaml.bak*
 # 上百 MB 的貼圖），跟執行這個 app 無關，而且往往牽涉到有版權的角色素材。
 /assets/live2d-work/
 
-# Bundled background images ship with the app (AI-generated generic scenes).
-# Exclude any image with unclear or third-party IP licensing.
-/backgrounds/future-gadget-lab.jpg
+# 只有已經追蹤的那批通用背景會跟著發佈。這行擋的是「之後放進來的」——
+# .gitignore 管不到已追蹤的檔案，所以既有的背景不受影響，而你自己丟進
+# backgrounds/ 的圖（含有版權角色場景）不會被 git add -A 掃進來。
+# 真的要新增隨附背景時，用 git add -f 明確表態。
+/backgrounds/*
 
 # 只附帶 Live2D 官方的免費範例。任何有版權的角色美術（同人模型、動畫角色）
 # 都不進版控——那是 NOTICE 裡「Not included — bring your own」那一條的實作，
