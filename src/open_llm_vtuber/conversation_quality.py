@@ -152,7 +152,8 @@ def is_repetitive_response_segment(text: str, previous_segments: list[str]) -> b
         if not current_ngrams or not previous_ngrams:
             continue
         dice_similarity = (
-            2 * len(current_ngrams & previous_ngrams)
+            2
+            * len(current_ngrams & previous_ngrams)
             / (len(current_ngrams) + len(previous_ngrams))
         )
         if dice_similarity >= 0.72:
@@ -161,11 +162,23 @@ def is_repetitive_response_segment(text: str, previous_segments: list[str]) -> b
     return False
 
 
-class ResponseRepetitionGuard:
-    """Track accepted sentence fragments for one response stream."""
+# 句子切分：在句末標點之後切開，標點留在前一段。
+SENTENCE_SPLIT_RE = re.compile(r"(?<=[。！？!?；;\n])")
 
-    def __init__(self) -> None:
-        self._accepted: list[str] = []
+
+class ResponseRepetitionGuard:
+    """Track accepted sentence fragments for one response stream.
+
+    ``seen`` 是跨輪的種子：把最近幾則回覆的句子放進來，這一輪就不會再送出
+    上一輪講過的句子。實測顯示模型的重複常常是「換掉開頭四個字、正文整段
+    照抄」，整則比對攔不到，逐句才攔得到。
+
+    不給 seen 時行為跟以前完全一樣，deduplicate_response_text 等既有呼叫端
+    不受影響。
+    """
+
+    def __init__(self, seen: "list[str] | None" = None) -> None:
+        self._accepted: list[str] = [str(s) for s in (seen or []) if str(s).strip()]
 
     def accept(self, text: str) -> bool:
         if is_repetitive_response_segment(text, self._accepted):

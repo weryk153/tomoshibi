@@ -23,9 +23,9 @@ from ..conversation_quality import (
     normalize_output_language_variant,
 )
 from ..reply_history import (
-    ReplyBuffer,
     build_recent_reply_guidance,
     build_reply_retry_prompt,
+    recent_sentences,
     record_reply,
 )
 from ..proactive_context import (
@@ -132,13 +132,15 @@ async def process_single_conversation(
     full_response = ""  # Initialize full_response here
     subtitle_response_parts: List[str] = []
     is_proactive = bool(metadata and metadata.get("proactive_speak"))
-    repetition_guard = ResponseRepetitionGuard()
-    # 句內重複交給 repetition_guard，跨輪逐字重複交給這個。主動發言自己有一套
-    # 跨輪機制（proactive_context），不要兩層互相打架，所以那條路關掉。
-    reply_buffer = ReplyBuffer(
-        context.character_config.conf_uid,
-        client_uid,
-        enabled=not is_proactive,
+    # 護欄帶著最近幾則回覆的句子當種子。單看一則的話攔不到實測最常見的重複
+    # ——模型換掉開頭四個字、正文整段照抄，整則比對認為那是不同的回覆。
+    # 主動發言有自己的跨輪機制（proactive_context），不種，免得兩層打架。
+    repetition_guard = ResponseRepetitionGuard(
+        seen=(
+            []
+            if is_proactive
+            else recent_sentences(context.character_config.conf_uid, client_uid)
+        )
     )
 
     try:
@@ -320,23 +322,13 @@ async def process_single_conversation(
                         logger.info("Suppressed repeated or near-duplicate sentence")
                         continue
 
-                    # 跨輪重複的攔截點。送進 process_agent_output 就等於送去 TTS
-                    # 並推給前端，所以判斷必須在這之前——只要目前累積到的文字
-                    # 還可能長成某則最近說過的回覆，就先扣住不送。一分岔就整批
-                    # 放行，沒有重複時延遲是零。
-                    offered_text = (
-                        output_item.display_text.text
-                        if isinstance(output_item, SentenceOutput)
-                        else ""
+                    full_response += await _speak(
+                        output_item,
+                        context=context,
+                        websocket_send=websocket_send,
+                        tts_manager=tts_manager,
+                        subtitle_response_parts=subtitle_response_parts,
                     )
-                    for released_item in reply_buffer.offer(output_item, offered_text):
-                        full_response += await _speak(
-                            released_item,
-                            context=context,
-                            websocket_send=websocket_send,
-                            tts_manager=tts_manager,
-                            subtitle_response_parts=subtitle_response_parts,
-                        )
                 else:
                     logger.warning(
                         f"Received unexpected item type from agent chat stream: {type(output_item)}"
@@ -358,61 +350,56 @@ async def process_single_conversation(
             # full_response will contain partial response before error
         # --- End processing agent response ---
 
-        # 串流結束時還扣在手上的東西，有兩種可能。
-        repeated_text = reply_buffer.held_text if reply_buffer.is_full_repeat else ""
-        if repeated_text:
-            # 從頭到尾沒分岔，而且逐字等於最近說過的一則。整批丟掉——它一個字
-            # 都還沒送出去，所以現在丟掉使用者不會聽到任何東西。
-            logger.info("整則回覆與最近說過的一模一樣，改為重生一次")
-        else:
-            # 沒分岔但也不是重複（例如這則比較短，剛好是舊回覆的開頭）。要補送，
-            # 吞掉的話她就沈默了。
-            for released_item in reply_buffer.flush():
-                full_response += await _speak(
-                    released_item,
-                    context=context,
-                    websocket_send=websocket_send,
-                    tts_manager=tts_manager,
-                    subtitle_response_parts=subtitle_response_parts,
-                )
-
-        if repeated_text:
+        # 整則都被護欄丟掉了——代表這一輪講的每一句最近都講過。與其讓她沈默，
+        # 帶著「你剛說過這些」重生一次。這條路以前只有主動發言走，現在一般回覆
+        # 也需要，因為逐句護欄會整輪丟光。
+        if not is_proactive and not full_response:
+            logger.info("整則回覆都被跨輪護欄丟掉，重生一次")
             retry_input = create_batch_input(
-                # 用 model_input_text 而不是 input_text：前者已經帶著「你最近
-                # 說過這些」。先前實測重生無效時，重生的輸入沒有那段，模型等於
-                # 只被告知「換個說法」卻不知道要避開什麼。
+                # 用 model_input_text：它已經帶著「你最近說過這些」。少了那段，
+                # 模型只被告知「換個說法」卻不知道要避開什麼。
                 input_text=build_reply_retry_prompt(
                     model_input_text if isinstance(model_input_text, str) else "",
-                    repeated_text,
+                    "\n".join(
+                        recent_sentences(
+                            context.character_config.conf_uid, client_uid
+                        )[-3:]
+                    ),
                 ),
                 images=images,
                 from_name=context.character_config.human_name,
                 metadata=metadata,
             )
+            # 重生的輸出也要過同一道護欄，否則它可能再講一次剛被丟掉的內容——
+            # 實測遇過。這裡先整批收完再決定：重生本來就是罕見路徑，多等這一下
+            # 不影響一般情況的延遲，而且收完才有辦法在「全部又是重複」時改口。
+            retry_items = []
             try:
                 async for retry_item in context.agent_engine.chat(retry_input):
                     if isinstance(retry_item, (SentenceOutput, AudioOutput)):
-                        full_response += await _speak(
-                            retry_item,
-                            context=context,
-                            websocket_send=websocket_send,
-                            tts_manager=tts_manager,
-                            subtitle_response_parts=subtitle_response_parts,
-                        )
+                        retry_items.append(retry_item)
             except Exception as e:
                 logger.warning(f"重生失敗（{type(e).__name__}: {e}）")
-            if not full_response:
-                # 重生也拿不到東西。寧可讓她重複，也不要突然沈默——那看起來像
-                # 當掉，而且使用者無從得知發生了什麼事。
-                logger.info("重生沒有產出，放行原本那則重複的回覆")
-                for released_item in reply_buffer.flush():
-                    full_response += await _speak(
-                        released_item,
-                        context=context,
-                        websocket_send=websocket_send,
-                        tts_manager=tts_manager,
-                        subtitle_response_parts=subtitle_response_parts,
-                    )
+
+            fresh = [
+                item
+                for item in retry_items
+                if not isinstance(item, SentenceOutput)
+                or repetition_guard.accept(item.display_text.text)
+            ]
+            if not fresh and retry_items:
+                # 重生出來的還是同一批內容。放行原樣——寧可重複，也不要她突然
+                # 沈默；沈默看起來像當掉，而使用者無從得知發生了什麼事。
+                logger.info("重生仍是重複的內容，放行以免整輪沈默")
+                fresh = retry_items
+            for item in fresh:
+                full_response += await _speak(
+                    item,
+                    context=context,
+                    websocket_send=websocket_send,
+                    tts_manager=tts_manager,
+                    subtitle_response_parts=subtitle_response_parts,
+                )
 
         if is_proactive and not full_response:
             logger.info(
