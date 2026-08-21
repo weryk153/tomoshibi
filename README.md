@@ -196,7 +196,7 @@ The parameter name differs per provider — check your endpoint's docs. Tested a
 On by default. Each character keeps its own memory at `chat_history/<conf_uid>/core_memory.md` — persona-injected core memory plus per-turn LLM consolidation (the model decides what to keep). Tune the memory cap in settings.
 
 ### Characters
-Create / edit / switch / delete characters in the app — each has its own name, persona, Live2D skin, voice, and **separate memory**. To add your own Live2D model, drop it under `live2d-models/<name>/`, add an entry in `model_dict.json`, and select it. **Do not commit copyrighted character models to a public repo.**
+Create / edit / switch / delete characters in the app — each has its own name, persona, Live2D skin, voice, and **separate memory**. To add your own Live2D model, drop the folder under `live2d-models/` and open the character settings — the app finds it and registers it for you. Only the three bundled Live2D samples are tracked in git; anything else you drop in there stays on your machine, and so does your `model_dict.json`.
 
 #### More characters (optional)
 For licensing safety, Tomoshibi bundles only **3 free Live2D Original Characters** (`mao_pro`, `haru`, `hiyori`). Want more — including the male butler character **Natori**? You can download free official Live2D sample models yourself from the official page and drop them in. Get them from **[Live2D's sample models page](https://www.live2d.com/en/learn/sample/)** under Live2D's own license — we don't redistribute them. See [`docs/add-live2d-character.md`](docs/add-live2d-character.md) for the how-to.
@@ -462,7 +462,7 @@ extra_body:
 ## 其他設定
 
 - **記憶**：預設開啟，每個角色記憶獨立存在 `chat_history/<conf_uid>/core_memory.md`，每輪由 LLM 決定要存什麼。記憶上限可在設定調整。
-- **角色**：在 app 內建立／編輯／切換／刪除，每個角色有獨立的名稱、人設、Live2D 皮、語音與記憶。要加自己的模型，放到 `live2d-models/<name>/` 並在 `model_dict.json` 加一筆。**不要把有版權的角色模型 commit 進公開 repo。**
+- **角色**：在 app 內建立／編輯／切換／刪除，每個角色有獨立的名稱、人設、Live2D 皮、語音與記憶。要加自己的模型，把資料夾放進 `live2d-models/` 再打開角色設定，app 會自己找到並登記。版控裡只有隨附的三個 Live2D 官方範例，你放進去的其他模型留在本機，`model_dict.json` 也是。
   - **想要更多角色（選用）**：為了授權安全，Tomoshibi 只內建 **3 個免費的 Live2D 原創角色**（`mao_pro`、`haru`、`hiyori`）。想要更多 — 包含男管家角色 **Natori（名取）**？你可以自己到官方頁面下載免費的官方 Live2D 範例模型再放進來。請從 **[Live2D 範例模型頁面](https://www.live2d.com/en/learn/sample/)** 依 Live2D 自己的授權下載 — 我們不代為散布。作法見 [`docs/add-live2d-character.md`](docs/add-live2d-character.md)。
 - **效能預設**：輕量／標準／高效能，一鍵搭好引擎、整理頻率與模型常駐。
 - **主動話題與新聞**：可用 `scripts/news_topics.py`（純標準函式庫、不需 key）定時更新話題。

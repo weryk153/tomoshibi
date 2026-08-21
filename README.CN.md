@@ -195,7 +195,7 @@ extra_body:
 默认开启。每个角色把自己的记忆保存在 `chat_history/<conf_uid>/core_memory.md` —— 既有注入人设的核心记忆，也有每轮由 LLM 进行的整理（模型决定要保留什么）。记忆上限可在设置里调。
 
 ### 角色
-在应用里创建 / 编辑 / 切换 / 删除角色 —— 每个角色有自己的名称、人设、Live2D 皮肤、语音，以及**独立的记忆**。要添加你自己的 Live2D 模型，把它放到 `live2d-models/<name>/` 下，在 `model_dict.json` 里加一条记录，然后选中它。**不要把有版权的角色模型 commit 进公开 repo。**
+在应用里创建 / 编辑 / 切换 / 删除角色 —— 每个角色有自己的名称、人设、Live2D 皮肤、语音，以及**独立的记忆**。要添加你自己的 Live2D 模型，把文件夹放进 `live2d-models/`，再打开角色设置，app 会自己找到并登记。版本控制里只有随附的三个 Live2D 官方示例，你放进去的其他模型留在本机，`model_dict.json` 也是。
 
 #### 更多角色（可选）
 为了授权安全，Tomoshibi 只内置 **3 个免费的 Live2D 原创角色**（`mao_pro`、`haru`、`hiyori`）。想要更多 —— 包括男管家角色 **Natori（名取）**？你可以自己从官方页面下载免费的官方 Live2D 示例模型再放进来。请从 **[Live2D 示例模型页面](https://www.live2d.com/en/learn/sample/)** 按 Live2D 自己的授权下载 —— 我们不代为分发。具体做法见 [`docs/add-live2d-character.md`](docs/add-live2d-character.md)。
