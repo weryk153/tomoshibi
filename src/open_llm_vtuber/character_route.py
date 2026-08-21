@@ -23,6 +23,7 @@ import re
 import json
 import uuid
 import glob
+import shutil
 from pathlib import Path
 import socket
 import asyncio
@@ -50,6 +51,7 @@ CONF_PATH = "conf.yaml"
 CHARACTERS_DIR = "characters"
 LIVE2D_DIR = "live2d-models"
 MODEL_DICT_PATH = "model_dict.json"
+MODEL_DICT_DEFAULT_PATH = "config_templates/model_dict.default.json"
 AVATARS_DIR = "avatars"
 
 # 檔名只用 ASCII，網址與路徑組合才不會踩到編碼的邊界情況。
@@ -199,8 +201,33 @@ def _find_model3(model_dir: str) -> Optional[str]:
     return None
 
 
+def _ensure_model_dict() -> None:
+    """首次執行時，把隨附的預設複製成使用者的 model_dict.json。
+
+    跟 conf.yaml 同一個模式。model_dict.json 是可變的使用者狀態——
+    live2d_config_route 會在使用者設定動作對應與點擊區時改寫它——所以它不進
+    版控；進版控的是 config_templates/model_dict.default.json。
+
+    已經有使用者的那份就什麼都不做：使用者的設定永遠優先於預設。
+    """
+    if os.path.exists(MODEL_DICT_PATH) or not os.path.exists(MODEL_DICT_DEFAULT_PATH):
+        return
+    try:
+        shutil.copy(MODEL_DICT_DEFAULT_PATH, MODEL_DICT_PATH)
+        logger.info(
+            f"[character] {MODEL_DICT_PATH} not found — created it from "
+            f"{MODEL_DICT_DEFAULT_PATH} (first run)."
+        )
+    except OSError as e:
+        # 複製不成不該擋住啟動：下面照樣回空清單，使用者仍能在 UI 裡加模型。
+        logger.warning(
+            f"[character] could not seed {MODEL_DICT_PATH}: {type(e).__name__}: {e}"
+        )
+
+
 def _load_model_dict() -> list:
     """讀 model_dict.json；不存在或壞掉都回空清單。"""
+    _ensure_model_dict()
     if not os.path.exists(MODEL_DICT_PATH):
         return []
     try:

@@ -55,7 +55,6 @@ def test_core_prompt_keeps_the_rule_that_no_code_enforces():
     assert "generic assistant sign-offs" in CORE_CONVERSATION_PROMPT
 
 
-
 def test_core_prompt_is_the_pre_refactor_text_verbatim():
     """常駐層與重構前逐位元組相同——這是人讀 135 則回覆後的判定，不是猜的。
 
@@ -64,17 +63,15 @@ def test_core_prompt_is_the_pre_refactor_text_verbatim():
     （4143／3646／540）各跑 3 次、135 則回覆並排給使用者判讀後，結論是完整
     舊版最像角色。自動化指標在 temperature 0.7 下的 run-to-run 變異蓋過版本
     差異，不足以支持任何瘦身。要重新嘗試壓縮之前，先做多次重複的人讀對照，
-    不要只看規則有沒有在別處出現。"""
-    import re as _re
-    import subprocess as _sp
+    不要只看規則有沒有在別處出現。
 
-    old = _sp.run(
-        ["git", "show", "1aec9f1:src/open_llm_vtuber/conversation_quality.py"],
-        capture_output=True,
-        text=True,
-        check=True,
-    ).stdout
-    expected = _re.search(
-        r'CONVERSATION_QUALITY_PROMPT = """\n(.*?)\n""".strip\(\)', old, _re.S
-    ).group(1)
-    assert CORE_CONVERSATION_PROMPT == expected
+    從前這裡是去 git show 一個 commit 取出當時的原文。那綁死了 repo 的歷史，
+    換一份歷史就整個崩掉——而且它讀的是版本庫，不是隨程式碼一起發佈的東西。
+    改成比對 tests/data 裡的 golden 檔：內容就是當初那個 commit 逐位元組取出
+    的原文，只是現在跟著程式碼一起走。要改這段提示詞，得連 golden 一起改，
+    那正是本測試要求的「刻意」。
+    """
+    from pathlib import Path as _Path
+
+    golden = _Path(__file__).parent / "data" / "core_conversation_prompt.golden.txt"
+    assert CORE_CONVERSATION_PROMPT == golden.read_text(encoding="utf-8")

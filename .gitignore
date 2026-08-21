@@ -1,5 +1,11 @@
 # ignore the user configuration file
 conf.yaml
+
+# 使用者的模型清單。app 會在使用者設定動作對應與點擊區時改寫它，所以它是
+# 狀態不是隨附檔案；隨附的是 config_templates/model_dict.default.json，
+# 首次讀取時複製過來。留在版控裡的話，每次在 UI 調設定都會冒出一筆 git
+# 修改，順手 commit 就把本機的模型寫進 repo。
+model_dict.json
 # 設定檔的備份也是使用者的東西——而且會夾帶端點、路徑、金鑰欄位。
 conf.yaml.bak*
 
