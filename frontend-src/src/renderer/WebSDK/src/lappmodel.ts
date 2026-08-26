@@ -672,7 +672,7 @@ export class LAppModel extends CubismUserModel {
       value = this._wavFileHandler.getRms();
       const compactKurisu = this.usesCompactKurisuRig();
       const targetValue = compactKurisu
-        // The Photopea v7 rig cross-fades Mouth_Closed/Mouth_Open across the
+        // The Kurisu Official v1 rig cross-fades Mouth_Closed/Mouth_Open across the
         // full 0..1 range. Raw speech RMS is usually far below that range, so
         // the previous 0.38 cap left the open-mouth layer almost invisible.
         ? Math.min(1.0, value * 9.0)
