@@ -78,9 +78,22 @@ def _get_safe_history_memory_dir(conf_uid: str, history_uid: str) -> str:
     """
     safe_conf_uid = _sanitize_path_component(conf_uid)
     safe_history_uid = _sanitize_path_component(history_uid)
+    # _sanitize_path_component happily lets "." and ".." through (both are
+    # basename-stable and made only of allowed characters), and unlike
+    # _get_safe_history_path this function joins the raw component with no
+    # ".json" suffix to defang it. os.path.normpath(base_dir + "/.") collapses
+    # right back to base_dir itself, which then equals — not just starts
+    # with — base_dir, so a bare-prefix check below would wave it through.
+    if safe_history_uid in (".", ".."):
+        raise ValueError(f"Invalid history_uid: {history_uid}")
     base_dir = os.path.join("chat_history", safe_conf_uid)
     full_path = os.path.normpath(os.path.join(base_dir, safe_history_uid))
-    if not full_path.startswith(base_dir):
+    # Require the separator, not just the prefix: "chat_history/charA".
+    # startswith("chat_history/charA") is also true of the base_dir itself
+    # (the "." case above) and would be true of a sibling "chat_history/charAB"
+    # under a bare-prefix check. Only base_dir itself or base_dir + os.sep + …
+    # is actually "inside" the directory.
+    if full_path != base_dir and not full_path.startswith(base_dir + os.sep):
         raise ValueError("Invalid path: Path traversal detected")
     return full_path
 
