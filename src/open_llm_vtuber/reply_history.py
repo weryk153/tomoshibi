@@ -15,6 +15,23 @@ docstring 寫得很清楚：「for one response stream」。它比對的是同�
 --------
 正規化後「逐字相同」才算重複，不做相似度比對。相似度門檻會誤殺「同一件事換
 個說法」——那是正常的回覆，不是故障。先擋住確定錯的那一類。
+
+狀態的歸屬（history_uid）
+--------------------------
+最初只用 (conf_uid, client_uid) 當 key，而 client_uid 認的是 WebSocket 連線、
+不是對話：使用者在同一條連線裡切換對話（不重新連線）時，這裡的狀態原封不動
+跟過去，於是新對話的提示詞裡混進了上一段對話說過的話——這是一次真實的隱私
+外洩，不是假設。修法是把 history_uid 併進 key，讓狀態跟著對話走。
+
+history_uid 為空時：不讀、不寫、不回退到只用 conf_uid+client_uid 的舊範圍。
+這跟 memory_core 對長期記憶定的規則一樣——「沒有對話就沒有記憶」。這裡刻意
+沿用同一條規則，而不是給重複護欄開特例，是因為：兩邊的 key 命名空間本來就
+共用同一份「history_uid 是什麼」的心智模型，一旦其中一邊在空值時悄悄回退到
+更寬的範圍，維護的人得記住「這裡跟那裡不一樣」，那正是這次外洩的成因（呼叫
+端以為狀態是跟著對話走的，實際上不是）。付出的代價很小：history_uid 為空
+只發生在連線剛建立、對話還沒建立的短暫窗口，那個當下本來就沒有東西可比對，
+護欄晚一輪才生效不痛不癢；換來的是「空值語意全模組一致」，不用逐一稽核每個
+呼叫端有沒有踩到那個特例。
 """
 
 from collections import OrderedDict, deque
@@ -34,11 +51,13 @@ MAX_SESSIONS = 32
 MAX_GUIDANCE_LINES = 3
 
 
-_recent_by_session: "OrderedDict[tuple[str, str], Deque[str]]" = OrderedDict()
+_recent_by_session: "OrderedDict[tuple[str, str, str], Deque[str]]" = OrderedDict()
 
 
-def _session_key(conf_uid: str, client_uid: str) -> tuple[str, str]:
-    return (str(conf_uid or ""), str(client_uid or ""))
+def _session_key(
+    conf_uid: str, history_uid: str, client_uid: str
+) -> tuple[str, str, str]:
+    return (str(conf_uid or ""), str(history_uid or ""), str(client_uid or ""))
 
 
 def _normalize(text: str) -> str:
@@ -46,38 +65,55 @@ def _normalize(text: str) -> str:
     return " ".join(str(text or "").split())
 
 
-def _touch(key: tuple[str, str]) -> None:
+def _touch(key: tuple[str, str, str]) -> None:
     if key in _recent_by_session:
         _recent_by_session.move_to_end(key)
     while len(_recent_by_session) > MAX_SESSIONS:
         _recent_by_session.popitem(last=False)
 
 
-def record_reply(conf_uid: str, client_uid: str, response: str) -> None:
-    """記下一則已經說出口的回覆。"""
+def record_reply(
+    conf_uid: str, history_uid: str, client_uid: str, response: str
+) -> None:
+    """記下一則已經說出口的回覆。
+
+    history_uid 為空就不記：這則狀態現在跟著對話走，沒有對話可歸屬的東西
+    不留底，免得下一段對話（不管是換了 history_uid 還是連線初始化中途）
+    意外收到不屬於它的種子。跟 memory_core 的規則一致——見模組開頭。
+    """
+    if not history_uid:
+        return
     normalized = _normalize(response)
     if not normalized:
         return
-    key = _session_key(conf_uid, client_uid)
+    key = _session_key(conf_uid, history_uid, client_uid)
     recent = _recent_by_session.setdefault(key, deque(maxlen=MAX_RECENT_REPLIES))
     recent.append(normalized)
     _touch(key)
 
 
-def recent_sentences(conf_uid: str, client_uid: str) -> list:
+def recent_sentences(conf_uid: str, history_uid: str, client_uid: str) -> list:
     """最近幾則回覆拆成句子，給跨輪的逐句護欄當種子。
 
     拆句用的是 conversation_quality 那份切分規則，跟護欄自己在同一則回覆裡
     的切法一致——兩邊用不同的規則會讓「同一句」在兩個地方長得不一樣。
+
+    history_uid 為空就回空清單：見模組開頭「history_uid 為空」的說明。
     """
-    recent = list(_recent_by_session.get(_session_key(conf_uid, client_uid), ()))
+    if not history_uid:
+        return []
+    recent = list(
+        _recent_by_session.get(_session_key(conf_uid, history_uid, client_uid), ())
+    )
     out: list = []
     for reply in recent[-MAX_GUIDANCE_LINES:]:
         out.extend(part for part in SENTENCE_SPLIT_RE.split(reply) if part.strip())
     return out
 
 
-def build_recent_reply_guidance(conf_uid: str, client_uid: str) -> str:
+def build_recent_reply_guidance(
+    conf_uid: str, history_uid: str, client_uid: str
+) -> str:
     """組出「你最近說過這些，不要重複」，附在當輪的輸入後面。
 
     這是預防，不是事後補救。實測顯示：等整則生成完才發現重複、再叫模型重寫，
@@ -86,8 +122,13 @@ def build_recent_reply_guidance(conf_uid: str, client_uid: str) -> str:
     有效的做法。
 
     沒有東西可列就回空字串：第一輪不該憑空多出一段沒有指涉對象的「不要重複」。
+    history_uid 為空同樣回空字串——見模組開頭的說明。
     """
-    recent = list(_recent_by_session.get(_session_key(conf_uid, client_uid), ()))
+    if not history_uid:
+        return ""
+    recent = list(
+        _recent_by_session.get(_session_key(conf_uid, history_uid, client_uid), ())
+    )
     if not recent:
         return ""
     # 只留最近的幾則，且維持由舊到新——最近說過的那句排在最後，離模型最近。

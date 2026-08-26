@@ -139,7 +139,9 @@ async def process_single_conversation(
         seen=(
             []
             if is_proactive
-            else recent_sentences(context.character_config.conf_uid, client_uid)
+            else recent_sentences(
+                context.character_config.conf_uid, context.history_uid, client_uid
+            )
         )
     )
 
@@ -176,7 +178,7 @@ async def process_single_conversation(
         model_input_text = input_text
         if not is_proactive and isinstance(input_text, str):
             model_input_text = input_text + build_recent_reply_guidance(
-                context.character_config.conf_uid, client_uid
+                context.character_config.conf_uid, context.history_uid, client_uid
             )
 
         # Create batch input
@@ -363,9 +365,11 @@ async def process_single_conversation(
                 input_text=build_reply_retry_prompt(
                     model_input_text if isinstance(model_input_text, str) else "",
                     "\n".join(
-                        recent_sentences(context.character_config.conf_uid, client_uid)[
-                            -3:
-                        ]
+                        recent_sentences(
+                            context.character_config.conf_uid,
+                            context.history_uid,
+                            client_uid,
+                        )[-3:]
                     ),
                 ),
                 images=images,
@@ -504,7 +508,10 @@ async def process_single_conversation(
                 # 記下來，下一輪才有東西可以比對。主動發言走 proactive_context
                 # 自己那套，不重複記。
                 record_reply(
-                    context.character_config.conf_uid, client_uid, full_response
+                    context.character_config.conf_uid,
+                    context.history_uid,
+                    client_uid,
+                    full_response,
                 )
 
         # 等待 TTS 收尾與送出 backend-synth-complete 都在 finalize_conversation_turn
