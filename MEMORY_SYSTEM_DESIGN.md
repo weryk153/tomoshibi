@@ -15,14 +15,19 @@ Don't stuff everything into the LLM's context. Keep the full history on disk,
 
 | Layer | What it holds | How it works |
 |-------|---------------|--------------|
-| **Core memory** (injected) | A few curated facts about the user (who they are, what they're working on, preferences, key moments) | Stored at `chat_history/<conf_uid>/core_memory.md`; appended to the persona prompt |
+| **Core memory** (injected) | A few curated facts about the user (who they are, what they're working on, preferences, key moments) | Stored per-conversation at `chat_history/<conf_uid>/<history_uid>/core_memory.md`; appended to the persona prompt |
 | **Full history** (fallback) | Every conversation, verbatim | The VTuber's existing `chat_history` JSON. (Phase 2: add FTS5 full-text retrieval) |
 | **Consolidation** | Decides what is worth remembering | After each turn the LLM checks the exchange against write-triggers and updates core memory only when there's something new |
 
+Memory belongs to one conversation (`history_uid`), not the character as a
+whole — starting a new conversation starts with a character that remembers
+nothing of the previous one. Deleting a conversation deletes its memory
+directory along with it.
+
 ## Flow
 
-1. **Conversation start** → core memory is injected into the persona, so the character already knows you.
-2. **After each turn** → a background, non-blocking LLM call decides whether anything in the exchange is worth saving (see write-triggers) and updates `core_memory.md` if so.
+1. **Conversation start** → that conversation's core memory is injected into the persona, so the character already knows what happened earlier in *this* conversation.
+2. **After each turn** → a background, non-blocking LLM call decides whether anything in the exchange is worth saving (see write-triggers) and updates that conversation's `core_memory.md` if so.
 3. **Per turn (phase 1.5)** → before each turn the system prompt is refreshed from `core_memory.md`, so newly-saved memories take effect immediately without a restart, while the conversation history in the agent is preserved.
 
 ## Write-triggers (what gets saved)

@@ -390,7 +390,9 @@ class ServiceContext:
 
         effective_system_prompt = await self.construct_system_prompt(prompt)
         if self.agent_engine is None or not hasattr(self.agent_engine, "set_system"):
-            raise RuntimeError("The active conversation agent cannot switch persona live.")
+            raise RuntimeError(
+                "The active conversation agent cannot switch persona live."
+            )
 
         # Persist first only after every validation/build step has succeeded.
         set_active_persona(self.character_config.conf_uid, clean_id)
@@ -834,7 +836,10 @@ class ServiceContext:
             ):
                 continue
 
-            if prompt_name == "live2d_motion_prompt" and not self.live2d_model.motion_str:
+            if (
+                prompt_name == "live2d_motion_prompt"
+                and not self.live2d_model.motion_str
+            ):
                 # An empty motion_str means this model's motionMap has no
                 # entries (or is missing entirely). Teaching the LLM a set of
                 # keywords that will never match anything just burns tokens
@@ -875,12 +880,13 @@ class ServiceContext:
 
             persona_prompt += prompt_content
 
-        # 注入核心記憶（關於使用者的長期記憶，跨對話累積。見 MEMORY_SYSTEM_DESIGN.md）
+        # 注入核心記憶（關於使用者的長期記憶，屬於這一段對話，不跨對話累積。
+        # 見 MEMORY_SYSTEM_DESIGN.md）
         # 長期記憶關閉時（long_term_memory_enabled=False）完全不注入。
         if getattr(target_character, "long_term_memory_enabled", True):
             from .memory_core import load_core_memory
 
-            core_mem = load_core_memory(target_character.conf_uid)
+            core_mem = load_core_memory(target_character.conf_uid, self.history_uid)
             if core_mem:
                 persona_prompt += (
                     "\n\n## 你對對方的長期記憶（之前對話累積下來的，自然運用、不要生硬複述）\n"
@@ -923,7 +929,9 @@ class ServiceContext:
         # handle_config_switch 會在切換角色時重讀 system_config，所以這裡會 hot-apply。
         player_prompt = getattr(self.system_config, "player_prompt", "") or ""
         if player_prompt:
-            persona_prompt += f"\n\n## About the player (applies to all characters)\n{player_prompt}"
+            persona_prompt += (
+                f"\n\n## About the player (applies to all characters)\n{player_prompt}"
+            )
 
         logger.debug("\n === System Prompt ===")
         logger.debug(persona_prompt)
@@ -960,7 +968,9 @@ class ServiceContext:
 
             alt_config_data = read_yaml(file_path).get("character_config")
             if not isinstance(alt_config_data, dict):
-                raise ValueError(f"Character configuration is missing: {config_file_name}")
+                raise ValueError(
+                    f"Character configuration is missing: {config_file_name}"
+                )
 
             # Older Character Manager files may not include character_name.
             if alt_config_data.get("conf_name") and not alt_config_data.get(
@@ -970,9 +980,7 @@ class ServiceContext:
 
             # Always merge against the on-disk base, never the previously active
             # character. Otherwise switching A -> B leaks omitted A settings into B.
-            new_character_config_data = deep_merge(
-                base_character_data, alt_config_data
-            )
+            new_character_config_data = deep_merge(base_character_data, alt_config_data)
 
         new_config = validate_config(
             {

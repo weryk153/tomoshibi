@@ -7,8 +7,9 @@
 三個約束是彼此牽連的，改動任何一個之前要先理解：
 
 - **conf_uid 就是檔名主幹，而且編輯時不可更動。** 記憶存在
-  chat_history/<conf_uid>/core_memory.md，改掉 conf_uid 等於讓那個角色的記憶
-  變成孤兒——她會突然什麼都不記得，而檔案還在硬碟上沒人認領。
+  chat_history/<conf_uid>/<history_uid>/core_memory.md，改掉 conf_uid 等於讓
+  那個角色底下每一段對話的記憶都變成孤兒——她會突然什麼都不記得，而檔案還在
+  硬碟上沒人認領。
 - **檔名一律是 ASCII slug**（mili.yaml），中文顯示名字放在 conf_name。這樣可以
   完全避開網址與路徑組合的邊界情況。
 - **底稿 conf.yaml 在這裡是唯讀的。** 角色檔是我們自己產生的，沒有使用者寫的
@@ -973,7 +974,7 @@ def init_character_route() -> APIRouter:
             return _bad_request("Invalid JSON body.")
 
         # conf_uid / slug / filename are IMMUTABLE — keep the existing conf_uid so
-        # we never orphan chat_history/<conf_uid>/core_memory.md.
+        # we never orphan chat_history/<conf_uid>/<history_uid>/core_memory.md.
         try:
             existing = read_yaml(path) or {}
         except Exception:

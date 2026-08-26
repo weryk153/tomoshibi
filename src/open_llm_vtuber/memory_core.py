@@ -2,8 +2,9 @@
 
 兩層式設計（core memory + consolidation，同 MemGPT / Generative Agents 一脈）：
 
-- **注入**：construct_system_prompt 把 chat_history/<conf_uid>/core_memory.md
-  的內容附在 persona 後面，每輪都帶著。
+- **注入**：construct_system_prompt 把 chat_history/<conf_uid>/<history_uid>/
+  core_memory.md 的內容附在 persona 後面，每輪都帶著。記憶屬於一段對話，不是
+  一個角色——新對話從空白開始。
 - **整理**：每輪對話結束後背景呼叫 LLM（fire-and-forget，不阻塞對話），
   判斷這輪有沒有值得留下的新事實，有才改寫檔案。
 
@@ -23,11 +24,11 @@ from .utils.path_safety import safe_join
 
 # --- 大小與頻率的界限 --------------------------------------------------------
 
-CAP_CHARS = 1500   # 記憶檔字數上限的預設值；撞上限時由整理 LLM 自行提煉合併
-CAP_MIN = 500      # 低於這個記不住東西
-CAP_MAX = 8000     # 高於這個每輪 token 暴增、整理更容易漏
+CAP_CHARS = 1500  # 記憶檔字數上限的預設值；撞上限時由整理 LLM 自行提煉合併
+CAP_MIN = 500  # 低於這個記不住東西
+CAP_MAX = 8000  # 高於這個每輪 token 暴增、整理更容易漏
 
-CONSOLIDATE_INTERVAL_DEFAULT = 1        # 每幾輪整理一次；1 = 每輪
+CONSOLIDATE_INTERVAL_DEFAULT = 1  # 每幾輪整理一次；1 = 每輪
 CONSOLIDATE_INTERVAL_CHOICES = (1, 3, 5)  # 弱機／本地模型可選 3 或 5 省呼叫
 
 
@@ -56,74 +57,113 @@ def _clamp_interval(value: Any) -> int:
 
 # --- 儲存 --------------------------------------------------------------------
 
-def _memory_file(conf_uid: str) -> Path:
-    """記憶檔位置。conf_uid 是請求可控的，safe_join 擋掉逃出 chat_history/ 的值。"""
-    return Path(safe_join("chat_history", conf_uid, "core_memory.md"))
 
+def _memory_file(conf_uid: str, history_uid: str) -> Path:
+    """記憶檔位置。
 
-def core_memory_path(conf_uid: str) -> str:
-    """給 route 層用的公開路徑查詢。"""
-    return str(_memory_file(conf_uid))
+    conf_uid 與 history_uid 都是請求可控的。分兩段呼叫 safe_join——先把 conf_uid
+    關進 chat_history/，再把 history_uid 關進 chat_history/<conf_uid>/——是刻意的：
+    一次呼叫 safe_join("chat_history", conf_uid, history_uid, ...) 只保證結果留在
+    chat_history/ 之內，history_uid 帶 "../" 仍能跳出 conf_uid 自己的資料夾、
+    寫進另一個角色的目錄，因為那個位置一樣落在 chat_history/ 底下、擋不住。
+    分段之後，history_uid 的逃逸目標就是 conf_uid 自己那層，才擋得住。
 
-
-def load_core_memory(conf_uid: str) -> str:
-    """讀出記憶內容；沒有、或讀不到，一律回空字串。
-
-    這條在注入路徑上，絕不能丟例外——檔案系統的問題不可以炸掉對話。
+    呼叫端必須先確定 history_uid 非空——記憶屬於一段對話，沒有對話就沒有記憶。
     """
+    char_dir = safe_join("chat_history", conf_uid)
+    return Path(safe_join(char_dir, history_uid, "core_memory.md"))
+
+
+def core_memory_path(conf_uid: str, history_uid: str) -> str:
+    """給 route 層用的公開路徑查詢。沒有對話、或路徑不安全時回空字串。
+
+    load/save/clear 三個都吞掉 safe_join 丟出的 ValueError、fail soft 回空字串
+    或 False；這個原本沒跟——一個不安全的 conf_uid/history_uid 會讓例外直接炸
+    出去。memory_route 的 GET /api/memory 就是這樣裸呼叫這個函式，於是三個姊妹
+    函式都能優雅降級的錯誤輸入，這裡會把設定頁的記憶分頁弄成 500。跟手足一致，
+    回空字串。
+    """
+    if not history_uid:
+        return ""
     try:
-        f = _memory_file(conf_uid)
-        return f.read_text(encoding="utf-8").strip() if f.is_file() else ""
-    except Exception as e:
-        logger.warning(f"[core_memory] load failed for {conf_uid}: {e}")
+        return str(_memory_file(conf_uid, history_uid))
+    except ValueError as e:
+        logger.warning(f"[core_memory] unsafe path for {conf_uid}/{history_uid}: {e}")
         return ""
 
 
-def _write_memory(conf_uid: str, text: str) -> None:
-    f = _memory_file(conf_uid)
+def load_core_memory(conf_uid: str, history_uid: str) -> str:
+    """讀出這段對話的記憶；沒有、或讀不到，一律回空字串。
+
+    這條在注入路徑上，絕不能丟例外——檔案系統的問題不可以炸掉對話。
+
+    history_uid 為空（連線還在初始化）時回空字串，不要退回舊的角色層路徑：
+    那會變成「有時候讀這裡、有時候讀那裡」。
+    """
+    if not history_uid:
+        return ""
+    try:
+        f = _memory_file(conf_uid, history_uid)
+        return f.read_text(encoding="utf-8").strip() if f.is_file() else ""
+    except Exception as e:
+        logger.warning(f"[core_memory] load failed for {conf_uid}/{history_uid}: {e}")
+        return ""
+
+
+def _write_memory(conf_uid: str, history_uid: str, text: str) -> None:
+    f = _memory_file(conf_uid, history_uid)
     f.parent.mkdir(parents=True, exist_ok=True)
     f.write_text(text, encoding="utf-8")
 
 
-def clear_core_memory(conf_uid: str) -> bool:
-    """忘掉一個角色的全部記憶。
+def clear_core_memory(conf_uid: str, history_uid: str) -> bool:
+    """忘掉這段對話的全部記憶。
 
     截斷成空檔而不是刪檔（house rule 不硬刪）；檔案不存在本來就等於已清空。
     """
+    if not history_uid:
+        return False
     try:
-        if _memory_file(conf_uid).is_file():
-            _write_memory(conf_uid, "")
-            logger.info(f"[core_memory] cleared for {conf_uid}")
+        if _memory_file(conf_uid, history_uid).is_file():
+            _write_memory(conf_uid, history_uid, "")
+            logger.info(f"[core_memory] cleared for {conf_uid}/{history_uid}")
         return True
     except Exception as e:
-        logger.warning(f"[core_memory] clear failed for {conf_uid}: {e}")
+        logger.warning(f"[core_memory] clear failed for {conf_uid}/{history_uid}: {e}")
         return False
 
 
-def save_core_memory(conf_uid: str, content: str, cap: int = CAP_CHARS) -> bool:
+def save_core_memory(
+    conf_uid: str, history_uid: str, content: str, cap: int = CAP_CHARS
+) -> bool:
     """整份覆寫記憶（記憶分頁的手動編輯用）。
 
     超過上限採「照存但警告」：使用者明確打的字尊重原樣，偷偷截斷比超長更意外；
     下一輪整理本來就會把過長內容提煉回上限內。None 視為空字串。
     """
+    if not history_uid:
+        return False
     try:
         text = (content or "").strip()
         limit = _clamp_cap(cap)
         if len(text) > limit:
             logger.warning(
-                f"[core_memory] manual save for {conf_uid} exceeds cap "
+                f"[core_memory] manual save for {conf_uid}/{history_uid} exceeds cap "
                 f"({len(text)} > {limit} chars); stored as-is, will be "
                 "compacted on next consolidation"
             )
-        _write_memory(conf_uid, text)
-        logger.info(f"[core_memory] manually saved for {conf_uid} ({len(text)} chars)")
+        _write_memory(conf_uid, history_uid, text)
+        logger.info(
+            f"[core_memory] manually saved for {conf_uid}/{history_uid} ({len(text)} chars)"
+        )
         return True
     except Exception as e:
-        logger.warning(f"[core_memory] save failed for {conf_uid}: {e}")
+        logger.warning(f"[core_memory] save failed for {conf_uid}/{history_uid}: {e}")
         return False
 
 
 # --- 整理（consolidation）----------------------------------------------------
+
 
 def build_consolidation_prompt(
     current: str,
@@ -239,6 +279,7 @@ async def _request_rewrite(
 
 async def consolidate_core_memory(
     conf_uid: str,
+    history_uid: str,
     user_input: str,
     ai_response: str,
     base_url: str,
@@ -253,11 +294,13 @@ async def consolidate_core_memory(
     fire-and-forget——任何失敗只記 warning，絕不影響對話本身。
     """
     try:
+        if not history_uid:
+            return
         if not user_input or not user_input.strip():
             return
 
         limit = _clamp_cap(cap)
-        current = load_core_memory(conf_uid)
+        current = load_core_memory(conf_uid, history_uid)
         prompt = build_consolidation_prompt(
             current=current,
             user_input=user_input,
@@ -267,12 +310,14 @@ async def consolidate_core_memory(
         )
         candidate = await _request_rewrite(base_url, model, prompt, api_key, extra_body)
         if _acceptable_rewrite(candidate, current, limit):
-            _write_memory(conf_uid, candidate)
+            _write_memory(conf_uid, history_uid, candidate)
             logger.info(
-                f"[core_memory] updated for {conf_uid} ({len(candidate)} chars)"
+                f"[core_memory] updated for {conf_uid}/{history_uid} ({len(candidate)} chars)"
             )
     except Exception as e:
-        logger.warning(f"[core_memory] consolidate failed for {conf_uid}: {e}")
+        logger.warning(
+            f"[core_memory] consolidate failed for {conf_uid}/{history_uid}: {e}"
+        )
 
 
 def resolve_consolidation_llm(character_config: Any) -> tuple[str, str, str, dict]:

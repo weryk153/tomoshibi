@@ -81,12 +81,13 @@ def test_consolidation_payload_carries_extra_body(monkeypatch, tmp_path):
 
     monkeypatch.setattr(mc.httpx, "AsyncClient", _Client)
     monkeypatch.setattr(
-        mc, "_memory_file", lambda conf_uid: tmp_path / "core_memory.md"
+        mc, "_memory_file", lambda conf_uid, history_uid: tmp_path / "core_memory.md"
     )
 
     asyncio.run(
         mc.consolidate_core_memory(
             "kurisu",
+            "conv-1",
             "我在做 Live2D",
             "加油",
             "http://x/v1",
@@ -96,9 +97,9 @@ def test_consolidation_payload_carries_extra_body(monkeypatch, tmp_path):
     )
 
     assert captured.get("reasoning_effort") == "none"
-    assert (
-        tmp_path / "core_memory.md"
-    ).read_text(encoding="utf-8") == "- 使用者在做 Live2D"
+    assert (tmp_path / "core_memory.md").read_text(
+        encoding="utf-8"
+    ) == "- 使用者在做 Live2D"
 
 
 def test_memory_consolidation_rejects_non_compatible_provider():

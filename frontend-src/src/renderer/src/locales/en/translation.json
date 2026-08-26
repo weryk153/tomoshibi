@@ -147,7 +147,7 @@
     },
     "characters": {
       "description": "Create, edit, and switch your companion characters — no YAML needed.",
-      "memoryNote": "Each character keeps its own separate memory and chat history.",
+      "memoryNote": "Memory belongs to a conversation, not a character. Starting a new conversation means starting fresh — the old memory stays with the old conversation and comes back when you return to it.",
       "add": "New character",
       "addTitle": "New character",
       "editTitle": "Edit character",

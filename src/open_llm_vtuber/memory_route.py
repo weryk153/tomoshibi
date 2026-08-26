@@ -1,8 +1,10 @@
 """長期記憶的設定頁後端：讓使用者不必手改 YAML 就能管理 AI 記住的東西。
 
-記憶是每個角色一份（chat_history/<conf_uid>/core_memory.md），所以每個端點都以
-conf_uid 為鍵。前端本來就從 WebSocket 的 set-model-and-conf 知道當前角色，會明確
-帶上；沒帶就退回 conf.yaml 裡的基礎角色。
+記憶現在是每段對話一份（chat_history/<conf_uid>/<history_uid>/core_memory.md）。
+conf_uid 前端知道（從 WebSocket 的 set-model-and-conf 來），沒帶就退回 conf.yaml
+裡的基礎角色；history_uid 前端不知道——它活在每個連線各自的 ServiceContext 裡，
+要從 client_contexts 找當前那段對話。找不到就回 409，不猜一個：猜錯會編輯到
+別段對話的記憶。
 
 安全上有兩道，兩道都不能省：
 
@@ -29,7 +31,11 @@ from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse
 from loguru import logger
 
-from .api_guard import is_trusted_request as _is_local_request, forbidden as _forbidden, make_yaml as _make_yaml
+from .api_guard import (
+    is_trusted_request as _is_local_request,
+    forbidden as _forbidden,
+    make_yaml as _make_yaml,
+)
 
 from .conf_editor import (
     CONF_PATH,
@@ -127,6 +133,25 @@ def _resolve_conf_uid(supplied: Optional[str]) -> tuple[Optional[str], Optional[
     return base, None
 
 
+def _resolve_history_uid(client_contexts: dict, conf_uid: str):
+    """當前連線正在用的那段對話。取不到回 None。
+
+    記憶現在屬於一段對話，而設定頁本身不知道是哪一段——它只知道角色。這個值
+    活在每個連線各自的 ServiceContext 裡，所以要從連線取。
+
+    dict 保有插入順序，最後一個就是最近連上的那一個；那正是使用者面前的視窗。
+    """
+    found = None
+    for ctx in client_contexts.values():
+        cfg = getattr(ctx, "character_config", None)
+        if getattr(cfg, "conf_uid", None) != conf_uid:
+            continue
+        history_uid = getattr(ctx, "history_uid", "")
+        if history_uid:
+            found = history_uid
+    return found
+
+
 # --- 寫設定 ----------------------------------------------------------------- #
 # --------------------------------------------------------------------------- #
 
@@ -139,12 +164,11 @@ def _write_memory_enabled(enabled: bool) -> bool:
     """
     lines = _read_conf_lines()
     cc_start, cc_end = _character_config_extent(lines)
-    _upsert_leaf(lines, cc_start, cc_end, "long_term_memory_enabled", str(bool(enabled)))
+    _upsert_leaf(
+        lines, cc_start, cc_end, "long_term_memory_enabled", str(bool(enabled))
+    )
     _write_conf(lines)
     return True
-
-
-
 
 
 def _write_core_memory_cap(cap: int) -> bool:
@@ -184,7 +208,9 @@ def _error(status: int, message: str) -> JSONResponse:
     return JSONResponse(status_code=status, content={"ok": False, "error": message})
 
 
-async def _parse_body(request: Request) -> tuple[Optional[dict], Optional[JSONResponse]]:
+async def _parse_body(
+    request: Request,
+) -> tuple[Optional[dict], Optional[JSONResponse]]:
     """讀出 JSON body，順便驗證它是個物件。
 
     回傳 (body, 錯誤回應)——其中一個一定是 None。六個端點原本各自寫一遍
@@ -220,6 +246,26 @@ def _resolved_uid(body: dict):
     return conf_uid, None
 
 
+def _resolved_history_uid(client_contexts: dict, conf_uid: str):
+    """取出目前連線正在用的 history_uid。回傳 (history_uid, 錯誤回應)。
+
+    三個端點（GET /api/memory、POST /api/memory、POST /api/memory/clear）原本
+    各自重複同一段八行的 409 guard——找不到就回 409，不猜一個（猜錯會編輯到
+    別段對話的記憶）。跟 _resolved_uid 擺在一起收成一個，未來要加第四個需要
+    這段對話身分的端點時，才不會複製貼上時漏掉這個檢查。
+    """
+    history_uid = _resolve_history_uid(client_contexts, conf_uid)
+    if not history_uid:
+        return None, JSONResponse(
+            status_code=409,
+            content={
+                "error": "記憶現在屬於一段對話。請先在 app 裡連上這個角色，"
+                "才知道要讀寫哪一段對話的記憶。"
+            },
+        )
+    return history_uid, None
+
+
 async def _write_or_error(fn, *args, what: str):
     """在執行緒裡跑一個寫入動作；失敗時記 log 並回統一的 500。
 
@@ -239,7 +285,7 @@ async def _write_or_error(fn, *args, what: str):
 # --------------------------------------------------------------------------- #
 
 
-def init_memory_route() -> APIRouter:
+def init_memory_route(client_contexts: dict) -> APIRouter:
     """長期記憶設定頁的 REST 端點。只接受本機請求。
 
     - GET  /api/memory?conf_uid=<uid>   記憶開關、內容、字數與各項界限
@@ -264,13 +310,19 @@ def init_memory_route() -> APIRouter:
         if err:
             return JSONResponse(status_code=400, content={"error": err})
 
-        content = memory_core.load_core_memory(conf_uid)
+        history_uid, bad = _resolved_history_uid(client_contexts, conf_uid)
+        if bad:
+            return bad
+
+        content = memory_core.load_core_memory(conf_uid, history_uid)
         return JSONResponse(
             {
                 "conf_uid": conf_uid,
                 "enabled": _memory_enabled_from_conf(),
                 "content": content,
-                "exists": os.path.isfile(memory_core.core_memory_path(conf_uid)),
+                "exists": os.path.isfile(
+                    memory_core.core_memory_path(conf_uid, history_uid)
+                ),
                 "char_count": len(content),
                 # 界限一律從後端送，UI 不要自己寫死一份——後端調整了那份副本不會
                 # 跟著動，畫面會強制一個伺服器早就不用的範圍，而且不會報錯。
@@ -301,18 +353,22 @@ def init_memory_route() -> APIRouter:
         if bad:
             return bad
 
+        history_uid, bad = _resolved_history_uid(client_contexts, conf_uid)
+        if bad:
+            return bad
+
         content = body.get("content")
         if not isinstance(content, str):
             return _error(400, "'content' must be a string.")
 
         cap = _cap_from_conf()
         if not await asyncio.to_thread(
-            memory_core.save_core_memory, conf_uid, content, cap
+            memory_core.save_core_memory, conf_uid, history_uid, content, cap
         ):
             return _error(500, "Could not save core memory.")
 
         # 讀回真正存下去的內容，讓 UI 的字數是誠實的。
-        stored = memory_core.load_core_memory(conf_uid)
+        stored = memory_core.load_core_memory(conf_uid, history_uid)
         logger.info(f"[memory] manually saved (conf_uid={conf_uid})")
         return JSONResponse(
             {
@@ -367,7 +423,13 @@ def init_memory_route() -> APIRouter:
         if bad:
             return bad
 
-        if not await asyncio.to_thread(memory_core.clear_core_memory, conf_uid):
+        history_uid, bad = _resolved_history_uid(client_contexts, conf_uid)
+        if bad:
+            return bad
+
+        if not await asyncio.to_thread(
+            memory_core.clear_core_memory, conf_uid, history_uid
+        ):
             return _error(500, "Could not clear core memory.")
 
         logger.info(f"[memory] cleared (conf_uid={conf_uid})")
