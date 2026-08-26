@@ -71,3 +71,22 @@ def test_is_safe_to_run_twice(tmp_path, monkeypatch):
 def test_no_chat_history_directory_is_not_an_error(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     assert memory_migration.migrate_character_memories() == []
+
+
+def test_a_corrupt_character_does_not_block_the_ones_after_it(tmp_path, monkeypatch):
+    # charA 排序在 charB 前面。charA 的舊檔不是合法 UTF-8(讀取會丟
+    # UnicodeDecodeError,不是 OSError)。這不該讓例外飛出迴圈連帶跳過
+    # 排序在它後面的 charB——每個角色的失敗要各自獨立。
+    monkeypatch.chdir(tmp_path)
+    bad_dir = tmp_path / "chat_history" / "charA"
+    bad_dir.mkdir(parents=True)
+    (bad_dir / "core_memory.md").write_bytes(b"\xff\xfe\x00bad")
+    _old(tmp_path, "charB", "她記得的事")
+    monkeypatch.setattr(memory_migration, "get_active_history_uid", lambda c: "conv1")
+
+    assert memory_migration.migrate_character_memories() == ["charB"]
+
+    # 壞掉的 charA 原檔留在原地,沒被改名也沒被搬走。
+    assert (bad_dir / "core_memory.md").exists()
+    moved = tmp_path / "chat_history" / "charB" / "conv1" / "core_memory.md"
+    assert moved.read_text(encoding="utf-8") == "她記得的事"

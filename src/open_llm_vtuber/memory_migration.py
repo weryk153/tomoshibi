@@ -7,6 +7,7 @@
 還原時讀的同一個值,所以搬完下次連上就會被讀到。
 """
 
+import os
 from pathlib import Path
 
 from loguru import logger
@@ -45,12 +46,23 @@ def migrate_character_memories() -> list:
 
         try:
             dest.parent.mkdir(parents=True, exist_ok=True)
-            dest.write_text(old.read_text(encoding="utf-8"), encoding="utf-8")
+            content = old.read_text(encoding="utf-8")
+            # 原子寫入:先寫暫存檔再 os.replace。半路死掉的話 dest 要嘛不存在、
+            # 要嘛是完整內容,不會出現「內容被截斷但 dest.exists() 是 True」
+            # 這種以後永遠被當成「已搬移」跳過、內容卻是壞的情況。
+            tmp = dest.with_name(f".{dest.name}.tmp")
+            tmp.write_text(content, encoding="utf-8")
+            os.replace(tmp, dest)
             # 原檔改名保留而不是刪除:搬錯了還救得回來。
             old.rename(char_dir / _KEPT)
             moved.append(conf_uid)
             logger.info(f"[memory-migration] {conf_uid} → {history_uid}")
-        except OSError as e:
+        except (OSError, UnicodeDecodeError) as e:
+            # UnicodeDecodeError 是 ValueError 的子類,不是 OSError——壞掉、
+            # 非 UTF-8 的舊檔會從這裡冒出來。要一起接住,否則一個字元角色
+            # 的舊記憶檔壞掉,就會讓例外飛出這次迴圈,連帶跳過排序在它後面
+            # 的所有角色,而外層 run_server.py 的 bare except 又會把這個
+            # 錯誤悄悄吞掉,變成每次開機都重演同樣的沉默失敗。
             logger.warning(
                 f"[memory-migration] {conf_uid} 搬移失敗({type(e).__name__}: {e})"
             )
