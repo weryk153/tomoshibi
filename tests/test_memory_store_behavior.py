@@ -7,12 +7,20 @@
 - 手動儲存超過上限「照存但警告」，不偷偷截斷使用者打的字。
 - 上限與整理頻率的夾界規則：壞值一律 fail-soft 回預設，垃圾設定不能讓
   整理悄悄停掉。
+- 不安全的路徑（逃出 chat_history/）一律 fail soft 回空字串／False，
+  跟 load/save/clear 三個姊妹函式一致，不丟例外把呼叫端炸掉。
 
 記憶現在是每段對話一份，所以每個呼叫都要帶 history_uid；HISTORY 是這份測試
 固定用的那一段對話。
+
+跑在 tmp_path 底下（monkeypatch.chdir），不寫進真正的 chat_history/——這裡曾
+經漏過 chdir，把 chat_history/memory-store-test/conv-1/ 寫進使用者的實際工作
+目錄，而清理只砍了 .md、留下那個目錄。
 """
 
 import os
+
+import pytest
 
 from src.open_llm_vtuber.memory_core import (
     CAP_CHARS,
@@ -31,18 +39,10 @@ CONF = "memory-store-test"
 HISTORY = "conv-1"
 
 
-def _cleanup() -> None:
-    p = core_memory_path(CONF, HISTORY)
-    if os.path.isfile(p):
-        os.remove(p)
-
-
-def setup_function() -> None:
-    _cleanup()
-
-
-def teardown_function() -> None:
-    _cleanup()
+@pytest.fixture(autouse=True)
+def _isolated_chat_history(tmp_path, monkeypatch):
+    """每個測試都在自己的 tmp_path 裡跑，永不碰真正的 chat_history/。"""
+    monkeypatch.chdir(tmp_path)
 
 
 def test_load_returns_empty_when_nothing_saved():
@@ -99,11 +99,10 @@ def test_interval_coercion_fails_soft():
 
 
 def test_path_is_confined_to_chat_history():
-    # conf_uid 是請求可控的；逃出 chat_history/ 必須被擋下。
-    import pytest
-
-    with pytest.raises(Exception):
-        core_memory_path("../outside", HISTORY)
+    # conf_uid 是請求可控的；逃出 chat_history/ 必須 fail soft 回空字串，
+    # 跟 load/save/clear 三個姊妹函式一致，不丟例外炸掉呼叫端（GET
+    # /api/memory 就是裸呼叫這個函式）。
+    assert core_memory_path("../outside", HISTORY) == ""
 
 
 def test_empty_history_uid_means_no_memory():

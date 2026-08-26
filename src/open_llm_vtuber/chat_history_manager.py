@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import shutil
 import uuid
 from datetime import datetime
 from typing import Literal, List, TypedDict, Optional
@@ -61,6 +62,24 @@ def _get_safe_history_path(conf_uid: str, history_uid: str) -> str:
     safe_history_uid = _sanitize_path_component(history_uid)
     base_dir = os.path.join("chat_history", safe_conf_uid)
     full_path = os.path.normpath(os.path.join(base_dir, f"{safe_history_uid}.json"))
+    if not full_path.startswith(base_dir):
+        raise ValueError("Invalid path: Path traversal detected")
+    return full_path
+
+
+def _get_safe_history_memory_dir(conf_uid: str, history_uid: str) -> str:
+    """Get sanitized path for a history's sibling memory directory.
+
+    Mirrors ``_get_safe_history_path`` exactly (same sanitizer, same base_dir,
+    same confinement check) so the json file and its memory directory can never
+    disagree about what counts as safe — memory_core lays the directory down as
+    chat_history/<conf_uid>/<history_uid>/core_memory.md, i.e. the json path
+    with ".json" swapped for a trailing "/".
+    """
+    safe_conf_uid = _sanitize_path_component(conf_uid)
+    safe_history_uid = _sanitize_path_component(history_uid)
+    base_dir = os.path.join("chat_history", safe_conf_uid)
+    full_path = os.path.normpath(os.path.join(base_dir, safe_history_uid))
     if not full_path.startswith(base_dir):
         raise ValueError("Invalid path: Path traversal detected")
     return full_path
@@ -291,20 +310,57 @@ def history_exists(conf_uid: str, history_uid: str) -> bool:
 
 
 def delete_history(conf_uid: str, history_uid: str) -> bool:
-    """Delete a specific history file"""
+    """Delete a specific history file and its sibling memory directory.
+
+    A conversation's per-conversation memory (chat_history/<conf_uid>/<uid>/
+    core_memory.md) lives in a directory named for the same uid as the json
+    file. Deleting only the json used to leave that directory — and every
+    private fact extracted into it — on disk forever, unreachable by any live
+    context once the uid is gone. Both must go for "deleted" to be true.
+
+    Order: the memory directory is removed *before* the json. Of the two ways
+    this can half-fail, a surviving memory directory is the dangerous one — it
+    is exactly the plaintext-privacy leak this function exists to close — while
+    a surviving json with its memory already gone is just a stale, harmless
+    list entry. Doing the dangerous removal first, unconditionally, and then
+    still attempting the json removal regardless of how the first one went
+    minimizes the chance of ending up with the bad kind of leftover.
+
+    A missing directory is not an error (nothing to clean up); a failure to
+    remove either one does not block the other — best effort on both, logged
+    on failure rather than raised, so a locked file doesn't strand the rest of
+    the deletion.
+    """
     if not conf_uid or not history_uid:
         logger.warning("Missing conf_uid or history_uid")
         return False
 
-    filepath = _get_safe_history_path(conf_uid, history_uid)
+    try:
+        filepath = _get_safe_history_path(conf_uid, history_uid)
+        memory_dir = _get_safe_history_memory_dir(conf_uid, history_uid)
+    except ValueError as e:
+        logger.error(f"Refusing to delete history with unsafe path: {e}")
+        return False
+
+    memory_ok = True
+    try:
+        if os.path.isdir(memory_dir):
+            shutil.rmtree(memory_dir)
+            logger.debug(f"Successfully deleted memory directory: {memory_dir}")
+    except Exception as e:
+        memory_ok = False
+        logger.error(f"Failed to delete memory directory {memory_dir}: {e}")
+
+    json_ok = False
     try:
         if os.path.exists(filepath):
             os.remove(filepath)
             logger.debug(f"Successfully deleted history file: {filepath}")
-            return True
+            json_ok = True
     except Exception as e:
         logger.error(f"Failed to delete history file: {e}")
-    return False
+
+    return json_ok and memory_ok
 
 
 def get_history_list(conf_uid: str) -> List[dict]:

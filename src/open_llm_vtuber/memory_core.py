@@ -2,8 +2,9 @@
 
 兩層式設計（core memory + consolidation，同 MemGPT / Generative Agents 一脈）：
 
-- **注入**：construct_system_prompt 把 chat_history/<conf_uid>/core_memory.md
-  的內容附在 persona 後面，每輪都帶著。
+- **注入**：construct_system_prompt 把 chat_history/<conf_uid>/<history_uid>/
+  core_memory.md 的內容附在 persona 後面，每輪都帶著。記憶屬於一段對話，不是
+  一個角色——新對話從空白開始。
 - **整理**：每輪對話結束後背景呼叫 LLM（fire-and-forget，不阻塞對話），
   判斷這輪有沒有值得留下的新事實，有才改寫檔案。
 
@@ -74,10 +75,21 @@ def _memory_file(conf_uid: str, history_uid: str) -> Path:
 
 
 def core_memory_path(conf_uid: str, history_uid: str) -> str:
-    """給 route 層用的公開路徑查詢。沒有對話時回空字串。"""
+    """給 route 層用的公開路徑查詢。沒有對話、或路徑不安全時回空字串。
+
+    load/save/clear 三個都吞掉 safe_join 丟出的 ValueError、fail soft 回空字串
+    或 False；這個原本沒跟——一個不安全的 conf_uid/history_uid 會讓例外直接炸
+    出去。memory_route 的 GET /api/memory 就是這樣裸呼叫這個函式，於是三個姊妹
+    函式都能優雅降級的錯誤輸入，這裡會把設定頁的記憶分頁弄成 500。跟手足一致，
+    回空字串。
+    """
     if not history_uid:
         return ""
-    return str(_memory_file(conf_uid, history_uid))
+    try:
+        return str(_memory_file(conf_uid, history_uid))
+    except ValueError as e:
+        logger.warning(f"[core_memory] unsafe path for {conf_uid}/{history_uid}: {e}")
+        return ""
 
 
 def load_core_memory(conf_uid: str, history_uid: str) -> str:

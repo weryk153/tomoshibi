@@ -65,14 +65,14 @@ def test_clear_truncates_only_that_conversation(tmp_path, monkeypatch):
 
 @pytest.mark.parametrize("evil", ["../escape", "..", "a/../../b"])
 def test_a_hostile_conversation_id_cannot_escape(tmp_path, monkeypatch, evil):
-    # history_uid 跟 conf_uid 一樣是請求可控的值。
+    # history_uid 跟 conf_uid 一樣是請求可控的值。core_memory_path 是 route 層
+    # 用的公開查詢，要跟 load/save/clear 一樣 fail soft 回空字串，不丟例外——
+    # GET /api/memory 就是裸呼叫這個函式，丟例外會讓記憶分頁 500。
     monkeypatch.chdir(tmp_path)
-    with pytest.raises(ValueError):
-        memory_core.core_memory_path("charA", evil)
+    assert memory_core.core_memory_path("charA", evil) == ""
 
 
 @pytest.mark.parametrize("evil", ["../escape", "..", "a/../../b"])
 def test_a_hostile_character_id_cannot_escape(tmp_path, monkeypatch, evil):
     monkeypatch.chdir(tmp_path)
-    with pytest.raises(ValueError):
-        memory_core.core_memory_path(evil, "conv1")
+    assert memory_core.core_memory_path(evil, "conv1") == ""

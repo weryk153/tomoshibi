@@ -1,6 +1,7 @@
 from typing import Union, List, Dict, Any, Optional, Callable, Awaitable
 import asyncio
 import json
+from collections import OrderedDict
 from loguru import logger
 import numpy as np
 
@@ -42,9 +43,29 @@ from ..agent.output_types import SentenceOutput, AudioOutput
 _BG_MEMORY_TASKS: set = set()
 
 # 每個連線各自數輪數，用來決定何時整理記憶。
-# (conf_uid, client_uid) so each character + client tracks its own cadence.
-# 只存在記憶體：重啟就歸零，整理週期重新開始，可以接受。
-_TURN_COUNTS: "dict[tuple[str, str], int]" = {}
+# key 是 (conf_uid, history_uid, client_uid)——history_uid 緊跟在 conf_uid 之後，
+# 是這個分支的慣例。原本只用 (conf_uid, client_uid)，於是同一條 WebSocket 連線
+# 切換對話（不重連）時輪數沿用舊對話：四輪私聊後開新對話，新對話第一輪就整理、
+# 第二到五輪反而不整理。內容不會外洩（consolidate_core_memory 本身帶的是正確
+# 的 context.history_uid），但節奏跟著連線走而不是跟著對話走，跟 reply_history
+# 修過的那次真實外洩是同一種漏洞形狀，只是這裡漏的是「什麼時候整理」而不是
+# 「說過什麼」。
+#
+# 只存在記憶體：重啟就歸零，整理週期重新開始，可以接受。但一個瀏覽器分頁不
+# 重啟只是不斷切換對話，key 會無限增生——用 OrderedDict 當 LRU，上限跟
+# reply_history.MAX_SESSIONS 一致，超過就淘汰最久沒動到的那個。
+MAX_TURN_COUNT_SESSIONS = 32
+_TURN_COUNTS: "OrderedDict[tuple[str, str, str], int]" = OrderedDict()
+
+
+def _bump_turn_count(key: "tuple[str, str, str]") -> int:
+    """記一輪、回傳累計輪數，並把這個 key 標成最近用過（LRU 淘汰用）。"""
+    n = _TURN_COUNTS.get(key, 0) + 1
+    _TURN_COUNTS[key] = n
+    _TURN_COUNTS.move_to_end(key)
+    while len(_TURN_COUNTS) > MAX_TURN_COUNT_SESSIONS:
+        _TURN_COUNTS.popitem(last=False)
+    return n
 
 
 def _effective_output_language(context: ServiceContext) -> str:
@@ -563,9 +584,8 @@ async def process_single_conversation(
                         context.character_config, "memory_consolidation_interval", 1
                     )
                 )
-                _key = (str(_conf_uid), str(client_uid))
-                _n = _TURN_COUNTS.get(_key, 0) + 1
-                _TURN_COUNTS[_key] = _n
+                _key = (str(_conf_uid), str(context.history_uid), str(client_uid))
+                _n = _bump_turn_count(_key)
                 if _n % _interval == 0:
                     _base_url, _model, _api_key, _extra_body = (
                         resolve_consolidation_llm(context.character_config)

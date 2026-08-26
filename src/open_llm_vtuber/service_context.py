@@ -880,7 +880,8 @@ class ServiceContext:
 
             persona_prompt += prompt_content
 
-        # 注入核心記憶（關於使用者的長期記憶，跨對話累積。見 MEMORY_SYSTEM_DESIGN.md）
+        # 注入核心記憶（關於使用者的長期記憶，屬於這一段對話，不跨對話累積。
+        # 見 MEMORY_SYSTEM_DESIGN.md）
         # 長期記憶關閉時（long_term_memory_enabled=False）完全不注入。
         if getattr(target_character, "long_term_memory_enabled", True):
             from .memory_core import load_core_memory

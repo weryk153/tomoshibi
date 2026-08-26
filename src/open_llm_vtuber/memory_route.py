@@ -246,6 +246,26 @@ def _resolved_uid(body: dict):
     return conf_uid, None
 
 
+def _resolved_history_uid(client_contexts: dict, conf_uid: str):
+    """取出目前連線正在用的 history_uid。回傳 (history_uid, 錯誤回應)。
+
+    三個端點（GET /api/memory、POST /api/memory、POST /api/memory/clear）原本
+    各自重複同一段八行的 409 guard——找不到就回 409，不猜一個（猜錯會編輯到
+    別段對話的記憶）。跟 _resolved_uid 擺在一起收成一個，未來要加第四個需要
+    這段對話身分的端點時，才不會複製貼上時漏掉這個檢查。
+    """
+    history_uid = _resolve_history_uid(client_contexts, conf_uid)
+    if not history_uid:
+        return None, JSONResponse(
+            status_code=409,
+            content={
+                "error": "記憶現在屬於一段對話。請先在 app 裡連上這個角色，"
+                "才知道要讀寫哪一段對話的記憶。"
+            },
+        )
+    return history_uid, None
+
+
 async def _write_or_error(fn, *args, what: str):
     """在執行緒裡跑一個寫入動作；失敗時記 log 並回統一的 500。
 
@@ -290,15 +310,9 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         if err:
             return JSONResponse(status_code=400, content={"error": err})
 
-        history_uid = _resolve_history_uid(client_contexts, conf_uid)
-        if not history_uid:
-            return JSONResponse(
-                status_code=409,
-                content={
-                    "error": "記憶現在屬於一段對話。請先在 app 裡連上這個角色，"
-                    "才知道要讀寫哪一段對話的記憶。"
-                },
-            )
+        history_uid, bad = _resolved_history_uid(client_contexts, conf_uid)
+        if bad:
+            return bad
 
         content = memory_core.load_core_memory(conf_uid, history_uid)
         return JSONResponse(
@@ -339,15 +353,9 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         if bad:
             return bad
 
-        history_uid = _resolve_history_uid(client_contexts, conf_uid)
-        if not history_uid:
-            return JSONResponse(
-                status_code=409,
-                content={
-                    "error": "記憶現在屬於一段對話。請先在 app 裡連上這個角色，"
-                    "才知道要讀寫哪一段對話的記憶。"
-                },
-            )
+        history_uid, bad = _resolved_history_uid(client_contexts, conf_uid)
+        if bad:
+            return bad
 
         content = body.get("content")
         if not isinstance(content, str):
@@ -415,15 +423,9 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         if bad:
             return bad
 
-        history_uid = _resolve_history_uid(client_contexts, conf_uid)
-        if not history_uid:
-            return JSONResponse(
-                status_code=409,
-                content={
-                    "error": "記憶現在屬於一段對話。請先在 app 裡連上這個角色，"
-                    "才知道要讀寫哪一段對話的記憶。"
-                },
-            )
+        history_uid, bad = _resolved_history_uid(client_contexts, conf_uid)
+        if bad:
+            return bad
 
         if not await asyncio.to_thread(
             memory_core.clear_core_memory, conf_uid, history_uid
