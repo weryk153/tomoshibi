@@ -227,7 +227,9 @@ async def process_single_conversation(
             )
             agent = context.agent_engine
             if _mem_on and hasattr(agent, "set_system"):
-                fresh_mem = load_core_memory(context.character_config.conf_uid)
+                fresh_mem = load_core_memory(
+                    context.character_config.conf_uid, context.history_uid
+                )
                 if fresh_mem != getattr(context, "_core_mem_injected", None):
                     refreshed_prompt = await context.construct_system_prompt(
                         context.character_config.persona_prompt
@@ -361,9 +363,9 @@ async def process_single_conversation(
                 input_text=build_reply_retry_prompt(
                     model_input_text if isinstance(model_input_text, str) else "",
                     "\n".join(
-                        recent_sentences(
-                            context.character_config.conf_uid, client_uid
-                        )[-3:]
+                        recent_sentences(context.character_config.conf_uid, client_uid)[
+                            -3:
+                        ]
                     ),
                 ),
                 images=images,
@@ -567,6 +569,7 @@ async def process_single_conversation(
                     _t = asyncio.create_task(
                         consolidate_core_memory(
                             _conf_uid,
+                            context.history_uid,
                             input_text,
                             full_response,
                             _base_url,
