@@ -196,6 +196,17 @@ def run(console_log_level: str, open_browser: bool = False):
     config: Config = validate_config(read_yaml("conf.yaml"))
     server_config = config.system_config
 
+    # 記憶改成每段對話一份之後,舊的角色層 core_memory.md 不會再被讀到。
+    # 只跑一次,搬完原檔改名保留。失敗不擋開機。
+    try:
+        from src.open_llm_vtuber.memory_migration import migrate_character_memories
+
+        _moved = migrate_character_memories()
+        if _moved:
+            logger.info(f"Migrated core memory for: {', '.join(_moved)}")
+    except Exception as e:
+        logger.warning(f"Memory migration skipped ({type(e).__name__}: {e})")
+
     if server_config.enable_proxy:
         logger.info("Proxy mode enabled - /proxy-ws endpoint will be available")
 
