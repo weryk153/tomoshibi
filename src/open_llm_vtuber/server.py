@@ -128,21 +128,25 @@ class WebSocketServer:
         # 萬用路由前面；順序反了的話每一個 API 都會回傳首頁的 HTML。
         #
         # 存取控制統一在 api_guard，各 route 不各自實作。
-        self.app.include_router(init_llm_config_route())      # 首次設定精靈
-        self.app.include_router(init_character_route())       # 角色管理
-        self.app.include_router(init_persona_route())         # 人設預設
-        self.app.include_router(init_translator_route())      # 翻譯
-        self.app.include_router(init_player_route())          # 玩家層級設定
-        self.app.include_router(init_network_route())         # 遠端存取
-        self.app.include_router(init_voice_route())           # 語音清單與試聽
-        self.app.include_router(init_memory_route())          # 長期記憶
-        self.app.include_router(init_perf_route())            # 引擎與硬體
-        self.app.include_router(init_topics_route())          # 主動話題
+        self.app.include_router(init_llm_config_route())  # 首次設定精靈
+        self.app.include_router(init_character_route())  # 角色管理
+        self.app.include_router(init_persona_route())  # 人設預設
+        self.app.include_router(init_translator_route())  # 翻譯
+        self.app.include_router(init_player_route())  # 玩家層級設定
+        self.app.include_router(init_network_route())  # 遠端存取
+        self.app.include_router(init_voice_route())  # 語音清單與試聽
+        self.app.include_router(
+            init_memory_route(ws_handler.client_contexts)
+        )  # 長期記憶
+        self.app.include_router(init_perf_route())  # 引擎與硬體
+        self.app.include_router(init_topics_route())  # 主動話題
 
         # Live2D 的動作與點擊區設定。多帶兩個參數是為了「存檔後立刻生效」：
         # PUT 成功時可以就地更新每一個正在顯示這個模型的連線，不必重啟或切角色。
         self.app.include_router(
-            init_live2d_config_route(self.default_context_cache, ws_handler.client_contexts)
+            init_live2d_config_route(
+                self.default_context_cache, ws_handler.client_contexts
+            )
         )
 
         # 開機時啟動新聞的定時更新，關機時取消。這取代了系統的 cron——使用者
