@@ -139,3 +139,40 @@ def test_write_openai_block_inserts_missing_leaf_instead_of_raising(conf_file):
     assert "llm_api_key: 'sk-secret'" in text
     assert "base_url: 'http://127.0.0.1:1234/v1'" in text
     assert "model: 'new-model'" in text
+
+
+def test_provider_and_mcpp_write_is_all_or_nothing(conf_file):
+    """provider 區塊與 use_mcpp 是同一次操作的兩個編輯,要嘛都套上,要嘛都不動。
+
+    write_provider_config 與 write_use_mcpp 各自對 conf.yaml 的寫入都是原子的
+    （temp + os.replace）,但疊呼叫兩次不是一次交易:第一個編輯落地、第二個才
+    丟例外的話,conf.yaml 會半套生效,卻讓呼叫端以為整個操作都失敗了。
+
+    這裡故意拿掉 agent_settings.basic_memory_agent 區塊,讓 use_mcpp 那一步的
+    nested_extent 丟 KeyError——這不是構造出來的極端情況,是一台使用者手寫過的
+    conf.yaml 完全可能長的樣子。provider 那一步（lmstudio_llm 區塊仍在,能成功
+    編輯）如果先落地,檔案就會被改到一半。
+    """
+    conf_file.write_text(
+        "character_config:\n"
+        "  agent_config:\n"
+        "    llm_configs:\n"
+        "      openai_compatible_llm:\n"
+        "        base_url: 'http://localhost:11434/v1'\n"
+        "        model: 'placeholder'\n"
+        "        llm_api_key: 'somethingelse'\n"
+        "      lmstudio_llm:\n"
+        "        base_url: 'http://localhost:1234/v1'\n"
+        "        model: 'qwen2.5:3b'\n",
+        encoding="utf-8",
+    )
+    before = _read(conf_file)
+
+    with pytest.raises(KeyError):
+        route.write_provider_config_and_use_mcpp(
+            "lmstudio_llm", {"model": "qwen/qwen3.5-9b"}, True
+        )
+
+    # 第二個編輯失敗,檔案要完全沒被動過——包括第一個編輯(provider 區塊、
+    # llm_provider 指標)也不能落地半套。「部分套用」不是可以接受的中間狀態。
+    assert _read(conf_file) == before

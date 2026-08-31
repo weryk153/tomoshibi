@@ -414,25 +414,22 @@ def _point_llm_provider_at_openai_compatible(lines: list) -> None:
     _point_llm_provider_at(lines, "openai_compatible_llm")
 
 
-def write_provider_config(provider: str, values: dict) -> None:
-    """把設定寫進指定的供應商區塊，並把 llm_provider 指過去。
+def _edit_provider_config(lines: list, provider: str, values: dict) -> None:
+    """在既有的 ``lines`` 上套用 provider 設定的編輯，不讀檔、不寫檔。
+
+    純粹的記憶體編輯步驟，從 ``write_provider_config`` 抽出來，讓它能跟其他
+    編輯步驟（例如 ``_edit_use_mcpp``）在同一份 ``lines`` 上合併成一次寫入——
+    見 ``write_provider_config_and_use_mcpp`` 的說明。
 
     provider 必須在 WRITABLE_PROVIDERS 裡——它會被拿去組 YAML 路徑，而呼叫端的
     值來自請求。
 
     values 可含 base_url / model / llm_api_key（字串葉節點）與 extra_body
     （巢狀）。**沒給的鍵不動**：自動設定只寫它有把握的東西，其餘留給使用者。
-
-    只改該改的葉節點，其餘每一行、每一個註解、每一個 True 與 null 的寫法都原樣
-    保留——ruamel 全份重新序列化會把它們正規化，在一個手寫的設定檔上那是幾十行
-    無關的改動。ruamel 只拿來在動手之前驗證結構。
     """
     if provider not in WRITABLE_PROVIDERS:
         raise ValueError(f"Refusing to write unknown provider block: {provider!r}")
 
-    _validate_path_with_ruamel(provider)
-
-    lines = _read_conf_lines()
     start, end = nested_extent(
         lines, "character_config", "agent_config", "llm_configs", provider
     )
@@ -447,7 +444,40 @@ def write_provider_config(provider: str, values: dict) -> None:
         end = upsert_nested_block(lines, start, end, "extra_body", rendered)
 
     _point_llm_provider_at(lines, provider)
+
+
+def write_provider_config(provider: str, values: dict) -> None:
+    """把設定寫進指定的供應商區塊，並把 llm_provider 指過去。
+
+    只改該改的葉節點，其餘每一行、每一個註解、每一個 True 與 null 的寫法都原樣
+    保留——ruamel 全份重新序列化會把它們正規化，在一個手寫的設定檔上那是幾十行
+    無關的改動。ruamel 只拿來在動手之前驗證結構。
+
+    編輯本身委派給 ``_edit_provider_config``；這裡只負責讀檔、驗證、寫檔這三個
+    單獨呼叫時該做的事。需要跟別的編輯合成一次原子寫入時，不要疊呼叫這個函式
+    （那樣會各自讀寫兩次，中間有半套生效的窗口），改用
+    ``write_provider_config_and_use_mcpp``。
+    """
+    if provider not in WRITABLE_PROVIDERS:
+        raise ValueError(f"Refusing to write unknown provider block: {provider!r}")
+
+    _validate_path_with_ruamel(provider)
+
+    lines = _read_conf_lines()
+    _edit_provider_config(lines, provider, values)
     _write_conf(lines)
+
+
+def _edit_use_mcpp(lines: list, enabled: bool) -> None:
+    """在既有的 ``lines`` 上套用 use_mcpp 開關的編輯，不讀檔、不寫檔。
+
+    這個鍵在 agent_settings.basic_memory_agent 底下，跟 llm_configs 是兄弟，
+    所以走自己的 nested_extent。
+    """
+    start, end = nested_extent(
+        lines, "character_config", "agent_config", "agent_settings", "basic_memory_agent"
+    )
+    upsert_leaf(lines, start, end, "use_mcpp", "true" if enabled else "false")
 
 
 def write_use_mcpp(enabled: bool) -> None:
@@ -457,14 +487,38 @@ def write_use_mcpp(enabled: bool) -> None:
     再加上工具 schema，而模型只會忽略它們；支援時關著則是白白少一組能力。兩邊
     都是偵測得到、不該讓使用者去猜的事。
 
-    這個鍵在 agent_settings.basic_memory_agent 底下，跟 llm_configs 是兄弟，
-    所以走自己的 nested_extent。
+    編輯本身委派給 ``_edit_use_mcpp``；理由同 ``write_provider_config`` 的
+    docstring。
     """
     lines = _read_conf_lines()
-    start, end = nested_extent(
-        lines, "character_config", "agent_config", "agent_settings", "basic_memory_agent"
-    )
-    upsert_leaf(lines, start, end, "use_mcpp", "true" if enabled else "false")
+    _edit_use_mcpp(lines, enabled)
+    _write_conf(lines)
+
+
+def write_provider_config_and_use_mcpp(
+    provider: str, values: dict, use_mcpp: bool
+) -> None:
+    """套用偵測到的模型設定：provider 區塊與 use_mcpp 兩個編輯要嘛都套上，要嘛
+    都不動——給 apply-detected 這種「兩個鍵邏輯上是同一次操作」的呼叫端用。
+
+    ``write_provider_config`` 與 ``write_use_mcpp`` 各自對 conf.yaml 的寫入都是
+    原子的（temp + os.replace），但兩者合起來疊呼叫並不是一次交易：第一個成功、
+    第二個才丟例外的話（例如 basic_memory_agent 區塊結構壞掉讓 nested_extent
+    丟 KeyError），conf.yaml 已經被改了——provider、model、llm_provider 指標
+    都切過去了——但呼叫端拿到的是「寫入失敗」。使用者以為什麼都沒存到，其實
+    存了一半，比乾脆全部不存更糟。
+
+    做法：只讀一次 lines，兩個編輯都在記憶體裡的同一份 lines 上做完才真正
+    寫檔一次——任何一步丟例外，檔案都還沒被碰過。
+    """
+    if provider not in WRITABLE_PROVIDERS:
+        raise ValueError(f"Refusing to write unknown provider block: {provider!r}")
+
+    _validate_path_with_ruamel(provider)
+
+    lines = _read_conf_lines()
+    _edit_provider_config(lines, provider, values)
+    _edit_use_mcpp(lines, use_mcpp)
     _write_conf(lines)
 
 
@@ -710,9 +764,13 @@ def init_llm_config_route() -> APIRouter:
         if not _is_local_request(request):
             return _forbidden()
 
-        lms = await asyncio.to_thread(list_lmstudio_models, LMSTUDIO_DEFAULT_BASE_URL)
-        olm = await asyncio.to_thread(list_ollama_models, OLLAMA_DEFAULT_BASE_URL)
-        ram = await asyncio.to_thread(total_ram_bytes)
+        # 兩個 probe 互相獨立，沒有理由排隊等——循序做的話，其中一個推論端
+        # 「有在聽但卡住」時，最壞延遲會從 max(兩者) 變成 sum(兩者)。
+        lms, olm, ram = await asyncio.gather(
+            asyncio.to_thread(list_lmstudio_models, LMSTUDIO_DEFAULT_BASE_URL),
+            asyncio.to_thread(list_ollama_models, OLLAMA_DEFAULT_BASE_URL),
+            asyncio.to_thread(total_ram_bytes),
+        )
 
         return JSONResponse(
             {
@@ -769,10 +827,15 @@ def init_llm_config_route() -> APIRouter:
             values["extra_body"] = profile["extra_body"]
 
         try:
-            await asyncio.to_thread(write_provider_config, provider, values)
-            # 工具能力偵測得到，就別讓使用者自己去猜要不要開。use_mcpp 住在
-            # agent_settings 而不是 llm_configs，所以要另外寫一次。
-            await asyncio.to_thread(write_use_mcpp, chosen.supports_tools)
+            # provider 區塊與 use_mcpp 是同一次操作的兩個鍵，走合併入口一次讀、
+            # 一次寫——避免第一個編輯落地、第二個才失敗時，conf.yaml 已經半套
+            # 生效但回應卻說寫入失敗（見 write_provider_config_and_use_mcpp）。
+            await asyncio.to_thread(
+                write_provider_config_and_use_mcpp,
+                provider,
+                values,
+                chosen.supports_tools,
+            )
         except Exception as e:
             logger.warning(f"apply-detected write failed: {type(e).__name__}: {e}")
             return _bad("Could not write conf.yaml.")
