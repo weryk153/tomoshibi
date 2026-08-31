@@ -23,6 +23,7 @@ import os
 import re
 import json
 import asyncio
+from dataclasses import asdict
 from typing import Any, Optional
 
 import httpx
@@ -48,6 +49,13 @@ from .api_guard import (
     make_yaml as _make_yaml,
     mask_key as _mask_key,
 )
+from .model_probe import (
+    describe_ollama_model,
+    list_lmstudio_models,
+    list_ollama_models,
+)
+from .model_profiles import profile_for, recommended_model
+from .system_probe import total_ram_bytes
 
 CONF_PATH = "conf.yaml"
 
@@ -58,6 +66,12 @@ OLLAMA_PULL_URL = "http://localhost:11434/api/pull"
 # 推薦給第一次使用者的模型：免費、跑在自己機器上、約 1.9 GB，一般筆電帶得動。
 # 精靈可以直接幫他下載，不會技術的人不必開終端機。跟預設設定範本裡的一致。
 RECOMMENDED_OLLAMA_MODEL = "qwen2.5:3b"
+
+LMSTUDIO_DEFAULT_BASE_URL = "http://127.0.0.1:1234/v1"
+# OLLAMA_DEFAULT_BASE_URL 已在上方定義，這裡沿用同一個，不重複宣告。
+
+# 偵測到的 backend → 要寫進哪個 conf 區塊。
+_BACKEND_TO_PROVIDER = {"lmstudio": "lmstudio_llm", "ollama": "ollama_llm"}
 
 # 驗證用那一次呼叫的逾時（秒）。
 TEST_CALL_TIMEOUT = 12.0
@@ -436,6 +450,24 @@ def write_provider_config(provider: str, values: dict) -> None:
     _write_conf(lines)
 
 
+def write_use_mcpp(enabled: bool) -> None:
+    """依偵測到的工具能力開關 MCP。
+
+    模型不支援 tool use 時開著 use_mcpp，等於每輪白付 mcp_prompt 的 ~388 token
+    再加上工具 schema，而模型只會忽略它們；支援時關著則是白白少一組能力。兩邊
+    都是偵測得到、不該讓使用者去猜的事。
+
+    這個鍵在 agent_settings.basic_memory_agent 底下，跟 llm_configs 是兄弟，
+    所以走自己的 nested_extent。
+    """
+    lines = _read_conf_lines()
+    start, end = nested_extent(
+        lines, "character_config", "agent_config", "agent_settings", "basic_memory_agent"
+    )
+    upsert_leaf(lines, start, end, "use_mcpp", "true" if enabled else "false")
+    _write_conf(lines)
+
+
 def _write_openai_block(base_url: str, model: str, api_key: str) -> None:
     """把使用者填的端點／模型／金鑰寫進 openai_compatible_llm，並切換供應商。
 
@@ -591,7 +623,11 @@ def init_llm_config_route() -> APIRouter:
         if not _is_local_request(request):
             return _forbidden()
         result = await _probe_ollama_models()
-        result["recommended"] = RECOMMENDED_OLLAMA_MODEL
+        # 走 recommended_model()（讀 model_profiles.yaml 的 fallback），不要再用
+        # 硬編碼的 RECOMMENDED_OLLAMA_MODEL——否則以後改了設定檔，這個端點還是
+        # 回舊值，而且不會有任何徵兆。
+        ram = await asyncio.to_thread(total_ram_bytes)
+        result["recommended"] = recommended_model(ram)
         return JSONResponse(result)
 
     @router.post("/api/llm-config/ollama-pull")
@@ -663,5 +699,96 @@ def init_llm_config_route() -> APIRouter:
                 ) + "\n"
 
         return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+    @router.get("/api/llm-config/detect")
+    async def detect_models(request: Request):
+        """列出本機兩個推論端上可用的模型。
+
+        兩邊都連不上不是錯誤——精靈要能顯示「請先裝一個」而不是白畫面。所以
+        一律回 200，用 *_available 告訴前端發生了什麼。
+        """
+        if not _is_local_request(request):
+            return _forbidden()
+
+        lms = await asyncio.to_thread(list_lmstudio_models, LMSTUDIO_DEFAULT_BASE_URL)
+        olm = await asyncio.to_thread(list_ollama_models, OLLAMA_DEFAULT_BASE_URL)
+        ram = await asyncio.to_thread(total_ram_bytes)
+
+        return JSONResponse(
+            {
+                "models": [asdict(m) for m in [*lms, *olm]],
+                "lmstudio_available": bool(lms),
+                "ollama_available": bool(olm),
+                "recommended_pull": recommended_model(ram),
+            }
+        )
+
+    @router.post("/api/llm-config/apply-detected")
+    async def apply_detected(request: Request):
+        """把使用者選的那顆模型寫進設定，並套用它需要的必要設定。"""
+        if not _is_local_request(request):
+            return _forbidden()
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+
+        backend = str(body.get("backend") or "").strip().lower()
+        model_id = str(body.get("model") or "").strip()
+        provider = _BACKEND_TO_PROVIDER.get(backend)
+        if not provider or not model_id:
+            return _bad("Unknown backend or missing model name.")
+
+        # model 是請求可控的。只接受這次真的偵測得到的那些——不讓任意字串走到
+        # 寫檔案那一步。
+        if backend == "lmstudio":
+            found = await asyncio.to_thread(
+                list_lmstudio_models, LMSTUDIO_DEFAULT_BASE_URL
+            )
+        else:
+            found = await asyncio.to_thread(list_ollama_models, OLLAMA_DEFAULT_BASE_URL)
+        chosen = next((m for m in found if m.id == model_id), None)
+        if chosen is None:
+            return _bad(f"Model {model_id!r} is no longer available on {backend}.")
+
+        # Ollama 的能力資訊要逐顆問，留到這裡才問（見 model_probe）。
+        if backend == "ollama":
+            detailed = await asyncio.to_thread(
+                describe_ollama_model, chosen.base_url, chosen.id
+            )
+            if detailed is not None:
+                chosen = detailed
+
+        ok, message = await _validate_combo(chosen.base_url, chosen.id, "")
+        if not ok:
+            return _bad(message)
+
+        profile = profile_for(chosen)
+        values = {"base_url": chosen.base_url, "model": chosen.id}
+        if profile:
+            values["extra_body"] = profile["extra_body"]
+
+        try:
+            await asyncio.to_thread(write_provider_config, provider, values)
+            # 工具能力偵測得到，就別讓使用者自己去猜要不要開。use_mcpp 住在
+            # agent_settings 而不是 llm_configs，所以要另外寫一次。
+            await asyncio.to_thread(write_use_mcpp, chosen.supports_tools)
+        except Exception as e:
+            logger.warning(f"apply-detected write failed: {type(e).__name__}: {e}")
+            return _bad("Could not write conf.yaml.")
+
+        return JSONResponse(
+            {
+                "ok": True,
+                "applied": {
+                    "provider": provider,
+                    "model": chosen.id,
+                    "is_vlm": chosen.is_vlm,
+                    "supports_tools": chosen.supports_tools,
+                    "max_context": chosen.max_context,
+                },
+                "note": profile["note"] if profile else None,
+            }
+        )
 
     return router
