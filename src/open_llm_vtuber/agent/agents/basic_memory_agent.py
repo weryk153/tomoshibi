@@ -34,6 +34,54 @@ from ...conversation_quality import (
     normalize_output_language_variant,
 )
 from ...stage_director import strip_stage_performance_tag
+from ...context_window import detect_context_window
+
+
+# --- 短期記憶的上限 ----------------------------------------------------------
+#
+# self._memory 原本沒有任何上限：set_memory_from_history 把整段對話全載進來，
+# _add_message 一路往後加。長對話遲早撐爆模型的 context window，而症狀不是一個
+# 清楚的錯誤——後端根本不知道 window 多大，超過時是推論端（LM Studio / Ollama）
+# 自己靜默砍掉最舊的訊息，畫面上只會看到她突然變糊、忘記剛講過的話。
+#
+# window 設在哪裡：不在這個 repo 裡。專案從不送 num_ctx / max_tokens，payload
+# 只有 model / messages / temperature / stream / extra_body。實際值由 LM Studio
+# 載入模型時的 Context Length（或 Ollama 的 num_ctx）決定，後端看不到也管不到。
+# 至少讓截斷的邏輯掌握在自己手上、砍完會寫 log。
+#
+# 這裡只做截斷，不做摘要。「別弄丟舊事實」那件事已經有人在做了：core_memory.md
+# 每輪整理，第 N 輪的事實在第 N 輪就寫進記憶檔，之後每輪注入進 persona——這正是
+# 兩層式設計裡「上層記事實、下層記逐字」的分工。再加一個摘要器等於在同一份資料
+# 上放第二個有損壓縮器，兩個提示詞會互相打架。
+#
+# 但這條分工有前提：長期記憶被關掉（long_term_memory_enabled=False）時沒有
+# backstop，被截掉就是真的沒了。那仍然好過撐爆 context，只是值得知道。
+#
+# 預算怎麼來的（2026-08，開發機實測，qwen/qwen3.5-9b on LM Studio）：
+#
+#     loaded_context_length            20,992 token（該模型 max 262,144）
+#   - kurisu 的 system prompt           5,479 token
+#       persona 2,007 / CORE_CONVERSATION_PROMPT 854 / think_tag 602
+#       / live2d_expression 505 / mcp 388 / core_memory 滿載 1,123
+#   - 留給生成                          1,500 token
+#   = 對話可用                        ~14,000 token
+#
+# 實測真實對話是 1.57 字元/token（中文比直覺便宜；英文提示詞更省，約 4.4–4.9），
+# 所以 14,000 token ≈ 22,000 字元。取 20,000 留一點餘裕。
+#
+# 這個數字綁在「window 20,992」這個前提上，而那是使用者在 LM Studio 裡按的，
+# 隨時可能不一樣（同一台機器上的模型 max 從 2,048 到 262,144 都有）。真正的解法
+# 是開機去問 /api/v0/models 的 loaded_context_length 回推——在那之前，這是個
+# 有依據但會過期的常數。
+MEMORY_MAX_CHARS = 20000  # 問不到 window 時的保守預設，也是「要不要去問」的門檻
+MEMORY_MIN_MESSAGES = 24  # 底線：無論多長都留最近這麼多則（約 12 輪一問一答）
+
+# 實測（開發機，qwen/qwen3.5-9b）：真實中文對話 1.57 字元/token，英文提示詞
+# 4.4–4.9。system prompt 是中英混雜，用中文的比率去估會高估它的 token 數——
+# 那個方向是安全的（預算算得比實際小）。
+CHARS_PER_TOKEN = 1.57
+GENERATION_RESERVE_TOKENS = 1500  # 留給她把話講完
+MIN_BUDGET_CHARS = 2000  # window 小到離譜時的地板，配合 MEMORY_MIN_MESSAGES  # 底線：無論多長都留最近這麼多則（約 12 輪一問一答）
 
 
 class BasicMemoryAgent(AgentInterface):
@@ -56,6 +104,8 @@ class BasicMemoryAgent(AgentInterface):
         tool_executor: Optional[ToolExecutor] = None,
         mcp_prompt_string: str = "",
         player_language: str = "",
+        llm_base_url: str = "",
+        llm_model: str = "",
     ):
         """Initialize agent with LLM and configuration."""
         super().__init__()
@@ -68,6 +118,9 @@ class BasicMemoryAgent(AgentInterface):
         self._faster_first_response = faster_first_response
         self._segment_method = segment_method
         self._use_mcpp = use_mcpp
+        # 只為了問推論端 window 多大而留的；問不到就退回 MEMORY_MAX_CHARS。
+        self._llm_base_url = llm_base_url
+        self._llm_model = llm_model
         self.interrupt_method = interrupt_method
         self._tool_prompts = tool_prompts or {}
         self._interrupt_handled = False
@@ -208,6 +261,69 @@ class BasicMemoryAgent(AgentInterface):
             return
 
         self._memory.append(message_data)
+        self._trim_memory()
+
+    def _memory_budget_chars(self) -> int:
+        """這一輪能留多少字的對話。
+
+        問得到 window 就照實算，問不到退回 MEMORY_MAX_CHARS。用 self._system
+        當場量 system prompt，而不是寫死一個保留值——每個角色的人設長度差很多
+        （實測 kurisu 的 persona 2,007 token、Mao 只有 55），寫死等於對其中一個
+        算錯。system prompt 每輪會被重新組（記憶刷新），所以每次都重算。
+
+        偵測到的值可以比保守預設更小：window 真的只有 4k 時就該勒緊，那正是
+        去問的理由。MEMORY_MIN_MESSAGES 和 MIN_BUDGET_CHARS 一起兜住地板。
+        """
+        window = detect_context_window(self._llm_base_url, self._llm_model)
+        if not window:
+            return MEMORY_MAX_CHARS
+
+        system_tokens = len(self._system) / CHARS_PER_TOKEN
+        usable = window - system_tokens - GENERATION_RESERVE_TOKENS
+        return max(int(usable * CHARS_PER_TOKEN), MIN_BUDGET_CHARS)
+
+    def _trim_memory(self) -> None:
+        """把最舊的對話丟掉，直到記憶回到預算內。
+
+        兩道界線，先撞到哪道就停在哪道：字元預算（MEMORY_MAX_CHARS）與則數底線
+        （MEMORY_MIN_MESSAGES）。底線優先——寧可稍微超出預算，也不要把對話砍到
+        接不上話。實測 20 輪語音對話大約 4–8k token，正常聊天根本碰不到截斷。
+
+        丟到最後會讓開頭停在 assistant 那則。留著不會壞，但接下來的訊息串就是
+        「她先開口、使用者才回」，跟真實對話的形狀對不上；模型讀到的第一件事變成
+        自己的話，容易照著它的語氣續寫。多丟一則讓開頭回到 user。
+        """
+        if len(self._memory) <= MEMORY_MIN_MESSAGES:
+            return
+
+        total = sum(len(str(m.get("content", ""))) for m in self._memory)
+        if total <= MEMORY_MAX_CHARS:
+            # 還在保守預算內，怎麼算都不用截——這條 early return 同時是「不去
+            # 探測 window」的守門員，正常對話因此一次網路請求都不會發。
+            return
+
+        budget = self._memory_budget_chars()
+        dropped = 0
+        while total > budget and len(self._memory) > MEMORY_MIN_MESSAGES:
+            total -= len(str(self._memory[0].get("content", "")))
+            self._memory.pop(0)
+            dropped += 1
+
+        # 對齊到 user 開頭。這一步不受底線保護——底線是「留幾則」，這裡是
+        # 「留下來的第一則是誰說的」，讓底線擋住它會留下錯的形狀。最多只會多丟一則。
+        if self._memory and self._memory[0]["role"] != "user":
+            self._memory.pop(0)
+            dropped += 1
+
+        if dropped:
+            logger.info(
+                "Trimmed {} oldest message(s) from working memory; {} left "
+                "(~{} chars, budget {}). Older facts survive in core_memory.md.",
+                dropped,
+                len(self._memory),
+                sum(len(str(m.get("content", ""))) for m in self._memory),
+                budget,
+            )
 
     def set_memory_from_history(self, conf_uid: str, history_uid: str) -> None:
         """Load a clean alternating conversation from chat history.
@@ -252,6 +368,9 @@ class BasicMemoryAgent(AgentInterface):
             len(self._memory),
             skipped,
         )
+        # 載入是第二個會撐爆 context 的入口：一段長對話重連時會一次全部灌進來，
+        # 光靠 _add_message 那邊的截斷擋不住（那是一則一則長出來的路徑）。
+        self._trim_memory()
 
     def handle_interrupt(self, heard_response: str) -> None:
         """Handle user interruption."""
