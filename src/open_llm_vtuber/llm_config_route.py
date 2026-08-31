@@ -442,6 +442,14 @@ def _write_openai_block(base_url: str, model: str, api_key: str) -> None:
     保留給 tests/test_llm_provider_write.py 與 tests/test_llm_config_write.py
     這兩份既有的特徵測試直接呼叫；行為完全交給通用的 write_provider_config，
     這裡只是釘住舊呼叫端的簽名，不重複邏輯。
+
+    行為差異（相對於重構前）：舊版用 rewrite_str_leaf，三個葉節點裡任何一個在
+    區塊裡找不到就丟 KeyError（"Could not locate keys [...]"）。現在委派給
+    write_provider_config，走的是 upsert_leaf，找不到的葉節點會被**插入**，
+    不丟例外——這是刻意的，不是疏漏。upsert_leaf 自己的 docstring 說得很清楚：
+    UI 開得出來的設定就該存得下去，手寫的 conf.yaml 常常根本沒有那一行，舊版
+    在這種情況直接丟 KeyError 是它自己的 bug，不是這裡要保留的行為。見
+    tests/test_write_provider_config.py::test_write_openai_block_inserts_missing_leaf_instead_of_raising。
     """
     write_provider_config(
         "openai_compatible_llm",
