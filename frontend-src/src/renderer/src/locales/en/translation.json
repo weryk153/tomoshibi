@@ -16,7 +16,7 @@
     "detectScanning": "Scanning for local models…",
     "detectFound": "Found these models — pick one:",
     "detectEmptyOllama": "Ollama is running, but it has no models yet.",
-    "detectEmptyLmStudio": "LM Studio is running, but no model is loaded. Download one in LM Studio, then check again — we can't download it for you there.",
+    "detectEmptyLmStudio": "LM Studio is running, but no model is downloaded. Download one in LM Studio, then check again — we can't download it for you there.",
     "detectNothingRunning": "No local model server was found. Install Ollama or LM Studio, then come back.",
     "detectUse": "Use this model",
     "detectApplied": "Applied {{model}}",

@@ -8,9 +8,11 @@
 # 寫得出來：能說出「不設會出現什麼故障」的才算必要設定；只能說「這樣比較好」
 # 的是品味，不收。缺 note 的項目載入時會被丟掉。
 #
-# match_arch 是清單，因為兩個後端的詞彙不一樣：LM Studio 回 'qwen35'，Ollama 的
-# details.family 用另一套寫法。與其硬做一套會一直漏的正規化對照，不如讓每條
-# 自己宣告它認得哪些字串。
+# match_arch 是清單，因為同一個模型家族在不同組建格式／後端下回報的字串不一樣：
+# LM Studio 的 GGUF 建置回 'qwen35'，MLX 建置回 'qwen3_5'（多一個底線）；Ollama 的
+# details.family 又是另一套寫法。與其硬做一套會一直漏掉分隔符號的正規化對照，
+# 不如讓每條自己宣告它認得哪些字串——這正是為什麼下面同時列了 'qwen3_5' 與
+# 'qwen35' 兩種寫法，兩者都是真的會出現的值，不是其中一個打錯字。
 #
 # match_backend 省略代表不限後端。多條同時命中時取第一條並記 warning——重疊
 # 代表這個檔該整理，不該靠隱性優先序默默解決。
@@ -19,7 +21,7 @@
 # 證據而憑印象填，正是這個檔要避免的事。一條有據勝過十條臆測。
 
 profiles:
-  - match_arch: ['qwen35', 'qwen3']
+  - match_arch: ['qwen3_5', 'qwen35', 'qwen3']
     match_backend: 'lmstudio'
     extra_body:
       reasoning_effort: 'none'

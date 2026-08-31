@@ -16,7 +16,7 @@
     "detectScanning": "ローカルのモデルを探しています…",
     "detectFound": "見つかったモデル — 1つ選んでください:",
     "detectEmptyOllama": "Ollama は起動していますが、モデルがまだありません。",
-    "detectEmptyLmStudio": "LM Studio は起動していますが、モデルが読み込まれていません。LM Studio 側でモデルをダウンロードしてから、もう一度確認してください — こちらから代わりにダウンロードすることはできません。",
+    "detectEmptyLmStudio": "LM Studio は起動していますが、モデルがダウンロードされていません。LM Studio 側でモデルをダウンロードしてから、もう一度確認してください — こちらから代わりにダウンロードすることはできません。",
     "detectNothingRunning": "ローカルのモデルサーバーが見つかりませんでした。Ollama か LM Studio をインストールしてから、もう一度お試しください。",
     "detectUse": "このモデルを使う",
     "detectApplied": "{{model}} を適用しました",

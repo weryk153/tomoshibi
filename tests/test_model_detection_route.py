@@ -173,7 +173,7 @@ def test_apply_syncs_use_mcpp_with_tool_support(client, monkeypatch):
         "/api/llm-config/apply-detected",
         json={"backend": "lmstudio", "model": "plain:8b"},
     )
-    assert "use_mcpp: false" in path.read_text(encoding="utf-8")
+    assert "use_mcpp: False" in path.read_text(encoding="utf-8")
 
 
 def test_apply_enables_use_mcpp_for_a_tool_capable_model(client, monkeypatch):
@@ -186,7 +186,7 @@ def test_apply_enables_use_mcpp_for_a_tool_capable_model(client, monkeypatch):
         "/api/llm-config/apply-detected",
         json={"backend": "lmstudio", "model": "qwen/qwen3.5-9b"},
     )
-    assert "use_mcpp: true" in path.read_text(encoding="utf-8")
+    assert "use_mcpp: True" in path.read_text(encoding="utf-8")
 
 
 def test_apply_blocks_when_validation_fails(client, monkeypatch):
@@ -218,6 +218,61 @@ def test_apply_rejects_a_model_that_was_not_detected(client, monkeypatch):
         json={"backend": "lmstudio", "model": "../../etc/passwd"},
     )
     assert resp.json()["ok"] is False
+
+
+def test_apply_ollama_describe_failure_leaves_use_mcpp_untouched(client, monkeypatch):
+    """describe_ollama_model 失敗（逾時、Ollama 正在載入大模型時的暫時性
+    500）代表「還沒問到」，不是「沒有工具」。沿用列表階段 supports_tools=False
+    這個預設值去覆寫 use_mcpp，會把使用者自己在 Settings 開的開關悄悄關掉——
+    這裡釘住修好之後的行為：問不到就完全不碰 use_mcpp。"""
+    c, path = client
+    listed = DetectedModel(
+        id="qwen2.5:3b",
+        backend="ollama",
+        base_url="http://localhost:11434/v1",
+        arch="qwen2",
+        supports_tools=False,
+    )
+    monkeypatch.setattr(route, "list_lmstudio_models", lambda base_url: [])
+    monkeypatch.setattr(route, "list_ollama_models", lambda base_url: [listed])
+    monkeypatch.setattr(route, "describe_ollama_model", lambda base_url, model_id: None)
+    monkeypatch.setattr(route, "_validate_combo", _ok_validate)
+
+    before = path.read_text(encoding="utf-8")
+    assert "use_mcpp: true" in before  # CONF fixture 裡使用者原本開著
+
+    body = c.post(
+        "/api/llm-config/apply-detected",
+        json={"backend": "ollama", "model": "qwen2.5:3b"},
+    ).json()
+
+    assert body["ok"] is True
+    after = path.read_text(encoding="utf-8")
+    assert "use_mcpp: true" in after, "describe 失敗不該覆寫使用者原本的 use_mcpp"
+    assert "model: 'qwen2.5:3b'" in after, "provider 區塊本身還是要照樣寫入"
+
+
+def test_apply_rejects_model_id_with_control_characters(client, monkeypatch):
+    """model id 會被逐字寫進 conf.yaml；換行之類的控制字元混進去就能在寫檔時
+    多插出任意一行 YAML。這條路今天只有本機推論端能觸發（id 要跟偵測清單裡
+    的一模一樣才會比對上），但堵起來不必去信任它回報的字串長什麼樣子。"""
+    c, path = client
+    evil = DetectedModel(
+        id="qwen2.5:3b\nlm_provider: 'ollama_llm'",
+        backend="lmstudio",
+        base_url="http://127.0.0.1:1234/v1",
+        arch="qwen2",
+    )
+    monkeypatch.setattr(route, "list_lmstudio_models", lambda base_url: [evil])
+    monkeypatch.setattr(route, "list_ollama_models", lambda base_url: [])
+
+    before = path.read_text(encoding="utf-8")
+    resp = c.post(
+        "/api/llm-config/apply-detected",
+        json={"backend": "lmstudio", "model": evil.id},
+    )
+    assert resp.json()["ok"] is False
+    assert path.read_text(encoding="utf-8") == before, "拒絕時完全不該碰檔案"
 
 
 async def _ok_validate(base_url, model, api_key):

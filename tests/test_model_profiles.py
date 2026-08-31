@@ -106,6 +106,17 @@ def test_shipped_file_loads_and_is_valid():
         assert entry["extra_body"]
 
 
+def test_shipped_file_matches_lmstudio_mlx_arch_string():
+    """R18 修的 bug：LM Studio 的 MLX 建置回報 arch='qwen3_5'（底線），GGUF
+    建置回報 'qwen35'——九次審查都沒抓到，是因為既有測試全部手餵
+    arch='qwen35' 這個 fixture 字串，從沒對過出貨檔案本身。這裡故意不傳
+    profiles 參數，逼 profile_for 去讀真正會被使用者機器載入的
+    model_profiles.yaml。"""
+    hit = mp.profile_for(DetectedModel(id="m", backend="lmstudio", base_url="http://x/v1", arch="qwen3_5"))
+    assert hit is not None, "qwen3_5（MLX 建置）必須命中出貨的 qwen 家族 profile"
+    assert hit["extra_body"] == {"reasoning_effort": "none"}
+
+
 def test_missing_file_fails_soft(tmp_path):
     assert mp.load_profiles(str(tmp_path / "nope.yaml")) == []
 

@@ -6,8 +6,6 @@
 LM Studio 一次全拿沒這問題，但兩邊的介面刻意長得一樣，讓路由層不必分兩套寫。
 """
 
-import pytest
-
 from src.open_llm_vtuber import model_probe
 
 BASE = "http://localhost:11434/v1"

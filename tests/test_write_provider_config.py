@@ -144,7 +144,7 @@ def test_write_openai_block_inserts_missing_leaf_instead_of_raising(conf_file):
 def test_provider_and_mcpp_write_is_all_or_nothing(conf_file):
     """provider 區塊與 use_mcpp 是同一次操作的兩個編輯,要嘛都套上,要嘛都不動。
 
-    write_provider_config 與 write_use_mcpp 各自對 conf.yaml 的寫入都是原子的
+    provider 區塊的編輯與 use_mcpp 的編輯各自都能對 conf.yaml 做到原子寫入
     （temp + os.replace）,但疊呼叫兩次不是一次交易:第一個編輯落地、第二個才
     丟例外的話,conf.yaml 會半套生效,卻讓呼叫端以為整個操作都失敗了。
 

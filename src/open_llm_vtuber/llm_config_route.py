@@ -358,16 +358,18 @@ def _quote_yaml_scalar(value: str) -> str:
     return "'" + str(value).replace("'", "''") + "'"
 
 
-def _validate_path_with_ruamel(provider: str = "openai_compatible_llm") -> None:
+def _validate_path_with_ruamel(provider: str) -> None:
     """
     Confirm the given provider's block exists at the expected path before we
     touch the file. Uses ruamel round-trip load (per spec) so a malformed/missing
     structure fails loudly instead of corrupting the config.
 
-    provider 預設 openai_compatible_llm 是為了不動到 _write_openai_block 這個舊
-    呼叫端的行為；write_provider_config 會傳入它真正要寫的那個區塊，不能沿用舊的
-    硬編碼——不然目標明明是 lmstudio_llm，卻只驗證了 openai_compatible_llm 存不
-    存在，驗過了但目標區塊其實不在，會晚一步才在逐行編輯時才炸開。
+    provider 是必填參數，沒有預設值：兩個呼叫端（write_provider_config、
+    write_provider_config_and_use_mcpp）都會傳它們真正要寫的那個區塊，不能
+    偷懶沿用 openai_compatible_llm 當預設值——不然哪天多了個忘記傳這個參數的
+    呼叫端，目標明明是 lmstudio_llm，卻只驗證了 openai_compatible_llm 存不
+    存在，驗過了但目標區塊其實不在，會晚一步才在逐行編輯時才炸開，而且是
+    悄悄驗過錯的區塊，不是直接報錯。
     """
     yaml = _make_yaml()
     with open(CONF_PATH, "r", encoding="utf-8") as f:
@@ -479,22 +481,10 @@ def _edit_use_mcpp(lines: list, enabled: bool) -> None:
     start, end = nested_extent(
         lines, "character_config", "agent_config", "agent_settings", "basic_memory_agent"
     )
-    upsert_leaf(lines, start, end, "use_mcpp", "true" if enabled else "false")
-
-
-def write_use_mcpp(enabled: bool) -> None:
-    """依偵測到的工具能力開關 MCP。
-
-    模型不支援 tool use 時開著 use_mcpp，等於每輪白付 mcp_prompt 的 ~388 token
-    再加上工具 schema，而模型只會忽略它們；支援時關著則是白白少一組能力。兩邊
-    都是偵測得到、不該讓使用者去猜的事。
-
-    編輯本身委派給 ``_edit_use_mcpp``；理由同 ``write_provider_config`` 的
-    docstring。
-    """
-    lines = _read_conf_lines()
-    _edit_use_mcpp(lines, enabled)
-    _write_conf(lines)
+    # 裸的 True／False，不是字串——這份設定檔裡既有的寫法（見
+    # player_route.py 的 rewrite_bool_leaf）都是這樣，conf_editor 存在的目的
+    # 就是不要去改動使用者檔案原本的風格。
+    upsert_leaf(lines, start, end, "use_mcpp", str(bool(enabled)))
 
 
 def write_provider_config_and_use_mcpp(
@@ -503,12 +493,12 @@ def write_provider_config_and_use_mcpp(
     """套用偵測到的模型設定：provider 區塊與 use_mcpp 兩個編輯要嘛都套上，要嘛
     都不動——給 apply-detected 這種「兩個鍵邏輯上是同一次操作」的呼叫端用。
 
-    ``write_provider_config`` 與 ``write_use_mcpp`` 各自對 conf.yaml 的寫入都是
-    原子的（temp + os.replace），但兩者合起來疊呼叫並不是一次交易：第一個成功、
-    第二個才丟例外的話（例如 basic_memory_agent 區塊結構壞掉讓 nested_extent
-    丟 KeyError），conf.yaml 已經被改了——provider、model、llm_provider 指標
-    都切過去了——但呼叫端拿到的是「寫入失敗」。使用者以為什麼都沒存到，其實
-    存了一半，比乾脆全部不存更糟。
+    provider 區塊的編輯與 use_mcpp 的編輯各自都能對 conf.yaml 做到原子寫入
+    （temp + os.replace），但把它們拆成兩次獨立呼叫並不是一次交易：第一個
+    成功、第二個才丟例外的話（例如 basic_memory_agent 區塊結構壞掉讓
+    nested_extent 丟 KeyError），conf.yaml 已經被改了——provider、model、
+    llm_provider 指標都切過去了——但呼叫端拿到的是「寫入失敗」。使用者以為
+    什麼都沒存到，其實存了一半，比乾脆全部不存更糟。
 
     做法：只讀一次 lines，兩個編輯都在記憶體裡的同一份 lines 上做完才真正
     寫檔一次——任何一步丟例外，檔案都還沒被碰過。
@@ -818,13 +808,30 @@ def init_llm_config_route() -> APIRouter:
         if chosen is None:
             return _bad(f"Model {model_id!r} is no longer available on {backend}.")
 
+        # id 會被逐字寫進 conf.yaml。它今天只可能來自本機推論端回報的清單
+        # （見上面的比對），不是使用者直接輸入，但控制字元（尤其是換行）一旦
+        # 混進 id，就能在寫檔時多插出任意一行 YAML——窄，但不是不可能：一個
+        # 被亂改過或本身有 bug 的 localhost 行程就辦得到。這裡直接拒絕，堵死
+        # 這條路，不必去信任偵測到的字串長什麼樣子。
+        if any(ord(ch) < 0x20 or ord(ch) == 0x7F for ch in chosen.id):
+            return _bad(f"Model id {chosen.id!r} contains invalid control characters.")
+
         # Ollama 的能力資訊要逐顆問，留到這裡才問（見 model_probe）。
+        #
+        # describe_ollama_model 問不到（3 秒逾時、Ollama 正在載入大模型時的
+        # 暫時性 500）不代表這顆模型沒有工具能力，只代表「還沒問到」。此時
+        # chosen 仍是列表階段那筆記錄，它的 supports_tools 是 False——但那個
+        # False 是「還沒問」的預設值，不是探測結果。capability_known 記住這
+        # 件事，讓下面寫檔那一步知道要不要動 use_mcpp。
+        capability_known = True
         if backend == "ollama":
             detailed = await asyncio.to_thread(
                 describe_ollama_model, chosen.base_url, chosen.id
             )
             if detailed is not None:
                 chosen = detailed
+            else:
+                capability_known = False
 
         ok, message = await _validate_combo(chosen.base_url, chosen.id, "")
         if not ok:
@@ -836,15 +843,22 @@ def init_llm_config_route() -> APIRouter:
             values["extra_body"] = profile["extra_body"]
 
         try:
-            # provider 區塊與 use_mcpp 是同一次操作的兩個鍵，走合併入口一次讀、
-            # 一次寫——避免第一個編輯落地、第二個才失敗時，conf.yaml 已經半套
-            # 生效但回應卻說寫入失敗（見 write_provider_config_and_use_mcpp）。
-            await asyncio.to_thread(
-                write_provider_config_and_use_mcpp,
-                provider,
-                values,
-                chosen.supports_tools,
-            )
+            if capability_known:
+                # provider 區塊與 use_mcpp 是同一次操作的兩個鍵，走合併入口
+                # 一次讀、一次寫——避免第一個編輯落地、第二個才失敗時，
+                # conf.yaml 已經半套生效但回應卻說寫入失敗
+                # （見 write_provider_config_and_use_mcpp）。
+                await asyncio.to_thread(
+                    write_provider_config_and_use_mcpp,
+                    provider,
+                    values,
+                    chosen.supports_tools,
+                )
+            else:
+                # 沒問到能力就不動 use_mcpp，留著使用者原本在 Settings 裡的
+                # 選擇——一次 fail-soft 的探測失敗不該變成一次確定的設定
+                # 變更。
+                await asyncio.to_thread(write_provider_config, provider, values)
         except Exception as e:
             logger.warning(f"apply-detected write failed: {type(e).__name__}: {e}")
             return _bad("Could not write conf.yaml.")

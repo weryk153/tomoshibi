@@ -16,7 +16,7 @@
     "detectScanning": "正在掃描本機模型…",
     "detectFound": "找到這些模型——選一個：",
     "detectEmptyOllama": "Ollama 在跑，但還沒有任何模型。",
-    "detectEmptyLmStudio": "LM Studio 在跑，但還沒載入模型。請在 LM Studio 裡下載一個模型再回來檢查——我們沒辦法代你下載。",
+    "detectEmptyLmStudio": "LM Studio 在跑，但還沒下載任何模型。請在 LM Studio 裡下載一個模型再回來檢查——我們沒辦法代你下載。",
     "detectNothingRunning": "沒偵測到本機的模型服務。請先安裝 Ollama 或 LM Studio，再回來看看。",
     "detectUse": "使用這顆",
     "detectApplied": "已套用 {{model}}",
