@@ -1,0 +1,38 @@
+# 模型家族 → 偵測不到的必要設定。
+#
+# 這個檔只放「不設就像壞掉」的東西。偵測得到的（是不是 VLM、支不支援工具、
+# context 多大）由 model_probe 直接回，不進這裡。
+#
+# extra_body 底下同時住著必要設定（reasoning_effort）與 sampling 旋鈕
+# （top_p / presence_penalty）。這裡只准放前者。分界不靠欄位名，靠 note 寫不
+# 寫得出來：能說出「不設會出現什麼故障」的才算必要設定；只能說「這樣比較好」
+# 的是品味，不收。缺 note 的項目載入時會被丟掉。
+#
+# match_arch 是清單，因為兩個後端的詞彙不一樣：LM Studio 回 'qwen35'，Ollama 的
+# details.family 用另一套寫法。與其硬做一套會一直漏的正規化對照，不如讓每條
+# 自己宣告它認得哪些字串。
+#
+# match_backend 省略代表不限後端。多條同時命中時取第一條並記 warning——重疊
+# 代表這個檔該整理，不該靠隱性優先序默默解決。
+#
+# 目前只有一條，因為只有這一條經過實測。不預填 Llama / Mistral / Gemma：沒有
+# 證據而憑印象填，正是這個檔要避免的事。一條有據勝過十條臆測。
+
+profiles:
+  - match_arch: ['qwen35', 'qwen3']
+    match_backend: 'lmstudio'
+    extra_body:
+      reasoning_effort: 'none'
+    note: |
+      不關思考模式會超過 60 秒 timeout，然後靜默 fallback 回原文／空白回覆。
+      症狀是「每句話等三分鐘然後沒反應」——看起來像壞掉，不是像慢。
+      實測：頂層 reasoning_effort=none 秒回且推理長度 0；巢狀寫法與完全不加
+      都超過 180 秒無回應。
+
+# RAM → 建議下載哪顆模型（只影響 Ollama 的一鍵下載，不影響任何既有設定）。
+# 型號待在不同 RAM 的機器上實測後填入。空著時 RAM 不影響任何事，一律用
+# fallback，行為與加這個功能之前相同。
+recommended_models: []
+
+# RAM 測不到、或分層表為空時用這個。沿用原本寫在程式裡的 RECOMMENDED_OLLAMA_MODEL。
+fallback: 'qwen2.5:3b'
