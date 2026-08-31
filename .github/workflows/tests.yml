@@ -1,0 +1,18 @@
+name: Tests
+on: [ push, pull_request ]
+jobs:
+  pytest:
+    # Windows 一起跑是刻意的：這個專案會就地改寫使用者手寫的 conf.yaml，
+    # 而換行符與路徑處理正是只有在 Windows 上才會爆的那一類。
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ ubuntu-latest, windows-latest ]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+        with:
+          python-version: '3.10'
+      - run: uv sync
+      - run: uv run pytest tests/ -q

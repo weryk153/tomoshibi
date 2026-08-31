@@ -227,8 +227,14 @@ def character_config_extent(lines: list[str]) -> tuple[int, int]:
 # --- 讀寫 --------------------------------------------------------------------
 
 def read_conf_lines() -> list[str]:
-    """整份讀成行，保留換行符。"""
-    return Path(CONF_PATH).read_text(encoding="utf-8").splitlines(keepends=True)
+    """整份讀成行，保留換行符。
+
+    用 open(newline="") 而不是 Path.read_text：後者在 Python 3.10 沒有 newline
+    參數（3.13 才加），預設的 universal newlines 會把 CRLF 讀成 LF，寫回去就
+    整份翻掉。newline="" 關掉翻譯，位元組原樣進出。
+    """
+    with open(CONF_PATH, "r", encoding="utf-8", newline="") as f:
+        return f.read().splitlines(keepends=True)
 
 
 def _backup_once() -> None:
@@ -256,7 +262,8 @@ def write_conf_document(dump) -> None:
     _backup_once()
     path = Path(CONF_PATH)
     tmp = path.with_name(f".{path.name}.tmp")
-    with open(tmp, "w", encoding="utf-8") as f:
+    # newline="" 的理由見 read_conf_lines。
+    with open(tmp, "w", encoding="utf-8", newline="") as f:
         dump(f)
     os.replace(tmp, path)
 
@@ -269,5 +276,6 @@ def write_conf(lines: list[str]) -> None:
     _backup_once()
     path = Path(CONF_PATH)
     tmp = path.with_name(f".{path.name}.tmp")
-    tmp.write_text("".join(lines), encoding="utf-8")
+    # newline="" 的理由見 read_conf_lines。Path.write_text 在 3.10 有這個參數。
+    tmp.write_text("".join(lines), encoding="utf-8", newline="")
     os.replace(tmp, path)
