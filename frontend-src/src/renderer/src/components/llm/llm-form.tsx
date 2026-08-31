@@ -7,7 +7,9 @@
 import {
   useCallback, useEffect, useMemo, useState,
 } from 'react';
-import { Stack, Text, Tabs, Box } from '@chakra-ui/react';
+import {
+  Stack, Text, Tabs, Box, HStack,
+} from '@chakra-ui/react';
 import { createListCollection } from '@ark-ui/react/collection';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/tw/primitives';
@@ -18,10 +20,16 @@ import {
   fetchLlmConfig,
   saveLlmConfig,
   fetchOllamaModels,
+  detectModels,
+  applyDetectedModel,
+  pullOllamaModel,
   type LlmMode,
   type ApiKeyProvider,
   type LlmFormState,
   type LlmSaveResult,
+  type DetectResponse,
+  type DetectedModel,
+  type OllamaPullEvent,
 } from '@/api/llm-config.ts';
 
 interface LlmFormProps {
@@ -59,17 +67,23 @@ type OllamaProbeStatus = 'idle' | 'loading' | 'unavailable' | 'empty' | 'ready';
 // 請使用者重新貼上一次。文案走 t('setup.keyRequiredAgain')／
 // t('setup.keyAlreadySetPlaceholder')——五語言都已補齊，見 locales/*/translation.json。
 
-function ReasoningModelWarning({ text }: { text: string }): JSX.Element {
+// 左邊一條色條 + 一句話的提示框。原本只給「思考模式」那句警告用（叫
+// ReasoningModelWarning），偵測流程套用成功後要顯示 note（例如「已為你關閉
+// 思考模式：不關會超過 60 秒 timeout」）——語意跟措辭都跟原本那句警告是同一
+// 類東西，所以擴充成通用元件、加一個 tone，而不是另外複製一份幾乎一樣的框。
+function NoticeBox({ text, tone = 'yellow' }: { text: string; tone?: 'yellow' | 'blue' }): JSX.Element {
+  const borderColor = tone === 'yellow' ? 'yellow.400' : 'blue.400';
+  const textColor = tone === 'yellow' ? 'yellow.200' : 'blue.200';
   return (
     <Box
       borderLeft="3px solid"
-      borderColor="yellow.400"
+      borderColor={borderColor}
       bg="whiteAlpha.100"
       px={3}
       py={2}
       borderRadius="sm"
     >
-      <Text fontSize="xs" color="yellow.200">
+      <Text fontSize="xs" color={textColor}>
         {text}
       </Text>
     </Box>
@@ -151,6 +165,147 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
     }
   }, [mode, ollamaStatus, probeOllama]);
 
+  // --- 偵測本機模型（Task 8 的兩個端點） ------------------------------------ //
+  //
+  // 跟上面的 ollama 分頁探測是兩條獨立的路：這裡一開表單就自動掃，掃的是
+  // LM Studio ＋ Ollama 兩個推論端而不是只有 Ollama，找到的話可以直接選、
+  // 直接套用（含必要設定），不必先選分頁、填欄位。手動填表的路徑完全不動
+  // ——這條只是加速，掃不到東西或掃失敗都不擋住下面的表單。
+  type DetectStatus = 'loading' | 'ready' | 'error';
+  const [detectStatus, setDetectStatus] = useState<DetectStatus>('loading');
+  const [detectResult, setDetectResult] = useState<DetectResponse | null>(null);
+  const [detectError, setDetectError] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+
+  type ApplyPhase = 'idle' | 'applying' | 'applied' | 'error';
+  const [applyPhase, setApplyPhase] = useState<ApplyPhase>('idle');
+  const [applyError, setApplyError] = useState<string | null>(null);
+  const [appliedInfo, setAppliedInfo] = useState<{
+    model: string
+    baseUrl: string
+    note: string | null
+  } | null>(null);
+
+  type PullPhase = 'idle' | 'preparing' | 'downloading' | 'error';
+  const [pullPhase, setPullPhase] = useState<PullPhase>('idle');
+  const [pullPercent, setPullPercent] = useState<number | null>(null);
+  const [pullError, setPullError] = useState<string | null>(null);
+
+  // /api/llm-config/detect 的 ollama_available／lmstudio_available 曾經是
+  // 「探測到至少一顆模型」（bool(models)），跟「daemon 有沒有在跑」是兩件事——
+  // 「Ollama 在跑但沒有模型」跟「Ollama 根本沒裝」在那個算法下是同一個值。
+  // 這裡原本因此得繞道另一支既有端點（/api/llm-config/ollama-models）幫
+  // Ollama 補一個真正的可達性訊號，LM Studio 沒有對應端點所以那個分支是
+  // 死路。R17 已經修根因：detect 端點現在用 probe_lmstudio()／probe_ollama()
+  // （見 model_probe.py），*_available 對兩個後端都是真正的可達性，不用再
+  // 繞道，兩個分支現在都是活的。
+  const runDetect = useCallback(async () => {
+    setDetectStatus('loading');
+    setDetectError(null);
+    const result = await detectModels(backendBaseUrl);
+    if (!result.ok) {
+      setDetectStatus('error');
+      setDetectError(result.error);
+      return;
+    }
+    setDetectResult(result.data);
+    setDetectStatus('ready');
+  }, [backendBaseUrl]);
+
+  // 掛載時掃一次。跟 fetchLlmConfig 那個效果不同，這裡不用 cancelled guard——
+  // 掃描失敗只是顯示一句錯誤，不像 hasExistingKey 那樣會影響送出邏輯的正確性。
+  useEffect(() => {
+    runDetect();
+  }, [runDetect]);
+
+  // id 只在各自的 backend 底下保證唯一，LM Studio 跟 Ollama 剛好都在跑、
+  // 剛好都有一顆同名模型時，光用 id 當 key／當選取依據會兩顆一起選中。
+  const detectModelKey = (m: DetectedModel): string => `${m.backend}:${m.id}`;
+
+  const handleSelectDetected = useCallback((m: DetectedModel) => {
+    setSelectedKey(detectModelKey(m));
+    setApplyPhase('idle');
+    setApplyError(null);
+  }, []);
+
+  const handleApplyDetected = useCallback(async () => {
+    if (!detectResult || !selectedKey) return;
+    const chosen = detectResult.models.find((m) => detectModelKey(m) === selectedKey);
+    if (!chosen) return;
+
+    setApplyPhase('applying');
+    setApplyError(null);
+    const result = await applyDetectedModel(backendBaseUrl, chosen.backend, chosen.id);
+
+    if (!result.ok) {
+      setApplyPhase('error');
+      setApplyError(result.error);
+      return;
+    }
+    if (!result.data.ok || !result.data.applied) {
+      setApplyPhase('error');
+      setApplyError(result.data.error || t('setup.testFailed'));
+      return;
+    }
+
+    setAppliedInfo({
+      model: result.data.applied.model,
+      baseUrl: chosen.base_url,
+      note: result.data.note ?? null,
+    });
+    setApplyPhase('applied');
+  }, [detectResult, selectedKey, backendBaseUrl, t]);
+
+  // 套用成功後不直接呼叫 onSaved：在首次精靈裡，onSaved 一叫外層就把整個
+  // LlmForm 換成「已完成」畫面，note（例如「已為你關閉思考模式」）會連顯示
+  // 的機會都沒有就消失。改成先在這裡把 note 顯示出來，使用者按下「開始聊天」
+  // 才真正呼叫 onSaved 收尾——跟 first-run-wizard 原本「顯示結果→按按鈕關閉」
+  // 的兩段式是同一個模式。
+  const handleContinueAfterApply = useCallback(() => {
+    if (!appliedInfo) return;
+    onSaved({
+      ok: true,
+      model: appliedInfo.model,
+      base_url: appliedInfo.baseUrl,
+      api_key_masked: '',
+      restart_required: true,
+    });
+  }, [appliedInfo, onSaved]);
+
+  const handlePullRecommended = useCallback(async () => {
+    if (!detectResult) return;
+    const modelName = detectResult.recommended_pull;
+    setPullPhase('preparing');
+    setPullError(null);
+    setPullPercent(null);
+
+    const result = await pullOllamaModel(backendBaseUrl, modelName, (event: OllamaPullEvent) => {
+      if (typeof event.completed === 'number' && typeof event.total === 'number' && event.total > 0) {
+        setPullPhase('downloading');
+        setPullPercent(Math.round((event.completed / event.total) * 100));
+      } else if (event.status && event.status !== 'error') {
+        setPullPhase((prev) => (prev === 'idle' ? 'preparing' : prev));
+      }
+    });
+
+    if (!result.ok) {
+      setPullPhase('error');
+      // 訊息在這裡組完整句，畫面上直接顯示 pullError，不要在 render 端二次包裝
+      // ——不然 result.error 缺席時的 generic 訊息會被 ollamaDownloadFailed 的
+      // {{error}} 佔位符再包一層，變成語意重複的句子。
+      setPullError(
+        result.error
+          ? t('setup.ollamaDownloadFailed', { error: result.error })
+          : t('setup.ollamaDownloadFailedGeneric'),
+      );
+      return;
+    }
+    // 下載完成：重新掃一次，讓剛下載的模型出現在清單裡可以選。
+    setPullPhase('idle');
+    setPullPercent(null);
+    await runDetect();
+  }, [detectResult, backendBaseUrl, runDetect, t]);
+
   const providerCollection = useMemo(
     // 明確標注泛型為 { label: string; value: string }——SelectField 的 collection
     // prop 就是這個型別。若讓它從 ApiKeyProvider[] 推論，value 會被推成
@@ -204,6 +359,125 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
 
   return (
     <Stack {...settingStyles.common.container}>
+      <Stack gap={3}>
+        <Text fontWeight="bold">{t('setup.detectTitle')}</Text>
+
+        {applyPhase === 'applied' && appliedInfo ? (
+          <Stack gap={3}>
+            <Text fontWeight="semibold" color="green.300">
+              {t('setup.detectApplied', { model: appliedInfo.model })}
+            </Text>
+            {appliedInfo.note && <NoticeBox text={appliedInfo.note} tone="blue" />}
+            <Text fontSize="sm" color="whiteAlpha.700">
+              {t('setup.savedRestart')}
+            </Text>
+            <Button tone="blue" onClick={handleContinueAfterApply} className="self-start">
+              {t('setup.startChatting')}
+            </Button>
+          </Stack>
+        ) : (
+          <Stack gap={3}>
+            {detectStatus === 'loading' && (
+              <Text fontSize="sm" color="whiteAlpha.700">
+                {t('setup.detectScanning')}
+              </Text>
+            )}
+
+            {detectStatus === 'error' && detectError && (
+              <Text fontSize="sm" color="red.300">{detectError}</Text>
+            )}
+
+            {detectStatus === 'ready' && detectResult && detectResult.models.length > 0 && (
+              <Stack gap={2}>
+                <Text fontSize="sm" color="whiteAlpha.700">{t('setup.detectFound')}</Text>
+                <Stack gap={2}>
+                  {detectResult.models.map((m) => {
+                    const key = detectModelKey(m);
+                    const selected = key === selectedKey;
+                    return (
+                      <Box
+                        key={key}
+                        onClick={() => handleSelectDetected(m)}
+                        cursor="pointer"
+                        borderWidth="1px"
+                        borderColor={selected ? 'blue.400' : 'whiteAlpha.200'}
+                        bg={selected ? 'blue.900' : 'whiteAlpha.50'}
+                        borderRadius="md"
+                        px={3}
+                        py={2}
+                      >
+                        <Text fontWeight="semibold">{m.id}</Text>
+                        <HStack flexWrap="wrap" gap={2} mt={1}>
+                          <Text fontSize="xs" color="whiteAlpha.600">{m.backend}</Text>
+                          {m.is_vlm && (
+                            <Text fontSize="xs" color="purple.300">{t('setup.detectVision')}</Text>
+                          )}
+                          {m.supports_tools && (
+                            <Text fontSize="xs" color="teal.300">{t('setup.detectTools')}</Text>
+                          )}
+                        </HStack>
+                      </Box>
+                    );
+                  })}
+                </Stack>
+                <Button
+                  tone="blue"
+                  onClick={handleApplyDetected}
+                  loading={applyPhase === 'applying'}
+                  disabled={!selectedKey || applyPhase === 'applying'}
+                  className="self-start"
+                >
+                  {t('setup.detectUse')}
+                </Button>
+                {applyPhase === 'error' && applyError && (
+                  <Text fontSize="sm" color="red.300">{applyError}</Text>
+                )}
+              </Stack>
+            )}
+
+            {detectStatus === 'ready' && detectResult && detectResult.models.length === 0
+              && detectResult.ollama_available && (
+                <Stack gap={2}>
+                  <Text fontSize="sm" color="orange.300">{t('setup.detectEmptyOllama')}</Text>
+                  <Text fontWeight="semibold">{t('setup.ollamaRecommendedTitle')}</Text>
+                  <Text fontSize="sm" color="whiteAlpha.700">
+                    {t('setup.ollamaRecommendedDesc', { model: detectResult.recommended_pull })}
+                  </Text>
+
+                  {pullPhase === 'idle' && (
+                    <Button tone="blue" onClick={handlePullRecommended} className="self-start">
+                      {t('setup.ollamaUseRecommended', { model: detectResult.recommended_pull })}
+                    </Button>
+                  )}
+                  {pullPhase === 'preparing' && (
+                    <Text fontSize="sm" color="whiteAlpha.700">
+                      {t('setup.ollamaDownloadPreparing')}
+                    </Text>
+                  )}
+                  {pullPhase === 'downloading' && (
+                    <Text fontSize="sm" color="whiteAlpha.700">
+                      {t('setup.ollamaDownloading', { percent: pullPercent ?? 0 })}
+                    </Text>
+                  )}
+                  {pullPhase === 'error' && pullError && (
+                    <Text fontSize="sm" color="red.300">{pullError}</Text>
+                  )}
+                </Stack>
+            )}
+
+            {detectStatus === 'ready' && detectResult && detectResult.models.length === 0
+              && !detectResult.ollama_available && detectResult.lmstudio_available && (
+                <Text fontSize="sm" color="orange.300">{t('setup.detectEmptyLmStudio')}</Text>
+            )}
+
+            {detectStatus === 'ready' && detectResult && detectResult.models.length === 0
+              && !detectResult.ollama_available && !detectResult.lmstudio_available && (
+                <Text fontSize="sm" color="orange.300">{t('setup.detectNothingRunning')}</Text>
+            )}
+          </Stack>
+        )}
+      </Stack>
+
       <Tabs.Root
         value={mode}
         onValueChange={(details) => setMode(details.value as LlmMode)}
@@ -250,7 +524,7 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
               help={t('setup.modelHelp', { example: PROVIDER_MODEL_EXAMPLE[provider] })}
             />
 
-            <ReasoningModelWarning text={t('setup.reasoningModelWarning')} />
+            <NoticeBox text={t('setup.reasoningModelWarning')} />
           </Stack>
         </Tabs.Content>
 
@@ -335,7 +609,7 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
               help={t('setup.customKeyHelp')}
             />
 
-            <ReasoningModelWarning text={t('setup.reasoningModelWarning')} />
+            <NoticeBox text={t('setup.reasoningModelWarning')} />
           </Stack>
         </Tabs.Content>
       </Tabs.Root>

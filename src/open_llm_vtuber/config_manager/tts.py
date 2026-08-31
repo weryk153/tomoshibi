@@ -288,6 +288,11 @@ class GPTSoVITSConfig(I18nMixin):
     batch_size: str = Field(..., alias="batch_size")
     media_type: str = Field(..., alias="media_type")
     streaming_mode: str = Field(..., alias="streaming_mode")
+    # 情緒 → 參考音。沒設就是現在的行為（整段對話一個語氣）。每一項要
+    # {ref_audio_path, prompt_text}，prompt_lang 可選。見 gpt_sovits_tts。
+    emotion_refs: Optional[Dict[str, Dict[str, str]]] = Field(
+        None, alias="emotion_refs"
+    )
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "api_url": Description(

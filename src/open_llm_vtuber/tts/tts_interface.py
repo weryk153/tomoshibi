@@ -6,7 +6,14 @@ from loguru import logger
 
 
 class TTSInterface(metaclass=abc.ABCMeta):
-    async def async_generate_audio(self, text: str, file_name_no_ext=None) -> str:
+    # 這個引擎的 generate_audio 吃不吃 emotion。預設 False，所以既有的十幾個
+    # 引擎一個字都不用改——它們的 generate_audio 仍然只被傳兩個參數。想支援的
+    # 引擎把它設成 True 並在 generate_audio 加一個 emotion 關鍵字參數。
+    supports_emotion: bool = False
+
+    async def async_generate_audio(
+        self, text: str, file_name_no_ext=None, emotion: str | None = None
+    ) -> str:
         """
         Asynchronously generate speech audio file using TTS.
 
@@ -22,6 +29,10 @@ class TTSInterface(metaclass=abc.ABCMeta):
         str: the path to the generated audio file
 
         """
+        if emotion and self.supports_emotion:
+            return await asyncio.to_thread(
+                self.generate_audio, text, file_name_no_ext, emotion
+            )
         return await asyncio.to_thread(self.generate_audio, text, file_name_no_ext)
 
     @abc.abstractmethod

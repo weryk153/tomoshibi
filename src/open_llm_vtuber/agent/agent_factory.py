@@ -92,6 +92,10 @@ class AgentFactory:
                     or kwargs.get("system_config", {}).get("player_language", "")
                     or ""
                 ),
+                # 短期記憶的截斷預算要知道推論端載了多大的 window，而那個值
+                # 只問得到、設定裡沒有（見 context_window 模組）。
+                llm_base_url=str(llm_config.get("base_url") or ""),
+                llm_model=str(llm_config.get("model") or ""),
             )
 
         elif conversation_agent_choice == "mem0_agent":

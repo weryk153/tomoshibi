@@ -165,7 +165,9 @@ class TTSTaskManager:
         audio_file_path = None
         try:
             async with self._synthesis_semaphore:
-                audio_file_path = await self._generate_audio(tts_engine, tts_text)
+                audio_file_path = await self._generate_audio(
+                    tts_engine, tts_text, emotion=getattr(actions, "emotion", None)
+                )
             # prepare_audio_payload does pydub/ffmpeg decode+re-encode and base64
             # encoding synchronously (utils/stream_audio.py) — non-trivial CPU work
             # per sentence. Keep it off the event loop, same as synthesis itself.
@@ -197,12 +199,25 @@ class TTSTaskManager:
                 tts_engine.remove_file(audio_file_path)
                 logger.debug("Audio cache file cleaned.")
 
-    async def _generate_audio(self, tts_engine: TTSInterface, text: str) -> str:
-        """Generate audio file from text"""
+    async def _generate_audio(
+        self, tts_engine: TTSInterface, text: str, emotion: Optional[str] = None
+    ) -> str:
+        """Generate audio file from text.
+
+        emotion 是這則回覆的情緒關鍵字（見 Actions.emotion）。支援的引擎拿它挑
+        參考音，其他引擎完全看不到這個參數（見 TTSInterface.supports_emotion）。
+        """
         logger.debug(f"🏃Generating audio for '''{text}'''...")
+        # 只有宣告支援的引擎才會看到 emotion 這個關鍵字。介面明說子類可以覆寫
+        # async_generate_audio（見 TTSInterface），而覆寫版的簽名是舊的兩個參數
+        # ——無條件傳下去會打破每一個這樣做的引擎，包括第三方的。
+        extra = {}
+        if emotion and getattr(tts_engine, "supports_emotion", False):
+            extra["emotion"] = emotion
         return await tts_engine.async_generate_audio(
             text=text,
             file_name_no_ext=f"{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}",
+            **extra,
         )
 
     def clear(self) -> None:

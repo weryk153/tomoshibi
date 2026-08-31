@@ -87,6 +87,7 @@ class TTSFactory:
                 batch_size=kwargs.get("batch_size"),
                 media_type=kwargs.get("media_type"),
                 streaming_mode=kwargs.get("streaming_mode"),
+                emotion_refs=kwargs.get("emotion_refs"),
             )
         elif engine_type == "siliconflow_tts":
             from .siliconflow_tts import SiliconFlowTTS

@@ -44,6 +44,10 @@ class _FakeLive2D:
         return None
 
     @staticmethod
+    def extract_emotion_keys(_text):
+        return []
+
+    @staticmethod
     def extract_motions(_text):
         return None
 

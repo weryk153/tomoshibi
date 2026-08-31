@@ -77,6 +77,12 @@ def actions_extractor(live2d_model: Live2dModel):
             Union[Tuple[SentenceWithTags, Actions], Dict[str, Any]]
         ]:  # Yield type hint
             stream = func(*args, **kwargs)
+            # 情緒關鍵字整則回覆只會出現一次，而且在最前面（見
+            # live2d_expression_prompt：寫在最後表情會來不及顯示）。但語音是一句
+            # 一句合成的，只有第一句拿得到關鍵字——不記住的話後面每一句都會退回
+            # 預設參考音，一則回覆裡聲音會從有情緒變回平的。
+            # 這個 wrapper 每則回覆重跑一次，閉包剛好就是「一則回覆」的作用域。
+            reply_emotion = None
             async for item in stream:
                 if isinstance(item, SentenceWithTags):
                     sentence = item
@@ -95,9 +101,15 @@ def actions_extractor(live2d_model: Live2dModel):
                         expressions = live2d_model.extract_emotion(sentence.text)
                         if expressions:
                             actions.expressions = expressions
+                        keys = live2d_model.extract_emotion_keys(sentence.text)
+                        if keys:
+                            reply_emotion = keys[0]
                         motions = live2d_model.extract_motions(sentence.text)
                         if motions:
                             actions.motions = motions
+                    # 標籤句（think 之類）不抽新情緒，但照樣沿用這則回覆的語氣：
+                    # 它們一樣會被唸出來。
+                    actions.emotion = reply_emotion
                     yield sentence, actions  # Yield the tuple
                 elif isinstance(item, dict):
                     # Pass through dictionaries

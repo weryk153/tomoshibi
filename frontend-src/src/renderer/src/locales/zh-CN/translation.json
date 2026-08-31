@@ -12,6 +12,16 @@
     "revert": "还原"
   },
   "setup": {
+    "detectTitle": "检测这台电脑上的模型",
+    "detectScanning": "正在扫描本机模型…",
+    "detectFound": "找到这些模型——选一个：",
+    "detectEmptyOllama": "Ollama 正在运行，但还没有任何模型。",
+    "detectEmptyLmStudio": "LM Studio 正在运行，但还没下载任何模型。请在 LM Studio 里下载一个模型后再回来检查——我们没法代你下载。",
+    "detectNothingRunning": "没有检测到本机的模型服务。请先安装 Ollama 或 LM Studio，然后再回来看看。",
+    "detectUse": "使用这个",
+    "detectApplied": "已应用 {{model}}",
+    "detectVision": "视觉",
+    "detectTools": "工具",
     "ollamaInstallTitle": "先安装 Ollama（免费）",
     "ollamaInstallDesc": "Ollama 是让 AI 在你电脑上运行的免费 app。装好后回来再点一次重新检测。",
     "ollamaInstallDownloadLink": "下载 Ollama",

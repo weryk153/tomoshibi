@@ -12,6 +12,16 @@
     "revert": "Revert"
   },
   "setup": {
+    "detectTitle": "Detect models on this computer",
+    "detectScanning": "Scanning for local models…",
+    "detectFound": "Found these models — pick one:",
+    "detectEmptyOllama": "Ollama is running, but it has no models yet.",
+    "detectEmptyLmStudio": "LM Studio is running, but no model is downloaded. Download one in LM Studio, then check again — we can't download it for you there.",
+    "detectNothingRunning": "No local model server was found. Install Ollama or LM Studio, then come back.",
+    "detectUse": "Use this model",
+    "detectApplied": "Applied {{model}}",
+    "detectVision": "Vision",
+    "detectTools": "Tools",
     "ollamaInstallTitle": "Install Ollama first (it's free)",
     "ollamaInstallDesc": "Ollama is the free app that runs the AI on your own computer. Install it, then come back and check again.",
     "ollamaInstallDownloadLink": "Download Ollama",

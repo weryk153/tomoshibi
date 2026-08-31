@@ -3,7 +3,7 @@
 // 刻意不含 React：這些是純資料轉換，所以能用 node:test 驗證。表單元件只負責
 // 呈現與狀態，送出前的欄位組裝與驗證都在這裡。
 
-import { apiGet, apiPost, type ApiResult } from './http.ts'
+import { apiGet, apiPost, buildUrl, type ApiResult } from './http.ts'
 
 export type LlmMode = 'apikey' | 'ollama' | 'custom'
 export type ApiKeyProvider = 'openai' | 'claude' | 'gemini'
@@ -80,3 +80,143 @@ export const saveLlmConfig = (
 // 後端對 localhost:11434 的逾時是 4 秒，前端給 6 秒緩衝。
 export const fetchOllamaModels = (baseUrl: string): Promise<ApiResult<unknown>> =>
   apiGet<unknown>(baseUrl, '/api/llm-config/ollama-models', 6000)
+
+// --- 偵測本機模型（LM Studio／Ollama） --------------------------------------- //
+//
+// 這兩個端點是 Task 8 後端的產物，這裡只是薄薄的 typed 包裝，形狀比照上面
+// fetchOllamaModels／saveLlmConfig 的既有慣例：apiGet／apiPost 回傳
+// ApiResult<T>，逾時另外算，不做重試。
+
+export interface DetectedModel {
+  id: string
+  backend: 'lmstudio' | 'ollama'
+  base_url: string
+  arch: string | null
+  is_vlm: boolean
+  supports_tools: boolean
+  max_context: number | null
+  quantization: string | null
+}
+
+export interface DetectResponse {
+  models: DetectedModel[]
+  lmstudio_available: boolean
+  ollama_available: boolean
+  recommended_pull: string
+}
+
+// 後端兩個探測各自 3 秒逾時、平行跑（asyncio.gather），最壞情況約 3 秒——
+// 8 秒給足緩衝，不用比照本機推論那種要等模型冷啟動的逾時。
+export const detectModels = (baseUrl: string): Promise<ApiResult<DetectResponse>> =>
+  apiGet<DetectResponse>(baseUrl, '/api/llm-config/detect', 8000)
+
+export interface ApplyDetectedResult {
+  ok: boolean
+  applied?: {
+    provider: string
+    model: string
+    is_vlm: boolean
+    supports_tools: boolean
+    max_context: number | null
+  }
+  note?: string | null
+  error?: string
+}
+
+// 逾時比照 saveLlmConfig：套用前會做一次真實 ping，本機模型冷啟動預算 90 秒
+// （llm_config_route.py 的 LOCAL_TEST_CALL_TIMEOUT），前端要比它寬鬆。
+export const applyDetectedModel = (
+  baseUrl: string,
+  backend: string,
+  model: string,
+): Promise<ApiResult<ApplyDetectedResult>> =>
+  apiPost<ApplyDetectedResult>(
+    baseUrl,
+    '/api/llm-config/apply-detected',
+    { backend, model },
+    100000,
+  )
+
+// --- Ollama 一鍵下載推薦模型 -------------------------------------------------- //
+//
+// POST /api/llm-config/ollama-pull 把 Ollama 的下載進度逐行轉成 NDJSON 串流
+// 給前端（見 llm_config_route.py 的 stream()）。這條路徑走不了 apiPost：
+// http.ts 的 request() 一次把整個回應當 JSON 讀完，串流要邊收邊解析，所以另外
+// 用一個薄的 fetch + ReadableStream，錯誤處理沿用 http.ts 的風格（絕不讓例外
+// 逸出、一律回傳一個帶 ok 欄位的結果、技術性錯誤訊息用中文字面量而不是 i18n
+// ——跟 buildUrl/normalizeError 旁邊那些逾時／網路錯誤訊息一致）。
+
+export interface OllamaPullEvent {
+  status?: string
+  error?: string
+  completed?: number
+  total?: number
+}
+
+export async function pullOllamaModel(
+  baseUrl: string,
+  model: string,
+  onEvent: (event: OllamaPullEvent) => void,
+): Promise<{ ok: boolean; error?: string }> {
+  let res: Response
+  try {
+    res = await fetch(buildUrl(baseUrl, '/api/llm-config/ollama-pull'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model }),
+    })
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '網路錯誤' }
+  }
+
+  // 目前的後端實作一律回 200，失敗都包成 NDJSON 裡的 {"status":"error",...}
+  // （見 llm_config_route.py 的 stream()）。這裡多檢查一次 res.ok 只是防禦——
+  // 萬一請求被中間層擋下（例如反向代理回 502 HTML 頁），不要把那份 HTML
+  // 當成串流逐行硬解析，直接用狀態碼給一句看得懂的錯誤。
+  if (!res.ok) {
+    return { ok: false, error: `請求失敗（HTTP ${res.status}）` }
+  }
+
+  if (!res.body) {
+    return { ok: false, error: '瀏覽器不支援串流回應。' }
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let sawError: string | null = null
+  let sawSuccess = false
+
+  try {
+    for (;;) {
+      // eslint-disable-next-line no-await-in-loop
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+      for (const line of lines) {
+        if (!line.trim()) continue
+        let parsed: OllamaPullEvent
+        try {
+          parsed = JSON.parse(line)
+        } catch {
+          continue
+        }
+        onEvent(parsed)
+        if (parsed.error || parsed.status === 'error') {
+          sawError = parsed.error || '下載失敗。'
+        }
+        if (parsed.status === 'success') {
+          sawSuccess = true
+        }
+      }
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '串流中斷。' }
+  }
+
+  if (sawError) return { ok: false, error: sawError }
+  if (!sawSuccess) return { ok: false, error: '下載未完成就中斷了，請再試一次。' }
+  return { ok: true }
+}
