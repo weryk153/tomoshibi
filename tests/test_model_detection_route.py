@@ -62,13 +62,14 @@ def client(tmp_path, monkeypatch):
 
 def test_detect_merges_both_backends(client, monkeypatch):
     c, _ = client
-    monkeypatch.setattr(route, "list_lmstudio_models", lambda base_url: [LMS])
+    monkeypatch.setattr(route, "probe_lmstudio", lambda base_url: (True, [LMS]))
     monkeypatch.setattr(
         route,
-        "list_ollama_models",
-        lambda base_url: [
-            DetectedModel(id="qwen3:8b", backend="ollama", base_url=base_url)
-        ],
+        "probe_ollama",
+        lambda base_url: (
+            True,
+            [DetectedModel(id="qwen3:8b", backend="ollama", base_url=base_url)],
+        ),
     )
     body = c.get("/api/llm-config/detect").json()
     ids = [m["id"] for m in body["models"]]
@@ -80,14 +81,40 @@ def test_detect_merges_both_backends(client, monkeypatch):
 def test_detect_survives_both_backends_being_down(client, monkeypatch):
     """都沒在跑不是錯誤——精靈要能顯示「請先裝一個」而不是白畫面。"""
     c, _ = client
-    monkeypatch.setattr(route, "list_lmstudio_models", lambda base_url: [])
-    monkeypatch.setattr(route, "list_ollama_models", lambda base_url: [])
+    monkeypatch.setattr(route, "probe_lmstudio", lambda base_url: (False, []))
+    monkeypatch.setattr(route, "probe_ollama", lambda base_url: (False, []))
     resp = c.get("/api/llm-config/detect")
     assert resp.status_code == 200
     body = resp.json()
     assert body["models"] == []
     assert body["lmstudio_available"] is False
+    assert body["ollama_available"] is False
     assert body["recommended_pull"]  # 仍要給得出下載建議
+
+
+def test_detect_ollama_reachable_but_no_models(client, monkeypatch):
+    """R17 修的那個 bug：daemon 在跑但一顆模型都沒有，不能跟「根本沒裝」回傳
+    同一個 ollama_available=False——這兩種情況前端要給完全不同的建議
+    （「去下載一個模型」vs「去把 Ollama 打開」），過去用 bool(models) 算旗標
+    時分不出來。"""
+    c, _ = client
+    monkeypatch.setattr(route, "probe_lmstudio", lambda base_url: (False, []))
+    monkeypatch.setattr(route, "probe_ollama", lambda base_url: (True, []))
+    body = c.get("/api/llm-config/detect").json()
+    assert body["models"] == []
+    assert body["ollama_available"] is True
+    assert body["lmstudio_available"] is False
+
+
+def test_detect_lmstudio_reachable_but_no_models(client, monkeypatch):
+    """理由同上一條，換成 LM Studio 這邊可達但沒有模型。"""
+    c, _ = client
+    monkeypatch.setattr(route, "probe_lmstudio", lambda base_url: (True, []))
+    monkeypatch.setattr(route, "probe_ollama", lambda base_url: (False, []))
+    body = c.get("/api/llm-config/detect").json()
+    assert body["models"] == []
+    assert body["lmstudio_available"] is True
+    assert body["ollama_available"] is False
 
 
 def test_apply_writes_model_and_profile(client, monkeypatch):

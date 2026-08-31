@@ -83,6 +83,32 @@ def test_list_failure_returns_empty(monkeypatch):
     assert model_probe.list_ollama_models(BASE) == []
 
 
+def test_probe_distinguishes_unreachable_from_reachable_but_empty(monkeypatch):
+    """probe_ollama() 的重點：連不上 vs 連得上但零模型是兩種不同的
+    (reachable, models) 組合——理由同 test_model_probe_lmstudio.py 那條
+    對稱測試。"""
+
+    def boom(base_url):
+        raise RuntimeError("connection refused")
+
+    monkeypatch.setattr(model_probe, "fetch_ollama_tags", boom)
+    reachable, models = model_probe.probe_ollama(BASE)
+    assert reachable is False
+    assert models == []
+
+    monkeypatch.setattr(model_probe, "fetch_ollama_tags", lambda base_url: [])
+    reachable, models = model_probe.probe_ollama(BASE)
+    assert reachable is True, "daemon 連得上但還沒 pull 任何模型，仍然是可達的"
+    assert models == []
+
+
+def test_probe_reachable_with_models(monkeypatch):
+    monkeypatch.setattr(model_probe, "fetch_ollama_tags", lambda base_url: TAGS["models"])
+    reachable, models = model_probe.probe_ollama(BASE)
+    assert reachable is True
+    assert len(models) == 2
+
+
 def test_describe_failure_returns_none(monkeypatch):
     def boom(base_url, model_id):
         raise RuntimeError("nope")

@@ -53,6 +53,8 @@ from .model_probe import (
     describe_ollama_model,
     list_lmstudio_models,
     list_ollama_models,
+    probe_lmstudio,
+    probe_ollama,
 )
 from .model_profiles import profile_for, recommended_model
 from .system_probe import total_ram_bytes
@@ -760,23 +762,30 @@ def init_llm_config_route() -> APIRouter:
 
         兩邊都連不上不是錯誤——精靈要能顯示「請先裝一個」而不是白畫面。所以
         一律回 200，用 *_available 告訴前端發生了什麼。
+
+        *_available 是**可達性**（daemon 連不連得上），不是「有沒有模型」。
+        這兩者曾經被 bool(models) 混在一起——「連得上但一顆模型都沒下載」
+        跟「根本沒裝」在那個寫法下是同一個值，前端因此永遠分不出「請下載一個
+        模型」跟「請先安裝」這兩種完全不同的建議（first-run-model-detection
+        Task 9 接上前端才發現）。probe_lmstudio()／probe_ollama() 把兩件事分開
+        回傳，這裡才能各自轉成正確的旗標。
         """
         if not _is_local_request(request):
             return _forbidden()
 
         # 兩個 probe 互相獨立，沒有理由排隊等——循序做的話，其中一個推論端
         # 「有在聽但卡住」時，最壞延遲會從 max(兩者) 變成 sum(兩者)。
-        lms, olm, ram = await asyncio.gather(
-            asyncio.to_thread(list_lmstudio_models, LMSTUDIO_DEFAULT_BASE_URL),
-            asyncio.to_thread(list_ollama_models, OLLAMA_DEFAULT_BASE_URL),
+        (lms_reachable, lms), (olm_reachable, olm), ram = await asyncio.gather(
+            asyncio.to_thread(probe_lmstudio, LMSTUDIO_DEFAULT_BASE_URL),
+            asyncio.to_thread(probe_ollama, OLLAMA_DEFAULT_BASE_URL),
             asyncio.to_thread(total_ram_bytes),
         )
 
         return JSONResponse(
             {
                 "models": [asdict(m) for m in [*lms, *olm]],
-                "lmstudio_available": bool(lms),
-                "ollama_available": bool(olm),
+                "lmstudio_available": lms_reachable,
+                "ollama_available": olm_reachable,
                 "recommended_pull": recommended_model(ram),
             }
         )

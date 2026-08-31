@@ -79,23 +79,39 @@ def _lmstudio_entry(raw: dict, base_url: str) -> DetectedModel | None:
     )
 
 
-def list_lmstudio_models(base_url: str) -> list[DetectedModel]:
-    """LM Studio 上可用於對話的模型。連不上就回空清單。
+def probe_lmstudio(base_url: str) -> tuple[bool, list[DetectedModel]]:
+    """探測 LM Studio，回傳 (可達, 模型清單) 兩件分開的事。
 
-    fail-soft 是刻意的：連不上不是錯誤，是「這個後端現在沒有模型」。首次啟動
-    精靈不能因為使用者沒裝 LM Studio 就壞掉。
+    「連得上但一顆模型都沒下載」跟「連不上」都會讓模型清單是空的，但對使用者
+    該給的建議完全不同——前者是「去下載一個模型」，後者是「去把 LM Studio
+    打開」。這兩者以前被 list_lmstudio_models() 折疊成同一個空清單，呼叫端
+    （detect 端點）拿 bool(models) 當「LM Studio 可用」的訊號，結果永遠分不出
+    這兩種情況（見 tomoshibi 這次修的 bug：first-run-model-detection Task 9）。
+    fetch_lmstudio_models() 連不上時丟例外，這裡把它接住並轉成
+    reachable=False，而不是讓兩種情況都變成「回空清單」。
     """
     try:
         raw_list = fetch_lmstudio_models(base_url)
     except Exception as e:
         logger.debug(f"[model_probe] LM Studio probe failed at {base_url}: {e}")
-        return []
+        return False, []
     out = []
     for raw in raw_list:
         entry = _lmstudio_entry(raw, base_url)
         if entry is not None:
             out.append(entry)
-    return out
+    return True, out
+
+
+def list_lmstudio_models(base_url: str) -> list[DetectedModel]:
+    """LM Studio 上可用於對話的模型。連不上或連得上但沒有模型都回空清單。
+
+    只要模型清單、不在乎可不可達的呼叫端用這個（例如 apply-detected 要重新
+    核對使用者選的模型是否還在）。要分辨「連不上」跟「可達但沒模型」的呼叫端
+    （例如 detect 端點）改用 probe_lmstudio()，不要在這個函式的空清單結果上
+    自己猜原因。
+    """
+    return probe_lmstudio(base_url)[1]
 
 
 def ollama_root(base_url: str) -> str:
@@ -120,14 +136,18 @@ def fetch_ollama_show(base_url: str, model_id: str) -> dict:
         return client.post(url, json={"model": model_id}).json()
 
 
-def list_ollama_models(base_url: str) -> list[DetectedModel]:
-    """Ollama 上有哪些模型。只回名字——能力要逐顆問 /api/show，二十顆模型就是
-    二十次請求，所以留到使用者選定之後（見 describe_ollama_model）。"""
+def probe_ollama(base_url: str) -> tuple[bool, list[DetectedModel]]:
+    """探測 Ollama，回傳 (可達, 模型清單)。語意同 probe_lmstudio()——可達性跟
+    有沒有模型是兩件事，呼叫端不該用模型清單是不是空的去猜可達性。
+
+    只回名字——能力要逐顆問 /api/show，二十顆模型就是二十次請求，所以留到
+    使用者選定之後（見 describe_ollama_model）。
+    """
     try:
         raw_list = fetch_ollama_tags(base_url)
     except Exception as e:
         logger.debug(f"[model_probe] Ollama probe failed at {base_url}: {e}")
-        return []
+        return False, []
     out = []
     for raw in raw_list:
         if not isinstance(raw, dict):
@@ -144,7 +164,16 @@ def list_ollama_models(base_url: str) -> list[DetectedModel]:
                 arch=(str(details["family"]).strip() if details.get("family") else None),
             )
         )
-    return out
+    return True, out
+
+
+def list_ollama_models(base_url: str) -> list[DetectedModel]:
+    """Ollama 上有哪些模型。連不上或連得上但沒有模型都回空清單。
+
+    只要模型清單、不在乎可不可達的呼叫端用這個。要分辨「連不上」跟「可達但
+    沒模型」改用 probe_ollama()——理由同 list_lmstudio_models()。
+    """
+    return probe_ollama(base_url)[1]
 
 
 def _ollama_context_length(model_info: dict, arch: str | None) -> int | None:

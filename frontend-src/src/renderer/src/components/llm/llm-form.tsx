@@ -191,26 +191,17 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
   const [pullPercent, setPullPercent] = useState<number | null>(null);
   const [pullError, setPullError] = useState<string | null>(null);
 
-  // /api/llm-config/detect 的 ollama_available／lmstudio_available 其實是
-  // 「探測到至少一顆模型」（route 裡就是 bool(lms)／bool(olm)，兩份清單都是
-  // 探測不到東西時一律回空陣列），不是「daemon 有沒有在跑」。這代表「Ollama
-  // 在跑但沒有模型」跟「Ollama 根本沒裝」在這個端點的回應裡是同一個值
-  // （false + 空清單），單靠它分不出來——brief 的四狀態表格假設這兩種狀態
-  // 分得出來，但拿到的資料做不到。
-  //
-  // Ollama 這邊有補救：既有的 /api/llm-config/ollama-models（這裡就是
-  // fetchOllamaModels，Ollama 分頁探測在用的那支）回的 available 是真正的
-  // 「連得到 daemon」，跟模型數量無關，所以清單是空的時候額外打一次，用它
-  // 分辨「在跑但沒模型」與「沒在跑」。LM Studio 沒有對應的端點，這個區分目前
-  // 做不到——下面 lmstudio-empty 那個分支因此永遠不會被觸發，是刻意保留、
-  // 有註解的死路，不是漏刪：detect 端點未來若把 lmstudio_available 改成真正
-  // 的可達性訊號，這裡不用再改就會生效。詳情見這次任務的報告。
-  const [ollamaReachable, setOllamaReachable] = useState<boolean | null>(null);
-
+  // /api/llm-config/detect 的 ollama_available／lmstudio_available 曾經是
+  // 「探測到至少一顆模型」（bool(models)），跟「daemon 有沒有在跑」是兩件事——
+  // 「Ollama 在跑但沒有模型」跟「Ollama 根本沒裝」在那個算法下是同一個值。
+  // 這裡原本因此得繞道另一支既有端點（/api/llm-config/ollama-models）幫
+  // Ollama 補一個真正的可達性訊號，LM Studio 沒有對應端點所以那個分支是
+  // 死路。R17 已經修根因：detect 端點現在用 probe_lmstudio()／probe_ollama()
+  // （見 model_probe.py），*_available 對兩個後端都是真正的可達性，不用再
+  // 繞道，兩個分支現在都是活的。
   const runDetect = useCallback(async () => {
     setDetectStatus('loading');
     setDetectError(null);
-    setOllamaReachable(null);
     const result = await detectModels(backendBaseUrl);
     if (!result.ok) {
       setDetectStatus('error');
@@ -218,12 +209,6 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
       return;
     }
     setDetectResult(result.data);
-
-    if (result.data.models.length === 0) {
-      const probe = await fetchOllamaModels(backendBaseUrl);
-      const reachable = probe.ok && Boolean((probe.data as { available?: boolean } | null)?.available);
-      setOllamaReachable(reachable);
-    }
     setDetectStatus('ready');
   }, [backendBaseUrl]);
 
@@ -451,7 +436,7 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
             )}
 
             {detectStatus === 'ready' && detectResult && detectResult.models.length === 0
-              && ollamaReachable === true && (
+              && detectResult.ollama_available && (
                 <Stack gap={2}>
                   <Text fontSize="sm" color="orange.300">{t('setup.detectEmptyOllama')}</Text>
                   <Text fontWeight="semibold">{t('setup.ollamaRecommendedTitle')}</Text>
@@ -480,19 +465,13 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
                 </Stack>
             )}
 
-            {/* 目前永遠不會觸發：detect 端點的 lmstudio_available 是「探測到
-                模型」而不是「daemon 可達」，兩者都空清單時無法區分「LM Studio
-                在跑但沒模型」與「根本沒裝」。沒有對應 ollama-models 那種的
-                獨立探測端點可用，這個區分做不到——見上面 ollamaReachable
-                旁邊的說明與這次任務報告。分支留著：一旦 detect 端點修好，
-                這裡不用改就會生效。 */}
             {detectStatus === 'ready' && detectResult && detectResult.models.length === 0
-              && ollamaReachable === false && detectResult.lmstudio_available && (
+              && !detectResult.ollama_available && detectResult.lmstudio_available && (
                 <Text fontSize="sm" color="orange.300">{t('setup.detectEmptyLmStudio')}</Text>
             )}
 
             {detectStatus === 'ready' && detectResult && detectResult.models.length === 0
-              && ollamaReachable === false && !detectResult.lmstudio_available && (
+              && !detectResult.ollama_available && !detectResult.lmstudio_available && (
                 <Text fontSize="sm" color="orange.300">{t('setup.detectNothingRunning')}</Text>
             )}
           </Stack>
