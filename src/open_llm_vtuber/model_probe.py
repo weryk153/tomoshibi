@@ -41,10 +41,15 @@ def lmstudio_root(base_url: str) -> str:
     return base_url.rstrip("/").removesuffix("/v1")
 
 
-def fetch_lmstudio_models(base_url: str) -> list[dict]:
-    """打 /api/v0/models，回原始的 data 陣列。失敗丟例外，由呼叫端決定怎麼降級。"""
+def fetch_lmstudio_models(base_url: str, timeout: float = _TIMEOUT) -> list[dict]:
+    """打 /api/v0/models，回原始的 data 陣列。失敗丟例外，由呼叫端決定怎麼降級。
+
+    timeout：
+      - 預設 3.0s（設定期，使用者願意等）
+      - context_window 呼叫時傳 1.5s（對話路徑上，同步在事件迴圈，要快速失敗）
+    """
     url = f"{lmstudio_root(base_url)}/api/v0/models"
-    with httpx.Client(timeout=_TIMEOUT) as client:
+    with httpx.Client(timeout=timeout) as client:
         payload = client.get(url).json()
     data = payload.get("data")
     return data if isinstance(data, list) else []

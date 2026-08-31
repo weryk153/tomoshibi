@@ -10,7 +10,7 @@
 
 import pytest
 
-from src.open_llm_vtuber import model_probe
+from src.open_llm_vtuber import model_probe, context_window
 
 PAYLOAD = {
     "data": [
@@ -108,3 +108,39 @@ def test_garbage_entries_are_skipped(fake_fetch):
     fake_fetch({"data": ["not a dict", {"type": "llm"}, {"id": "ok", "type": "llm"}]})
     ids = [m.id for m in model_probe.list_lmstudio_models(BASE)]
     assert ids == ["ok"], "沒有 id 的項目要丟掉"
+
+
+def test_context_window_uses_its_own_timeout(monkeypatch):
+    """context_window._probe_lmstudio 要用 1.5s 而不是 model_probe 的 3.0s 預設。
+
+    對話中途的探測要快速失敗（同步在事件迴圈），設定期的 list_lmstudio_models
+    則使用者願意等。
+    """
+    # 先清快取
+    context_window.reset_cache()
+
+    captured_args = []
+
+    def capture_fetch(base_url, timeout=3.0):
+        """Mock fetch_lmstudio_models，記錄收到的 timeout 引數。"""
+        captured_args.append({"timeout": timeout})
+        # 回傳一個有 loaded_context_length 的假模型
+        return [{"id": "test-model-unique", "loaded_context_length": 8192}]
+
+    # Monkeypatch context_window 的 fetch_lmstudio_models
+    # （它是從 model_probe import 過來的，但要在 context_window namespace 改）
+    monkeypatch.setattr(context_window, "fetch_lmstudio_models", capture_fetch)
+
+    # 呼叫 context_window 的探測
+    result = context_window._probe_lmstudio("http://unique.test:1234/v1", None)
+
+    # 驗證回傳值
+    assert result == 8192
+
+    # 驗證 timeout 確實是 1.5s（_PROBE_TIMEOUT），不是 3.0s（model_probe._TIMEOUT）
+    assert len(captured_args) == 1
+    assert captured_args[0]["timeout"] == context_window._PROBE_TIMEOUT
+    assert captured_args[0]["timeout"] == 1.5
+
+    # 清理快取
+    context_window.reset_cache()

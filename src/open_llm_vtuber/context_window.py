@@ -31,7 +31,7 @@ from loguru import logger
 
 from .model_probe import fetch_lmstudio_models, lmstudio_root
 
-_PROBE_TIMEOUT = 1.5
+_PROBE_TIMEOUT = 1.5  # 對話中途呼叫，同步在 event loop 上，要快速失敗；設定期用 3.0s
 _RETRY_COOLDOWN = 60.0  # 問不到時，至少隔這麼久才再問一次
 
 # base_url -> window。None 代表問過但問不出來（例如模型還沒載入、端點不存在）。
@@ -49,10 +49,14 @@ def _probe_lmstudio(base_url: str, model: str | None) -> int | None:
     """回傳目前載入的 context 長度；問不到回 None。
 
     多個模型同時載入時優先認呼叫端指名的那個——對話用的是哪顆，預算就該照哪顆算。
+
+    使用縮短的 timeout（1.5s）而不是 model_probe 的預設（3.0s），因為這個函式
+    在對話中途被呼叫，是同步的且在 event loop 上，需要快速失敗。設定期的
+    list_lmstudio_models 使用者願意等更久，用預設的 3.0s。
     """
     loaded = [
         m
-        for m in fetch_lmstudio_models(base_url)
+        for m in fetch_lmstudio_models(base_url, timeout=_PROBE_TIMEOUT)
         if isinstance(m, dict) and m.get("loaded_context_length")
     ]
     if not loaded:
