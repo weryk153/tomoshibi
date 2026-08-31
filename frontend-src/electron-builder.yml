@@ -29,7 +29,10 @@ mac:
   target:
     - target: dmg
       arch: [x64, arm64]
-  entitlementsInherit: build/entitlements.mac.plist
+  # resources/ 而不是預設的 build/：build 在 .gitignore 裡（第 19 行），
+  # 放那邊的話這個檔進不了版控，簽章時就會找不到。
+  entitlements: resources/entitlements.mac.plist
+  entitlementsInherit: resources/entitlements.mac.plist
   extendInfo:
     - NSCameraUsageDescription: Application requests access to the device's camera.
     - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
@@ -44,12 +47,16 @@ linux:
     - AppImage
     - snap
     - deb
-  maintainer: electronjs.org
+  maintainer: Kuren Peng <weryk153@users.noreply.github.com>
   category: Utility
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:
   provider: github
-  releaseType: release
+  owner: weryk153
+  repo: tomoshibi
+  # draft，不是 release：打包時就算帶了 --publish，也只會產生草稿，
+  # 要不要公開由人按下去決定。目前還沒有任何打包發行版。
+  releaseType: draft
   publishAutoUpdate: false
