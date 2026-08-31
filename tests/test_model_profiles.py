@@ -61,6 +61,22 @@ def test_no_arch_returns_none():
     assert mp.profile_for(_model(arch=None), PROFILES) is None
 
 
+def test_matches_unnormalized_mixed_case_profiles():
+    """profile_for 對未經 normalize() 的輸入也要成立——match_backend 跟
+    match_arch 一樣都要在這裡自己 lower，不能只信任已正規化的資料。"""
+    unnormalized = [
+        {
+            "match_arch": ["QWEN35"],
+            "match_backend": "LMStudio",
+            "extra_body": {"reasoning_effort": "none"},
+            "note": "混合大小寫，未過 normalize()。",
+        }
+    ]
+    p = mp.profile_for(_model(arch="qwen35", backend="lmstudio"), unnormalized)
+    assert p is not None
+    assert p["extra_body"] == {"reasoning_effort": "none"}
+
+
 def test_first_match_wins_and_warns(caplog):
     dupes = [
         {"match_arch": ["x"], "extra_body": {"a": "1"}, "note": "第一條"},

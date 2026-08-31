@@ -84,7 +84,13 @@ def load_profiles(path: str | None = None) -> list[dict]:
 def profile_for(
     model: DetectedModel, profiles: list[dict] | None = None
 ) -> dict | None:
-    """這顆模型要不要套什麼必要設定。查不到回 None——不猜、不套通用建議值。"""
+    """這顆模型要不要套什麼必要設定。查不到回 None——不猜、不套通用建議值。
+
+    對未經 normalize() 的 profiles 也成立：match_arch / match_backend 兩邊都
+    在這裡自行 strip().lower()，不假設呼叫端已經正規化過。這是刻意的保證，
+    不是巧合——`profiles` 是公開可直接傳入的參數，靜默比不中正是這個檔案要
+    防止的那類失敗。
+    """
     if not model.arch:
         return None
     candidates = load_profiles() if profiles is None else profiles
@@ -95,7 +101,10 @@ def profile_for(
         p
         for p in candidates
         if arch in [a.strip().lower() for a in p.get("match_arch", [])]
-        and (not p.get("match_backend") or p["match_backend"] == backend)
+        and (
+            not p.get("match_backend")
+            or str(p["match_backend"]).strip().lower() == backend
+        )
     ]
     if not hits:
         return None
