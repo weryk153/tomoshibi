@@ -108,8 +108,12 @@ class TTSEngine(TTSInterface):
     def generate_audio(self, text, file_name_no_ext=None, emotion=None):
         file_name = self.generate_cache_file_name(file_name_no_ext, self.media_type)
         cleaned_text = re.sub(r"\[.*?\]", "", text)
-        cleaned_text = re.sub(r"\(\*[^)]*\)", "", cleaned_text)  # strip (*action*) roleplay text
-        cleaned_text = re.sub(r"\*[^*]+\*", "", cleaned_text)  # strip *action* inline text
+        cleaned_text = re.sub(
+            r"\(\*[^)]*\)", "", cleaned_text
+        )  # strip (*action*) roleplay text
+        cleaned_text = re.sub(
+            r"\*[^*]+\*", "", cleaned_text
+        )  # strip *action* inline text
         cleaned_text = cleaned_text.strip()
         ref_audio_path, prompt_text, prompt_lang = self._ref_for(emotion)
         # Prepare the data for the POST request

@@ -50,7 +50,11 @@ def test_the_prompt_shows_a_keyword_inside_a_spoken_line():
     head, _, tail = text.partition("範例（錯誤")
     assert "[" in head and "]" in head
     good_examples = [
-        line for line in head.splitlines()
-        if "[" in line and "]" in line and "規則" not in line and "關鍵字要用" not in line
+        line
+        for line in head.splitlines()
+        if "[" in line
+        and "]" in line
+        and "規則" not in line
+        and "關鍵字要用" not in line
     ]
     assert good_examples, "正確範例裡沒有任何一句帶方括號關鍵字的台詞"

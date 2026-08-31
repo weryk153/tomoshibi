@@ -30,9 +30,10 @@ def test_write_openai_block_also_points_llm_provider_at_it(tmp_path, monkeypatch
     text = conf.read_text(encoding="utf-8")
     assert "openai_compatible_llm" in text
     assert "new-model" in text
-    assert "llm_provider: 'openai_compatible_llm'" in text or \
-           'llm_provider: "openai_compatible_llm"' in text, \
-        "llm_provider 必須被指向 openai_compatible_llm，否則存檔不生效"
+    assert (
+        "llm_provider: 'openai_compatible_llm'" in text
+        or 'llm_provider: "openai_compatible_llm"' in text
+    ), "llm_provider 必須被指向 openai_compatible_llm，否則存檔不生效"
 
 
 def test_is_configured_respects_llm_provider(tmp_path, monkeypatch):
@@ -100,8 +101,7 @@ def test_empty_llm_provider_falls_through_to_block_check(tmp_path, monkeypatch):
 
     data = _load_conf()
     assert asyncio.run(_is_configured_for_conf(data)) is False, (
-        "llm_provider 是空字串時 agent 開機會直接失敗，"
-        "不能因為短路邏輯就回報「已設定」"
+        "llm_provider 是空字串時 agent 開機會直接失敗，不能因為短路邏輯就回報「已設定」"
     )
 
 
@@ -114,8 +114,12 @@ def test_resolve_base_url_default_fills_in_when_field_omitted():
         PROVIDER_DEFAULT_BASE_URL,
     )
 
-    assert _resolve_base_url_default("openai", None) == PROVIDER_DEFAULT_BASE_URL["openai"]
-    assert _resolve_base_url_default("ollama", None) == PROVIDER_DEFAULT_BASE_URL["ollama"]
+    assert (
+        _resolve_base_url_default("openai", None) == PROVIDER_DEFAULT_BASE_URL["openai"]
+    )
+    assert (
+        _resolve_base_url_default("ollama", None) == PROVIDER_DEFAULT_BASE_URL["ollama"]
+    )
 
 
 def test_resolve_base_url_default_leaves_explicit_empty_string_alone():

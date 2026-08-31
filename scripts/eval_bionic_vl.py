@@ -373,18 +373,23 @@ def _vision_cases(
         grounding_checks = [
             (
                 "reads editor",
-                lambda text: any(token in text for token in ("VS Code", "Visual Studio Code")),
+                lambda text: any(
+                    token in text for token in ("VS Code", "Visual Studio Code")
+                ),
             ),
             ("reads active file", lambda text: "service_context.py" in text),
             (
                 "reads right-side character",
                 lambda text: any(
-                    token in text for token in ("角色", "人物", "女孩", "Live2D", "虛擬")
+                    token in text
+                    for token in ("角色", "人物", "女孩", "Live2D", "虛擬")
                 ),
             ),
             (
                 "reads bottom terminal",
-                lambda text: any(token in text for token in ("終端機", "終端", "日誌", "log")),
+                lambda text: any(
+                    token in text for token in ("終端機", "終端", "日誌", "log")
+                ),
             ),
             (
                 "does not invent an edit",
@@ -713,7 +718,8 @@ def _vision_cases(
                     ),
                     (
                         "does not repeat active-file observation",
-                        lambda text: "你正在 VS Code 編輯 service_context.py" not in text,
+                        lambda text: "你正在 VS Code 編輯 service_context.py"
+                        not in text,
                     ),
                     (
                         "respects screen-only boundary",
@@ -875,7 +881,9 @@ def main() -> int:
                                 visual_facts,
                             )
                     request_messages[-1]["content"] = [
-                        item for item in final_content if item.get("type") != "image_url"
+                        item
+                        for item in final_content
+                        if item.get("type") != "image_url"
                     ]
 
         completion = client.chat.completions.create(

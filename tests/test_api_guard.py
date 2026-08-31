@@ -49,9 +49,7 @@ def test_a_request_without_a_client_is_not_trusted():
     assert g.is_trusted_request(_request(None)) is False
 
 
-@pytest.mark.parametrize(
-    "header", ["x-forwarded-for", "x-real-ip", "forwarded"]
-)
+@pytest.mark.parametrize("header", ["x-forwarded-for", "x-real-ip", "forwarded"])
 def test_localhost_behind_a_proxy_is_not_trusted(header):
     # 這是最重要的一條：來源是 localhost 但帶著轉發標頭，代表前面有反向代理，
     # 真正的使用者可能在任何地方。放行等於誰都能改設定。
@@ -66,7 +64,9 @@ def test_tailscale_range_is_recognised(ip):
     assert g.is_tailscale_ip(ip) is True
 
 
-@pytest.mark.parametrize("ip", ["100.63.0.1", "100.128.0.1", "10.0.0.1", "", "100.x.1.1"])
+@pytest.mark.parametrize(
+    "ip", ["100.63.0.1", "100.128.0.1", "10.0.0.1", "", "100.x.1.1"]
+)
 def test_addresses_outside_the_range_are_not_tailscale(ip):
     assert g.is_tailscale_ip(ip) is False
 

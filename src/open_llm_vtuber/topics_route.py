@@ -58,6 +58,7 @@ _STARTUP_DELAY_SECONDS = 30
 
 # --- 數值整理 ----------------------------------------------------------------
 
+
 def _clamp_interval(value: Any) -> int:
     """把間隔夾進 [MIN, MAX] 小時；看不懂的值 fail-soft 回預設。"""
     try:
@@ -96,6 +97,7 @@ def _now_iso() -> str:
 
 
 # --- 狀態檔 ------------------------------------------------------------------
+
 
 def _default_state() -> dict:
     return {
@@ -170,6 +172,7 @@ def _write_state(state: dict) -> None:
 
 # --- 話題 → 新聞 -------------------------------------------------------------
 
+
 def _get_news_module():
     """新聞模組。抽成函式是為了讓測試 monkeypatch 得到同一個物件。"""
     return news_topics
@@ -235,7 +238,9 @@ async def _fetch_news_in_thread(topics: list) -> tuple[list, bool, int]:
     try:
         seen = await asyncio.to_thread(nt.load_seen)
     except Exception as e:
-        logger.warning(f"[topics] seen load failed, treating as empty: {type(e).__name__}")
+        logger.warning(
+            f"[topics] seen load failed, treating as empty: {type(e).__name__}"
+        )
         seen = {}
 
     new_titles: list = []
@@ -314,7 +319,9 @@ async def _news_refresh_loop() -> None:
             except asyncio.CancelledError:
                 raise
             except Exception as e:
-                logger.warning(f"[topics] auto-refresh cycle error: {type(e).__name__}: {e}")
+                logger.warning(
+                    f"[topics] auto-refresh cycle error: {type(e).__name__}: {e}"
+                )
                 interval = _IDLE_RECHECK_HOURS
             await asyncio.sleep(max(1, interval) * 3600)
     except asyncio.CancelledError:
@@ -348,6 +355,7 @@ async def stop_news_refresh_task() -> None:
 
 
 # --- 端點 --------------------------------------------------------------------
+
 
 def _state_payload(state: dict) -> dict:
     return {

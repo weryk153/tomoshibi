@@ -30,11 +30,15 @@ def normalize(raw: Any) -> dict:
         if not isinstance(entry, dict):
             continue
         arches = entry.get("match_arch")
-        arches = [str(a).strip().lower() for a in arches] if isinstance(arches, list) else []
+        arches = (
+            [str(a).strip().lower() for a in arches] if isinstance(arches, list) else []
+        )
         extra_body = entry.get("extra_body")
         note = str(entry.get("note") or "").strip()
         if not arches or not isinstance(extra_body, dict) or not extra_body:
-            logger.warning(f"[profiles] 略過缺 match_arch 或 extra_body 的項目：{entry!r}")
+            logger.warning(
+                f"[profiles] 略過缺 match_arch 或 extra_body 的項目：{entry!r}"
+            )
             continue
         if not note:
             logger.warning(

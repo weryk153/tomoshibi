@@ -57,7 +57,11 @@ def test_says_the_character_statements_must_not_become_user_facts():
     # 這是整個修正的重點，用一個穩定的關鍵詞釘住，避免日後有人改寫提示詞時
     # 把這條規則整段刪掉而沒人發現。
     prompt = build_consolidation_prompt(
-        current="", user_input="去哪", ai_response="往北。", cap=1500, character_name="芙莉蓮"
+        current="",
+        user_input="去哪",
+        ai_response="往北。",
+        cap=1500,
+        character_name="芙莉蓮",
     )
     assert "主詞" in prompt
 
@@ -66,6 +70,10 @@ def test_empty_existing_memory_is_labelled_not_blank():
     # 空字串直接插進提示詞會變成一段沒有內容的「現有記憶：」，模型容易把下一段
     # 誤讀成記憶內容。
     prompt = build_consolidation_prompt(
-        current="", user_input="嗨", ai_response="嗨。", cap=1500, character_name="芙莉蓮"
+        current="",
+        user_input="嗨",
+        ai_response="嗨。",
+        cap=1500,
+        character_name="芙莉蓮",
     )
     assert "（目前還沒有任何記憶）" in prompt

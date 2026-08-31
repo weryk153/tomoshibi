@@ -36,10 +36,10 @@ SEEN_PATH = str(_ROOT / "prompts" / "utils" / "seen_news.json")
 
 # --- 調節參數 ----------------------------------------------------------------
 
-SEEN_MAX = 500       # seen 最多保留幾筆（超過淘汰最舊）
-SEEN_TTL_DAYS = 14   # 超過幾天的記錄淘汰
-PER_CAT = 4          # 每個主題取幾則
-_FETCH_BUFFER = 8    # 多抓幾則當緩衝，被 seen 濾掉一批後仍湊得齊
+SEEN_MAX = 500  # seen 最多保留幾筆（超過淘汰最舊）
+SEEN_TTL_DAYS = 14  # 超過幾天的記錄淘汰
+PER_CAT = 4  # 每個主題取幾則
+_FETCH_BUFFER = 8  # 多抓幾則當緩衝，被 seen 濾掉一批後仍湊得齊
 _TIMEOUT_SECONDS = 15
 
 _UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36"
@@ -73,6 +73,7 @@ CATEGORIES: list[tuple[str, str]] = [
 
 # --- 標題正規化 ---------------------------------------------------------------
 
+
 def normalize_title(title) -> str:
     """把標題化成穩定的比對鍵：解 HTML 實體、去掉來源尾綴。
 
@@ -87,6 +88,7 @@ def normalize_title(title) -> str:
 
 
 # --- 端過的標題（跨輪去重）-----------------------------------------------------
+
 
 def _now() -> datetime.datetime:
     return datetime.datetime.now().astimezone()
@@ -178,6 +180,7 @@ def mark_seen(seen: dict, titles) -> dict:
 
 
 # --- 抓取 --------------------------------------------------------------------
+
 
 def _rss_url(query: str) -> str:
     params = urllib.parse.urlencode(
@@ -328,9 +331,7 @@ def compose_content(manual_topics=None, news_blocks=None, got_any: bool = False)
     # 這樣寫，等於叫模型從不存在的東西裡選題——它只好自己編，編出來的就是
     # 「你最近有聽過哪首曲子嗎？」這種丟回給使用者的萬用問句。
     if has_list:
-        parts.append(
-            "想換題的話，可以從下面的主題或新聞挑一則自然聊起。"
-        )
+        parts.append("想換題的話，可以從下面的主題或新聞挑一則自然聊起。")
     else:
         parts.append(
             "這次沒有預先準備的主題清單。不必硬找話題——講一件此刻具體的小事、"
@@ -351,7 +352,6 @@ def compose_content(manual_topics=None, news_blocks=None, got_any: bool = False)
         )
 
     return "\n\n".join(parts) + "\n"
-
 
 
 def write_prompt(content: str) -> None:
@@ -375,9 +375,7 @@ def refresh_from_news() -> tuple[int, int]:
     seen = load_seen()
     new_titles: list[str] = []
     blocks, got_any = fetch_news_blocks(seen=seen, new_titles=new_titles)
-    content = compose_content(
-        manual_topics=None, news_blocks=blocks, got_any=got_any
-    )
+    content = compose_content(manual_topics=None, news_blocks=blocks, got_any=got_any)
     write_prompt(content)
 
     if new_titles:

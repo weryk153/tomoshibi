@@ -142,9 +142,7 @@ def test_out_of_order_completion_still_emits_in_sequence_order():
 
     async def _run():
         tts_manager = TTSTaskManager()
-        tts_engine = _FakeTTSEngine(
-            delays={"one": 0.06, "two": 0.01, "three": 0.03}
-        )
+        tts_engine = _FakeTTSEngine(delays={"one": 0.06, "two": 0.01, "three": 0.03})
         ws_send = _RecordingWebsocketSend()
 
         for text in ("one", "two", "three"):
@@ -235,9 +233,7 @@ def test_raising_translator_does_not_hang_and_keeps_prior_ordering():
         # get dispatched is intact.
         assert len(tts_manager.task_list) == 1
         await _drain(tts_manager)
-        assert [m["display_text"]["text"] for m in ws_send.messages] == [
-            "Hello world"
-        ]
+        assert [m["display_text"]["text"] for m in ws_send.messages] == ["Hello world"]
 
     asyncio.run(_run())
 
@@ -263,9 +259,7 @@ def test_translate_call_does_not_block_the_event_loop():
 
         hb_task = asyncio.create_task(heartbeat())
 
-        sentences = _FakeSentences(
-            [(DisplayText(text="Hello"), "Hello", Actions())]
-        )
+        sentences = _FakeSentences([(DisplayText(text="Hello"), "Hello", Actions())])
         await handle_sentence_output(
             sentences,
             live2d_model=None,

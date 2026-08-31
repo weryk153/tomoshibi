@@ -90,7 +90,9 @@ def test_missing_block_returns_nones(conf):
 
 def test_nested_block_can_be_found_from_an_offset(conf):
     lines = _lines(conf)
-    _, _, _ = ce.find_block_extent(lines, re.compile(r"^(\s*)character_config:\s*(#.*)?$"))
+    _, _, _ = ce.find_block_extent(
+        lines, re.compile(r"^(\s*)character_config:\s*(#.*)?$")
+    )
     start, indent, _ = ce.find_block_extent(
         lines, re.compile(r"^(\s*)translator_config:\s*(#.*)?$")
     )

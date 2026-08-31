@@ -27,9 +27,7 @@ def normalize_stage_candidates(raw: Any) -> list[dict[str, str]]:
         if not PRESET_ID_RE.fullmatch(preset_id) or preset_id in seen:
             continue
         name = " ".join(str(item.get("name") or preset_id).split())[:80] or preset_id
-        description = " ".join(
-            str(item.get("description") or "").split()
-        )[:240]
+        description = " ".join(str(item.get("description") or "").split())[:240]
         result.append(
             {
                 "id": preset_id,
@@ -45,8 +43,7 @@ def build_stage_director_prompt(candidates: list[dict[str, str]]) -> str:
     if not candidates:
         return ""
     choices = "\n".join(
-        f"- {item['id']}: {item['name']} — {item['description']}"
-        for item in candidates
+        f"- {item['id']}: {item['name']} — {item['description']}" for item in candidates
     )
     return f"""
 ## Optional stage direction

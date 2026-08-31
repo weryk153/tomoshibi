@@ -46,8 +46,6 @@ def normalize_tap_motions(raw) -> dict:
     return result
 
 
-
-
 class Live2dModel:
     """
     A class to represent a Live2D model. This class only prepares and stores the information of the Live2D model. It does not send anything to the frontend or server or anything.

@@ -543,9 +543,6 @@ class MinimaxTTSConfig(I18nMixin):
     }
 
 
-
-
-
 class TTSConfig(I18nMixin):
     """Configuration for Text-to-Speech."""
 

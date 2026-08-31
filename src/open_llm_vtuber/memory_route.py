@@ -23,7 +23,6 @@ conf_uid 前端知道（從 WebSocket 的 set-model-and-conf 來），沒帶就�
 """
 
 import os
-import re
 import asyncio
 from typing import Any, Optional
 
@@ -40,9 +39,7 @@ from .api_guard import (
 from .conf_editor import (
     CONF_PATH,
     character_config_extent as _character_config_extent,
-    find_block_extent as _find_block_extent,
     read_conf_lines as _read_conf_lines,
-    rewrite_int_leaf as _rewrite_int_leaf,
     upsert_leaf as _upsert_leaf,
     write_conf as _write_conf,
 )

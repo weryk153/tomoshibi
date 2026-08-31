@@ -6,6 +6,7 @@ from loguru import logger
 from ..agent.output_types import Actions
 from ..agent.output_types import DisplayText
 
+
 # pydub shells out to an external ffmpeg to decode/encode audio. Non-technical
 # users (especially on Windows) usually don't have ffmpeg on PATH, so the default
 # edge-tts voice — which produces an mp3 — would fail to convert to wav with
@@ -18,7 +19,9 @@ def _setup_bundled_ffmpeg() -> None:
 
         ffmpeg_exe = imageio_ffmpeg.get_ffmpeg_exe()
     except Exception as e:  # pragma: no cover - keep startup resilient
-        logger.debug(f"imageio-ffmpeg unavailable, using system ffmpeg: {type(e).__name__}")
+        logger.debug(
+            f"imageio-ffmpeg unavailable, using system ffmpeg: {type(e).__name__}"
+        )
         return
     if not ffmpeg_exe or not os.path.exists(ffmpeg_exe):
         return
@@ -48,7 +51,9 @@ def _make_ffprobe_optional() -> None:
             try:
                 return _orig_mediainfo_json(filepath, read_ahead_limit=read_ahead_limit)
             except Exception as e:
-                logger.debug(f"ffprobe unavailable, skipping media probe: {type(e).__name__}")
+                logger.debug(
+                    f"ffprobe unavailable, skipping media probe: {type(e).__name__}"
+                )
                 return {}
 
         _pas.mediainfo_json = _safe_mediainfo_json

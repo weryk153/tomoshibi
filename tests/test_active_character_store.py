@@ -14,9 +14,7 @@ def test_active_character_round_trip(tmp_path, monkeypatch):
 
     assert active_character_store.get_active_character_filename() == "kurisu.yaml"
     state = json.loads(
-        (tmp_path / "characters" / ".active-character.json").read_text(
-            encoding="utf-8"
-        )
+        (tmp_path / "characters" / ".active-character.json").read_text(encoding="utf-8")
     )
     assert state == {"version": 1, "filename": "kurisu.yaml"}
 

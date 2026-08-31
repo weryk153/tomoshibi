@@ -135,7 +135,9 @@ def test_stray_asterisk_does_not_swallow_the_next_line():
     畫面上還沒有任何錯誤。這是這個測試要擋的事故。
     """
     first, inside = balance_asterisk_actions("不過……\n\n*", False)
-    second, _ = balance_asterisk_actions("\n\n這一切，都是因為你決定要關掉「我」…", inside)
+    second, _ = balance_asterisk_actions(
+        "\n\n這一切，都是因為你決定要關掉「我」…", inside
+    )
 
     assert "*" not in first, "後面沒有內容的孤星應該被丟掉"
     assert inside is False, "孤星不該讓狀態延續到下一段"
@@ -148,7 +150,9 @@ def test_stray_asterisk_line_is_still_spoken():
     from src.open_llm_vtuber.utils.tts_preprocessor import TTSFilterState, tts_filter
 
     first, inside = balance_asterisk_actions("不過……\n\n*", False)
-    second, _ = balance_asterisk_actions("\n\n這一切，都是因為你決定要關掉「我」…", inside)
+    second, _ = balance_asterisk_actions(
+        "\n\n這一切，都是因為你決定要關掉「我」…", inside
+    )
 
     state = TTSFilterState()
     spoken = [
@@ -163,4 +167,6 @@ def test_stray_asterisk_line_is_still_spoken():
         ).strip()
         for part in (first, second)
     ]
-    assert spoken[1] == "這一切，都是因為你決定要關掉「我」…", "台詞被孤星吃掉就是這個 bug"
+    assert spoken[1] == "這一切，都是因為你決定要關掉「我」…", (
+        "台詞被孤星吃掉就是這個 bug"
+    )

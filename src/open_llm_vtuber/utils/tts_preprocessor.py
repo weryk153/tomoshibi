@@ -219,9 +219,7 @@ def filter_parentheses(text: str, state: "TTSFilterState") -> str:
     #
     # 兩種寬度共用同一個深度計數：模型不會在同一段裡混用左右不同寬度，而共用
     # 之後「(前半…」跨片段接上「…後半）」這種情況也還是能收斂。
-    filtered_text, state.paren_depth = _filter_nested(
-        text, "(", ")", state.paren_depth
-    )
+    filtered_text, state.paren_depth = _filter_nested(text, "(", ")", state.paren_depth)
     filtered_text, state.paren_depth = _filter_nested(
         filtered_text, "（", "）", state.paren_depth
     )
@@ -240,9 +238,7 @@ def filter_angle_brackets(text: str, state: "TTSFilterState") -> str:
     Returns:
         str: The filtered text.
     """
-    filtered_text, state.angle_depth = _filter_nested(
-        text, "<", ">", state.angle_depth
-    )
+    filtered_text, state.angle_depth = _filter_nested(text, "<", ">", state.angle_depth)
     return filtered_text
 
 

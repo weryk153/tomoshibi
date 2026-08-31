@@ -47,12 +47,16 @@ def test_reports_a_provider_that_is_not_the_edited_block(tmp_path, monkeypatch):
 
 def test_reports_the_edited_block_when_they_agree(tmp_path, monkeypatch):
     """No warning must appear in the common case, or it becomes background noise."""
-    data = _write_conf(tmp_path, monkeypatch, "        llm_provider: 'openai_compatible_llm'\n")
+    data = _write_conf(
+        tmp_path, monkeypatch, "        llm_provider: 'openai_compatible_llm'\n"
+    )
 
     assert _get_llm_provider(data) == "openai_compatible_llm"
 
 
-def test_missing_selector_is_reported_as_absent_rather_than_guessed(tmp_path, monkeypatch):
+def test_missing_selector_is_reported_as_absent_rather_than_guessed(
+    tmp_path, monkeypatch
+):
     """The caller defaults to openai_compatible_llm; this helper must not lie
     about a selector that is not there, or a genuinely broken config would look
     deliberate."""

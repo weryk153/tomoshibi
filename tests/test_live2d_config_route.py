@@ -12,7 +12,10 @@ none of them touch the real live2d-models/ or model_dict.json.
 import json
 from types import SimpleNamespace
 
-from src.open_llm_vtuber.live2d_config_route import build_model_config, write_model_config
+from src.open_llm_vtuber.live2d_config_route import (
+    build_model_config,
+    write_model_config,
+)
 from src.open_llm_vtuber.live2d_model import Live2dModel
 
 
@@ -63,7 +66,9 @@ def test_lists_every_motion_group_and_index(tmp_path, monkeypatch):
     assert keys == {("Idle", 0), ("", 0), ("", 1), ("", 2)}, (
         "the empty-string group must be listed like any other group"
     )
-    special_01 = next(m for m in result["motions"] if m["group"] == "" and m["index"] == 2)
+    special_01 = next(
+        m for m in result["motions"] if m["group"] == "" and m["index"] == 2
+    )
     assert special_01["file"] == "motions/special_01.motion3.json"
 
 
@@ -149,11 +154,15 @@ def test_motion_map_entry_pointing_at_missing_motion_is_flagged(tmp_path, monkey
 
     result = build_model_config("haru")
 
-    orphans = {(o["keyword"], o["group"], o["index"]) for o in result["orphan_keywords"]}
+    orphans = {
+        (o["keyword"], o["group"], o["index"]) for o in result["orphan_keywords"]
+    }
     assert orphans == {("greet", "TapBody", 5), ("ghost", "GoneNow", 0)}
     # And the real motion that DOES exist must not have picked up either
     # orphaned keyword.
-    real_motion = next(m for m in result["motions"] if m["group"] == "TapBody" and m["index"] == 0)
+    real_motion = next(
+        m for m in result["motions"] if m["group"] == "TapBody" and m["index"] == 0
+    )
     assert real_motion["mappings"] == []
 
 
@@ -202,7 +211,9 @@ def test_two_keywords_pointing_at_same_motion_both_survive(tmp_path, monkeypatch
 
 
 def test_legacy_tap_motions_object_shape_is_converted_to_list(tmp_path, monkeypatch):
-    _write_model3(tmp_path, "haru", "Haru.model3.json", motions={"TapBody": [{"File": "a"}]})
+    _write_model3(
+        tmp_path, "haru", "Haru.model3.json", motions={"TapBody": [{"File": "a"}]}
+    )
     _write_model_dict(
         tmp_path,
         [{"name": "haru", "tapMotions": {"HitArea": {"TapBody": 2}}}],
@@ -256,7 +267,9 @@ def test_unknown_model_name_returns_404(tmp_path, monkeypatch):
 
 
 def test_writes_only_the_named_model_entry(tmp_path, monkeypatch):
-    _write_model3(tmp_path, "haru", "Haru.model3.json", motions={"Wave": [{"File": "a"}]})
+    _write_model3(
+        tmp_path, "haru", "Haru.model3.json", motions={"Wave": [{"File": "a"}]}
+    )
     _write_model_dict(
         tmp_path,
         [
@@ -299,7 +312,9 @@ def test_writes_only_the_named_model_entry(tmp_path, monkeypatch):
         "url": "/live2d-models/hiyori/Hiyori.model3.json",
         "motionMap": {"greet": {"group": "TapBody", "index": 0, "label": "hi"}},
         "tapMotions": {"HitArea": {"TapBody": 3}},
-    }, "an untouched model's entry must be byte-identical, including its motionMap/tapMotions"
+    }, (
+        "an untouched model's entry must be byte-identical, including its motionMap/tapMotions"
+    )
 
     haru = next(e for e in on_disk if e["name"] == "haru")
     assert haru["motionMap"] == {"wave": {"group": "Wave", "index": 0, "label": "揮手"}}
@@ -356,7 +371,9 @@ def test_rejects_duplicate_keywords_within_a_model(tmp_path, monkeypatch):
 
 
 def test_rejects_motion_pointing_at_nonexistent_group_or_index(tmp_path, monkeypatch):
-    _write_model3(tmp_path, "haru", "Haru.model3.json", motions={"Wave": [{"File": "a"}]})
+    _write_model3(
+        tmp_path, "haru", "Haru.model3.json", motions={"Wave": [{"File": "a"}]}
+    )
     _write_model_dict(tmp_path, [{"name": "haru", "emotionMap": {"neutral": 0}}])
     monkeypatch.chdir(tmp_path)
 
@@ -423,7 +440,9 @@ def test_rejects_tap_area_id_not_in_the_model(tmp_path, monkeypatch):
 
 def test_accepts_empty_maps(tmp_path, monkeypatch):
     # Clearing everything out is a legitimate operation.
-    _write_model3(tmp_path, "haru", "Haru.model3.json", motions={"Wave": [{"File": "a"}]})
+    _write_model3(
+        tmp_path, "haru", "Haru.model3.json", motions={"Wave": [{"File": "a"}]}
+    )
     _write_model_dict(
         tmp_path,
         [
@@ -450,7 +469,9 @@ def test_write_refreshes_the_shared_live2d_model_in_place(tmp_path, monkeypatch)
     # object reference as default_context_cache.live2d_model. Calling
     # set_model() on it in place must make motion_map/motion_str reflect the
     # just-written config, with no restart and no character switch.
-    _write_model3(tmp_path, "haru", "Haru.model3.json", motions={"Wave": [{"File": "a"}]})
+    _write_model3(
+        tmp_path, "haru", "Haru.model3.json", motions={"Wave": [{"File": "a"}]}
+    )
     _write_model_dict(
         tmp_path, [{"name": "haru", "emotionMap": {"neutral": 0}, "motionMap": {}}]
     )
@@ -470,12 +491,16 @@ def test_write_refreshes_the_shared_live2d_model_in_place(tmp_path, monkeypatch)
 
     assert result["ok"] is True
     assert result["restart_required"] is False
-    assert shared_model.motion_map == {"wave": {"group": "Wave", "index": 0, "label": "揮手"}}
+    assert shared_model.motion_map == {
+        "wave": {"group": "Wave", "index": 0, "label": "揮手"}
+    }
     assert "wave" in shared_model.motion_str
 
 
 def test_write_does_not_touch_sessions_using_a_different_model(tmp_path, monkeypatch):
-    _write_model3(tmp_path, "haru", "Haru.model3.json", motions={"Wave": [{"File": "a"}]})
+    _write_model3(
+        tmp_path, "haru", "Haru.model3.json", motions={"Wave": [{"File": "a"}]}
+    )
     _write_model3(
         tmp_path, "hiyori", "Hiyori.model3.json", motions={"Nod": [{"File": "b"}]}
     )
@@ -504,7 +529,9 @@ def test_write_does_not_touch_sessions_using_a_different_model(tmp_path, monkeyp
     )
 
     assert result["ok"] is True
-    assert haru_model.motion_map == {"wave": {"group": "Wave", "index": 0, "label": "揮手"}}
+    assert haru_model.motion_map == {
+        "wave": {"group": "Wave", "index": 0, "label": "揮手"}
+    }
     # The session on a different model must be left completely alone.
     assert other_session_model.motion_map == {}
 
@@ -513,7 +540,9 @@ def test_write_refreshes_a_sessions_own_live2d_model_instance(tmp_path, monkeypa
     # A session that did a character switch holds its OWN Live2dModel
     # instance (not shared with default_context_cache) — it must still be
     # refreshed when it's showing the model that was just edited.
-    _write_model3(tmp_path, "haru", "Haru.model3.json", motions={"Wave": [{"File": "a"}]})
+    _write_model3(
+        tmp_path, "haru", "Haru.model3.json", motions={"Wave": [{"File": "a"}]}
+    )
     _write_model_dict(
         tmp_path, [{"name": "haru", "emotionMap": {"neutral": 0}, "motionMap": {}}]
     )
@@ -532,12 +561,18 @@ def test_write_refreshes_a_sessions_own_live2d_model_instance(tmp_path, monkeypa
     )
 
     assert result["ok"] is True
-    assert default_model.motion_map == {"wave": {"group": "Wave", "index": 0, "label": "揮手"}}
-    assert own_model.motion_map == {"wave": {"group": "Wave", "index": 0, "label": "揮手"}}
+    assert default_model.motion_map == {
+        "wave": {"group": "Wave", "index": 0, "label": "揮手"}
+    }
+    assert own_model.motion_map == {
+        "wave": {"group": "Wave", "index": 0, "label": "揮手"}
+    }
 
 
 def test_write_is_atomic_and_preserves_unrelated_keys(tmp_path, monkeypatch):
-    _write_model3(tmp_path, "haru", "Haru.model3.json", motions={"Wave": [{"File": "a"}]})
+    _write_model3(
+        tmp_path, "haru", "Haru.model3.json", motions={"Wave": [{"File": "a"}]}
+    )
     _write_model_dict(
         tmp_path,
         [
@@ -585,7 +620,9 @@ def test_unhashable_index_does_not_crash(tmp_path, monkeypatch):
     before any parsing guard can catch it, which would make the settings page
     -- the very tool for repairing a broken model_dict.json -- refuse to open.
     """
-    _write_model3(tmp_path, "toy", "toy.model3.json", motions={"": [{"File": "a.motion3.json"}]})
+    _write_model3(
+        tmp_path, "toy", "toy.model3.json", motions={"": [{"File": "a.motion3.json"}]}
+    )
     _write_model_dict(
         tmp_path,
         [
@@ -595,7 +632,11 @@ def test_unhashable_index_does_not_crash(tmp_path, monkeypatch):
                 "motionMap": {
                     "broken_list": {"group": "", "index": [0], "label": "壞掉的"},
                     "broken_dict": {"group": "", "index": {}, "label": "也壞掉"},
-                    "broken_group": {"group": ["x"], "index": 0, "label": "群組型別壞掉"},
+                    "broken_group": {
+                        "group": ["x"],
+                        "index": 0,
+                        "label": "群組型別壞掉",
+                    },
                     "ok": {"group": "", "index": 0, "label": "好的"},
                 },
             }
@@ -637,7 +678,9 @@ def test_hit_areas_are_read_from_the_root_not_file_references(tmp_path, monkeypa
         ),
         encoding="utf-8",
     )
-    _write_model_dict(tmp_path, [{"name": "toy", "url": "/live2d-models/toy/toy.model3.json"}])
+    _write_model_dict(
+        tmp_path, [{"name": "toy", "url": "/live2d-models/toy/toy.model3.json"}]
+    )
     monkeypatch.chdir(tmp_path)
 
     result = build_model_config("toy")

@@ -110,7 +110,9 @@ def test_probe_failure_returns_empty_list(monkeypatch):
     assert model_probe.list_lmstudio_models(BASE) == []
 
 
-def test_probe_distinguishes_unreachable_from_reachable_but_empty(monkeypatch, fake_fetch):
+def test_probe_distinguishes_unreachable_from_reachable_but_empty(
+    monkeypatch, fake_fetch
+):
     """probe_lmstudio() 的重點：連不上 vs 連得上但零模型，是兩種不同的
     (reachable, models) 組合，不能只看 models 是不是空清單去猜 reachable。
     """

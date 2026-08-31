@@ -26,13 +26,11 @@ import uuid
 import glob
 import shutil
 from pathlib import Path
-import socket
 import asyncio
-import subprocess
 from typing import Optional
 
 from fastapi import APIRouter, Request
-from starlette.responses import JSONResponse, Response
+from starlette.responses import JSONResponse
 from loguru import logger
 
 from .api_guard import (
@@ -42,7 +40,6 @@ from .api_guard import (
 )
 from .conf_editor import write_conf_document
 from .config_manager.utils import read_yaml
-from .live2d_discovery import is_discoverable_live2d_dir
 from .utils.path_safety import safe_join
 
 
@@ -89,9 +86,8 @@ BG_MAX_BYTES = 12 * 1024 * 1024
 MODEL3_GLOB_DEPTHS = ("*.model3.json", "*/*.model3.json", "*/*/*.model3.json")
 
 
-
-
 # --- 檔名（slug）----------------------------------------------------------- #
+
 
 def _slugify(raw: str) -> str:
     """把任意字串壓成合法檔名：只留 [a-z0-9_-]，空白換成底線。
@@ -159,6 +155,7 @@ def _unique_slug(slug: str, taken_uids: set) -> str:
 
 # --- 路徑守衛 --------------------------------------------------------------- #
 
+
 def _safe_character_path(filename: str) -> Optional[str]:
     """把檔名解析成 characters/ 底下的路徑，逃出去就回 None。
 
@@ -192,6 +189,7 @@ def _list_character_files() -> list:
 #
 # 這份清單記錄每個 Live2D 模型的顯示設定（縮放、位移、表情對照）。
 # live2d_config_route 掃描到新模型時會登記進來，這裡提供讀寫。
+
 
 def _find_model3(model_dir: str) -> Optional[str]:
     """在模型資料夾裡找出 .model3.json；限定深度，不做無底洞的遞迴。"""
@@ -255,6 +253,7 @@ def _write_model_dict_atomic(entries: list) -> None:
 
 
 # --- 角色檔的讀寫 ----------------------------------------------------------- #
+
 
 def _dig(data: dict, *keys: str, default=None):
     """一層一層往下取值，任何一層不是 dict 或不存在都回 default。
@@ -456,7 +455,9 @@ def _update_base_character_config(
 
     # 人設是多行的，用 literal block scalar 存，使用者打開檔案還看得懂、也改得動。
     if isinstance(persona_prompt, str):
-        text = persona_prompt if persona_prompt.endswith("\n") else persona_prompt + "\n"
+        text = (
+            persona_prompt if persona_prompt.endswith("\n") else persona_prompt + "\n"
+        )
         cc["persona_prompt"] = LiteralScalarString(text)
     else:
         cc["persona_prompt"] = persona_prompt
@@ -493,6 +494,7 @@ def _update_base_character_config(
 
 
 # --- 請求解析 --------------------------------------------------------------- #
+
 
 def _extract_body_fields(body: dict) -> dict:
     """把請求 body 正規化成欄位字典。
@@ -533,6 +535,7 @@ def _bad_request(msg: str) -> JSONResponse:
 
 # --- 圖片上傳的實作 --------------------------------------------------------- #
 
+
 def _safe_avatar_filename(conf_uid: Optional[str], ext: str) -> str:
     """組出安全的頭像檔名：<slug 或隨機碼><副檔名>。
 
@@ -562,7 +565,7 @@ def _decode_data_url(data: str) -> Optional[tuple]:
     except ValueError:
         return None
     # header looks like "data:image/png;base64"
-    meta = header[len("data:"):]
+    meta = header[len("data:") :]
     mime = meta.split(";", 1)[0].strip().lower()
     ext = AVATAR_MIME_EXT.get(mime)
     if ext is None:
@@ -611,6 +614,7 @@ def _write_bg_atomic(filename: str, raw: bytes) -> None:
 # --------------------------------------------------------------------------- #
 # Route factory
 # --------------------------------------------------------------------------- #
+
 
 def _rescan_skins() -> None:
     """掃描 live2d-models/ 並登記新模型。
@@ -775,7 +779,9 @@ def init_character_route() -> APIRouter:
             except Exception:
                 return _bad_request("Invalid multipart body.")
             upload = form.get("file")
-            conf_uid = form.get("conf_uid") if isinstance(form.get("conf_uid"), str) else None
+            conf_uid = (
+                form.get("conf_uid") if isinstance(form.get("conf_uid"), str) else None
+            )
             if upload is None or not hasattr(upload, "read"):
                 return _bad_request("Missing 'file' field.")
             # 副檔名取自上傳的檔名，但一定要在允許清單裡才收。
@@ -797,7 +803,9 @@ def init_character_route() -> APIRouter:
                 return _bad_request("Invalid JSON body.")
             if not isinstance(body, dict):
                 return _bad_request("Invalid JSON body.")
-            conf_uid = body.get("conf_uid") if isinstance(body.get("conf_uid"), str) else None
+            conf_uid = (
+                body.get("conf_uid") if isinstance(body.get("conf_uid"), str) else None
+            )
             decoded = _decode_data_url(body.get("data") or "")
             if decoded is None:
                 return _bad_request(
@@ -931,9 +939,7 @@ def init_character_route() -> APIRouter:
                     if fields["character_name"] is not None
                     else existing_cc.get("character_name"),
                     # Avatar: explicit "" clears; absent key (None) preserves on disk.
-                    avatar=fields["avatar"]
-                    if fields["avatar"] is not None
-                    else None,
+                    avatar=fields["avatar"] if fields["avatar"] is not None else None,
                     # None（缺鍵）＝維持原狀；""＝清掉改回沿用全域。
                     reply_language=fields["reply_language"],
                     voice_lang=fields["voice_lang"],
@@ -1004,9 +1010,7 @@ def init_character_route() -> APIRouter:
             logger.warning(f"pre-update skin scan failed: {type(e).__name__}")
         registered = {m.get("name") for m in _load_model_dict()}
         if skin not in registered:
-            return _bad_request(
-                f"Skin '{skin}' is not a registered Live2D model."
-            )
+            return _bad_request(f"Skin '{skin}' is not a registered Live2D model.")
 
         cc = _build_character_config(
             conf_name=conf_name,
@@ -1101,5 +1105,3 @@ def init_character_route() -> APIRouter:
         return JSONResponse({"ok": True, "filename": filename})
 
     return router
-
-

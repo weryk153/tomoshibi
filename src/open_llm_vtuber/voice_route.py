@@ -40,18 +40,64 @@ VOICE_SAMPLE_TIMEOUT = 12.0  # seconds
 
 CURATED_VOICES = [
     # zh-TW（台灣國語）
-    {"value": "zh-TW-HsiaoChenNeural", "label": "曉臻（台灣國語・女）", "locale": "zh-TW", "gender": "Female"},
-    {"value": "zh-TW-HsiaoYuNeural", "label": "曉雨（台灣國語・女）", "locale": "zh-TW", "gender": "Female"},
-    {"value": "zh-TW-YunJheNeural", "label": "雲哲（台灣國語・男）", "locale": "zh-TW", "gender": "Male"},
+    {
+        "value": "zh-TW-HsiaoChenNeural",
+        "label": "曉臻（台灣國語・女）",
+        "locale": "zh-TW",
+        "gender": "Female",
+    },
+    {
+        "value": "zh-TW-HsiaoYuNeural",
+        "label": "曉雨（台灣國語・女）",
+        "locale": "zh-TW",
+        "gender": "Female",
+    },
+    {
+        "value": "zh-TW-YunJheNeural",
+        "label": "雲哲（台灣國語・男）",
+        "locale": "zh-TW",
+        "gender": "Male",
+    },
     # en（English）
-    {"value": "en-US-AvaNeural", "label": "Ava（English US・F）", "locale": "en-US", "gender": "Female"},
-    {"value": "en-US-AndrewNeural", "label": "Andrew（English US・M）", "locale": "en-US", "gender": "Male"},
-    {"value": "en-GB-SoniaNeural", "label": "Sonia（English UK・F）", "locale": "en-GB", "gender": "Female"},
-    {"value": "en-US-AshleyNeural", "label": "Ashley（English US・F）", "locale": "en-US", "gender": "Female"},
+    {
+        "value": "en-US-AvaNeural",
+        "label": "Ava（English US・F）",
+        "locale": "en-US",
+        "gender": "Female",
+    },
+    {
+        "value": "en-US-AndrewNeural",
+        "label": "Andrew（English US・M）",
+        "locale": "en-US",
+        "gender": "Male",
+    },
+    {
+        "value": "en-GB-SoniaNeural",
+        "label": "Sonia（English UK・F）",
+        "locale": "en-GB",
+        "gender": "Female",
+    },
+    {
+        "value": "en-US-AshleyNeural",
+        "label": "Ashley（English US・F）",
+        "locale": "en-US",
+        "gender": "Female",
+    },
     # ja（日本語）
-    {"value": "ja-JP-NanamiNeural", "label": "Nanami（日本語・女）", "locale": "ja-JP", "gender": "Female"},
-    {"value": "ja-JP-KeitaNeural", "label": "Keita（日本語・男）", "locale": "ja-JP", "gender": "Male"},
+    {
+        "value": "ja-JP-NanamiNeural",
+        "label": "Nanami（日本語・女）",
+        "locale": "ja-JP",
+        "gender": "Female",
+    },
+    {
+        "value": "ja-JP-KeitaNeural",
+        "label": "Keita（日本語・男）",
+        "locale": "ja-JP",
+        "gender": "Male",
+    },
 ]
+
 
 def _sample_text_for_voice(voice: str) -> str:
     """Pick a short locale-appropriate preview line from the voice ShortName."""

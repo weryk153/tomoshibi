@@ -266,11 +266,11 @@ async def handle_conversation_trigger(
         except (TypeError, ValueError):
             idle_seconds = None
 
-        # The hand-raise button reports idle_time = -1 (see use-footer.ts). That is
-        # the user asking for a line, so it is never rate-limited; only the idle
-        # timer is, because it rearms itself every time she stops speaking.
-        hand_raised = idle_seconds is not None and idle_seconds < 0
-
+        # The hand-raise button reports idle_time = -1 (see use-footer.ts) — the
+        # user asking for a line rather than an idle timer firing. It used to be
+        # read here to skip the consecutive-turn throttle; that throttle was
+        # removed (see consecutive_proactive_turns), so nothing branches on it
+        # now. The value still flows into build_proactive_prompt as idle_seconds.
         raw_images = data.get("images")
         verified_visual_facts = None
         conversation_anchor = None

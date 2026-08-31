@@ -21,5 +21,7 @@ def _never_touch_the_real_conf(tmp_path, monkeypatch):
     """把 conf_editor 的寫入目標指到本次測試專屬的暫存檔。"""
     sandbox = tmp_path / "conf.yaml"
     if not sandbox.exists():
-        sandbox.write_text("system_config: {}\ncharacter_config: {}\n", encoding="utf-8")
+        sandbox.write_text(
+            "system_config: {}\ncharacter_config: {}\n", encoding="utf-8"
+        )
     monkeypatch.setattr(conf_editor, "CONF_PATH", str(sandbox))

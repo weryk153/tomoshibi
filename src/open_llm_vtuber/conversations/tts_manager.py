@@ -179,7 +179,9 @@ class TTSTaskManager:
                 subtitle_text=subtitle_text,
             )
             has_audio = payload.get("audio") is not None
-            logger.info(f"Audio payload ready: has_audio={has_audio}, text='{tts_text[:30]}'")
+            logger.info(
+                f"Audio payload ready: has_audio={has_audio}, text='{tts_text[:30]}'"
+            )
             # Queue the payload with its sequence number
             await self._payload_queue.put((payload, sequence_number))
 

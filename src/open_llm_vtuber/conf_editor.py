@@ -40,6 +40,7 @@ _DEFAULT_INDENT = "  "
 
 # --- 定位 --------------------------------------------------------------------
 
+
 def find_block_extent(
     lines: list[str],
     key_pattern: re.Pattern,
@@ -95,6 +96,7 @@ def _find_leaf(lines: list[str], start: int, end: int, key: str) -> Optional[int
 
 # --- 改寫 --------------------------------------------------------------------
 
+
 def _rewrite(lines: list[str], start: int, end: int, key: str, rendered: str) -> bool:
     index = _find_leaf(lines, start, end, key)
     if index is None:
@@ -104,7 +106,9 @@ def _rewrite(lines: list[str], start: int, end: int, key: str, rendered: str) ->
     return True
 
 
-def rewrite_bool_leaf(lines: list[str], start: int, end: int, key: str, value: bool) -> bool:
+def rewrite_bool_leaf(
+    lines: list[str], start: int, end: int, key: str, value: bool
+) -> bool:
     """改寫一個布林葉節點，寫成裸的 True／False。
 
     加引號會變成字串 'True'，Pydantic 讀進來就不是布林了。
@@ -112,12 +116,16 @@ def rewrite_bool_leaf(lines: list[str], start: int, end: int, key: str, value: b
     return _rewrite(lines, start, end, key, str(bool(value)))
 
 
-def rewrite_int_leaf(lines: list[str], start: int, end: int, key: str, value: int) -> bool:
+def rewrite_int_leaf(
+    lines: list[str], start: int, end: int, key: str, value: int
+) -> bool:
     """改寫一個整數葉節點，寫成裸的數字（同理，不能加引號）。"""
     return _rewrite(lines, start, end, key, str(int(value)))
 
 
-def rewrite_str_leaf(lines: list[str], start: int, end: int, key: str, value: str) -> bool:
+def rewrite_str_leaf(
+    lines: list[str], start: int, end: int, key: str, value: str
+) -> bool:
     """改寫一個字串葉節點，加單引號並跳脫內部的單引號。"""
     escaped = str(value).replace("'", "''")
     return _rewrite(lines, start, end, key, f"'{escaped}'")
@@ -265,6 +273,7 @@ def character_config_extent(lines: list[str]) -> tuple[int, int]:
 
 
 # --- 讀寫 --------------------------------------------------------------------
+
 
 def read_conf_lines() -> list[str]:
     """整份讀成行，保留換行符。

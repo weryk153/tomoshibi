@@ -140,14 +140,18 @@ def test_apply_without_a_profile_still_succeeds(client, monkeypatch):
     """查不到 profile 只代表不加必要設定，不代表設定失敗。"""
     c, path = client
     plain = DetectedModel(
-        id="llama3:8b", backend="lmstudio", base_url="http://127.0.0.1:1234/v1", arch="llama"
+        id="llama3:8b",
+        backend="lmstudio",
+        base_url="http://127.0.0.1:1234/v1",
+        arch="llama",
     )
     monkeypatch.setattr(route, "list_lmstudio_models", lambda base_url: [plain])
     monkeypatch.setattr(route, "list_ollama_models", lambda base_url: [])
     monkeypatch.setattr(route, "_validate_combo", _ok_validate)
 
     body = c.post(
-        "/api/llm-config/apply-detected", json={"backend": "lmstudio", "model": "llama3:8b"}
+        "/api/llm-config/apply-detected",
+        json={"backend": "lmstudio", "model": "llama3:8b"},
     ).json()
     assert body["ok"] is True
     assert body["note"] is None

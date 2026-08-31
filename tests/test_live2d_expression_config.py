@@ -14,7 +14,10 @@ model3.json 刪掉兩個表情之後索引整個往前位移，emotionMap 還指
 
 import json
 
-from src.open_llm_vtuber.live2d_config_route import build_model_config, write_model_config
+from src.open_llm_vtuber.live2d_config_route import (
+    build_model_config,
+    write_model_config,
+)
 
 
 def _write_model3(tmp_path, folder, *, expressions=(), motions=None):
@@ -23,9 +26,7 @@ def _write_model3(tmp_path, folder, *, expressions=(), motions=None):
     data = {
         "FileReferences": {
             "Motions": motions if motions is not None else {},
-            "Expressions": [
-                {"Name": n, "File": f"{n}.exp3.json"} for n in expressions
-            ],
+            "Expressions": [{"Name": n, "File": f"{n}.exp3.json"} for n in expressions],
         },
         "HitAreas": [],
     }
@@ -49,7 +50,9 @@ def test_lists_every_expression_with_its_index(tmp_path, monkeypatch):
     config = build_model_config("Frieren")
 
     assert [(e["name"], e["index"]) for e in config["expressions"]] == [
-        ("ku", 0), ("mmy", 1), ("anya", 2)
+        ("ku", 0),
+        ("mmy", 1),
+        ("anya", 2),
     ]
 
 
@@ -58,7 +61,9 @@ def test_expression_carries_its_emotion_keyword(tmp_path, monkeypatch):
     _write_model_dict(tmp_path, [{"name": "Frieren", "emotionMap": {"sadness": 0}}])
     monkeypatch.chdir(tmp_path)
 
-    by_index = {e["index"]: e["keywords"] for e in build_model_config("Frieren")["expressions"]}
+    by_index = {
+        e["index"]: e["keywords"] for e in build_model_config("Frieren")["expressions"]
+    }
 
     assert by_index[0] == ["sadness"]
     # 沒有人指向它的表情不是錯誤，只是還沒命名。
@@ -73,7 +78,9 @@ def test_two_keywords_on_one_expression_both_survive(tmp_path, monkeypatch):
     )
     monkeypatch.chdir(tmp_path)
 
-    by_index = {e["index"]: e["keywords"] for e in build_model_config("Frieren")["expressions"]}
+    by_index = {
+        e["index"]: e["keywords"] for e in build_model_config("Frieren")["expressions"]
+    }
 
     assert sorted(by_index[1]) == ["joy", "smug"]
 
@@ -83,7 +90,9 @@ def test_writes_emotion_map(tmp_path, monkeypatch):
     _write_model_dict(tmp_path, [{"name": "Frieren", "emotionMap": {"neutral": 0}}])
     monkeypatch.chdir(tmp_path)
 
-    result = write_model_config("Frieren", {}, {}, emotion_map={"sadness": 0, "smug": 1})
+    result = write_model_config(
+        "Frieren", {}, {}, emotion_map={"sadness": 0, "smug": 1}
+    )
 
     assert result["ok"] is True
     assert _entry(tmp_path, "Frieren")["emotionMap"] == {"sadness": 0, "smug": 1}
@@ -91,7 +100,12 @@ def test_writes_emotion_map(tmp_path, monkeypatch):
 
 def test_omitting_emotion_map_leaves_it_untouched(tmp_path, monkeypatch):
     # 動作設定那半存檔時不會帶 emotionMap，不能因此把表情設定清掉。
-    _write_model3(tmp_path, "Frieren", expressions=["ku"], motions={"": [{"File": "a.motion3.json"}]})
+    _write_model3(
+        tmp_path,
+        "Frieren",
+        expressions=["ku"],
+        motions={"": [{"File": "a.motion3.json"}]},
+    )
     _write_model_dict(tmp_path, [{"name": "Frieren", "emotionMap": {"sadness": 0}}])
     monkeypatch.chdir(tmp_path)
 

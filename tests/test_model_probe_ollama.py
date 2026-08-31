@@ -31,7 +31,9 @@ SHOW_PLAIN = {
 
 
 def test_list_returns_ids_without_capabilities(monkeypatch):
-    monkeypatch.setattr(model_probe, "fetch_ollama_tags", lambda base_url: TAGS["models"])
+    monkeypatch.setattr(
+        model_probe, "fetch_ollama_tags", lambda base_url: TAGS["models"]
+    )
     models = model_probe.list_ollama_models(BASE)
     assert [m.id for m in models] == ["qwen3:8b", "llama3.2-vision:11b"]
     assert all(m.backend == "ollama" for m in models)
@@ -101,7 +103,9 @@ def test_probe_distinguishes_unreachable_from_reachable_but_empty(monkeypatch):
 
 
 def test_probe_reachable_with_models(monkeypatch):
-    monkeypatch.setattr(model_probe, "fetch_ollama_tags", lambda base_url: TAGS["models"])
+    monkeypatch.setattr(
+        model_probe, "fetch_ollama_tags", lambda base_url: TAGS["models"]
+    )
     reachable, models = model_probe.probe_ollama(BASE)
     assert reachable is True
     assert len(models) == 2

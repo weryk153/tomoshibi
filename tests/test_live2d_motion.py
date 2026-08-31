@@ -133,7 +133,11 @@ def labelled_model(tmp_path):
                 "name": "labelled",
                 "emotionMap": {"neutral": 0},
                 "motionMap": {
-                    "acknowledge": {"group": "Acknowledge", "index": 0, "label": "點頭認同"},
+                    "acknowledge": {
+                        "group": "Acknowledge",
+                        "index": 0,
+                        "label": "點頭認同",
+                    },
                     "gesture_1": {"group": "", "index": 0, "label": ""},
                     "gesture_2": {"group": "", "index": 1},
                 },

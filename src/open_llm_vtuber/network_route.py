@@ -56,7 +56,10 @@ def current_host() -> str:
     """conf.yaml 裡設的綁定位址；讀不到就當成 loopback（最保守的假設）。"""
     try:
         conf = read_yaml(CONF_PATH) or {}
-        return str((conf.get("system_config") or {}).get("host", "")).strip() or "127.0.0.1"
+        return (
+            str((conf.get("system_config") or {}).get("host", "")).strip()
+            or "127.0.0.1"
+        )
     except Exception:
         return "127.0.0.1"
 
@@ -81,7 +84,6 @@ def write_host(allow_other_devices: bool) -> None:
     host = OPEN_HOST if allow_other_devices else "127.0.0.1"
     upsert_leaf(lines, start, end, "host", f"'{host}'")
     write_conf(lines)
-
 
 
 def _lan_ip() -> Optional[str]:
@@ -156,7 +158,9 @@ def _tailscale_serve_https_url(port: Optional[int]) -> Optional[str]:
         try:
             out = subprocess.run(
                 [exe, "serve", "status", "--json"],
-                capture_output=True, text=True, timeout=3,
+                capture_output=True,
+                text=True,
+                timeout=3,
             )
             data = json.loads(out.stdout or "{}")
             web = data.get("Web") or {}
@@ -244,7 +248,10 @@ def init_network_route() -> APIRouter:
         if not isinstance(body, dict) or "allow_other_devices" not in body:
             return JSONResponse(
                 status_code=400,
-                content={"ok": False, "error": "Missing 'allow_other_devices' boolean."},
+                content={
+                    "ok": False,
+                    "error": "Missing 'allow_other_devices' boolean.",
+                },
             )
 
         allow = bool(body["allow_other_devices"])

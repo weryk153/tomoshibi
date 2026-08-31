@@ -25,10 +25,15 @@ def _write_history(tmp_path, conf_uid, history_uid, messages):
 
 
 def test_every_message_has_an_id(tmp_path, monkeypatch):
-    _write_history(tmp_path, "frieren", "hist-1", [
-        {"role": "human", "content": "去哪", "timestamp": "2026-08-19T16:29:13"},
-        {"role": "ai", "content": "往北。", "timestamp": "2026-08-19T16:29:53"},
-    ])
+    _write_history(
+        tmp_path,
+        "frieren",
+        "hist-1",
+        [
+            {"role": "human", "content": "去哪", "timestamp": "2026-08-19T16:29:13"},
+            {"role": "ai", "content": "往北。", "timestamp": "2026-08-19T16:29:53"},
+        ],
+    )
     monkeypatch.chdir(tmp_path)
 
     messages = get_history("frieren", "hist-1")
@@ -39,11 +44,16 @@ def test_every_message_has_an_id(tmp_path, monkeypatch):
 def test_ids_are_unique_even_when_content_and_timestamp_repeat(tmp_path, monkeypatch):
     # 同一秒內連送兩則一模一樣的訊息是做得到的（重複點送出、或主動發言重試）。
     # 用內容或時間當 id 會撞在一起，撞了就是同一個 React key，正是要避免的情況。
-    _write_history(tmp_path, "frieren", "hist-1", [
-        {"role": "ai", "content": "嗯。", "timestamp": "2026-08-19T16:29:13"},
-        {"role": "ai", "content": "嗯。", "timestamp": "2026-08-19T16:29:13"},
-        {"role": "ai", "content": "嗯。", "timestamp": "2026-08-19T16:29:13"},
-    ])
+    _write_history(
+        tmp_path,
+        "frieren",
+        "hist-1",
+        [
+            {"role": "ai", "content": "嗯。", "timestamp": "2026-08-19T16:29:13"},
+            {"role": "ai", "content": "嗯。", "timestamp": "2026-08-19T16:29:13"},
+            {"role": "ai", "content": "嗯。", "timestamp": "2026-08-19T16:29:13"},
+        ],
+    )
     monkeypatch.chdir(tmp_path)
 
     ids = [m["id"] for m in get_history("frieren", "hist-1")]
@@ -54,9 +64,14 @@ def test_ids_are_unique_even_when_content_and_timestamp_repeat(tmp_path, monkeyp
 def test_ids_are_stable_across_reads(tmp_path, monkeypatch):
     # 每次讀都換一組 id 的話，推送過去等於整個列表全部換新，畫面會整片重繪、
     # 捲動位置也會跳掉。
-    _write_history(tmp_path, "frieren", "hist-1", [
-        {"role": "human", "content": "嗨", "timestamp": "2026-08-19T16:29:13"},
-    ])
+    _write_history(
+        tmp_path,
+        "frieren",
+        "hist-1",
+        [
+            {"role": "human", "content": "嗨", "timestamp": "2026-08-19T16:29:13"},
+        ],
+    )
     monkeypatch.chdir(tmp_path)
 
     assert [m["id"] for m in get_history("frieren", "hist-1")] == [
@@ -65,19 +80,34 @@ def test_ids_are_stable_across_reads(tmp_path, monkeypatch):
 
 
 def test_existing_id_is_left_alone(tmp_path, monkeypatch):
-    _write_history(tmp_path, "frieren", "hist-1", [
-        {"role": "ai", "content": "嗨", "timestamp": "2026-08-19T16:29:13", "id": "keep-me"},
-    ])
+    _write_history(
+        tmp_path,
+        "frieren",
+        "hist-1",
+        [
+            {
+                "role": "ai",
+                "content": "嗨",
+                "timestamp": "2026-08-19T16:29:13",
+                "id": "keep-me",
+            },
+        ],
+    )
     monkeypatch.chdir(tmp_path)
 
     assert get_history("frieren", "hist-1")[0]["id"] == "keep-me"
 
 
 def test_metadata_entries_are_still_filtered_out(tmp_path, monkeypatch):
-    _write_history(tmp_path, "frieren", "hist-1", [
-        {"role": "metadata", "content": ""},
-        {"role": "human", "content": "嗨", "timestamp": "2026-08-19T16:29:13"},
-    ])
+    _write_history(
+        tmp_path,
+        "frieren",
+        "hist-1",
+        [
+            {"role": "metadata", "content": ""},
+            {"role": "human", "content": "嗨", "timestamp": "2026-08-19T16:29:13"},
+        ],
+    )
     monkeypatch.chdir(tmp_path)
 
     messages = get_history("frieren", "hist-1")

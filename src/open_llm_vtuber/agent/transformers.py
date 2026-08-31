@@ -168,7 +168,7 @@ def balance_asterisk_actions(text: str, inside: bool) -> tuple[str, bool]:
         # 而且畫面上沒有任何錯誤訊息。
         partial = "".join(out)
         opener = partial.rfind("*")
-        if partial[opener + 1:].strip() == "":
+        if partial[opener + 1 :].strip() == "":
             out = list(partial[:opener])
             inside = False
         else:

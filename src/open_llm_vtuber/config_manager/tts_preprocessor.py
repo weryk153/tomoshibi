@@ -70,7 +70,9 @@ class LLMTranslateConfig(I18nMixin):
             en="OpenAI-compatible chat completions endpoint",
             zh="OpenAI 相容的 chat completions 端點",
         ),
-        "model": Description(en="Model name to use for translation", zh="翻譯用的模型名稱"),
+        "model": Description(
+            en="Model name to use for translation", zh="翻譯用的模型名稱"
+        ),
         "target_lang": Description(
             en="Target language to translate into", zh="翻譯的目標語言"
         ),

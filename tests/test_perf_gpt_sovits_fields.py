@@ -168,7 +168,9 @@ def test_write_tts_prompt_lang_only_leaves_everything_else_byte_identical(
     changed = [i for i in range(len(before)) if before[i] != after[i]]
     assert changed == [_line_index(before, "prompt_lang:")]
     assert "prompt_lang: 'en'" in after[changed[0]]
-    assert "str.(必需)" in after[changed[0]], "the leaf's own trailing comment must survive"
+    assert "str.(必需)" in after[changed[0]], (
+        "the leaf's own trailing comment must survive"
+    )
 
 
 def test_write_tts_all_three_together_and_read_back(tmp_path, monkeypatch):
@@ -203,9 +205,7 @@ def _line_index(lines: list, needle: str) -> int:
         for i in range(gs_start + 1, len(lines))
         if lines[i].strip() and not lines[i].startswith(" " * 6)
     )
-    matches = [
-        i for i in range(gs_start, gs_end) if needle in lines[i]
-    ]
+    matches = [i for i in range(gs_start, gs_end) if needle in lines[i]]
     assert len(matches) == 1, (
         f"expected exactly one line containing {needle!r} inside gpt_sovits_tts"
     )

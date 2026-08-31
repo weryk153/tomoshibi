@@ -107,7 +107,9 @@ def test_whitespace_only_is_stripped_to_empty():
 
 
 def test_values_are_trimmed_but_kept():
-    fields = _extract_body_fields({"reply_language": " Japanese ", "voice_lang": " ja "})
+    fields = _extract_body_fields(
+        {"reply_language": " Japanese ", "voice_lang": " ja "}
+    )
 
     assert fields["reply_language"] == "Japanese"
     assert fields["voice_lang"] == "ja"

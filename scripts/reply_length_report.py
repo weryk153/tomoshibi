@@ -109,7 +109,10 @@ def main() -> None:
     args = parser.parse_args()
 
     rows = collect(args.conf_uid, args.since)
-    print(f"角色 {args.conf_uid}：{len(rows)} 則有效發言" + (f"（{args.since} 之後）" if args.since else ""))
+    print(
+        f"角色 {args.conf_uid}：{len(rows)} 則有效發言"
+        + (f"（{args.since} 之後）" if args.since else "")
+    )
     report(rows, "reply", "使用者觸發", "人設：平常講一到三句")
     report(rows, "proactive", "主動發言", "提示詞：長度不限")
 

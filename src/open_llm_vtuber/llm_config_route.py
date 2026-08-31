@@ -19,8 +19,6 @@ llm_provider 指名的那個供應商。一台原本指著 lmstudio_llm 的機�
 回應帶 restart_required。
 """
 
-import os
-import re
 import json
 import asyncio
 from dataclasses import asdict
@@ -30,7 +28,6 @@ import httpx
 from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse, StreamingResponse
 from loguru import logger
-from ruamel.yaml import YAML
 
 
 # --- 常數 ------------------------------------------------------------------- #
@@ -105,9 +102,8 @@ PLACEHOLDER_KEYS = {
 }
 
 
-
-
 # --- 讀設定 ----------------------------------------------------------------- #
+
 
 def _load_conf() -> Any:
     yaml = _make_yaml()
@@ -147,6 +143,7 @@ def _get_system_host(data: Any) -> Optional[str]:
 # 從伺服器端問，不是從瀏覽器問：瀏覽器打 localhost:11434 會撞上 CORS，頁面走
 # HTTPS 時還會被 mixed-content 擋掉。
 
+
 async def _probe_ollama_models() -> dict:
     """
     Hit the local Ollama /api/tags endpoint and return its model list.
@@ -174,6 +171,7 @@ async def _probe_ollama_models() -> dict:
 # --------------------------------------------------------------------------- #
 # "is configured" heuristic
 # --------------------------------------------------------------------------- #
+
 
 def _has_real_key(block: Optional[Any]) -> bool:
     """
@@ -209,9 +207,10 @@ async def _is_configured(block: Optional[Any]) -> bool:
     key_is_placeholder = (api_key is None) or (str(api_key) in PLACEHOLDER_KEYS)
 
     base_url_str = str(base_url) if base_url is not None else ""
-    is_ollama = base_url_str.rstrip("/").startswith(
-        OLLAMA_DEFAULT_BASE_URL.rstrip("/")
-    ) or ":11434" in base_url_str
+    is_ollama = (
+        base_url_str.rstrip("/").startswith(OLLAMA_DEFAULT_BASE_URL.rstrip("/"))
+        or ":11434" in base_url_str
+    )
 
     if not is_ollama:
         # 雲端端點只要金鑰不是佔位符就算設定好了。
@@ -262,6 +261,7 @@ async def _is_configured_for_conf(data: Any) -> bool:
 
 
 # --- 用一次便宜的呼叫確認設定能用 ------------------------------------------- #
+
 
 def _test_call_sync(base_url: str, model: str, api_key: str) -> tuple[bool, str]:
     """
@@ -317,7 +317,11 @@ def _sanitize_error(exc: Exception, api_key: str) -> str:
     lowered = text.lower()
     if "401" in text or "unauthor" in lowered or "invalid_api_key" in lowered:
         return "Authentication failed — the API key was rejected. Check the key."
-    if "404" in text or "not found" in lowered or ("model" in lowered and "exist" in lowered):
+    if (
+        "404" in text
+        or "not found" in lowered
+        or ("model" in lowered and "exist" in lowered)
+    ):
         return "The model was not found at this endpoint. Check the model name."
     if "connect" in lowered or "timeout" in lowered or "refused" in lowered:
         return "Could not reach the endpoint. Check the URL (and that the server is running)."
@@ -349,6 +353,7 @@ def _resolve_base_url_default(provider: str, base_url: Optional[str]) -> Optiona
 
 
 # --- 寫入設定檔 ------------------------------------------------------------- #
+
 
 def _quote_yaml_scalar(value: str) -> str:
     """
@@ -387,9 +392,7 @@ def _validate_path_with_ruamel(provider: str) -> None:
 
 # 允許寫入的供應商區塊。白名單而不是自由字串：provider 會被拿去組 YAML 路徑，
 # 而路徑是請求可控的。
-WRITABLE_PROVIDERS = frozenset(
-    {"lmstudio_llm", "ollama_llm", "openai_compatible_llm"}
-)
+WRITABLE_PROVIDERS = frozenset({"lmstudio_llm", "ollama_llm", "openai_compatible_llm"})
 
 
 def _point_llm_provider_at(lines: list, provider: str) -> None:
@@ -440,7 +443,9 @@ def _edit_provider_config(lines: list, provider: str, values: dict) -> None:
 
     for key in ("base_url", "model", "llm_api_key"):
         if key in values:
-            end = upsert_leaf(lines, start, end, key, _quote_yaml_scalar(str(values[key])))
+            end = upsert_leaf(
+                lines, start, end, key, _quote_yaml_scalar(str(values[key]))
+            )
 
     extra_body = values.get("extra_body")
     if extra_body:
@@ -479,7 +484,11 @@ def _edit_use_mcpp(lines: list, enabled: bool) -> None:
     所以走自己的 nested_extent。
     """
     start, end = nested_extent(
-        lines, "character_config", "agent_config", "agent_settings", "basic_memory_agent"
+        lines,
+        "character_config",
+        "agent_config",
+        "agent_settings",
+        "basic_memory_agent",
     )
     # 裸的 True／False，不是字串——這份設定檔裡既有的寫法（見
     # player_route.py 的 rewrite_bool_leaf）都是這樣，conf_editor 存在的目的
@@ -537,6 +546,7 @@ def _write_openai_block(base_url: str, model: str, api_key: str) -> None:
 
 # --- 端點 ------------------------------------------------------------------- #
 
+
 def _bad(message: str) -> JSONResponse:
     return JSONResponse(status_code=400, content={"ok": False, "error": message})
 
@@ -584,9 +594,13 @@ def init_llm_config_route() -> APIRouter:
                 "provider": "openai_compatible_llm",
                 "active_provider": str(active_provider),
                 "base_url": (
-                    str(block.get("base_url")) if block.get("base_url") is not None else ""
+                    str(block.get("base_url"))
+                    if block.get("base_url") is not None
+                    else ""
                 ),
-                "model": str(block.get("model")) if block.get("model") is not None else "",
+                "model": str(block.get("model"))
+                if block.get("model") is not None
+                else "",
                 "api_key_masked": _mask_key(block.get("llm_api_key")),
                 "has_real_key": _has_real_key(block),
                 "is_configured": configured,
@@ -692,7 +706,9 @@ def init_llm_config_route() -> APIRouter:
             body = {}
         model = str(body.get("model") or RECOMMENDED_OLLAMA_MODEL).strip()
         if not model:
-            return JSONResponse(status_code=400, content={"error": "Missing model name."})
+            return JSONResponse(
+                status_code=400, content={"error": "Missing model name."}
+            )
 
         async def stream():
             # 整個下載可能好幾分鐘，所以不設總逾時。但兩件事要管：連線階段要有
@@ -709,13 +725,18 @@ def init_llm_config_route() -> APIRouter:
                         json={"model": model, "stream": True},
                     ) as resp:
                         if resp.status_code != 200:
-                            detail = (await resp.aread()).decode("utf-8", "replace")[:300]
-                            yield json.dumps(
-                                {
-                                    "status": "error",
-                                    "error": f"Ollama returned {resp.status_code}. {detail}".strip(),
-                                }
-                            ) + "\n"
+                            detail = (await resp.aread()).decode("utf-8", "replace")[
+                                :300
+                            ]
+                            yield (
+                                json.dumps(
+                                    {
+                                        "status": "error",
+                                        "error": f"Ollama returned {resp.status_code}. {detail}".strip(),
+                                    }
+                                )
+                                + "\n"
+                            )
                             return
                         line_iter = resp.aiter_lines().__aiter__()
                         while True:
@@ -726,23 +747,29 @@ def init_llm_config_route() -> APIRouter:
                             except StopAsyncIteration:
                                 break
                             except asyncio.TimeoutError:
-                                yield json.dumps(
-                                    {
-                                        "status": "error",
-                                        "error": "Download stalled (no progress for a while). Check your connection and try again — it resumes from where it left off.",
-                                    }
-                                ) + "\n"
+                                yield (
+                                    json.dumps(
+                                        {
+                                            "status": "error",
+                                            "error": "Download stalled (no progress for a while). Check your connection and try again — it resumes from where it left off.",
+                                        }
+                                    )
+                                    + "\n"
+                                )
                                 return
                             if line.strip():
                                 yield line + "\n"
             except Exception as e:
                 logger.info(f"ollama-pull failed: {type(e).__name__}")
-                yield json.dumps(
-                    {
-                        "status": "error",
-                        "error": "Could not reach Ollama. Is the Ollama app running?",
-                    }
-                ) + "\n"
+                yield (
+                    json.dumps(
+                        {
+                            "status": "error",
+                            "error": "Could not reach Ollama. Is the Ollama app running?",
+                        }
+                    )
+                    + "\n"
+                )
 
         return StreamingResponse(stream(), media_type="application/x-ndjson")
 

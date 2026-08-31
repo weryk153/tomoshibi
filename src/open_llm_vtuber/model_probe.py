@@ -161,7 +161,9 @@ def probe_ollama(base_url: str) -> tuple[bool, list[DetectedModel]]:
                 id=name,
                 backend="ollama",
                 base_url=base_url,
-                arch=(str(details["family"]).strip() if details.get("family") else None),
+                arch=(
+                    str(details["family"]).strip() if details.get("family") else None
+                ),
             )
         )
     return True, out

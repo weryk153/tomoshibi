@@ -125,7 +125,9 @@ def test_path_traversal_is_rejected_before_the_known_set_check(conf, monkeypatch
     # 這條是安全防線：路徑符號在比對已知集合「之前」就要擋掉。
     conf(CONF)
     monkeypatch.setattr(
-        mr, "_existing_conf_uids", lambda: {evil}  # 就算它在集合裡也要擋
+        mr,
+        "_existing_conf_uids",
+        lambda: {evil},  # 就算它在集合裡也要擋
     )
 
     uid, err = mr._resolve_conf_uid(evil)

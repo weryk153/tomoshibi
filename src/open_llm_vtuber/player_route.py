@@ -33,7 +33,11 @@ from .conf_editor import (
     upsert_leaf,
     write_conf,
 )
-from .api_guard import forbidden as _forbidden, is_trusted_request as _is_local_request, make_yaml as _make_yaml
+from .api_guard import (
+    forbidden as _forbidden,
+    is_trusted_request as _is_local_request,
+    make_yaml as _make_yaml,
+)
 from .conf_editor import CONF_PATH
 
 
@@ -84,7 +88,9 @@ def _write_use_mcpp(enabled: bool) -> None:
     write_conf(lines)
 
 
-async def _parse_body(request: Request) -> tuple[Optional[dict], Optional[JSONResponse]]:
+async def _parse_body(
+    request: Request,
+) -> tuple[Optional[dict], Optional[JSONResponse]]:
     try:
         body = await request.json()
     except Exception:
@@ -119,9 +125,7 @@ def _read_or_error(fn, *, what: str, key: str) -> JSONResponse:
         return JSONResponse({key: fn()})
     except Exception as e:
         logger.error(f"[player] {what} read failed: {type(e).__name__}")
-        return JSONResponse(
-            status_code=500, content={"error": "could not read config"}
-        )
+        return JSONResponse(status_code=500, content={"error": "could not read config"})
 
 
 def init_player_route() -> APIRouter:

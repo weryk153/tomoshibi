@@ -56,7 +56,7 @@ def test_prune_caps_the_total_count_keeping_newest():
     kept = nt._prune_seen(seen)
 
     assert len(kept) == nt.SEEN_MAX
-    assert "標題0" in kept          # 最新的留著
+    assert "標題0" in kept  # 最新的留著
     assert f"標題{nt.SEEN_MAX + 19}" not in kept  # 最舊的被丟掉
 
 
@@ -76,7 +76,9 @@ def test_mark_seen_normalizes_before_storing():
 
 
 def test_previously_served_titles_are_not_served_again(monkeypatch):
-    monkeypatch.setattr(nt, "fetch_titles", lambda q, n: ["昨天就端過的 - 來源", "今天的新料"])
+    monkeypatch.setattr(
+        nt, "fetch_titles", lambda q, n: ["昨天就端過的 - 來源", "今天的新料"]
+    )
 
     new_titles = []
     blocks, got_any = nt.fetch_news_blocks(
@@ -95,9 +97,7 @@ def test_previously_served_titles_are_not_served_again(monkeypatch):
 def test_the_same_story_is_not_repeated_across_categories(monkeypatch):
     monkeypatch.setattr(nt, "fetch_titles", lambda q, n: ["同一則新聞"])
 
-    blocks, _ = nt.fetch_news_blocks(
-        categories=[("甲", "甲"), ("乙", "乙")], per_cat=3
-    )
+    blocks, _ = nt.fetch_news_blocks(categories=[("甲", "甲"), ("乙", "乙")], per_cat=3)
 
     # 第一類拿到，第二類整個沒有內容可放，於是不產生區塊。
     assert len(blocks) == 1

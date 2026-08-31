@@ -46,6 +46,7 @@ from loguru import logger
 from .api_guard import is_trusted_request as _is_local_request, forbidden as _forbidden
 from .live2d_model import normalize_tap_motions as _normalize_tap_motions
 from .live2d_discovery import is_discoverable_live2d_dir
+
 # REUSE the generic model3.json resolver + model_dict reader/writer — already
 # proven against all four bundled models (nested runtime/, filename-case
 # mismatch, and an unrelated filename). Do NOT reimplement "filename == folder
@@ -62,6 +63,7 @@ from .character_route import (
 # --------------------------------------------------------------------------- #
 # Pure helpers (unit-testable without FastAPI/TestClient)
 # --------------------------------------------------------------------------- #
+
 
 def _find_model_entry(model_dict: list, name: str) -> Optional[dict]:
     """First model_dict.json entry whose ``name`` matches, or None."""
@@ -114,7 +116,9 @@ def build_model_config(name: str) -> Optional[dict]:
         with open(model3_path, "r", encoding="utf-8") as f:
             model3 = json.load(f)
     except Exception as e:
-        logger.error(f"live2d model-config: unreadable model3.json for '{name}': {type(e).__name__}")
+        logger.error(
+            f"live2d model-config: unreadable model3.json for '{name}': {type(e).__name__}"
+        )
         return None
 
     file_refs = model3.get("FileReferences", {}) or {}
@@ -164,7 +168,9 @@ def build_model_config(name: str) -> Optional[dict]:
                         "file": (motion_def or {}).get("File", "")
                         if isinstance(motion_def, dict)
                         else "",
-                        "reserved": group == "Idle" or group == idle_group or group == "Talk",
+                        "reserved": group == "Idle"
+                        or group == idle_group
+                        or group == "Talk",
                         "mappings": mappings_by_target.get(key, []),
                     }
                 )
@@ -224,6 +230,7 @@ def build_model_config(name: str) -> Optional[dict]:
 # --------------------------------------------------------------------------- #
 # Write side (pure helpers, unit-testable without FastAPI/TestClient)
 # --------------------------------------------------------------------------- #
+
 
 def _real_motion_keys(model3: dict) -> set:
     """Every ``(group, index)`` this model's ``.model3.json`` actually has.
@@ -331,7 +338,9 @@ def _validate_emotion_map(emotion_map, expression_count: int) -> Optional[str]:
     return None
 
 
-def _validate_tap_motions(tap_motions, real_hit_area_ids: set, real_motion_keys: set) -> Optional[str]:
+def _validate_tap_motions(
+    tap_motions, real_hit_area_ids: set, real_motion_keys: set
+) -> Optional[str]:
     """None if valid, else a human-readable reason.
 
     Shape: ``{hitAreaId: [{group, index, weight}, ...]}``. ``index`` of
@@ -394,7 +403,10 @@ def _refresh_live2d_caches(name: str, default_context_cache, client_contexts) ->
         if default_context_cache is not None
         else None
     )
-    if shared_model is not None and getattr(shared_model, "live2d_model_name", None) == name:
+    if (
+        shared_model is not None
+        and getattr(shared_model, "live2d_model_name", None) == name
+    ):
         shared_model.set_model(name)
         refreshed_ids.add(id(shared_model))
 
@@ -453,7 +465,9 @@ def write_model_config(
         with open(model3_path, "r", encoding="utf-8") as f:
             model3 = json.load(f)
     except Exception as e:
-        logger.error(f"live2d model-config write: unreadable model3.json for '{name}': {type(e).__name__}")
+        logger.error(
+            f"live2d model-config write: unreadable model3.json for '{name}': {type(e).__name__}"
+        )
         return {"ok": False, "status": 404, "error": f"Unknown Live2D model: {name}"}
 
     real_motion_keys = _real_motion_keys(model3)
@@ -488,9 +502,15 @@ def write_model_config(
 # --------------------------------------------------------------------------- #
 
 _THUMB_NAMES = (
-    "thumbnail.png", "thumbnail.jpg", "thumbnail.jpeg", "thumbnail.webp",
-    "preview.png", "preview.jpg", "icon.png",
+    "thumbnail.png",
+    "thumbnail.jpg",
+    "thumbnail.jpeg",
+    "thumbnail.webp",
+    "preview.png",
+    "preview.jpg",
+    "icon.png",
 )
+
 
 def _detect_idle_group(model3_path: str) -> str:
     """Read FileReferences.Motions and pick the idle group ('Idle' preferred)."""
@@ -568,7 +588,9 @@ def scan_and_register_skins() -> dict:
                     "initialXshift": 0,
                     "initialYshift": 0,
                     "idleMotionGroupName": idle_group,
-                    "emotionMap": {"neutral": 0},  # MUST be non-empty (set_model KeyErrors otherwise)
+                    "emotionMap": {
+                        "neutral": 0
+                    },  # MUST be non-empty (set_model KeyErrors otherwise)
                     "tapMotions": {},
                     "motionMap": {},
                 }
@@ -587,8 +609,9 @@ def scan_and_register_skins() -> dict:
     return {"skins": skins, "newly_registered": newly_registered}
 
 
-
-def init_live2d_config_route(default_context_cache=None, client_contexts=None) -> APIRouter:
+def init_live2d_config_route(
+    default_context_cache=None, client_contexts=None
+) -> APIRouter:
     """REST endpoints for the in-app motion/hit-area config UI. Localhost-only.
 
     - GET /api/live2d/model-config/{name} -> enumerate motions/hit areas and

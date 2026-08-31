@@ -38,10 +38,7 @@ def test_reports_only_characters_that_pin_an_engine(tmp_path, monkeypatch):
     _write_character(
         tmp_path,
         "inherits.yaml",
-        "character_config:\n"
-        "  conf_name: 普通角色\n"
-        "  persona_prompt: |\n"
-        "    你好。\n",
+        "character_config:\n  conf_name: 普通角色\n  persona_prompt: |\n    你好。\n",
     )
     monkeypatch.chdir(tmp_path)
 

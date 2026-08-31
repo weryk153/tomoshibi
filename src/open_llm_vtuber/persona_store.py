@@ -83,7 +83,9 @@ def _validate_fields(name: Any, prompt: Any) -> tuple[str, str]:
 def _unique_id(requested: Any, name: str, existing: set[str]) -> str:
     raw = str(requested or "").strip()
     if raw and not PERSONA_ID_RE.fullmatch(raw):
-        raise ValueError("Persona ID must contain only lowercase letters, numbers, _ or -.")
+        raise ValueError(
+            "Persona ID must contain only lowercase letters, numbers, _ or -."
+        )
     base = raw or _slugify(name) or f"persona_{uuid.uuid4().hex[:8]}"
     if base not in existing:
         return base

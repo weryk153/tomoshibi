@@ -31,6 +31,5 @@ def test_read_character_fields_includes_live2d_model_name(tmp_path, monkeypatch)
 
     assert fields is not None
     assert fields["live2d_model_name"] == "mao_pro", (
-        "GET 必須回傳目前的皮膚，否則編輯表單無法預填，"
-        "而 PUT 缺這個欄位會回 400"
+        "GET 必須回傳目前的皮膚，否則編輯表單無法預填，而 PUT 缺這個欄位會回 400"
     )

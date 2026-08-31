@@ -259,9 +259,11 @@ class AsyncLLM(StatelessLLMInterface):
                     r"<think>.*?</think>", "", reasoning_buffer, flags=re.DOTALL
                 ).strip()
                 if not fallback:
-                    fallback = reasoning_buffer.replace("<think>", "").replace(
-                        "</think>", ""
-                    ).strip()
+                    fallback = (
+                        reasoning_buffer.replace("<think>", "")
+                        .replace("</think>", "")
+                        .strip()
+                    )
                 if fallback:
                     logger.info(
                         "No content streamed; falling back to buffered reasoning."

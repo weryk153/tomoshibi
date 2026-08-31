@@ -74,9 +74,7 @@ def _normalize_lang(raw: Optional[str]) -> Optional[str]:
         return "ja"
     if any(
         name in s
-        for name in (
-            "中文", "繁體", "繁体", "簡體", "简体", "chinese", "mandarin"
-        )
+        for name in ("中文", "繁體", "繁体", "簡體", "简体", "chinese", "mandarin")
     ):
         return "zh"
     if any(name in s for name in ("韓文", "韩文", "한국어", "korean")):

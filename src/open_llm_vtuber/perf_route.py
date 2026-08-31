@@ -23,7 +23,6 @@ restart_required 對這裡的每一個改動都是誠實的 True：引擎設定�
 烤進 CharacterConfig，改完要重啟或重選角色才會生效。
 """
 
-import re
 import asyncio
 from pathlib import Path
 from typing import Any, Optional
@@ -32,7 +31,11 @@ from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse
 from loguru import logger
 
-from .api_guard import is_trusted_request as _is_local_request, forbidden as _forbidden, mask_key as _mask_key
+from .api_guard import (
+    is_trusted_request as _is_local_request,
+    forbidden as _forbidden,
+    mask_key as _mask_key,
+)
 
 from .conf_editor import (
     CONF_PATH,
@@ -113,6 +116,7 @@ PRESETS: dict[str, dict[str, Any]] = {
 
 
 # --- 讀設定 ----------------------------------------------------------------- #
+
 
 def _load_plain() -> Any:
     return read_yaml(CONF_PATH) or {}
@@ -246,6 +250,7 @@ def _interval_from_conf() -> int:
 #
 # 每一次寫入都限定在該子區塊的範圍內，絕不平掃整個檔案——好幾個引擎共用同樣的
 # 葉節點名字（api_key、model），平掃會寫到別的引擎去，而且不會有任何徵兆。
+
 
 def _asr_config_extent(lines: list) -> tuple[int, int]:
     return block_extent(lines, "asr_config")
@@ -443,6 +448,7 @@ async def _write_or_error(fn, *args, what: str):
 
 # --- 端點 ------------------------------------------------------------------- #
 
+
 def init_perf_route() -> APIRouter:
     """引擎與硬體設定的端點。只接受可信來源。
 
@@ -503,7 +509,11 @@ def init_perf_route() -> APIRouter:
             return _error(400, "Nothing to update.")
 
         bad = await _write_or_error(
-            _write_asr, asr_model, groq_api_key, azure_api_key, azure_region,
+            _write_asr,
+            asr_model,
+            groq_api_key,
+            azure_api_key,
+            azure_region,
             what="asr write",
         )
         if bad:
@@ -568,11 +578,15 @@ def init_perf_route() -> APIRouter:
         if bad:
             return bad
 
-        keep_alive, bad = _bounded_int(body, "keep_alive", KEEP_ALIVE_MIN, KEEP_ALIVE_MAX)
+        keep_alive, bad = _bounded_int(
+            body, "keep_alive", KEEP_ALIVE_MIN, KEEP_ALIVE_MAX
+        )
         if bad:
             return bad
 
-        bad = await _write_or_error(_write_keep_alive, keep_alive, what="keep_alive write")
+        bad = await _write_or_error(
+            _write_keep_alive, keep_alive, what="keep_alive write"
+        )
         if bad:
             return bad
 
@@ -657,7 +671,6 @@ def _apply_preset_bundle(bundle: dict) -> bool:
     KeyError if a leaf is missing -> the whole apply fails cleanly, nothing written).
     """
     from .conf_editor import character_config_extent as _character_config_extent
-    from .conf_editor import rewrite_bool_leaf as _rewrite_bool_leaf
 
     with open(CONF_PATH, "r", encoding="utf-8") as f:
         lines = f.readlines()
@@ -666,13 +679,19 @@ def _apply_preset_bundle(bundle: dict) -> bool:
     cc_start, cc_end = _character_config_extent(lines)
     if "core_memory_max_chars" in bundle:
         if not _rewrite_int_leaf(
-            lines, cc_start, cc_end, "core_memory_max_chars",
+            lines,
+            cc_start,
+            cc_end,
+            "core_memory_max_chars",
             int(bundle["core_memory_max_chars"]),
         ):
             raise KeyError("core_memory_max_chars leaf not found")
     if "memory_consolidation_interval" in bundle:
         if not _rewrite_int_leaf(
-            lines, cc_start, cc_end, "memory_consolidation_interval",
+            lines,
+            cc_start,
+            cc_end,
+            "memory_consolidation_interval",
             int(bundle["memory_consolidation_interval"]),
         ):
             raise KeyError("memory_consolidation_interval leaf not found")

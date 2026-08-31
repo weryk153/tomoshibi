@@ -26,7 +26,11 @@ from src.open_llm_vtuber.utils.tts_preprocessor import (
 )
 from src.open_llm_vtuber.agent.transformers import tts_filter as tts_filter_decorator
 from src.open_llm_vtuber.agent.output_types import Actions, DisplayText
-from src.open_llm_vtuber.utils.sentence_divider import SentenceWithTags, TagInfo, TagState
+from src.open_llm_vtuber.utils.sentence_divider import (
+    SentenceWithTags,
+    TagInfo,
+    TagState,
+)
 
 
 def _kwargs(**overrides):

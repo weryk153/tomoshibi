@@ -24,7 +24,6 @@ init_translate 重建。所以誠實的說法是——重選角色就會套用�
 帶 restart_required，那是安全的底線。
 """
 
-import os
 import re
 import time
 import asyncio
@@ -34,11 +33,13 @@ from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse
 from loguru import logger
 
-from .api_guard import is_trusted_request as _is_local_request, forbidden as _forbidden, make_yaml as _make_yaml
+from .api_guard import (
+    is_trusted_request as _is_local_request,
+    forbidden as _forbidden,
+    make_yaml as _make_yaml,
+)
 from .conf_editor import (
     block_extent,
-    find_block_extent as _find_block_extent,
-    read_conf_lines as _read_conf_lines,
     read_conf_lines as _read_conf_lines,
     rewrite_bool_leaf as _rewrite_bool_leaf,
     upsert_leaf,
@@ -67,6 +68,7 @@ DEFAULT_LLM_TARGET = "日文"
 
 
 # --- 讀設定 ----------------------------------------------------------------- #
+
 
 def _load_conf() -> Any:
     yaml = _make_yaml()
@@ -130,7 +132,6 @@ def _derive_llm_endpoint(base_url: Optional[str]) -> Optional[str]:
     return b + "/chat/completions"
 
 
-
 # Translation-test sample + verdict. Kept at module level, out of the route
 # closure, so the rule that actually matters can be tested without a live LLM.
 #
@@ -153,15 +154,15 @@ def classify_translation_test(sample: str, result: str) -> tuple[bool, str]:
     unchanged = str(result or "").strip() == str(sample or "").strip()
     return (not unchanged, "unchanged" if unchanged else "ok")
 
+
 # --------------------------------------------------------------------------- #
 # --- 寫設定（就地改行，保留註解）------------------------------------------- #
 # --------------------------------------------------------------------------- #
 
+
 def _quote_yaml_scalar(value: str) -> str:
     """YAML 的單引號純量；內部的單引號要成對跳脫。"""
     return "'" + str(value).replace("'", "''") + "'"
-
-
 
 
 def _validate_translator_path() -> None:
@@ -172,9 +173,6 @@ def _validate_translator_path() -> None:
             "translator_config block not found in conf.yaml "
             "(character_config.tts_preprocessor_config.translator_config)"
         )
-
-
-
 
 
 def _nested(block: Any, name: str, key: str, default: str = "") -> str:
@@ -217,13 +215,17 @@ def _subtitle_from(body: dict):
         target = str(raw).strip() if raw is not None else ""
 
     if enabled and not (target if target is not None else _stored_subtitle_target()):
-        return None, None, JSONResponse(
-            status_code=400,
-            content={
-                "ok": False,
-                "error": "subtitle_target_lang is required when "
-                "translate_subtitle is enabled.",
-            },
+        return (
+            None,
+            None,
+            JSONResponse(
+                status_code=400,
+                content={
+                    "ok": False,
+                    "error": "subtitle_target_lang is required when "
+                    "translate_subtitle is enabled.",
+                },
+            ),
         )
     return enabled, target, None
 
@@ -245,7 +247,9 @@ def _engine_settings_from(body: dict, engine: str) -> dict:
         try:
             block = _get_openai_llm(_load_conf())
         except Exception as e:
-            logger.warning(f"[translator] could not read player LLM: {type(e).__name__}")
+            logger.warning(
+                f"[translator] could not read player LLM: {type(e).__name__}"
+            )
             block = None
         if block is not None:
             llm_endpoint = llm_endpoint or _derive_llm_endpoint(block.get("base_url"))
@@ -309,7 +313,11 @@ def _write_translator_config(
         written["translate_subtitle"] = subtitle_enabled
     if subtitle_target_lang is not None:
         tc_end = upsert_leaf(
-            lines, tc_start, tc_end, "subtitle_target_lang", _quote_yaml_scalar(subtitle_target_lang)
+            lines,
+            tc_start,
+            tc_end,
+            "subtitle_target_lang",
+            _quote_yaml_scalar(subtitle_target_lang),
         )
         written["subtitle_target_lang"] = subtitle_target_lang
 
@@ -360,6 +368,7 @@ def _write_translator_config(
 # Route factory
 # --------------------------------------------------------------------------- #
 
+
 def init_translator_route() -> APIRouter:
     """跨語言語音與字幕翻譯的端點。
 
@@ -397,7 +406,9 @@ def init_translator_route() -> APIRouter:
                 # 假裝一個它其實沒在用的值。
                 "engine": provider if provider in VALID_ENGINES else "llm",
                 "raw_provider": provider,
-                "llm_target_lang": _nested(block, "llm", "target_lang", DEFAULT_LLM_TARGET),
+                "llm_target_lang": _nested(
+                    block, "llm", "target_lang", DEFAULT_LLM_TARGET
+                ),
                 "llm_endpoint": _nested(block, "llm", "api_endpoint"),
                 "llm_model": _nested(block, "llm", "model"),
                 "deeplx_target_lang": _nested(

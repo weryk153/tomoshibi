@@ -45,7 +45,8 @@ def _read(path):
 
 def test_writes_into_the_named_block(conf_file):
     route.write_provider_config(
-        "lmstudio_llm", {"base_url": "http://127.0.0.1:1234/v1", "model": "qwen/qwen3.5-9b"}
+        "lmstudio_llm",
+        {"base_url": "http://127.0.0.1:1234/v1", "model": "qwen/qwen3.5-9b"},
     )
     text = _read(conf_file)
     assert "model: 'qwen/qwen3.5-9b'" in text

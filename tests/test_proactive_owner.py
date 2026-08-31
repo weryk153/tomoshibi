@@ -62,7 +62,9 @@ def test_missing_activity_entry_counts_as_never_active():
 
 
 def test_unknown_client_is_not_the_owner():
-    assert is_proactive_owner({"pc": _ctx("frieren", "h1")}, {"pc": 1.0}, "gone") is False
+    assert (
+        is_proactive_owner({"pc": _ctx("frieren", "h1")}, {"pc": 1.0}, "gone") is False
+    )
 
 
 def test_client_with_no_conversation_is_not_the_owner():

@@ -849,8 +849,7 @@ class WebSocketHandler:
             messages = get_history(conf_uid, history_uid)
         except Exception as e:
             logger.warning(
-                f"Could not read history for peer push "
-                f"({type(e).__name__}: {e})"
+                f"Could not read history for peer push ({type(e).__name__}: {e})"
             )
             return
 
@@ -871,8 +870,7 @@ class WebSocketHandler:
             except Exception as e:
                 # 一個已經斷掉的連線不該讓其他裝置也收不到。
                 logger.debug(
-                    f"Peer history push to {uid} failed "
-                    f"({type(e).__name__}: {e})"
+                    f"Peer history push to {uid} failed ({type(e).__name__}: {e})"
                 )
 
     async def _handle_fetch_configs(

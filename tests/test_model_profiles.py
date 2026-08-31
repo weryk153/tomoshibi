@@ -41,7 +41,9 @@ def test_matches_by_arch_and_backend():
 
 
 def test_any_arch_in_the_list_counts():
-    assert mp.profile_for(_model(arch="qwen3", backend="lmstudio"), PROFILES) is not None
+    assert (
+        mp.profile_for(_model(arch="qwen3", backend="lmstudio"), PROFILES) is not None
+    )
 
 
 def test_backend_mismatch_does_not_match():
@@ -112,7 +114,11 @@ def test_shipped_file_matches_lmstudio_mlx_arch_string():
     arch='qwen35' 這個 fixture 字串，從沒對過出貨檔案本身。這裡故意不傳
     profiles 參數，逼 profile_for 去讀真正會被使用者機器載入的
     model_profiles.yaml。"""
-    hit = mp.profile_for(DetectedModel(id="m", backend="lmstudio", base_url="http://x/v1", arch="qwen3_5"))
+    hit = mp.profile_for(
+        DetectedModel(
+            id="m", backend="lmstudio", base_url="http://x/v1", arch="qwen3_5"
+        )
+    )
     assert hit is not None, "qwen3_5（MLX 建置）必須命中出貨的 qwen 家族 profile"
     assert hit["extra_body"] == {"reasoning_effort": "none"}
 

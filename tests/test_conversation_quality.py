@@ -94,5 +94,3 @@ def test_non_proactive_batch_with_the_same_text_gets_the_yes_no_rule():
     messages = agent._to_messages(batch)
 
     assert "不是答案" in _user_text(messages)
-
-

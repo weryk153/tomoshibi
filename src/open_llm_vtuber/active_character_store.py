@@ -37,7 +37,13 @@ def get_active_character_filename() -> str | None:
             if not isinstance(data, dict):
                 return None
             return _validate_filename(data.get("filename"))
-        except (FileNotFoundError, json.JSONDecodeError, OSError, ValueError, TypeError):
+        except (
+            FileNotFoundError,
+            json.JSONDecodeError,
+            OSError,
+            ValueError,
+            TypeError,
+        ):
             return None
 
 

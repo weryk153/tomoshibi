@@ -212,11 +212,7 @@ def _delegated_choice_repair_guidance(
         "",
     )
     following_character = next(
-        (
-            content
-            for role, content in turns[user_index + 1 :]
-            if role == "assistant"
-        ),
+        (content for role, content in turns[user_index + 1 :] if role == "assistant"),
         "",
     )
     choice_markers = (
@@ -271,9 +267,7 @@ def should_suppress_proactive_text(
     # silent audio payload, and also prevents the one-shot retry from running.
     if not re.sub(r"[\s.,!?，。！？、；;…'\"「」『』]+", "", normalized):
         return True
-    compact_fragment = re.sub(
-        r"[\s.,!?，。！？、；;…'\"「」『』]+", "", normalized
-    )
+    compact_fragment = re.sub(r"[\s.,!?，。！？、；;…'\"「」『』]+", "", normalized)
     if compact_fragment in _PROACTIVE_ACKNOWLEDGEMENT_FRAGMENTS:
         return True
     if forbid_question and ("？" in normalized or "?" in normalized):
@@ -508,7 +502,8 @@ def _is_near_duplicate(current: str, previous: str) -> bool:
     if not current_ngrams or not previous_ngrams:
         return False
     dice_similarity = (
-        2 * len(current_ngrams & previous_ngrams)
+        2
+        * len(current_ngrams & previous_ngrams)
         / (len(current_ngrams) + len(previous_ngrams))
     )
     return dice_similarity >= 0.72
@@ -540,9 +535,9 @@ def record_proactive_response(
     recent.append(_clip_preserving_ends(normalized, MAX_RECENT_CHARS))
     _touch_session(key)
     _pending_by_session[key] = _clip_preserving_ends(normalized, MAX_PENDING_CHARS)
-    _since_user_by_session.setdefault(
-        key, deque(maxlen=MAX_RECENT_PROACTIVE)
-    ).append(_clip_preserving_ends(normalized, MAX_RECENT_CHARS))
+    _since_user_by_session.setdefault(key, deque(maxlen=MAX_RECENT_PROACTIVE)).append(
+        _clip_preserving_ends(normalized, MAX_RECENT_CHARS)
+    )
 
 
 def record_suppressed_proactive(
@@ -760,9 +755,7 @@ def build_proactive_prompt(
         )
 
     if normalized_anchor:
-        delegated_choice_repair = _delegated_choice_repair_guidance(
-            normalized_anchor
-        )
+        delegated_choice_repair = _delegated_choice_repair_guidance(normalized_anchor)
         unanswered_note = (
             "\n最後那 "
             f"{len(unseen_own_lines)} "

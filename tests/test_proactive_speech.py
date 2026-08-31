@@ -525,9 +525,7 @@ def test_history_identity_keeps_proactive_context_across_socket_reconnects():
 
     clear_proactive_context("character", first_socket)
     record_proactive_response("character", first_socket, "這是上一條主動發言。")
-    assert get_recent_proactive("character", second_socket) == [
-        "這是上一條主動發言。"
-    ]
+    assert get_recent_proactive("character", second_socket) == ["這是上一條主動發言。"]
 
 
 def test_generic_support_closing_is_filtered_without_touching_character_text():
@@ -914,7 +912,9 @@ def test_quoting_the_user_is_not_treated_as_self_repetition():
 def test_anchor_comparison_survives_simplified_traditional_drift():
     """The anchor comes from raw memory and the checked sentence has already
     been normalized, so an exact copy differs only by script variant."""
-    anchor = "角色：既然连这种基本功能都要先试一次……你确定接下来要聊些稍微像样的话题吗？"
+    anchor = (
+        "角色：既然连这种基本功能都要先试一次……你确定接下来要聊些稍微像样的话题吗？"
+    )
     language = "Traditional Chinese (Taiwan)"
 
     raw_lines = extract_anchor_character_lines(anchor)
@@ -933,7 +933,9 @@ def test_anchor_comparison_survives_simplified_traditional_drift():
             recent_outputs=raw_lines,
         )
         is False
-    ), "without normalization the copy slips through — this is why the handler normalizes"
+    ), (
+        "without normalization the copy slips through — this is why the handler normalizes"
+    )
     assert (
         should_suppress_proactive_text(
             checked,
@@ -995,25 +997,37 @@ def test_an_identical_short_line_is_suppressed_regardless_of_length():
     """
     previous = ["別做夢了，哈！"]
 
-    assert should_suppress_proactive_text(
-        "別做夢了，哈！", forbid_question=False, recent_outputs=previous
-    ) is True
+    assert (
+        should_suppress_proactive_text(
+            "別做夢了，哈！", forbid_question=False, recent_outputs=previous
+        )
+        is True
+    )
 
 
 def test_punctuation_only_differences_still_count_as_identical():
-    assert should_suppress_proactive_text(
-        "別做夢了，哈。", forbid_question=False, recent_outputs=["別做夢了，哈！"]
-    ) is True
+    assert (
+        should_suppress_proactive_text(
+            "別做夢了，哈。", forbid_question=False, recent_outputs=["別做夢了，哈！"]
+        )
+        is True
+    )
 
 
 def test_a_genuinely_different_short_line_still_gets_through():
     """完全比對不能變成「短句一律擋」——那會讓角色沒辦法講短話。"""
-    assert should_suppress_proactive_text(
-        "那你想聊什麼？", forbid_question=False, recent_outputs=["別做夢了，哈！"]
-    ) is False
-    assert should_suppress_proactive_text(
-        "別做夢了！", forbid_question=False, recent_outputs=["別做夢了，哈！"]
-    ) is False
+    assert (
+        should_suppress_proactive_text(
+            "那你想聊什麼？", forbid_question=False, recent_outputs=["別做夢了，哈！"]
+        )
+        is False
+    )
+    assert (
+        should_suppress_proactive_text(
+            "別做夢了！", forbid_question=False, recent_outputs=["別做夢了，哈！"]
+        )
+        is False
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1036,7 +1050,9 @@ def test_bare_yes_no_proactive_fragments_are_suppressed(text):
 def test_negation_words_inside_a_real_sentence_still_pass():
     """裸答案要擋，但含這些字的正常句子不能被連坐。"""
     assert (
-        should_suppress_proactive_text("沒有啦，我只是在想剛才那個實驗。", forbid_question=False)
+        should_suppress_proactive_text(
+            "沒有啦，我只是在想剛才那個實驗。", forbid_question=False
+        )
         is False
     )
 
@@ -1322,7 +1338,9 @@ def test_physics_and_ambiguous_words_are_left_alone():
     會把正確的句子改壞，代價比留著陸語味道大得多。
     """
     text = "這個粒子的質量與水平方向的分量，我估計一下就能搞定。"
-    assert normalize_output_language_variant(text, "Traditional Chinese (Taiwan)") == text
+    assert (
+        normalize_output_language_variant(text, "Traditional Chinese (Taiwan)") == text
+    )
 
 
 @pytest.mark.parametrize(

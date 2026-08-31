@@ -60,7 +60,8 @@ def evaluate_conversation(got: list[dict]) -> list[str]:
         m
         for m in got
         if m.get("type") == "audio"
-        and "Error calling the chat endpoint" in ((m.get("display_text") or {}).get("text") or "")
+        and "Error calling the chat endpoint"
+        in ((m.get("display_text") or {}).get("text") or "")
     ]
     non_empty_audio = [m for m in audio if m.get("audio")]
 
@@ -71,13 +72,9 @@ def evaluate_conversation(got: list[dict]) -> list[str]:
     elif not audio:
         failures.append("一輪對話沒有任何語音輸出（沒有收到任何 audio 訊息）")
     elif text_errors:
-        failures.append(
-            "對話回傳錯誤訊息——檢查 conf.yaml 的 LLM 設定與後端日誌"
-        )
+        failures.append("對話回傳錯誤訊息——檢查 conf.yaml 的 LLM 設定與後端日誌")
     elif not non_empty_audio:
-        failures.append(
-            "收到 audio 訊息，但每一段語音內容都是空的（TTS 整輪靜默失敗）"
-        )
+        failures.append("收到 audio 訊息，但每一段語音內容都是空的（TTS 整輪靜默失敗）")
     return failures
 
 
@@ -117,7 +114,11 @@ async def main() -> int:
             audio = [m for m in got if m.get("type") == "audio"]
             empty_count = sum(1 for m in audio if not m.get("audio"))
             first = (audio[0].get("display_text") or {}).get("text")
-            note = f"（其中 {empty_count} 段內容為空，可能是收尾標點片段）" if empty_count else ""
+            note = (
+                f"（其中 {empty_count} 段內容為空，可能是收尾標點片段）"
+                if empty_count
+                else ""
+            )
             print(f"✓ 對話：收到 {len(audio)} 段語音，首句 {first!r}{note}")
 
     if failures:
