@@ -29,9 +29,6 @@ import {
 import { toaster } from '@/components/ui/tw/toaster';
 import MotionConfig from './motion-config';
 
-interface live2DProps {
-}
-
 function live2D(): JSX.Element {
   const { t } = useTranslation();
   const { playEffect } = useStageEffect();
