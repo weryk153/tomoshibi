@@ -37,7 +37,8 @@ from ruamel.yaml import YAML
 from .conf_editor import (
     nested_extent,
     read_conf_lines as _read_conf_lines,
-    rewrite_str_leaf,
+    upsert_leaf,
+    upsert_nested_block,
     write_conf as _write_conf,
     split_leaf as _split_leaf,
 )
@@ -341,28 +342,43 @@ def _quote_yaml_scalar(value: str) -> str:
     return "'" + str(value).replace("'", "''") + "'"
 
 
-def _validate_path_with_ruamel() -> None:
+def _validate_path_with_ruamel(provider: str = "openai_compatible_llm") -> None:
     """
-    Confirm the openai_compatible_llm block exists at the expected path before we
+    Confirm the given provider's block exists at the expected path before we
     touch the file. Uses ruamel round-trip load (per spec) so a malformed/missing
     structure fails loudly instead of corrupting the config.
+
+    provider 預設 openai_compatible_llm 是為了不動到 _write_openai_block 這個舊
+    呼叫端的行為；write_provider_config 會傳入它真正要寫的那個區塊，不能沿用舊的
+    硬編碼——不然目標明明是 lmstudio_llm，卻只驗證了 openai_compatible_llm 存不
+    存在，驗過了但目標區塊其實不在，會晚一步才在逐行編輯時才炸開。
     """
     yaml = _make_yaml()
     with open(CONF_PATH, "r", encoding="utf-8") as f:
         data = yaml.load(f)
-    if _get_openai_block(data) is None:
+    try:
+        block = data["character_config"]["agent_config"]["llm_configs"][provider]
+    except (KeyError, TypeError):
+        block = None
+    if block is None:
         raise KeyError(
-            "openai_compatible_llm block not found in conf.yaml "
-            "(character_config.agent_config.llm_configs.openai_compatible_llm)"
+            f"{provider} block not found in conf.yaml "
+            f"(character_config.agent_config.llm_configs.{provider})"
         )
 
 
-def _point_llm_provider_at_openai_compatible(lines: list) -> None:
-    """把 llm_provider 選擇器指向 openai_compatible_llm，保留縮排與行尾註解。
+# 允許寫入的供應商區塊。白名單而不是自由字串：provider 會被拿去組 YAML 路徑，
+# 而路徑是請求可控的。
+WRITABLE_PROVIDERS = frozenset(
+    {"lmstudio_llm", "ollama_llm", "openai_compatible_llm"}
+)
 
-    沒有這一步，一台 llm_provider 指著別的區塊（例如 lmstudio_llm）的機器會「驗證
-    通過、存檔成功」，然後 agent 繼續讀舊的供應商——哪裡都不會報錯，只是那次存檔
-    完全沒有效果。
+
+def _point_llm_provider_at(lines: list, provider: str) -> None:
+    """把 llm_provider 選擇器指向指定區塊，保留縮排與行尾註解。
+
+    沒有這一步，一台 llm_provider 指著別的區塊的機器會「驗證通過、存檔成功」，
+    然後 agent 繼續讀舊的供應商——哪裡都不會報錯，只是那次存檔完全沒有效果。
 
     這個鍵目前只出現在 basic_memory_agent 底下，所以全檔掃第一個就對。
     """
@@ -370,38 +386,67 @@ def _point_llm_provider_at_openai_compatible(lines: list) -> None:
         if not line.lstrip().startswith("llm_provider:"):
             continue
         indent, comment = _split_leaf(line)
-        lines[i] = f"{indent}llm_provider: 'openai_compatible_llm'{comment}\n"
+        lines[i] = f"{indent}llm_provider: '{provider}'{comment}\n"
         return
     raise KeyError("llm_provider: line not found in conf.yaml")
+
+
+def _point_llm_provider_at_openai_compatible(lines: list) -> None:
+    """把 llm_provider 選擇器指向 openai_compatible_llm。
+
+    保留給 tests/test_llm_config_write.py 這份特徵測試直接呼叫；邏輯已經搬到
+    通用的 _point_llm_provider_at，這裡只是釘住舊呼叫端的簽名。
+    """
+    _point_llm_provider_at(lines, "openai_compatible_llm")
+
+
+def write_provider_config(provider: str, values: dict) -> None:
+    """把設定寫進指定的供應商區塊，並把 llm_provider 指過去。
+
+    provider 必須在 WRITABLE_PROVIDERS 裡——它會被拿去組 YAML 路徑，而呼叫端的
+    值來自請求。
+
+    values 可含 base_url / model / llm_api_key（字串葉節點）與 extra_body
+    （巢狀）。**沒給的鍵不動**：自動設定只寫它有把握的東西，其餘留給使用者。
+
+    只改該改的葉節點，其餘每一行、每一個註解、每一個 True 與 null 的寫法都原樣
+    保留——ruamel 全份重新序列化會把它們正規化，在一個手寫的設定檔上那是幾十行
+    無關的改動。ruamel 只拿來在動手之前驗證結構。
+    """
+    if provider not in WRITABLE_PROVIDERS:
+        raise ValueError(f"Refusing to write unknown provider block: {provider!r}")
+
+    _validate_path_with_ruamel(provider)
+
+    lines = _read_conf_lines()
+    start, end = nested_extent(
+        lines, "character_config", "agent_config", "llm_configs", provider
+    )
+
+    for key in ("base_url", "model", "llm_api_key"):
+        if key in values:
+            end = upsert_leaf(lines, start, end, key, _quote_yaml_scalar(str(values[key])))
+
+    extra_body = values.get("extra_body")
+    if extra_body:
+        rendered = {k: _quote_yaml_scalar(str(v)) for k, v in extra_body.items()}
+        end = upsert_nested_block(lines, start, end, "extra_body", rendered)
+
+    _point_llm_provider_at(lines, provider)
+    _write_conf(lines)
 
 
 def _write_openai_block(base_url: str, model: str, api_key: str) -> None:
     """把使用者填的端點／模型／金鑰寫進 openai_compatible_llm，並切換供應商。
 
-    只改那三個葉節點。其餘每一行、每一個註解、每一個 True 與 null 的寫法都原樣
-    保留——ruamel 全份重新序列化會把它們正規化成 true 與空值，在一個手寫的設定檔
-    上那是幾十行無關的改動。ruamel 只拿來在動手之前驗證結構。
+    保留給 tests/test_llm_provider_write.py 與 tests/test_llm_config_write.py
+    這兩份既有的特徵測試直接呼叫；行為完全交給通用的 write_provider_config，
+    這裡只是釘住舊呼叫端的簽名，不重複邏輯。
     """
-    _validate_path_with_ruamel()
-
-    lines = _read_conf_lines()
-    start, end = nested_extent(
-        lines, "character_config", "agent_config", "llm_configs", "openai_compatible_llm"
+    write_provider_config(
+        "openai_compatible_llm",
+        {"base_url": base_url, "model": model, "llm_api_key": api_key},
     )
-
-    targets = {"base_url": base_url, "model": model, "llm_api_key": api_key}
-    missing = {
-        key
-        for key, value in targets.items()
-        if not rewrite_str_leaf(lines, start, end, key, value)
-    }
-    if missing:
-        raise KeyError(
-            f"Could not locate keys {sorted(missing)} in openai_compatible_llm block"
-        )
-
-    _point_llm_provider_at_openai_compatible(lines)
-    _write_conf(lines)
 
 
 # --- 端點 ------------------------------------------------------------------- #
@@ -509,7 +554,11 @@ def init_llm_config_route() -> APIRouter:
             return _bad(err)
 
         try:
-            await asyncio.to_thread(_write_openai_block, base_url, model, api_key)
+            await asyncio.to_thread(
+                write_provider_config,
+                "openai_compatible_llm",
+                {"base_url": base_url, "model": model, "llm_api_key": api_key},
+            )
         except Exception as e:
             logger.error(f"[llm] write failed: {type(e).__name__}")
             return JSONResponse(
