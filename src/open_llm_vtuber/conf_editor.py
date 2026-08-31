@@ -160,6 +160,46 @@ def upsert_leaf(lines: list[str], start: int, end: int, key: str, rendered: str)
     return end + 1
 
 
+def upsert_nested_block(
+    lines: list[str], start: int, end: int, key: str, mapping: dict[str, str]
+) -> int:
+    """在 [start, end) 這個區塊裡寫入一個巢狀子區塊，不存在就建立。
+
+    用途是 extra_body 這種「值本身是一組鍵值」的設定。upsert_leaf 只處理葉節點，
+    而 extra_body 底下還有一層。
+
+    子區塊已存在時就地 upsert 每個葉節點；不存在時在區塊尾端建立。判斷「存在」
+    交給 sub_block_extent，它的 regex 是 ^(\\s*)key:\\s*(#.*)?$——被註解掉的
+    `# extra_body:` 因為 # 卡在空白與 key 之間而不會命中，所以樣板裡那段註解範例
+    會被正確地視為「不存在」，而且我們不去動它（跟這個模組其他地方一樣，不屬於
+    我們要改的東西就原樣留著）。
+
+    回傳區塊新的結束行號，語意與 upsert_leaf 一致，讓連續呼叫不會錯位。
+    """
+    inner_start, inner_end = sub_block_extent(lines, start, end, key)
+    if inner_start is not None:
+        before = len(lines)
+        for leaf_key, rendered in mapping.items():
+            inner_end = upsert_leaf(lines, inner_start, inner_end, leaf_key, rendered)
+        # upsert_leaf 可能插入新行，父區塊的結束位置要跟著往後推。
+        return end + (len(lines) - before)
+
+    outer_indent = _block_indent(lines, start, end)
+    inner_indent = outer_indent + _DEFAULT_INDENT
+
+    insert_at = end
+    while insert_at > start and (
+        not lines[insert_at - 1].strip()
+        or lines[insert_at - 1].lstrip().startswith("#")
+    ):
+        insert_at -= 1
+
+    block = [f"{outer_indent}{key}:\n"]
+    block += [f"{inner_indent}{k}: {v}\n" for k, v in mapping.items()]
+    lines[insert_at:insert_at] = block
+    return end + len(block)
+
+
 def block_extent(lines: list[str], key: str, start_from: int = 0) -> tuple[int, int]:
     """某個 ``key:`` 區塊底下子項的範圍。找不到就丟 KeyError。
 
