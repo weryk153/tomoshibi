@@ -12,6 +12,16 @@
     "revert": "元に戻す"
   },
   "setup": {
+    "detectTitle": "このパソコン上のモデルを検出",
+    "detectScanning": "ローカルのモデルを探しています…",
+    "detectFound": "見つかったモデル — 1つ選んでください:",
+    "detectEmptyOllama": "Ollama は起動していますが、モデルがまだありません。",
+    "detectEmptyLmStudio": "LM Studio は起動していますが、モデルが読み込まれていません。LM Studio 側でモデルをダウンロードしてから、もう一度確認してください — こちらから代わりにダウンロードすることはできません。",
+    "detectNothingRunning": "ローカルのモデルサーバーが見つかりませんでした。Ollama か LM Studio をインストールしてから、もう一度お試しください。",
+    "detectUse": "このモデルを使う",
+    "detectApplied": "{{model}} を適用しました",
+    "detectVision": "画像認識",
+    "detectTools": "ツール対応",
     "ollamaInstallTitle": "まず Ollama をインストール(無料)",
     "ollamaInstallDesc": "Ollama は AI をあなたのパソコンで動かす無料アプリです。インストールしてから、もう一度確認してください。",
     "ollamaInstallDownloadLink": "Ollama をダウンロード",
