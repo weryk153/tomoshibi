@@ -14,6 +14,8 @@
 行為契約由 tests/test_memory_store_behavior.py 釘住。
 """
 
+import asyncio
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any
 
@@ -277,6 +279,43 @@ async def _request_rewrite(
     return str(text).strip().strip("`").strip()
 
 
+# --- 併發（同一段對話一次只整理一份）--------------------------------------
+
+_consolidation_locks: "OrderedDict[tuple[str, str], asyncio.Lock]" = OrderedDict()
+_MAX_LOCKS = 64
+
+
+def _consolidation_lock(conf_uid: str, history_uid: str) -> asyncio.Lock:
+    """同一段對話的整理必須排隊。
+
+    整理是「讀出整份記憶 → 丟給 LLM 重寫 → 整份覆寫」，中間那步要花到 60 秒。
+    沒有鎖的話，第 N 輪還在等 LLM、第 N+1 輪就開始了：兩邊各自讀到同一份舊記憶
+    當底稿，各自整份寫回，後寫的贏——先寫那輪的新事實就這樣消失，而且不留痕跡
+    （整條路徑是 fire-and-forget，失敗只記 warning）。本地慢模型加上
+    memory_consolidation_interval=1 時這是搆得到的，不是理論風險。
+
+    鎖要含蓋「讀」才有用：只鎖寫入的話兩邊依然是從同一份底稿長出來的。
+
+    鎖以 (conf_uid, history_uid) 為單位——不同對話之間本來就互不相干，
+    沒有理由讓它們互相等。
+    """
+    key = (str(conf_uid), str(history_uid))
+    lock = _consolidation_locks.get(key)
+    if lock is None:
+        lock = asyncio.Lock()
+        _consolidation_locks[key] = lock
+    _consolidation_locks.move_to_end(key)
+
+    # 長時間執行不該讓這張表無限長。只淘汰沒被持有的鎖——把還鎖著的鎖丟掉，
+    # 等於讓下一輪拿到一把新鎖，併發保護就破了。
+    excess = len(_consolidation_locks) - _MAX_LOCKS
+    if excess > 0:
+        stale = [k for k, v in _consolidation_locks.items() if not v.locked()]
+        for old_key in stale[:excess]:
+            _consolidation_locks.pop(old_key, None)
+    return lock
+
+
 async def consolidate_core_memory(
     conf_uid: str,
     history_uid: str,
@@ -300,20 +339,25 @@ async def consolidate_core_memory(
             return
 
         limit = _clamp_cap(cap)
-        current = load_core_memory(conf_uid, history_uid)
-        prompt = build_consolidation_prompt(
-            current=current,
-            user_input=user_input,
-            ai_response=ai_response,
-            cap=limit,
-            character_name=character_name,
-        )
-        candidate = await _request_rewrite(base_url, model, prompt, api_key, extra_body)
-        if _acceptable_rewrite(candidate, current, limit):
-            _write_memory(conf_uid, history_uid, candidate)
-            logger.info(
-                f"[core_memory] updated for {conf_uid}/{history_uid} ({len(candidate)} chars)"
+        # 讀→重寫→寫回，整段持鎖。見 _consolidation_lock。
+        async with _consolidation_lock(conf_uid, history_uid):
+            current = load_core_memory(conf_uid, history_uid)
+            prompt = build_consolidation_prompt(
+                current=current,
+                user_input=user_input,
+                ai_response=ai_response,
+                cap=limit,
+                character_name=character_name,
             )
+            candidate = await _request_rewrite(
+                base_url, model, prompt, api_key, extra_body
+            )
+            if _acceptable_rewrite(candidate, current, limit):
+                _write_memory(conf_uid, history_uid, candidate)
+                logger.info(
+                    f"[core_memory] updated for {conf_uid}/{history_uid} "
+                    f"({len(candidate)} chars)"
+                )
     except Exception as e:
         logger.warning(
             f"[core_memory] consolidate failed for {conf_uid}/{history_uid}: {e}"
