@@ -18,8 +18,7 @@
 from __future__ import annotations
 
 import asyncio
-import os
-import re
+import json
 import socket
 import subprocess
 from typing import Optional
@@ -167,7 +166,14 @@ def _tailscale_serve_https_url(port: Optional[int]) -> Optional[str]:
                     if proxy.endswith(f":{port}"):
                         return _serve_host_to_url(host)
             return None  # tailscale ran but nothing maps to our port
-        except Exception:
+        except FileNotFoundError:
+            continue  # 這個路徑沒裝 tailscale，是正常情況，不值得記
+        except Exception as e:
+            # 這裡原本是裸 continue。它吞掉過一個 NameError（json 沒 import），
+            # 於是這個函式從未成功回傳過一次網址——設定頁上那個「唯一能用麥克風
+            # 的遠端連法」永遠是空的，而且四個路徑都在同一行炸、log 一片乾淨，
+            # 看起來就只像「大概是 Tailscale Serve 沒設好」。留一行痕跡。
+            logger.debug(f"[network] `{exe} serve status` failed: {e!r}")
             continue
     return None
 
