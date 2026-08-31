@@ -96,3 +96,98 @@ def list_lmstudio_models(base_url: str) -> list[DetectedModel]:
         if entry is not None:
             out.append(entry)
     return out
+
+
+def ollama_root(base_url: str) -> str:
+    """Ollama 原生 API 的根位址。設定裡寫的是 .../v1（OpenAI 相容那套），
+    而 /api/tags 與 /api/show 在 /v1 之外。"""
+    return base_url.rstrip("/").removesuffix("/v1")
+
+
+def fetch_ollama_tags(base_url: str) -> list[dict]:
+    """打 /api/tags，回原始的 models 陣列。失敗丟例外。"""
+    url = f"{ollama_root(base_url)}/api/tags"
+    with httpx.Client(timeout=_TIMEOUT) as client:
+        payload = client.get(url).json()
+    models = payload.get("models")
+    return models if isinstance(models, list) else []
+
+
+def fetch_ollama_show(base_url: str, model_id: str) -> dict:
+    """打 /api/show 拿單一模型的細節。失敗丟例外。"""
+    url = f"{ollama_root(base_url)}/api/show"
+    with httpx.Client(timeout=_TIMEOUT) as client:
+        return client.post(url, json={"model": model_id}).json()
+
+
+def list_ollama_models(base_url: str) -> list[DetectedModel]:
+    """Ollama 上有哪些模型。只回名字——能力要逐顆問 /api/show，二十顆模型就是
+    二十次請求，所以留到使用者選定之後（見 describe_ollama_model）。"""
+    try:
+        raw_list = fetch_ollama_tags(base_url)
+    except Exception as e:
+        logger.debug(f"[model_probe] Ollama probe failed at {base_url}: {e}")
+        return []
+    out = []
+    for raw in raw_list:
+        if not isinstance(raw, dict):
+            continue
+        name = str(raw.get("name") or "").strip()
+        if not name:
+            continue
+        details = raw.get("details") if isinstance(raw.get("details"), dict) else {}
+        out.append(
+            DetectedModel(
+                id=name,
+                backend="ollama",
+                base_url=base_url,
+                arch=(str(details["family"]).strip() if details.get("family") else None),
+            )
+        )
+    return out
+
+
+def _ollama_context_length(model_info: dict, arch: str | None) -> int | None:
+    """model_info 的 context 鍵是 '<arch>.context_length'，不是固定名字。
+
+    優先用 arch 組出來的鍵；arch 不明或對不上時退而找任何以 .context_length
+    結尾的鍵——只認固定名字的話，換個模型家族就抓不到。
+    """
+    if arch:
+        value = model_info.get(f"{arch}.context_length")
+        if isinstance(value, int):
+            return value
+    for key, value in model_info.items():
+        if key.endswith(".context_length") and isinstance(value, int):
+            return value
+    return None
+
+
+def describe_ollama_model(base_url: str, model_id: str) -> DetectedModel | None:
+    """補上這顆模型的能力資訊。問不到回 None，呼叫端沿用列表階段那筆。"""
+    try:
+        payload = fetch_ollama_show(base_url, model_id)
+    except Exception as e:
+        logger.debug(f"[model_probe] Ollama show failed for {model_id}: {e}")
+        return None
+    details = payload.get("details") if isinstance(payload.get("details"), dict) else {}
+    caps = payload.get("capabilities")
+    caps = caps if isinstance(caps, list) else []
+    model_info = (
+        payload.get("model_info") if isinstance(payload.get("model_info"), dict) else {}
+    )
+    arch = str(details["family"]).strip() if details.get("family") else None
+    return DetectedModel(
+        id=model_id,
+        backend="ollama",
+        base_url=base_url,
+        arch=arch,
+        is_vlm=("vision" in caps),
+        supports_tools=("tools" in caps),
+        max_context=_ollama_context_length(model_info, arch),
+        quantization=(
+            str(details["quantization_level"]).strip()
+            if details.get("quantization_level")
+            else None
+        ),
+    )
