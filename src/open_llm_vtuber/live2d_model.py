@@ -221,6 +221,34 @@ class Live2dModel:
 
         return matched_model
 
+    def _scan_emotion_keys(self, str_to_check: str) -> list:
+        """掃出字串裡出現過的情緒關鍵字（名字，不是索引），依出現順序。
+
+        extract_emotion 回傳的是表情索引，那是前端要的；語音要的是名字——
+        參考音檔的對照表以人看得懂的關鍵字為 key（見 gpt_sovits_tts）。用索引
+        反查名字會有歧義（多個關鍵字可以指向同一個表情），所以掃描時就把名字
+        留下來，不要繞一圈再倒推。
+        """
+        keys = []
+        str_to_check = str_to_check.lower()
+        i = 0
+        while i < len(str_to_check):
+            if str_to_check[i] != "[":
+                i += 1
+                continue
+            for key in self.emo_map.keys():
+                emo_tag = f"[{key}]"
+                if str_to_check[i : i + len(emo_tag)] == emo_tag:
+                    keys.append(key)
+                    i += len(emo_tag) - 1
+                    break
+            i += 1
+        return keys
+
+    def extract_emotion_keys(self, str_to_check: str) -> list:
+        """公開版的關鍵字掃描；語音那條路徑用它挑參考音。"""
+        return self._scan_emotion_keys(str_to_check)
+
     def extract_emotion(self, str_to_check: str) -> list:
         """
         Check the input string for any emotion keywords and return a list of values (the expression index) of the emotions found in the string.

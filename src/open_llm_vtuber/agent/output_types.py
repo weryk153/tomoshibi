@@ -12,6 +12,9 @@ class Actions:
     pictures: Optional[List[str]] = None
     sounds: Optional[List[str]] = None
     stage_performance: Optional[str] = None
+    # 這一則回覆的情緒關鍵字（名字）。表情用的是 expressions 裡的索引；這個欄位
+    # 是給語音挑參考音用的，兩者刻意分開，因為索引反查名字有歧義。
+    emotion: Optional[str] = None
 
     def to_dict(self) -> dict:
         """Convert Actions object to a dictionary for JSON serialization"""

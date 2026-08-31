@@ -393,6 +393,20 @@ character_config:
       batch_size: '1' # 批处理大小
       media_type: 'wav' # 媒体类型
       streaming_mode: 'false' # 流模式
+      # 依情緒切換參考音（可選）。參考音決定語氣，不設就是整段對話一個語氣。
+      # key 用 Live2D 模型 emotionMap 裡的關鍵字——也就是 LLM 每輪寫在回覆開頭
+      # 的那個 [xxx]，所以表情跟語氣自然對得上，不必再定義第二套詞彙。
+      # ref_audio_path 和 prompt_text 是一組的：prompt_text 必須是那段參考音
+      # 「實際說的那句話」，填錯輸出會歪掉。缺一個的項目會被略過並記 warning。
+      # 對不上的情緒、檔案不存在，都退回上面的預設參考音。
+      # emotion_refs:
+      #   joy:
+      #     ref_audio_path: '/path/to/refs/joy.wav'
+      #     prompt_text: '參考音檔裡實際說的那句話'
+      #   anger:
+      #     ref_audio_path: '/path/to/refs/anger.wav'
+      #     prompt_text: '參考音檔裡實際說的那句話'
+      #     prompt_lang: 'ja' # 可選，沒寫就沿用上面的 prompt_lang
 
     fish_api_tts:
       # Fish TTS API 的 API 密钥。
