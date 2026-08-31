@@ -27,8 +27,9 @@ LM Studio 預設 JIT 載入：server 起著，但要等第一個請求進來才�
 
 import time
 
-import httpx
 from loguru import logger
+
+from .model_probe import fetch_lmstudio_models, lmstudio_root
 
 _PROBE_TIMEOUT = 1.5
 _RETRY_COOLDOWN = 60.0  # 問不到時，至少隔這麼久才再問一次
@@ -39,11 +40,9 @@ _last_failed_at: dict[str, float] = {}
 
 
 def _lmstudio_root(base_url: str) -> str:
-    """把 OpenAI 相容的 base_url 還原成 LM Studio 的根位址。
-
-    設定裡寫的是 'http://127.0.0.1:1234/v1'，而 /api/v0 跟 /v1 是平行的兩套。
-    """
-    return base_url.rstrip("/").removesuffix("/v1")
+    """保留這個名字：既有測試釘著它。實作移到 model_probe，避免兩個地方
+    各自知道 /v1 與 /api/v0 的關係。"""
+    return lmstudio_root(base_url)
 
 
 def _probe_lmstudio(base_url: str, model: str | None) -> int | None:
@@ -51,13 +50,9 @@ def _probe_lmstudio(base_url: str, model: str | None) -> int | None:
 
     多個模型同時載入時優先認呼叫端指名的那個——對話用的是哪顆，預算就該照哪顆算。
     """
-    url = f"{_lmstudio_root(base_url)}/api/v0/models"
-    with httpx.Client(timeout=_PROBE_TIMEOUT) as client:
-        data = client.get(url).json()
-
     loaded = [
         m
-        for m in data.get("data", [])
+        for m in fetch_lmstudio_models(base_url)
         if isinstance(m, dict) and m.get("loaded_context_length")
     ]
     if not loaded:
