@@ -18,8 +18,9 @@ class _Response:
         return {"choices": [{"message": {"content": self.content}}]}
 
 
-def _translator(target: str = "繁體中文") -> LLMTranslate:
+def _translator(target: str = "繁體中文", protected_names=None) -> LLMTranslate:
     return LLMTranslate(
+        protected_names=protected_names,
         api_endpoint="http://translator.test/v1/chat/completions",
         model="local-model",
         target_lang=target,
@@ -131,4 +132,7 @@ def test_kurisu_name_is_not_rewritten_as_homophones(monkeypatch):
         lambda *args, **kwargs: _Response("我是「紅麗棲」。"),
     )
 
-    assert _translator().translate("私は「紅莉栖」です。") == "我是「紅莉栖」。"
+    # 名字由角色設定提供；引擎本身不認得任何角色（見 test_translate_protected_names.py）。
+    translator = _translator(protected_names={"紅莉栖": ["紅麗棲", "紅莉棲", "紅麗栖"]})
+
+    assert translator.translate("私は「紅莉栖」です。") == "我是「紅莉栖」。"

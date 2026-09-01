@@ -703,7 +703,11 @@ class ServiceContext:
                     f"Initializing audio Translator: {provider} -> "
                     f"global target_lang (V={voice_lang} not mappable)"
                 )
-            self.translate_engine = TranslateFactory.get_translator(provider, audio_cfg)
+            self.translate_engine = TranslateFactory.get_translator(
+                provider,
+                audio_cfg,
+                protected_names=getattr(self.character_config, "protected_names", None),
+            )
             self._audio_translate_voice_lang = voice_lang
         else:
             logger.info("Audio translation already initialized with the same config.")
@@ -771,7 +775,11 @@ class ServiceContext:
         else:  # llm / tencent both use 'target_lang'
             cfg["target_lang"] = target
         try:
-            return TranslateFactory.get_translator(provider, cfg)
+            return TranslateFactory.get_translator(
+                provider,
+                cfg,
+                protected_names=getattr(self.character_config, "protected_names", None),
+            )
         except Exception as e:
             logger.warning(
                 f"Could not build subtitle translator ({provider}): "

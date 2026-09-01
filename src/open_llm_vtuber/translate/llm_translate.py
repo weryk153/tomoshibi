@@ -1,3 +1,5 @@
+from collections.abc import Mapping, Sequence
+
 import httpx
 import re
 from loguru import logger
@@ -20,6 +22,7 @@ class LLMTranslate(TranslateInterface):
         target_lang: str,
         extra_body: dict | None = None,
         timeout: int = 30,
+        protected_names: "Mapping[str, Sequence[str]] | None" = None,
     ):
         self.api_endpoint = api_endpoint
         self.model = model
@@ -29,6 +32,9 @@ class LLMTranslate(TranslateInterface):
         # 無錯誤。傳 {"reasoning_effort": "none"} 之類的值把推理關掉。
         self.extra_body = extra_body
         self.timeout = timeout
+        # 這個角色的專有名詞：正式寫法 → 要折回去的錯誤寫法。由角色設定提供，
+        # 這個模組不認得任何具體角色。見 CharacterConfig.protected_names。
+        self.protected_names = dict(protected_names or {})
 
     @property
     def _is_traditional_chinese_target(self) -> bool:
@@ -51,9 +57,17 @@ class LLMTranslate(TranslateInterface):
                 "dialogue: interpret Japanese grammar before translating. In particular, "
                 "無理をせず means 不要勉強自己 or 不要逞強, never 別扭地做. "
                 "When Japanese omits a first-person subject, do not invent the plural "
-                "pronoun 我們. Treat character names as immutable proper nouns: "
-                "紅莉栖 must remain 紅莉栖, never 紅麗棲 or another homophonic spelling."
+                "pronoun 我們."
             )
+            # 專有名詞是角色資料，不是翻譯引擎的知識。沒設就完全不提，避免
+            # 對別人的角色下達莫名其妙的指令。
+            if self.protected_names:
+                spellings = "、".join(self.protected_names)
+                variant_rule += (
+                    " Treat character names as immutable proper nouns. These "
+                    f"spellings must be reproduced exactly: {spellings}. Never "
+                    "substitute a homophonic character."
+                )
         return (
             f"You are a deterministic dialogue subtitle translator. Translate the "
             f"source into {self.target_lang}. Translate faithfully, sentence by "
@@ -131,7 +145,7 @@ class LLMTranslate(TranslateInterface):
 
             if self._is_traditional_chinese_target:
                 res = normalize_output_language_variant(
-                    res, "Traditional Chinese (Taiwan)"
+                    res, "Traditional Chinese (Taiwan)", self.protected_names
                 )
                 # Dialogue models occasionally pluralize an omitted Japanese subject
                 # despite the contract above. Only correct the characteristic future
@@ -142,14 +156,9 @@ class LLMTranslate(TranslateInterface):
                     text,
                 ):
                     res = res.replace("我們將", "我會")
-                # This is a display subtitle, not a localization pass over names.
-                # Small local models have repeatedly rewritten 紅莉栖 as the
-                # homophonic 紅麗棲 even with a strict prompt, so enforce the source
-                # spelling deterministically when that proper noun is present.
-                if "紅莉栖" in text:
-                    res = re.sub(r"紅[莉麗][栖棲]", "紅莉栖", res)
-                if "牧瀬" in text:
-                    res = res.replace("牧瀬", "牧瀨")
+                # normalize_output_language_variant above already folded the
+                # configured spellings back. Nothing character-specific belongs
+                # here — the list comes from the character, via self.protected_names.
             logger.info(f"LLM translate: '{text}' -> '{res}'")
             return res
         except Exception as e:

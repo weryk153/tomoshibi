@@ -51,6 +51,18 @@ class CharacterConfig(I18nMixin):
     # （R），text_lang 是「用什麼語言發聲」（V）。兩者不同時，語音路徑會先翻譯
     # 再合成；相同時直接唸，省下一次翻譯。
     reply_language: str = Field(default="", alias="reply_language")
+    # 這個角色的專有名詞：正式寫法 → 要被折回去的錯誤寫法。
+    #
+    # 兩件事會破壞專有名詞：小模型會把名字換成同音字（實測反覆發生，即使
+    # prompt 已經明講不可以），而 OpenCC 的 s2twp 會把名字裡的某個字當成一般
+    # 詞彙做台灣用語轉換。兩者都需要在輸出端把正確寫法確定性地釘回去。
+    #
+    # 為什麼放在角色層級而不是寫在引擎裡：要保護哪些名字屬於角色，不屬於這個
+    # app。引擎內建特定作品的角色名字，等於每個使用者的安裝都帶著別人的角色。
+    # 留空（預設）＝不保護任何名字，行為與沒有這個功能時完全相同。
+    protected_names: dict[str, list[str]] = Field(
+        default_factory=dict, alias="protected_names"
+    )
     # 每幾輪整理一次記憶。3 或 5 可以把整理用的呼叫省一半以上，適合弱機。
     # (every turn) preserves existing behavior. 3/5 halve+ the "tidy-up" LLM calls for
     # weak/local models. Clamped to {1,3,5} by the validator below (fail-soft -> 1).

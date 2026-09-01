@@ -4,6 +4,7 @@ This module contains capability rules only.  Character identity, temperament,
 relationship style, and wording remain owned by each character's persona prompt.
 """
 
+from collections.abc import Mapping, Sequence
 from difflib import SequenceMatcher
 from functools import lru_cache
 import re
@@ -350,8 +351,18 @@ def _taiwan_converter():
     return OpenCC("s2twp")
 
 
-def normalize_output_language_variant(text: str, language: str | None) -> str:
-    """Normalize Chinese output only when the configured locale is Taiwan zh."""
+def normalize_output_language_variant(
+    text: str,
+    language: str | None,
+    protected_names: "Mapping[str, Sequence[str]] | None" = None,
+) -> str:
+    """Normalize Chinese output only when the configured locale is Taiwan zh.
+
+    `protected_names` maps a proper noun's official spelling to the misspellings
+    that must be folded back into it. It is character data, not engine data, so
+    it is supplied by the caller from the active character's config — this module
+    must not know any specific work's character names.
+    """
     if not text or not _is_taiwan_traditional(language):
         return text
 
@@ -390,13 +401,16 @@ def normalize_output_language_variant(text: str, language: str | None) -> str:
     for source, target in taiwan_terms.items():
         normalized = normalized.replace(source, target)
 
-    # Proper names are identity, not vocabulary to localize. Small multilingual
-    # models occasionally rewrite Kurisu's name with homophonic characters even
-    # while otherwise producing valid Traditional Chinese.
-    normalized = re.sub(r"紅[莉麗][栖棲]", "紅莉栖", normalized)
-    # 同一個坑：s2twp 把岡部自封稱號裡的「凶」當一般用字轉成「兇」。只綁在
-    # 「鳳凰院」後面，句子裡其他的「兇」（例如「眼神有點兇」）不受影響。
-    normalized = re.sub(r"鳳凰院[兇凶]真", "鳳凰院凶真", normalized)
+    # Proper names are identity, not vocabulary to localize. Two things attack
+    # them: small multilingual models swap in homophones (repeatedly observed),
+    # and s2twp treats a character in a name as ordinary vocabulary to convert.
+    #
+    # Only the listed spellings are touched, so an unrelated occurrence of the
+    # same character elsewhere in the sentence is left alone.
+    for canonical, variants in (protected_names or {}).items():
+        for variant in variants:
+            if variant and variant != canonical:
+                normalized = normalized.replace(variant, canonical)
 
     # Direct Chinese generation can very rarely leave one Japanese copula/ending
     # particle attached to a Chinese clause (observed: ``人類よ。``). In a Taiwan

@@ -37,6 +37,18 @@ character_config:
   avatar: 'mao.png' # Suggest using a square image for the avatar. Save it in the avatars folder. Leave blank to use the first letter of the character name as the avatar.
   human_name: 'Human' # Will be used in the group conversation and the display name of the human.
 
+  # Protected proper nouns: official spelling -> misspellings to fold back into it.
+  # Empty (the default) means no name is protected.
+  #
+  # Two things corrupt proper nouns: small models substitute homophones, and the
+  # Traditional-Chinese conversion treats a character inside a name as ordinary
+  # vocabulary. This list is both stated in the translator's system prompt and
+  # applied deterministically to its output -- the instruction alone is not enough,
+  # since small models routinely ignore it.
+  # Example:
+  # protected_names:
+  #   星野凛: [星野凜, 星野琳]
+
   # ============== Prompts ==============
 
   # Enter the persona prompt you want to use below.

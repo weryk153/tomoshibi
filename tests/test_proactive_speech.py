@@ -705,10 +705,12 @@ def test_taiwan_language_setting_normalizes_script_and_regional_terms():
         )
         == "咱們看看视频"
     )
+    # 專有名詞的保護由呼叫端給名單（角色資料），引擎本身不認得任何角色名字。
     assert (
         normalize_output_language_variant(
             "我是牧瀨紅莉棲。人類よ。",
             "Traditional Chinese (Taiwan)",
+            protected_names={"紅莉栖": ["紅麗棲", "紅莉棲", "紅麗栖"]},
         )
         == "我是牧瀨紅莉栖。人類。"
     )

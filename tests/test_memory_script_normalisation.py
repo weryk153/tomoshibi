@@ -91,7 +91,9 @@ def test_okabe_chuuni_title_keeps_its_official_character():
     )
 
     out = normalize_output_language_variant(
-        "「鳳凰院兇真」就是岡部自己取的中二稱號。", "Traditional Chinese (Taiwan)"
+        "「鳳凰院兇真」就是岡部自己取的中二稱號。",
+        "Traditional Chinese (Taiwan)",
+        protected_names={"鳳凰院凶真": ["鳳凰院兇真"]},
     )
     assert "鳳凰院凶真" in out
     assert "兇真" not in out

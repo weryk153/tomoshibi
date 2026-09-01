@@ -8,6 +8,7 @@ This module keeps a small in-memory rolling window for that purpose.
 
 from collections import OrderedDict, deque
 from difflib import SequenceMatcher
+from collections.abc import Mapping, Sequence
 import re
 import time
 from typing import Deque
@@ -632,6 +633,7 @@ def build_proactive_prompt(
     conversation_anchor: str | None = None,
     verified_visual_facts: str | None = None,
     verified_search_facts: str | None = None,
+    protected_names: "Mapping[str, Sequence[str]] | None" = None,
 ) -> str:
     """Add turn-specific continuation and anti-repetition guidance."""
     recent = get_recent_proactive(conf_uid, client_uid)
@@ -734,6 +736,7 @@ def build_proactive_prompt(
     normalized_anchor = normalize_output_language_variant(
         str(conversation_anchor or "").strip(),
         output_language,
+        protected_names,
     )
 
     # The anchor comes from agent memory, which proactive turns never enter. Left
@@ -743,7 +746,7 @@ def build_proactive_prompt(
     # dozen times over. Appending what she has already said since that exchange
     # is what lets "the last concrete thing" move forward.
     unseen_own_lines = [
-        normalize_output_language_variant(line, output_language)
+        normalize_output_language_variant(line, output_language, protected_names)
         for line in proactive_lines_since_user_turn(conf_uid, client_uid)
     ]
     if unseen_own_lines:

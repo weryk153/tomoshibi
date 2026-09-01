@@ -323,6 +323,9 @@ async def handle_conversation_trigger(
                     conversation_anchor=conversation_anchor,
                     verified_visual_facts=verified_visual_facts,
                     verified_search_facts=verified_search_facts,
+                    protected_names=getattr(
+                        context.character_config, "protected_names", None
+                    ),
                 )
             else:
                 logger.warning("Proactive speak prompt not configured, using default")
@@ -353,7 +356,11 @@ async def handle_conversation_trigger(
                 proactive_uid,
             )
             + [
-                normalize_output_language_variant(line, output_language)
+                normalize_output_language_variant(
+                    line,
+                    output_language,
+                    getattr(context.character_config, "protected_names", None),
+                )
                 for line in extract_anchor_character_lines(conversation_anchor)
             ],
             "proactive_context_uid": proactive_uid,
