@@ -13,9 +13,12 @@ export interface WavEnvelope {
   frameSeconds: number;
 }
 
+// 假包絡的常數。Float32Array 存不下精確的 0.35，所以 envelopeAt 對這個物件直接回這個數。
+export const FAKE_MOUTH_VALUE = 0.35;
+
 /** 標頭壞掉時的退路：嘴巴微開的常數，讓「在講話」看得出來。 */
 export const FAKE_ENVELOPE: WavEnvelope = {
-  values: new Float32Array([0.35]),
+  values: new Float32Array([FAKE_MOUTH_VALUE]),
   frameSeconds: Number.POSITIVE_INFINITY,
 };
 
@@ -92,7 +95,7 @@ export function computeEnvelope(pcm: PcmData, frameSeconds = 0.02): WavEnvelope 
 
 export function envelopeAt(env: WavEnvelope, t: number): number {
   if (t < 0) return 0;
-  if (!isFinite(env.frameSeconds)) return 0.35;
+  if (env === FAKE_ENVELOPE) return FAKE_MOUTH_VALUE;
   const i = Math.floor(t / env.frameSeconds);
   return i < env.values.length ? env.values[i] : 0;
 }
