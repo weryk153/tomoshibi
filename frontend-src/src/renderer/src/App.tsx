@@ -24,7 +24,7 @@ import { ChatHistoryProvider } from "./context/chat-history-context";
 import { CharacterConfigProvider } from "./context/character-config-context";
 import { Toaster } from "./components/ui/tw/toaster";
 import { VADProvider } from "./context/vad-context";
-import { Live2D } from "./components/canvas/live2d";
+import { Avatar } from "./avatar/avatar";
 import TitleBar from "./components/electron/title-bar";
 import { InputSubtitle } from "./components/electron/input-subtitle";
 import { ProactiveSpeakProvider } from "./context/proactive-speak-context";
@@ -124,7 +124,7 @@ function AppContent(): JSX.Element {
           ? getResponsiveLive2DWindowStyle(showSidebar)
           : live2dPetStyle)}
       >
-        <Live2D />
+        <Avatar />
         <StageEffects />
       </Box>
 

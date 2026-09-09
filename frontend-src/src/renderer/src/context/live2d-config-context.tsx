@@ -39,6 +39,12 @@ export interface TapMotionMap {
  * @interface ModelInfo
  */
 export interface ModelInfo {
+  /** 角色 renderer。缺省為 live2d（舊的 model_dict.json 項目沒有這欄）。 */
+  type?: 'live2d' | 'vrm';
+
+  /** VRM 相機：距離與高度（公尺）。Live2D 不用。 */
+  camera?: { distance: number; height: number };
+
   /** Model name */
   name?: string;
 
@@ -80,7 +86,7 @@ export interface ModelInfo {
    * Optional: older `model_dict.json` entries and user-defined models may not
    * have it.
    */
-  motionMap?: Record<string, { group: string; index: number }>;
+  motionMap?: Record<string, { group: string; index: number } | { clip: string }>;
 
   /** Enable scroll to resize */
   scrollToResize?: boolean;

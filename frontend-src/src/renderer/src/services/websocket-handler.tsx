@@ -10,7 +10,7 @@ import {
 import { ModelInfo, useLive2DConfig } from '@/context/live2d-config-context';
 import { useSubtitle } from '@/context/subtitle-context';
 import { audioTaskQueue } from '@/utils/task-queue';
-import { useAudioTask } from '@/components/canvas/live2d';
+import { useAudioTask } from '@/hooks/utils/use-audio-task';
 import { useBgUrl } from '@/context/bgurl-context';
 import { useConfig } from '@/context/character-config-context';
 import { useChatHistory } from '@/context/chat-history-context';

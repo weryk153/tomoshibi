@@ -3,17 +3,14 @@
 /* eslint-disable @typescript-eslint/ban-ts-comment */
 import { memo, useRef, useEffect } from "react";
 import { useLive2DConfig } from "@/context/live2d-config-context";
-import { useIpcHandlers } from "@/hooks/utils/use-ipc-handlers";
-import { useInterrupt } from "@/hooks/utils/use-interrupt";
-import { useAudioTask } from "@/hooks/utils/use-audio-task";
 import { useLive2DModel } from "@/hooks/canvas/use-live2d-model";
 import { useLive2DResize } from "@/hooks/canvas/use-live2d-resize";
-import { useAiState, AiStateEnum } from "@/context/ai-state-context";
-import { useLive2DExpression } from "@/hooks/canvas/use-live2d-expression";
 import { useForceIgnoreMouse } from "@/hooks/utils/use-force-ignore-mouse";
 import { useMode } from "@/context/mode-context";
 // 視線跟隨的開關是 LAppModel 上的 static 旗標，見下方 useEffect 的說明。
 import { LAppModel } from "@cubismsdksamples/lappmodel";
+import { registerRenderer } from "@/avatar/character-renderer";
+import { createLive2DRenderer } from "@/avatar/live2d/live2d-renderer";
 
 interface Live2DProps {
   showSidebar?: boolean;
@@ -25,8 +22,6 @@ export const Live2D = memo(
     const { modelInfo } = useLive2DConfig();
     const { mode } = useMode();
     const internalContainerRef = useRef<HTMLDivElement>(null);
-    const { aiState } = useAiState();
-    const { resetExpression } = useLive2DExpression();
 
     // 把「視線跟隨」設定同步到 SDK。那段邏輯在 lappmodel 的 update() 裡，每一幀
     // 把游標位置加到頭部／身體／眼球的參數上，原本沒有任何開關可以關掉；
@@ -50,20 +45,9 @@ export const Live2D = memo(
       canvasRef,
     });
 
-    // Setup hooks
-    useIpcHandlers();
-    useInterrupt();
-    useAudioTask();
-
-    // Reset expression to default when AI state becomes idle
-    useEffect(() => {
-      if (aiState === AiStateEnum.IDLE) {
-        const lappAdapter = (window as any).getLAppAdapter?.();
-        if (lappAdapter) {
-          resetExpression(lappAdapter);
-        }
-      }
-    }, [aiState, modelInfo, resetExpression]);
+    // 掛上去就是當前 renderer；卸載就註銷。註銷只在自己仍是當前時才清，
+    // 所以 Live2D → VRM 切換時舊的晚一步卸載也不會清掉新的。
+    useEffect(() => registerRenderer(createLive2DRenderer()), []);
 
     // Expose setExpression for console testing
     // useEffect(() => {
@@ -135,5 +119,3 @@ export const Live2D = memo(
 );
 
 Live2D.displayName = "Live2D";
-
-export { useInterrupt, useAudioTask };

@@ -15,9 +15,8 @@ import { toaster } from '@/components/ui/tw/toaster';
 import { classifyMediaError } from '@/utils/media-error';
 import { useWebSocket } from '@/context/websocket-context';
 import { DisplayText } from '@/services/websocket-service';
-import { useLive2DExpression } from '@/hooks/canvas/use-live2d-expression';
-import { useLive2DMotion, MotionRequest } from '@/hooks/canvas/use-live2d-motion';
-import * as LAppDefine from '../../../WebSDK/src/lappdefine';
+import { getActiveRenderer } from '@/avatar/character-renderer';
+import type { MotionRequest } from '@/avatar/character-renderer';
 
 interface AudioTaskOptions {
   audioBase64: string
@@ -44,8 +43,6 @@ export const useAudioTask = () => {
   const { setSubtitleText } = useSubtitle();
   const { appendResponse, appendAIMessage } = useChatHistory();
   const { sendMessage } = useWebSocket();
-  const { setExpression } = useLive2DExpression();
-  const { playMotion } = useLive2DMotion();
 
   // State refs to avoid stale closures
   const stateRef = useRef({
@@ -118,50 +115,6 @@ export const useAudioTask = () => {
       if (audioBase64) {
         const audioDataUrl = `data:audio/wav;base64,${audioBase64}`;
 
-        // Get Live2D manager and model
-        const live2dManager = (window as any).getLive2DManager?.();
-        if (!live2dManager) {
-          console.error('Live2D manager not found');
-          resolve();
-          return;
-        }
-
-        const model = live2dManager.getModel(0);
-        if (!model) {
-          console.error('Live2D model not found at index 0');
-          resolve();
-          return;
-        }
-        console.log('Found model for audio playback');
-
-        if (!model._wavFileHandler) {
-          console.warn('Model does not have _wavFileHandler for lip sync');
-        } else {
-          console.log('Model has _wavFileHandler available');
-        }
-
-        // Set expression if available
-        const lappAdapter = (window as any).getLAppAdapter?.();
-        if (lappAdapter && expressions?.[0] !== undefined) {
-          setExpression(
-            expressions[0],
-            lappAdapter,
-            `Set expression to: ${expressions[0]}`,
-          );
-        }
-
-        // Play LLM-triggered motion if available. Live2D's motion queue is
-        // single-slot, so only the first motion of the segment is used
-        // (mirrors expressions[0] above).
-        const motion = motions?.[0];
-        if (lappAdapter && motion) {
-          playMotion(
-            motion,
-            lappAdapter,
-            `Playing motion: ${motion.group}[${motion.index}]`,
-          );
-        }
-
         // 共用同一個 <audio>，不是每段各建一個。iOS 的自動播放授權掛在元素上，
         // new Audio() 出來的都是未授權的新元素，程式主動 play() 一律被擋——實測
         // 在首次手勢解鎖後，桌面正常但 iPad 照樣沒聲音。詳見 utils/shared-audio.ts。
@@ -213,45 +166,7 @@ export const useAudioTask = () => {
         // 少了這個，被停掉的音訊不會再發出 ended／error，這個 promise 就永遠
         // 懸著，整條音訊佇列卡死，最後整輪對話收不了尾（見 audio-manager.ts
         // 的 currentSettle 說明）。cleanup 自己有 isFinished 擋重入。
-        audioManager.setCurrentAudio(audio, model, cleanup);
-
-        // Start Talk once for the whole queued response. Replaying it for every
-        // TTS chunk causes visible resets at sentence boundaries.
-        // NOTE: beginSpeaking() has side effects (tracks the speaking/current
-        // model) and must always run, so it's evaluated unconditionally here
-        // rather than inside the `if`.
-        const shouldStartTalk = audioManager.beginSpeaking(model);
-        if (shouldStartTalk && LAppDefine && LAppDefine.PriorityNormal) {
-          if (motion) {
-            // This segment carries an LLM-triggered motion, started above at
-            // PriorityForce (3) so it can play *while the character speaks*.
-            //
-            // Skipping Talk here is belt-and-braces rather than load-bearing:
-            // `beginSpeaking()` returns true at most once per response, so no
-            // later segment restarts Talk anyway, and a Talk request at
-            // PriorityNormal (2) would in any case be rejected by
-            // `reserveMotion` while the force-priority motion is reserved.
-            // It is kept because both of those are properties of code
-            // elsewhere — if either changes, requesting Talk here would start
-            // cutting the motion short, and that failure would be silent.
-            console.log("Skipping 'Talk' motion: this segment triggers an LLM motion");
-          } else {
-            console.log("Starting random 'Talk' motion");
-            model.startRandomMotion(
-              "Talk",
-              LAppDefine.PriorityNormal,
-            );
-          }
-        } else if (!LAppDefine || !LAppDefine.PriorityNormal) {
-          console.warn("LAppDefine.PriorityNormal not found - cannot start talk motion");
-        }
-
-        // Full rigs benefit from the historical sensitivity boost. Kurisu's
-        // compact two-state mouth needs the raw envelope so it does not slam
-        // into its maximum open sprite on every syllable.
-        const lipSyncScale = /\/(?:kurisu_fan)\/$/.test(model._modelHomeDir ?? '')
-          ? 1.0
-          : 2.0;
+        audioManager.setCurrentAudio(audio, cleanup);
 
         audio.addEventListener('canplaythrough', () => {
           // Check for interruption before playback
@@ -281,26 +196,24 @@ export const useAudioTask = () => {
             cleanup();
           });
 
-          // Setup lip sync
-          if (model._wavFileHandler) {
-            if (!model._wavFileHandler._initialized) {
-              console.log('Applying enhanced lip sync');
-              model._wavFileHandler._initialized = true;
-
-              const originalUpdate = model._wavFileHandler.update.bind(model._wavFileHandler);
-              model._wavFileHandler.update = function (deltaTimeSeconds: number) {
-                const result = originalUpdate(deltaTimeSeconds);
-                // @ts-ignore
-                this._lastRms = Math.min(2.0, this._lastRms * lipSyncScale);
-                return result;
-              };
-            }
-
-            if (audioManager.hasCurrentAudio()) {
-              model._wavFileHandler.start(audioDataUrl);
-            } else {
-              console.warn('WavFileHandler start skipped - audio was stopped');
-            }
+          // renderer 在播放當下才讀（任務排進佇列時它可能還沒到或已經換掉）。
+          // 沒有 renderer 就只是沒口型——音訊照播、字幕照出。以前這裡找不到
+          // Live2D manager 會把整句丟掉；雙 renderer 之後每次切角色都有一段
+          // 空窗，丟句子會變常態，所以改成降級而不是跳過。
+          const renderer = getActiveRenderer();
+          if (!renderer) {
+            console.warn('[AudioTask] No character renderer registered; playing audio without lip sync');
+            return;
+          }
+          const first = audioManager.beginSpeaking();
+          try {
+            renderer.beginSegment(
+              audio,
+              { expression: expressions?.[0], motion: motions?.[0] ?? undefined },
+              first,
+            );
+          } catch (e) {
+            console.error('[AudioTask] renderer.beginSegment failed:', e);
           }
         }, { once: true, signal: listeners.signal });
 

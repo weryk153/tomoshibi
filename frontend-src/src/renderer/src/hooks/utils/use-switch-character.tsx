@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useWebSocket } from '@/context/websocket-context';
 import { useConfig } from '@/context/character-config-context';
-import { useInterrupt } from '@/components/canvas/live2d';
+import { useInterrupt } from '@/hooks/utils/use-interrupt';
 import { useVAD } from '@/context/vad-context';
 import { useSubtitle } from '@/context/subtitle-context';
 import { useAiState } from '@/context/ai-state-context';
