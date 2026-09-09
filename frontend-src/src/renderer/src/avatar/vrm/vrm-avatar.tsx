@@ -84,7 +84,13 @@ export function VRMAvatar(): JSX.Element {
     resize();
 
     const onPointer = (e: PointerEvent) => {
-      if (!lookAtPointerRef.current) return;
+      if (!lookAtPointerRef.current) {
+        // 關掉跟隨時要把視線收回鏡頭，否則會凍在游標最後停的地方。復位放在這裡
+        // 而不是另開 effect，是為了不讓 lookAtPointer 進依賴陣列——那會重建整個
+        // WebGL context。下一次滑鼠動就會歸位。
+        lookTarget.position.set(0, camHeight, camDistance);
+        return;
+      }
       const r = container.getBoundingClientRect();
       const nx = ((e.clientX - r.left) / r.width) * 2 - 1;
       const ny = -(((e.clientY - r.top) / r.height) * 2 - 1);

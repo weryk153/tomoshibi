@@ -5,7 +5,7 @@ import { isClipMotion } from "../character-renderer.ts";
 import { ExpressionController } from "./expression-controller.ts";
 import { AutoBlink } from "./auto-blink.ts";
 import { LipSync } from "./lip-sync.ts";
-import type { MotionPlayer } from "./motion-player.ts";
+import { IDLE_CLIP, type MotionPlayer } from "./motion-player.ts";
 
 export class VRMRenderer implements CharacterRenderer {
   private lip = new LipSync();
@@ -43,7 +43,7 @@ export class VRMRenderer implements CharacterRenderer {
     this.expressions.setMouth(this.lip.update(dt));
     this.expressions.update(dt);
     this.vrm.expressionManager?.setValue("blink", this.blink.update(dt));
-    if (!this.motions.hasClip("idle")) {
+    if (!this.motions.hasClip(IDLE_CLIP)) {
       // 沒有 idle 動畫時的程序式微擺，免得像人偶。
       const spine = this.vrm.humanoid?.getNormalizedBoneNode("spine");
       const chest = this.vrm.humanoid?.getNormalizedBoneNode("chest");
