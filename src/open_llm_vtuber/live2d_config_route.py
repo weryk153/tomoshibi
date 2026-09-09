@@ -106,6 +106,11 @@ def build_model_config(name: str) -> Optional[dict]:
     if entry is None:
         return None
 
+    if entry.get("type") == "vrm":
+        from .vrm_models import build_vrm_model_config
+
+        return build_vrm_model_config(entry)
+
     model_dir = os.path.join(LIVE2D_DIR, name)
     model3_path = _find_model3(model_dir)
     if model3_path is None:
@@ -454,6 +459,41 @@ def write_model_config(
     entry = _find_model_entry(model_dict, name)
     if entry is None:
         return {"ok": False, "status": 404, "error": f"Unknown Live2D model: {name}"}
+
+    if entry.get("type") == "vrm":
+        from .vrm_models import (
+            VRM_DIR,
+            find_vrm_file,
+            list_vrm_clips,
+            read_vrm_expressions,
+            validate_vrm_emotion_map,
+            validate_vrm_motion_map,
+        )
+
+        model_dir = os.path.join(VRM_DIR, name)
+        vrm_path = find_vrm_file(model_dir)
+        if not vrm_path:
+            return {"ok": False, "status": 404, "error": f"Unknown VRM model: {name}"}
+        error = validate_vrm_motion_map(motion_map, set(list_vrm_clips(model_dir)))
+        if error is None and tap_motions:
+            error = "tapMotions must be empty for a VRM model (no hit areas)"
+        if error is None and emotion_map is not None:
+            error = validate_vrm_emotion_map(
+                emotion_map, set(read_vrm_expressions(vrm_path) or [])
+            )
+        if error is not None:
+            return {"ok": False, "status": 400, "error": error}
+        write_dict = _load_model_dict()
+        write_entry = _find_model_entry(write_dict, name)
+        if write_entry is None:
+            return {"ok": False, "status": 404, "error": f"Unknown VRM model: {name}"}
+        write_entry["motionMap"] = motion_map
+        write_entry["tapMotions"] = {}
+        if emotion_map is not None:
+            write_entry["emotionMap"] = emotion_map
+        _write_model_dict_atomic(write_dict)
+        _refresh_live2d_caches(name, default_context_cache, client_contexts)
+        return {"ok": True, "restart_required": False}
 
     model_dir = os.path.join(LIVE2D_DIR, name)
     model3_path = _find_model3(model_dir)

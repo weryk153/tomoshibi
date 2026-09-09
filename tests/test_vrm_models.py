@@ -178,3 +178,113 @@ def test_list_all_skins_merges_live2d_and_vrm(tmp_path, monkeypatch):
         ("kv", "vrm"),
     ]
     assert sorted(result["newly_registered"]) == ["haru", "kv"]
+
+
+def _vrm_folder(
+    tmp_path, name="kv", clips=("wave", "idle"), expressions=("neutral", "happy", "aa")
+):
+    d = tmp_path / "vrm-models" / name
+    (d / "motions").mkdir(parents=True)
+    (d / f"{name}.vrm").write_bytes(_vrm1(preset=expressions, custom=()))
+    for c in clips:
+        (d / "motions" / f"{c}.vrma").write_bytes(b"")
+    return d
+
+
+def test_build_vrm_model_config(tmp_path, monkeypatch):
+    from src.open_llm_vtuber.vrm_models import build_vrm_model_config
+
+    monkeypatch.chdir(tmp_path)
+    _vrm_folder(tmp_path)
+    entry = {
+        "name": "kv",
+        "type": "vrm",
+        "url": "/vrm-models/kv/kv.vrm",
+        "emotionMap": {"neutral": "neutral", "joy": "happy", "smug": "happy"},
+        "motionMap": {
+            "wave": {"clip": "wave", "label": "揮手"},
+            "gone": {"clip": "nope"},
+        },
+    }
+    assert build_vrm_model_config(entry) == {
+        "name": "kv",
+        "type": "vrm",
+        "clips": [
+            {
+                "clip": "wave",
+                "file": "motions/wave.vrma",
+                "mappings": [{"keyword": "wave", "label": "揮手"}],
+            }
+        ],
+        "expressions": [
+            {"name": "neutral", "keywords": ["neutral"]},
+            {"name": "happy", "keywords": ["joy", "smug"]},
+            {"name": "aa", "keywords": []},
+        ],
+        "has_idle": True,
+        "orphan_keywords": [{"keyword": "gone", "clip": "nope"}],
+    }
+
+
+def test_validate_vrm_motion_map():
+    from src.open_llm_vtuber.vrm_models import validate_vrm_motion_map
+
+    assert validate_vrm_motion_map({"wave": {"clip": "wave"}}, {"wave"}) is None
+    assert "nope" in validate_vrm_motion_map({"x": {"clip": "nope"}}, {"wave"})
+    assert "group" in validate_vrm_motion_map(
+        {"x": {"group": "", "index": 0}}, {"wave"}
+    )
+    assert "duplicate" in validate_vrm_motion_map(
+        {"Wave": {"clip": "wave"}, "wave": {"clip": "wave"}}, {"wave"}
+    )
+
+
+def test_validate_vrm_emotion_map():
+    from src.open_llm_vtuber.vrm_models import validate_vrm_emotion_map
+
+    assert validate_vrm_emotion_map({"joy": "happy"}, {"happy"}) is None
+    assert "sad" in validate_vrm_emotion_map({"x": "sad"}, {"happy"})
+    assert "string" in validate_vrm_emotion_map({"x": 3}, {"happy"})
+
+
+def test_route_dispatches_on_type(tmp_path, monkeypatch):
+    from src.open_llm_vtuber.live2d_config_route import (
+        build_model_config,
+        write_model_config,
+    )
+
+    monkeypatch.chdir(tmp_path)
+    _vrm_folder(tmp_path)
+    (tmp_path / "model_dict.json").write_text(
+        json.dumps(
+            [
+                {
+                    "name": "kv",
+                    "type": "vrm",
+                    "url": "/vrm-models/kv/kv.vrm",
+                    "emotionMap": {"neutral": "neutral"},
+                    "motionMap": {},
+                    "tapMotions": {},
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    assert build_model_config("kv")["type"] == "vrm"
+
+    ok = write_model_config(
+        "kv",
+        {"wave": {"clip": "wave", "label": "揮手"}},
+        {},
+        emotion_map={"joy": "happy"},
+    )
+    assert ok == {"ok": True, "restart_required": False}
+    saved = json.loads((tmp_path / "model_dict.json").read_text(encoding="utf-8"))[0]
+    assert saved["motionMap"] == {"wave": {"clip": "wave", "label": "揮手"}}
+    assert saved["emotionMap"] == {"joy": "happy"}
+
+    bad = write_model_config("kv", {"x": {"clip": "nope"}}, {})
+    assert bad["ok"] is False and bad["status"] == 400
+
+    tap = write_model_config("kv", {}, {"Head": []})
+    assert tap["ok"] is False and "tapMotions" in tap["error"]

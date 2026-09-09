@@ -178,3 +178,94 @@ def scan_and_register_vrm() -> dict:
         logger.info(f"Auto-registered VRM models: {newly}")
 
     return {"skins": skins, "newly_registered": newly}
+
+
+def _entry_dir(entry: dict) -> str:
+    return os.path.join(VRM_DIR, entry["name"])
+
+
+def build_vrm_model_config(entry: dict) -> Optional[dict]:
+    """列舉一個 VRM 模型真的有的 clip 與表情，合併 model_dict 的對應。
+
+    形狀跟 Live2D 的 build_model_config 不同（沒有 group/index、沒有 hit area），
+    前端用 ``type`` 分辨。找不到 .vrm 回 None → 404。
+    """
+    model_dir = _entry_dir(entry)
+    vrm_path = find_vrm_file(model_dir)
+    if not vrm_path:
+        return None
+
+    motion_map = entry.get("motionMap", {}) or {}
+    clips = list_vrm_clips(model_dir)
+    by_clip: dict = {c: [] for c in clips}
+    orphans = []
+    for keyword, target in motion_map.items():
+        clip = (target or {}).get("clip") if isinstance(target, dict) else None
+        if clip in by_clip:
+            by_clip[clip].append({"keyword": keyword, "label": target.get("label")})
+        else:
+            orphans.append({"keyword": keyword, "clip": clip})
+
+    expressions = read_vrm_expressions(vrm_path) or []
+    emotion_map = entry.get("emotionMap", {}) or {}
+    by_expr: dict = {e: [] for e in expressions}
+    for keyword, name in emotion_map.items():
+        if name in by_expr:
+            by_expr[name].append(keyword)
+
+    return {
+        "name": entry["name"],
+        "type": "vrm",
+        "clips": [
+            {"clip": c, "file": f"{MOTIONS_SUBDIR}/{c}.vrma", "mappings": by_clip[c]}
+            for c in clips
+        ],
+        "expressions": [{"name": e, "keywords": by_expr[e]} for e in expressions],
+        "has_idle": os.path.isfile(
+            os.path.join(model_dir, MOTIONS_SUBDIR, f"{IDLE_CLIP}.vrma")
+        ),
+        "orphan_keywords": orphans,
+    }
+
+
+def _duplicate_keyword(mapping: dict) -> Optional[str]:
+    seen: dict = {}
+    for keyword in mapping:
+        lowered = keyword.lower() if isinstance(keyword, str) else keyword
+        if lowered in seen:
+            return (
+                f"duplicate keyword (case-insensitive): '{seen[lowered]}' and "
+                f"'{keyword}' both resolve to '{lowered}'"
+            )
+        seen[lowered] = keyword
+    return None
+
+
+def validate_vrm_motion_map(motion_map, clips: set) -> Optional[str]:
+    """None 代表合法。值必須是 {clip} 且 clip 存在於 motions/。"""
+    if not isinstance(motion_map, dict):
+        return "motionMap must be an object"
+    dup = _duplicate_keyword(motion_map)
+    if dup:
+        return dup
+    for keyword, target in motion_map.items():
+        if not isinstance(target, dict) or "clip" not in target:
+            return f"motionMap['{keyword}'] must be an object with a clip (VRM has no group/index)"
+        if target["clip"] not in clips:
+            return f"motionMap['{keyword}'] points at clip {target['clip']!r}, which this model does not have"
+    return None
+
+
+def validate_vrm_emotion_map(emotion_map, expressions: set) -> Optional[str]:
+    """None 代表合法。值必須是模型裡存在的表情名（字串）。"""
+    if not isinstance(emotion_map, dict):
+        return "emotionMap must be an object"
+    dup = _duplicate_keyword(emotion_map)
+    if dup:
+        return dup
+    for keyword, name in emotion_map.items():
+        if not isinstance(name, str):
+            return f"emotionMap['{keyword}'] must be an expression name string, got {name!r}"
+        if name not in expressions:
+            return f"emotionMap['{keyword}'] points at expression {name!r}, which this model does not have"
+    return None
