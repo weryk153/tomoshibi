@@ -9,6 +9,7 @@ import { useInterrupt } from "@/hooks/utils/use-interrupt";
 import { useAudioTask } from "@/hooks/utils/use-audio-task";
 import { Live2D } from "@/components/canvas/live2d";
 import { getActiveRenderer } from "./character-renderer";
+import { VRMAvatar } from "./vrm/vrm-avatar";
 
 export function Avatar(): JSX.Element {
   const { modelInfo } = useLive2DConfig();
@@ -25,6 +26,6 @@ export function Avatar(): JSX.Element {
     }
   }, [aiState, modelInfo]);
 
-  // Task C5 會在這裡加 VRM 分支。
+  if (modelInfo?.type === "vrm") return <VRMAvatar />;
   return <Live2D />;
 }
