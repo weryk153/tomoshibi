@@ -609,6 +609,20 @@ def scan_and_register_skins() -> dict:
     return {"skins": skins, "newly_registered": newly_registered}
 
 
+def list_all_skins() -> dict:
+    """Live2D 與 VRM 兩邊的掃描結果合併；每筆帶 ``type``，前端角色編輯器靠它分辨。"""
+    from .vrm_models import scan_and_register_vrm
+
+    live2d = scan_and_register_skins()
+    for skin in live2d["skins"]:
+        skin["type"] = "live2d"
+    vrm = scan_and_register_vrm()
+    return {
+        "skins": live2d["skins"] + vrm["skins"],
+        "newly_registered": live2d["newly_registered"] + vrm["newly_registered"],
+    }
+
+
 def init_live2d_config_route(
     default_context_cache=None, client_contexts=None
 ) -> APIRouter:
@@ -641,7 +655,7 @@ def init_live2d_config_route(
         if not _is_local_request(request):
             return _forbidden()
         try:
-            result = await asyncio.to_thread(scan_and_register_skins)
+            result = await asyncio.to_thread(list_all_skins)
         except Exception as e:
             logger.error(f"[live2d] skin scan failed: {type(e).__name__}")
             return JSONResponse(status_code=500, content={"error": "skin scan failed"})

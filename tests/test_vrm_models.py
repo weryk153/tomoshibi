@@ -156,3 +156,25 @@ def test_scan_without_dir(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "model_dict.json").write_text("[]", encoding="utf-8")
     assert scan_and_register_vrm() == {"skins": [], "newly_registered": []}
+
+
+def test_list_all_skins_merges_live2d_and_vrm(tmp_path, monkeypatch):
+    from src.open_llm_vtuber.live2d_config_route import list_all_skins
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "model_dict.json").write_text("[]", encoding="utf-8")
+    l2d = tmp_path / "live2d-models" / "haru"
+    l2d.mkdir(parents=True)
+    (l2d / "Haru.model3.json").write_text(
+        json.dumps({"FileReferences": {"Motions": {"Idle": [{}]}}}), encoding="utf-8"
+    )
+    v = tmp_path / "vrm-models" / "kv"
+    v.mkdir(parents=True)
+    (v / "kv.vrm").write_bytes(_vrm1())
+
+    result = list_all_skins()
+    assert [(s["name"], s["type"]) for s in result["skins"]] == [
+        ("haru", "live2d"),
+        ("kv", "vrm"),
+    ]
+    assert sorted(result["newly_registered"]) == ["haru", "kv"]

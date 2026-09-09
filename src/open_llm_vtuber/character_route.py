@@ -627,9 +627,9 @@ def _rescan_skins() -> None:
     完全沒跑，而畫面顯示一切正常。所以這裡把它收成具名函式，讓「盡力而為」的
     範圍縮到真的只有掃描本身。
     """
-    from .live2d_config_route import scan_and_register_skins
+    from .live2d_config_route import list_all_skins
 
-    scan_and_register_skins()
+    list_all_skins()
 
 
 def init_character_route() -> APIRouter:

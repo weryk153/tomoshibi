@@ -28,6 +28,9 @@ conf.yaml.bak*
 !/live2d-models/haru
 !/live2d-models/hiyori
 
+# VRM 模型跟 live2d-models 一樣是使用者本機資產，不進版控（沒有隨附的預設模型，所以整個目錄忽略）。
+/vrm-models/
+
 # ignore non-default character configs
 /characters/*
 !/characters/README.md
