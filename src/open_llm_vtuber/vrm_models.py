@@ -67,6 +67,8 @@ def read_vrm_expressions(path: str) -> Optional[list[str]]:
     if data is None:
         return None
     ext = data.get("extensions", {}) or {}
+    if not isinstance(ext, dict):
+        return None
     vrmc = ext.get("VRMC_vrm")
     if not isinstance(vrmc, dict):
         if "VRM" in ext:
@@ -76,6 +78,8 @@ def read_vrm_expressions(path: str) -> Optional[list[str]]:
             )
         return None
     expressions = vrmc.get("expressions", {}) or {}
+    if not isinstance(expressions, dict):
+        return []
     names: list[str] = []
     for bucket in ("preset", "custom"):
         group = expressions.get(bucket, {}) or {}

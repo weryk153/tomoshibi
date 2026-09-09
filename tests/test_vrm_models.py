@@ -63,6 +63,25 @@ def test_read_expressions_garbage_is_none(tmp_path):
     assert read_vrm_expressions(str(p)) is None
 
 
+def test_read_expressions_non_dict_extensions_is_none(tmp_path):
+    p = tmp_path / "a.vrm"
+    p.write_bytes(_glb({"asset": {"version": "2.0"}, "extensions": "foo"}))
+    assert read_vrm_expressions(str(p)) is None
+
+
+def test_read_expressions_non_dict_expressions_is_empty(tmp_path):
+    p = tmp_path / "a.vrm"
+    p.write_bytes(
+        _glb(
+            {
+                "asset": {"version": "2.0"},
+                "extensions": {"VRMC_vrm": {"expressions": [1, 2]}},
+            }
+        )
+    )
+    assert read_vrm_expressions(str(p)) == []
+
+
 def test_default_emotion_map_only_presets_present():
     assert default_emotion_map(["neutral", "happy", "aa", "smug"]) == {
         "neutral": "neutral",
