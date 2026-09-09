@@ -36,6 +36,8 @@
     "@electron-toolkit/preload": "^3.0.1",
     "@electron-toolkit/utils": "^3.0.0",
     "@emotion/react": "^11.14.0",
+    "@pixiv/three-vrm": "3.5.5",
+    "@pixiv/three-vrm-animation": "3.5.5",
     "@ricky0123/vad-web": "^0.0.24",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",
