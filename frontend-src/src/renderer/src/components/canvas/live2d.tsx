@@ -9,6 +9,7 @@ import { useForceIgnoreMouse } from "@/hooks/utils/use-force-ignore-mouse";
 import { useMode } from "@/context/mode-context";
 // 視線跟隨的開關是 LAppModel 上的 static 旗標，見下方 useEffect 的說明。
 import { LAppModel } from "@cubismsdksamples/lappmodel";
+import { LAppDelegate } from "@cubismsdksamples/lappdelegate";
 import { registerRenderer } from "@/avatar/character-renderer";
 import { createLive2DRenderer } from "@/avatar/live2d/live2d-renderer";
 
@@ -48,6 +49,24 @@ export const Live2D = memo(
     // 掛上去就是當前 renderer；卸載就註銷。註銷只在自己仍是當前時才清，
     // 所以 Live2D → VRM 切換時舊的晚一步卸載也不會清掉新的。
     useEffect(() => registerRenderer(createLive2DRenderer()), []);
+
+    // 卸載時把整組 SDK 收掉。Cubism 的 singleton 在 constructor 就把
+    // <canvas id="canvas"> 抓進去、之後再也不重讀，所以那張 canvas 一旦隨著這個
+    // 元件被 React 移除，SDK 手上就只剩一個離開 DOM 的死畫布。這個分支以前不需要
+    // 清理，是因為 <Live2D/> 掛上去就不會卸載；現在 Live2D → VRM 會把它整個換掉。
+    // 不收的話 rAF 迴圈會繼續跑、WebGL context 也一直占著。
+    // LAppDelegate.releaseInstance() 內部會連帶叫 LAppLive2DManager.releaseInstance()。
+    useEffect(
+      () => () => {
+        try {
+          LAppDelegate.releaseInstance();
+        } catch (e) {
+          // SDK 還沒初始化完就卸載（例如載入中途切走）時會走到這裡，忽略即可。
+          console.warn("[Live2D] LAppDelegate.releaseInstance() failed:", e);
+        }
+      },
+      [],
+    );
 
     // Expose setExpression for console testing
     // useEffect(() => {

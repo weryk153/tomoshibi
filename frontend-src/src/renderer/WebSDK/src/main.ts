@@ -28,6 +28,15 @@ export function initializeLive2D(): void {
     LAppLive2DManager.releaseInstance();
   }
 
+  // 先釋放再取得，不是多此一舉。LAppGlManager 的 constructor 只在「建構的那一刻」
+  // 抓一次 document.getElementById('canvas')，之後永遠用手上那個 element；
+  // 這個 branch 以前不會出事，是因為 <Live2D/> 一旦掛上去就不會卸載，canvas 永遠是同一個。
+  // 雙 renderer 之後 Live2D → VRM → Live2D 會把舊的 <canvas id="canvas"> 整個從 DOM 移掉、
+  // 再掛一個新的；不重建這個 singleton 的話，SDK 會繼續畫進那張已經離開 DOM 的舊畫布，
+  // 畫面就永遠空白。同一張 canvas 重複呼叫 getContext('webgl2') 會拿回同一個 context，
+  // 所以 Live2D → Live2D 換角色走同一條路徑時，gl 不變、行為也不變。
+  LAppGlManager.releaseInstance();
+
   if (
     !LAppGlManager.getInstance() ||
     !LAppDelegate.getInstance().initialize()
