@@ -126,9 +126,10 @@ authored in the file.
 auto-registered entry sets `clip` to each `motions/*.vrma` file's stem (minus `idle`) and
 leaves `label` as `null`.
 
-**Add a label.** The label is the only thing the LLM sees when deciding which motion to
-trigger — the keyword alone isn't shown to it. An entry with `label: null` is unusable for
-the LLM to pick deliberately. Watch the clip, then edit `model_dict.json`:
+**Add a label.** The LLM is shown every keyword regardless of whether it has a label, but
+a keyword with `label: null` is listed bare — which reads to the LLM as "unspecified,"
+not as a description — so it has nothing to go on when choosing between clips. The label
+is what makes a deliberate choice possible. Watch the clip, then edit `model_dict.json`:
 
 ```json
 "motionMap": { "wave": { "clip": "wave", "label": "揮手打招呼" } }
@@ -189,18 +190,21 @@ recommends is still undecided** — a spike is planned to settle it. Both produc
 
 1. **VRoid Studio → export VRM 1.0.** The straightforward path: VRoid Studio exports VRM
    1.0 directly, and the standard expression presets (`neutral`, `happy`, `angry`,
-   `sad`, `surprised`, blink, and the `aa`/`ih`/`ou`/`ee`/`oh` mouth shapes used for lip
-   sync) come pre-authored — no extra rigging work needed. You can optionally refine the
-   exported model further in Blender using the
+   `sad`, `surprised`, blink, and the five vowel mouth shapes `aa`/`ih`/`ou`/`ee`/`oh`)
+   come pre-authored — no extra rigging work needed. Tomoshibi's lip sync only drives
+   `aa` today (`frontend-src/src/renderer/src/avatar/vrm/expression-controller.ts`), so
+   the other four vowel shapes VRoid exports go unused for now — no harm in having them,
+   just not currently read. You can optionally refine the exported model further in
+   Blender using the
    [VRM Add-on for Blender](https://github.com/saturday06/VRM-Add-on-for-Blender)
    (saturday06, MIT license).
 2. **Image-to-3D generation → Blender → VRM export.** Generate a mesh from a reference
    image with a tool that includes auto-rigging (e.g. Meshy or Tripo), or with
    Hunyuan3D / Hyper3D, then bring it into Blender and export with the same VRM Add-on.
    The body rig comes out usable, but **these generators do not produce VRM facial
-   blendshapes** — the `aa` mouth shape used for lip sync, blink, and the emotion
-   expressions all have to be authored by hand in Blender before export. This is
-   meaningfully more manual work than pipeline 1, which is why the spike exists.
+   blendshapes** — the `aa` mouth shape Tomoshibi's lip sync actually uses, blink, and
+   the emotion expressions all have to be authored by hand in Blender before export.
+   This is meaningfully more manual work than pipeline 1, which is why the spike exists.
 
 ### Motion sources for `.vrma` clips
 
@@ -210,8 +214,10 @@ recommends is still undecided** — a spike is planned to settle it. Both produc
 
 ## v1 limitations
 
-- **Window mode only** — VRM characters don't currently support Tomoshibi's pet
-  (desktop overlay) mode.
+- **Pet (desktop overlay) mode is untested/unsupported for v1** — nothing in the code
+  blocks a VRM character from mounting in pet mode, but the transparent-window
+  compositing needed for it to look right hasn't been verified with the VRM renderer.
+  If you try it, expect rough edges.
 - **No tap/hit areas** — clicking on the character does nothing (Live2D's tap-triggered
   reactions have no VRM equivalent yet).
 - **Settings are read-only** — see [Settings page](#settings-page) above; there is no
@@ -346,9 +352,10 @@ Live2D 那樣的索引）。掃描器只有在檔案裡真的有對應的標準 
 的條目會把 `clip` 設成每個 `motions/*.vrma` 檔案的檔名主體（扣掉 `idle`），`label` 則
 留白（`null`）。
 
-**記得補上 label。** label 是 LLM 決定要觸發哪個動作時**唯一看得到**的東西——光是關鍵字
-本身不會顯示給它看。`label: null` 的條目，LLM 沒辦法有意識地挑選它。先看過那段動畫，
-再去改 `model_dict.json`：
+**記得補上 label。** 不管有沒有 label，LLM 都看得到每個關鍵字；但沒有 label 的關鍵字
+只會被裸列出來——對 LLM 來說讀起來就是「未指定」，不是一句描述——所以它在片段之間根本
+沒有依據可以選。label 才是讓它能有意識地做選擇的東西。先看過那段動畫，再去改
+`model_dict.json`：
 
 ```json
 "motionMap": { "wave": { "clip": "wave", "label": "揮手打招呼" } }
@@ -400,15 +407,19 @@ spike 計畫要來釐清這件事。兩條路都能產出合法的 `.vrm` 檔，
 去補臉部綁定。
 
 1. **VRoid Studio → 匯出 VRM 1.0。** 最直接的路：VRoid Studio 直接匯出 VRM 1.0，標準
-   表情 preset（`neutral`、`happy`、`angry`、`sad`、`surprised`）、眨眼，以及口型同步用的
-   `aa`/`ih`/`ou`/`ee`/`oh` 嘴型都是現成的——不用額外綁定。你也可以選擇性地在 Blender 裡
-   用 [VRM Add-on for Blender](https://github.com/saturday06/VRM-Add-on-for-Blender)
+   表情 preset（`neutral`、`happy`、`angry`、`sad`、`surprised`）、眨眼，以及五個母音
+   嘴型 `aa`/`ih`/`ou`/`ee`/`oh` 都是現成的——不用額外綁定。但 Tomoshibi 現在的口型同步
+   只會驅動 `aa`
+   （`frontend-src/src/renderer/src/avatar/vrm/expression-controller.ts`），VRoid 匯出的
+   另外四個母音嘴型目前用不到——放著沒壞處，只是現在還沒被讀取。你也可以選擇性地在
+   Blender 裡用 [VRM Add-on for Blender](https://github.com/saturday06/VRM-Add-on-for-Blender)
    （saturday06 出品，MIT 授權）進一步微調匯出的模型。
 2. **圖生 3D → Blender → VRM 匯出。** 用一個帶自動綁骨功能的工具（例如 Meshy 或
    Tripo），或用 Hunyuan3D／Hyper3D，從參考圖生成一個網格模型，再拉進 Blender 用同一個
    VRM Add-on 匯出。身體的骨架綁定通常堪用，但**這類生成工具做不出 VRM 的臉部
-   blendshape**——口型同步用的 `aa` 嘴型、眨眼、以及各種情緒表情，都得在 Blender 裡匯出
-   前手動做出來。這比管線 1 要多花不少人工，這也是為什麼會有這個 spike。
+   blendshape**——Tomoshibi 口型同步實際會用到的 `aa` 嘴型、眨眼、以及各種情緒表情，都
+   得在 Blender 裡匯出前手動做出來。這比管線 1 要多花不少人工，這也是為什麼會有這個
+   spike。
 
 **`.vrma` 動作片段的來源**
 
@@ -418,7 +429,9 @@ spike 計畫要來釐清這件事。兩條路都能產出合法的 `.vrm` 檔，
 
 ### v1 限制
 
-- **只支援視窗模式**——VRM 角色目前不支援 Tomoshibi 的桌面寵物（pet）模式。
+- **桌面寵物（pet）模式在 v1 未經測試、不保證支援**——程式碼裡沒有擋 VRM 角色進 pet
+  模式，但 pet 模式需要的透明視窗合成，在 VRM renderer 上還沒驗證過畫面是否正常。如果
+  你試了，要有心理準備會有粗糙的地方。
 - **沒有點擊區**——點角色本身沒有反應（Live2D 的點擊觸發反應，VRM 目前還沒有對應功能）。
 - **設定唯讀**——見上方[設定頁](#設定頁)；沒有應用內編輯器可以改片段或表情對應，只能
   改 `model_dict.json`。
