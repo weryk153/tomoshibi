@@ -116,6 +116,7 @@ The codebase uses the missing `_cleanup_failed_connection` method pattern - when
 - **Frontend build output**: `frontend/` — a **generated** artifact produced by `pnpm --dir frontend-src run build:web`. That command runs with `emptyOutDir: true`, so it wipes `frontend/` before writing. Never hand-edit files in `frontend/` — edit `frontend-src/` and rebuild. Static files that must ship in `frontend/` belong in `frontend-src/src/renderer/public/`, since anything else in `frontend/` gets deleted on the next build.
   - **Any commit that changes `frontend-src/` must rebuild and commit `frontend/` too.** `frontend/` is what the backend actually serves, so a change left unbuilt simply does not take effect — and nothing warns you. This has already happened once: a fix adding a missing i18n key was committed without a rebuild, so the broken UI label stayed broken in the served bundle. Locale JSON in particular is bundled into the JS, so translation edits always change the output. To check whether `frontend/` is stale: run `pnpm --dir frontend-src run build:web` and see whether `git status --short -- frontend/` comes back non-empty.
 - **Live2D models**: `live2d-models/`
+- **VRM models**: `vrm-models/` — `<name>/<name>.vrm` + `<name>/motions/*.vrma`；掃描登記與對應驗證在 `src/open_llm_vtuber/vrm_models.py`，角色 renderer 的共用介面在 `frontend-src/src/renderer/src/avatar/character-renderer.ts`（見 `docs/add-vrm-character.md`）
 - **Character definitions**: `characters/`
 - **Chat history**: `chat_history/`
 - **Cache**: `cache/` (audio files, temporary data)
