@@ -226,3 +226,207 @@ recommends is still undecided** — a spike is planned to settle it. Both produc
 - **Follow each model's own license**, including any license attached to a `.vrma`
   motion clip you use (VRoid Hub and Mixamo both have their own terms).
 - Using your own commissioned or self-made model is the safe path.
+
+---
+
+## 繁體中文
+
+**情境：** 你有（或想做一個）VRM 3D 模型，想拿它當 Tomoshibi 角色的外觀，作為 Live2D
+之外的另一種選擇。
+
+### 你需要什麼
+
+一個 **VRM 檔**——`.vrm` 其實是包了 VRM 擴充的二進位 glTF（`.glb`）容器，所以任何
+VRoid Studio 或 Blender VRM 匯出的檔案都能用。另外可以選配一個或多個 **`.vrma` 動作檔**
+（VRM 的動畫格式）搭配它。
+
+強烈建議用 VRM 1.0：Tomoshibi 會讀 VRM 1.0 檔案的 `VRMC_vrm.expressions` 區塊來知道它
+有哪些表情，而且只有當檔案裡真的有對應的標準 preset 時，才會自動把某個關鍵字對應到它
+（見下面的[對應設定](#對應設定)）。VRM 0.x 檔案還是能載入、能顯示，但 Tomoshibi 沒辦法
+列舉它的表情，所以只會拿到最陽春的 `{"neutral": "neutral"}` 對應，加上伺服器 log 裡的一則
+警告——其餘的都要自己手動補上。
+
+### Tomoshibi 怎麼找到你的模型（已讀程式碼查證）
+
+跟 Live2D 一樣的自動掃描模式，實作在 `src/open_llm_vtuber/vrm_models.py`
+（`scan_and_register_vrm`）：
+
+- 每當**角色管理器**載入皮膚清單（打 `GET /api/live2d-skins`）時，Tomoshibi 也會掃描
+  `vrm-models/` 資料夾。
+- `vrm-models/` 底下每個**最上層子資料夾**，只要它的頂層（不是巢狀更深處）直接放了一個
+  `*.vrm` 檔，就會被當成可用模型——**資料夾名稱就是模型名稱**，跟 Live2D 一樣。
+- 如果一個資料夾頂層有一個以上的 `.vrm` 檔，Tomoshibi 會挑**依字母排序後排第一個**的那個。
+- 任何掃到但**還沒註冊**的資料夾，會被**自動寫進** `model_dict.json`：讀 `.vrm` 檔算出
+  預設的表情對應，掃 `motions/*.vrma` 算出預設的動作對應（見下方）。這個寫入是自動的，
+  只有發現新模型時才會發生。
+
+所以：把資料夾丟進去，打開角色管理器，它就會出現在皮膚下拉選單裡——一開始不用手改任何
+東西。`vrm-models/` 本身有被 gitignore，你放進去的東西不會被提交進版控。
+
+### 操作步驟
+
+**1. 把模型放進 `vrm-models/`**
+
+```
+vrm-models/
+  my_character/
+    my_character.vrm
+    motions/
+      idle.vrma
+      wave.vrma
+      nod.vrma
+    thumbnail.png
+```
+
+- `.vrm` 檔本身叫什麼名字不重要——只有**資料夾名稱**會變成模型名稱，掃描器只是抓資料夾
+  頂層第一個找到的 `.vrm`。
+- `motions/` 是選用的。裡面的 `idle.vrma` 是一個**保留檔名**：如果存在，它會取代內建的
+  簡易搖擺，成為迴圈播放的待機動畫。`motions/` 裡**其他**每一個 `.vrma` 檔都會變成一個
+  LLM 可觸發的一次性動作片段，預設關鍵字就是它的檔名（去掉 `.vrma`）。
+- `thumbnail.png` / `.jpg` / `.jpeg` / `.webp` 是選用的，跟 Live2D 一樣——見下方
+  [給你的角色一張選皮縮圖（選用）](#給你的角色一張選皮縮圖選用)。
+
+**2. 讓 Tomoshibi 掃描它（自動）**
+
+打開 Tomoshibi →**設定 → 角色管理器**，在新增或編輯角色時打開**外觀**下拉選單——打開
+管理器就會觸發掃描，自動註冊你的新資料夾。你的模型會以資料夾名稱，出現在跟 Live2D 皮膚
+同一個下拉選單裡。
+
+自動註冊出來的 `model_dict.json` 條目長這樣（這是一個真實範例，不是模板——這個形狀是
+固定的）：
+
+```json
+{
+  "name": "kurisu_vrm",
+  "type": "vrm",
+  "description": "自動偵測並註冊的 VRM 模型",
+  "url": "/vrm-models/kurisu_vrm/kurisu_vrm.vrm",
+  "kScale": 1,
+  "initialXshift": 0,
+  "initialYshift": 0,
+  "emotionMap": { "neutral": "neutral", "joy": "happy" },
+  "tapMotions": {},
+  "motionMap": { "wave": { "clip": "wave", "label": null } },
+  "camera": { "distance": 1.6, "height": 1.35 }
+}
+```
+
+（`kScale` / `initialXshift` / `initialYshift` / `tapMotions` 是為了跟 Live2D 條目
+形狀相容而沿用的欄位，VRM 模型不會用到它們。）
+
+**3. 建立或編輯一個用它的角色**
+
+跟 Live2D 一樣：在角色管理器裡，把**外觀**設成你的 VRM 模型（它的資料夾名）——這個欄位
+在角色 YAML 裡的名字還是 `live2d_model_name`，只是現在它也接受 VRM 模型名稱了。設定
+人設與聲音、儲存，再切換到那個角色套用即可。
+
+### 對應設定
+
+**`emotionMap`——臉部表情**
+
+`emotionMap` 把一個 Tomoshibi 情緒關鍵字對應到一個 **VRM 表情名稱**（是字串，不是像
+Live2D 那樣的索引）。掃描器只有在檔案裡真的有對應的標準 preset 時，才會自動填入某個
+關鍵字：
+
+| Tomoshibi 關鍵字 | VRM 1.0 preset |
+|---|---|
+| `neutral` | `neutral` |
+| `joy` | `happy` |
+| `anger` | `angry` |
+| `sadness` | `sad` |
+| `surprise` | `surprised` |
+
+`relaxed` 沒有常見的對應 preset，永遠不會被自動填入。如果你的 `.vrm` 檔案定義了自訂表情
+（超出這五個標準 preset），可以在 `model_dict.json` 裡手動編輯 `emotionMap` 來對應——
+表情名稱要跟檔案裡實際寫的一模一樣。
+
+**`motionMap`——一次性動作片段**
+
+`motionMap` 把一個關鍵字對應到 `{ "clip": "<檔名主體>", "label": "<描述>" }`。自動註冊
+的條目會把 `clip` 設成每個 `motions/*.vrma` 檔案的檔名主體（扣掉 `idle`），`label` 則
+留白（`null`）。
+
+**記得補上 label。** label 是 LLM 決定要觸發哪個動作時**唯一看得到**的東西——光是關鍵字
+本身不會顯示給它看。`label: null` 的條目，LLM 沒辦法有意識地挑選它。先看過那段動畫，
+再去改 `model_dict.json`：
+
+```json
+"motionMap": { "wave": { "clip": "wave", "label": "揮手打招呼" } }
+```
+
+關鍵字本身就是 LLM 在回覆裡寫 `[關鍵字]` 用來觸發這個片段的東西——機制跟 Live2D 的
+`[關鍵字]` 動作一樣。要換某個片段的關鍵字，重新命名那個 `.vrma` 檔即可（掃描器是用檔名
+來產生新條目的 key）；要改既有對應的 label，直接編輯 JSON 就好。
+
+`PUT /api/live2d/model-config/{name}`（從設定頁儲存時會呼叫）會拿這兩份對應表去比對
+`.vrm` 檔與 `motions/` 資料夾裡實際存在的內容——指到不存在的片段或表情名稱會被拒絕。
+
+### 相機
+
+`camera.distance` 跟 `camera.height`，單位都是公尺，決定 VRM 相機的位置；相機會看向
+`(0, height, 0)` 這個點。預設是 `distance: 1.6`、`height: 1.35`。如果模型框得太近／太遠
+或太高／太低，就到 `model_dict.json` 調這兩個值。
+
+### 執行期行為（模型載入後你會看到什麼）
+
+- **口型同步**直接吃 TTS 產生的 WAV 音檔驅動（不經過 Web Audio API）。
+- **表情**淡入淡出各 0.2 秒。
+- **眨眼**是自動的（內建一套眨眼狀態機），跟你設的 `emotionMap` 無關。
+- **視線**：如果 Live2D 的「視線跟隨滑鼠」設定是開的，角色的眼睛會跟著滑鼠指標；關閉的話
+  就看向鏡頭。
+- **待機**：如果有 `motions/idle.vrma` 就迴圈播放；沒有的話就用內建的簡易搖擺代替。
+- **LLM 觸發的動作**：`motionMap` 裡的 `[關鍵字]` 會讓角色淡入該片段，播完再淡回待機。
+- **載入失敗**：如果 `.vrm` 檔載入失敗，Tomoshibi 會跳一個提示，對話照常繼續，只是沒有
+  角色畫面——不會卡住聊天。
+
+### 設定頁
+
+對 VRM 模型來說，角色管理器模型設定裡的**外觀**分頁顯示的是模型的片段、表情、目前關鍵字
+對應的**唯讀摘要**（沒有 Live2D 那種動作／點擊區編輯器的 VRM 版本）。要改東西的話：
+
+- **重新命名 `.vrma` 檔**來改變觸發它的關鍵字。
+- **手動編輯 `model_dict.json`**來改動作的 label 或表情的關鍵字對應。
+
+### 給你的角色一張選皮縮圖（選用）
+
+機制跟 Live2D 完全一樣：把 `thumbnail.png` / `.jpg` / `.jpeg` / `.webp` 放進模型資料夾
+（跟 `.vrm` 檔同一層），重開角色管理器讓它重掃，選皮的地方就會顯示。不放也沒關係，選單
+會顯示一個佔位圖——其他功能都不受影響。
+
+### 模型來源
+
+目前有兩條候選管線可以做出一個 VRM 模型；**Tomoshibi 該推薦哪一條還沒定案**——有一個
+spike 計畫要來釐清這件事。兩條路都能產出合法的 `.vrm` 檔，差別在匯出之後要花多少人工
+去補臉部綁定。
+
+1. **VRoid Studio → 匯出 VRM 1.0。** 最直接的路：VRoid Studio 直接匯出 VRM 1.0，標準
+   表情 preset（`neutral`、`happy`、`angry`、`sad`、`surprised`）、眨眼，以及口型同步用的
+   `aa`/`ih`/`ou`/`ee`/`oh` 嘴型都是現成的——不用額外綁定。你也可以選擇性地在 Blender 裡
+   用 [VRM Add-on for Blender](https://github.com/saturday06/VRM-Add-on-for-Blender)
+   （saturday06 出品，MIT 授權）進一步微調匯出的模型。
+2. **圖生 3D → Blender → VRM 匯出。** 用一個帶自動綁骨功能的工具（例如 Meshy 或
+   Tripo），或用 Hunyuan3D／Hyper3D，從參考圖生成一個網格模型，再拉進 Blender 用同一個
+   VRM Add-on 匯出。身體的骨架綁定通常堪用，但**這類生成工具做不出 VRM 的臉部
+   blendshape**——口型同步用的 `aa` 嘴型、眨眼、以及各種情緒表情，都得在 Blender 裡匯出
+   前手動做出來。這比管線 1 要多花不少人工，這也是為什麼會有這個 spike。
+
+**`.vrma` 動作片段的來源**
+
+- VRoid Hub 上發布的免費範例 `.vrma` 動作（原始來源是 pixiv）。
+- [Mixamo](https://www.mixamo.com/) 的動作捕捉片段，重新綁定後透過 Blender 的 VRM
+  Add-on 匯出成 `.vrma`。
+
+### v1 限制
+
+- **只支援視窗模式**——VRM 角色目前不支援 Tomoshibi 的桌面寵物（pet）模式。
+- **沒有點擊區**——點角色本身沒有反應（Live2D 的點擊觸發反應，VRM 目前還沒有對應功能）。
+- **設定唯讀**——見上方[設定頁](#設定頁)；沒有應用內編輯器可以改片段或表情對應，只能
+  改 `model_dict.json`。
+- **沒有陰影或環境光照（IBL）**——VRM 畫布渲染時沒有陰影通道，也沒有環境光照。
+
+### 授權提醒（務必看）
+
+- **不要在公開／商用情境使用有版權的角色模型**，除非你有使用權。
+- **遵守每個模型自己的授權**，包括你用的 `.vrma` 動作片段各自附帶的授權（VRoid Hub 跟
+  Mixamo 都有各自的條款）。
+- 用你自己委託製作或自製的模型是最安全的做法。
