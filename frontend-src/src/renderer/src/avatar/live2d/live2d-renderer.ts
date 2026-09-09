@@ -23,11 +23,26 @@ function getAdapter(): any | null {
 export function createLive2DRenderer(): CharacterRenderer {
   return {
     beginSegment(audio, cues: SpeakCues, firstOfResponse) {
-      const model = getModel();
+      // Get Live2D manager and model
+      const live2dManager = (window as any).getLive2DManager?.();
+      if (!live2dManager) {
+        console.error("Live2D manager not found");
+        return;
+      }
+
+      const model = live2dManager.getModel(0);
       if (!model) {
         console.error("Live2D model not found at index 0");
         return;
       }
+      console.log("Found model for audio playback");
+
+      if (!model._wavFileHandler) {
+        console.warn("Model does not have _wavFileHandler for lip sync");
+      } else {
+        console.log("Model has _wavFileHandler available");
+      }
+
       const lappAdapter = getAdapter();
 
       if (lappAdapter && cues.expression !== undefined) {
@@ -55,9 +70,15 @@ export function createLive2DRenderer(): CharacterRenderer {
         if (motion) {
           // This segment carries an LLM-triggered motion, started above at
           // PriorityForce (3) so it can play *while the character speaks*.
-          // A Talk request at PriorityNormal (2) would be rejected by
-          // reserveMotion anyway; skipping it here keeps that failure loud
-          // if either priority ever changes.
+          //
+          // Skipping Talk here is belt-and-braces rather than load-bearing:
+          // `beginSpeaking()` returns true at most once per response, so no
+          // later segment restarts Talk anyway, and a Talk request at
+          // PriorityNormal (2) would in any case be rejected by
+          // `reserveMotion` while the force-priority motion is reserved.
+          // It is kept because both of those are properties of code
+          // elsewhere — if either changes, requesting Talk here would start
+          // cutting the motion short, and that failure would be silent.
           console.log("Skipping 'Talk' motion: this segment triggers an LLM motion");
         } else {
           console.log("Starting random 'Talk' motion");
@@ -67,11 +88,6 @@ export function createLive2DRenderer(): CharacterRenderer {
         console.warn("LAppDefine.PriorityNormal not found - cannot start talk motion");
       }
 
-      if (!model._wavFileHandler) {
-        console.warn("Model does not have _wavFileHandler for lip sync");
-        return;
-      }
-
       // Full rigs benefit from the historical sensitivity boost. Kurisu's
       // compact two-state mouth needs the raw envelope so it does not slam
       // into its maximum open sprite on every syllable.
@@ -79,18 +95,20 @@ export function createLive2DRenderer(): CharacterRenderer {
         ? 1.0
         : 2.0;
 
-      if (!model._wavFileHandler._initialized) {
-        console.log("Applying enhanced lip sync");
-        model._wavFileHandler._initialized = true;
-        const originalUpdate = model._wavFileHandler.update.bind(model._wavFileHandler);
-        model._wavFileHandler.update = function (deltaTimeSeconds: number) {
-          const result = originalUpdate(deltaTimeSeconds);
-          // @ts-ignore
-          this._lastRms = Math.min(2.0, this._lastRms * lipSyncScale);
-          return result;
-        };
+      if (model._wavFileHandler) {
+        if (!model._wavFileHandler._initialized) {
+          console.log("Applying enhanced lip sync");
+          model._wavFileHandler._initialized = true;
+          const originalUpdate = model._wavFileHandler.update.bind(model._wavFileHandler);
+          model._wavFileHandler.update = function (deltaTimeSeconds: number) {
+            const result = originalUpdate(deltaTimeSeconds);
+            // @ts-ignore
+            this._lastRms = Math.min(2.0, this._lastRms * lipSyncScale);
+            return result;
+          };
+        }
+        model._wavFileHandler.start(audio.src);
       }
-      model._wavFileHandler.start(audio.src);
     },
 
     stop() {
@@ -99,6 +117,7 @@ export function createLive2DRenderer(): CharacterRenderer {
       if (model._wavFileHandler) {
         try {
           model._wavFileHandler.releasePcmData();
+          console.log("[Live2DRenderer] Called _wavFileHandler.releasePcmData()");
           model._wavFileHandler._lastRms = 0.0;
           model._wavFileHandler._sampleOffset = 0;
           model._wavFileHandler._userTimeSeconds = 0.0;
