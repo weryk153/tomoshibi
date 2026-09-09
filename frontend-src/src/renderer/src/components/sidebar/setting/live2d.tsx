@@ -28,6 +28,7 @@ import {
 } from '@/effects/stage-effect-music';
 import { toaster } from '@/components/ui/tw/toaster';
 import MotionConfig from './motion-config';
+import VrmConfigSummary from './vrm-config-summary';
 
 function live2D(): JSX.Element {
   const { t } = useTranslation();
@@ -200,7 +201,7 @@ function live2D(): JSX.Element {
         </Box>
       </Box>
 
-      <MotionConfig />
+      {modelInfo?.type === 'vrm' ? <VrmConfigSummary /> : <MotionConfig />}
     </Stack>
   );
 }
