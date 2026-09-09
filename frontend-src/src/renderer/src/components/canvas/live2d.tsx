@@ -61,7 +61,12 @@ export const Live2D = memo(
         try {
           LAppDelegate.releaseInstance();
         } catch (e) {
-          // SDK 還沒初始化完就卸載（例如載入中途切走）時會走到這裡，忽略即可。
+          // 正常情況不該進來。沒模型就卸載（SDK 從沒初始化過）時 releaseInstance()
+          // 已經是安全的：s_instance 是 null 就直接跳過，就算只被 resize handler
+          // 建出一個空 delegate，LAppView.release() 對 _back／_programId／gl 都有
+          // 防呆。留著 catch 純粹是保險，真的印出來就代表 SDK 那邊又多了一條會炸的路。
+          // releaseInstance() 本身用 try/finally 保證 s_instance 一定歸零，
+          // 所以這裡接到例外時 singleton 也不會殘留。
           console.warn("[Live2D] LAppDelegate.releaseInstance() failed:", e);
         }
       },

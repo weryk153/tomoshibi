@@ -93,10 +93,20 @@ export class LAppView {
     // this._gear.release();
     // this._gear = null;
 
-    this._back.release();
+    // Null-safe on purpose. In this fork `_back` is *never* assigned: the only
+    // assignment lives in the commented-out background-texture callback inside
+    // `initializeSprite()`. `_programId` (and the module-level `gl`) likewise stay
+    // null until the view has actually been initialized. Upstream got away with the
+    // unguarded version because nothing ever called `release()` during a session --
+    // unmounting `<Live2D/>`, which only became possible with the dual-renderer
+    // change (Live2D -> VRM tears the component down), is the first code path in
+    // this app's lifetime that does, and it hit `_back.release()` on null every time.
+    this._back?.release();
     this._back = null;
 
-    gl.deleteProgram(this._programId);
+    if (gl && this._programId) {
+      gl.deleteProgram(this._programId);
+    }
     this._programId = null;
   }
 

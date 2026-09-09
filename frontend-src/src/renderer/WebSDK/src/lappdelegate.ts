@@ -52,11 +52,21 @@ export class LAppDelegate {
    * 
    */
   public static releaseInstance(): void {
-    if (s_instance != null) {
-      s_instance.release();
+    // `s_instance = null` has to happen even when `release()` throws part-way, or a
+    // half-released delegate stays reachable: `run()`'s loop guard is
+    // `if (s_instance == null) return`, so the rAF loop would keep running, and the
+    // next `getInstance()` would hand back the corrupted instance whose
+    // `initialize()` then dereferences the members `release()` already nulled.
+    // Unmounting `<Live2D/>` (Live2D -> VRM, new with the dual-renderer change) is
+    // the first path that ever calls this while the app keeps running -- before
+    // that it only ran on `beforeunload`, where a throw was harmless.
+    try {
+      if (s_instance != null) {
+        s_instance.release();
+      }
+    } finally {
+      s_instance = null;
     }
-
-    s_instance = null;
   }
 
   /**
