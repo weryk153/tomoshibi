@@ -1,118 +1,69 @@
-import { test } from 'node:test'
-import assert from 'node:assert/strict'
-import { AudioManager } from './audio-manager.ts'
+import assert from "node:assert/strict";
+import test from "node:test";
+import { AudioManager } from "./audio-manager.ts";
+import { registerRenderer, type CharacterRenderer } from "../avatar/character-renderer.ts";
 
-type FakeAudio = HTMLAudioElement & {
-  pauseCalls: number
-  loadCalls: number
-}
-
-function makeAudio(): FakeAudio {
+function fakeAudio() {
+  const calls: string[] = [];
   return {
-    src: 'data:audio/wav;base64,test',
-    pauseCalls: 0,
-    loadCalls: 0,
-    pause() {
-      this.pauseCalls += 1
-    },
-    load() {
-      this.loadCalls += 1
-    },
-  } as FakeAudio
+    calls,
+    src: "data:x",
+    pause() { calls.push("pause"); },
+    load() { calls.push("load"); },
+  } as unknown as HTMLAudioElement & { calls: string[] };
 }
 
-function makeModel() {
-  return {
-    idleCalls: 0,
-    _wavFileHandler: {
-      releaseCalls: 0,
-      _lastRms: 0.9,
-      _sampleOffset: 42,
-      _userTimeSeconds: 1.5,
-      releasePcmData() {
-        this.releaseCalls += 1
-      },
-    },
-    returnToIdleMotion() {
-      this.idleCalls += 1
-    },
-  }
-}
+test("beginSpeaking 一個 stop 週期內只回一次 true", () => {
+  const m = new AudioManager();
+  assert.equal(m.beginSpeaking(), true);
+  assert.equal(m.beginSpeaking(), false);
+  m.stopCurrentAudioAndLipSync();
+  assert.equal(m.beginSpeaking(), true);
+});
 
-// 播放任務的 promise 只靠 audio 的 canplaythrough／ended／error 事件收尾。
-// 被外部停掉的音訊（stopCurrentAudioAndLipSync 會 pause + 清空 src + load）
-// 這三個事件一個都不會來，promise 就永遠懸著，音訊佇列跟著卡死。所以「停止」
-// 必須是一條確定會收尾的路徑，而不是指望瀏覽器補一個事件給我們。
-test('外部停止播放時，仍在等待的播放任務會被收尾', () => {
-  const manager = new AudioManager()
-  const model = makeModel()
-  const audio = makeAudio()
-  let settled = 0
+test("stop 會停音訊、叫 renderer.stop、且 settle 只叫一次", () => {
+  const m = new AudioManager();
+  const audio = fakeAudio();
+  let stopped = 0;
+  let settled = 0;
+  const r: CharacterRenderer = {
+    beginSegment() {},
+    stop() { stopped += 1; },
+    resetExpression() {},
+  };
+  const unregister = registerRenderer(r);
+  m.setCurrentAudio(audio, () => { settled += 1; });
+  m.stopCurrentAudioAndLipSync();
+  m.stopCurrentAudioAndLipSync();
+  unregister();
+  assert.deepEqual(audio.calls, ["pause", "load"]);
+  assert.equal(audio.src, "");
+  assert.equal(stopped, 2);
+  assert.equal(settled, 1);
+  assert.equal(m.hasCurrentAudio(), false);
+});
 
-  manager.beginSpeaking(model)
-  manager.setCurrentAudio(audio, model, () => { settled += 1 })
-  manager.stopCurrentAudioAndLipSync()
+test("renderer.stop 丟例外不會讓 settle 漏掉", () => {
+  const m = new AudioManager();
+  const r: CharacterRenderer = {
+    beginSegment() {},
+    stop() { throw new Error("boom"); },
+    resetExpression() {},
+  };
+  const unregister = registerRenderer(r);
+  let settled = 0;
+  m.setCurrentAudio(fakeAudio(), () => { settled += 1; });
+  m.stopCurrentAudioAndLipSync();
+  unregister();
+  assert.equal(settled, 1);
+});
 
-  assert.equal(settled, 1, '停止播放必須讓等待中的任務結束，否則佇列會卡住')
-
-  manager.stopCurrentAudioAndLipSync()
-  assert.equal(settled, 1, '重複停止不可重複收尾')
-})
-
-test('音訊自然結束後，再停止播放不會重複收尾', () => {
-  const manager = new AudioManager()
-  const model = makeModel()
-  const audio = makeAudio()
-  let settled = 0
-
-  manager.beginSpeaking(model)
-  manager.setCurrentAudio(audio, model, () => { settled += 1 })
-  // ended 事件已經自己 resolve 過，並解除註冊。
-  manager.clearCurrentAudio(audio)
-  manager.stopCurrentAudioAndLipSync()
-
-  assert.equal(settled, 0, '自然結束的任務不該再被停止路徑收尾一次')
-})
-
-test('連續語音分段只在第一段啟動 Talk', () => {
-  const manager = new AudioManager()
-  const model = makeModel()
-
-  assert.equal(manager.beginSpeaking(model), true)
-  assert.equal(manager.beginSpeaking(model), false)
-})
-
-test('一段音訊自然結束後仍保留整次回覆的 speaking 狀態', () => {
-  const manager = new AudioManager()
-  const model = makeModel()
-  const firstAudio = makeAudio()
-
-  assert.equal(manager.beginSpeaking(model), true)
-  manager.setCurrentAudio(firstAudio, model)
-  manager.clearCurrentAudio(firstAudio)
-
-  assert.equal(manager.hasCurrentAudio(), false)
-  assert.equal(manager.beginSpeaking(model), false)
-})
-
-test('整次回覆完成時重設嘴型並以 Idle 淡出 Talk', () => {
-  const manager = new AudioManager()
-  const model = makeModel()
-  const audio = makeAudio()
-
-  manager.beginSpeaking(model)
-  manager.setCurrentAudio(audio, model)
-  manager.stopCurrentAudioAndLipSync()
-
-  assert.equal(audio.pauseCalls, 1)
-  assert.equal(audio.loadCalls, 1)
-  assert.equal(audio.src, '')
-  assert.equal(model._wavFileHandler.releaseCalls, 1)
-  assert.equal(model._wavFileHandler._lastRms, 0)
-  assert.equal(model._wavFileHandler._sampleOffset, 0)
-  assert.equal(model._wavFileHandler._userTimeSeconds, 0)
-  assert.equal(model.idleCalls, 1)
-  assert.equal(manager.hasCurrentAudio(), false)
-
-  assert.equal(manager.beginSpeaking(model), true)
-})
+test("自然結束的 clearCurrentAudio 之後，stop 不再 settle", () => {
+  const m = new AudioManager();
+  const audio = fakeAudio();
+  let settled = 0;
+  m.setCurrentAudio(audio, () => { settled += 1; });
+  m.clearCurrentAudio(audio);
+  m.stopCurrentAudioAndLipSync();
+  assert.equal(settled, 0);
+});

@@ -2,10 +2,13 @@
  * Global audio manager for handling audio playback and interruption
  * This ensures all components share the same audio reference
  */
+import { getActiveRenderer } from "../avatar/character-renderer.ts";
+
 export class AudioManager {
   private currentAudio: HTMLAudioElement | null = null;
-  private currentModel: any | null = null;
-  private speakingModel: any | null = null;
+  // 這輪回覆是否已經開講。以前靠「speakingModel 是不是同一個模型」判斷，
+  // 模型在一輪裡不會換，所以語意等於「上次 stop 之後第一次」——現在直接記這件事。
+  private speaking = false;
   // 目前這段音訊所屬播放 task 的收尾函式。播放 task 的 promise 平常靠 audio 的
   // ended／error 事件 resolve，但被這裡停掉的音訊（pause + 清空 src + load）
   // 那些事件一個都不會來，promise 就永遠懸著，音訊佇列跟著卡死——最後整輪對話
@@ -13,15 +16,13 @@ export class AudioManager {
   private currentSettle: (() => void) | null = null;
 
   /**
-   * Mark a model as speaking.
    * Returns true only for the first chunk of a continuous response so the Talk
    * motion is not restarted at every synthesized audio chunk.
    */
-  beginSpeaking(model: any): boolean {
-    const shouldStartTalkMotion = this.speakingModel !== model;
-    this.speakingModel = model;
-    this.currentModel = model;
-    return shouldStartTalkMotion;
+  beginSpeaking(): boolean {
+    const first = !this.speaking;
+    this.speaking = true;
+    return first;
   }
 
   /**
@@ -30,9 +31,8 @@ export class AudioManager {
    * onStopped 由播放 task 傳入，讓 stopCurrentAudioAndLipSync() 能確實地結束
    * 那個 task。省略時行為與以往相同（只有事件能收尾），所以呼叫端沒改到也不會壞。
    */
-  setCurrentAudio(audio: HTMLAudioElement, model: any, onStopped?: () => void) {
+  setCurrentAudio(audio: HTMLAudioElement, onStopped?: () => void) {
     this.currentAudio = audio;
-    this.currentModel = model;
     this.currentSettle = onStopped ?? null;
   }
 
@@ -41,55 +41,28 @@ export class AudioManager {
    */
   stopCurrentAudioAndLipSync() {
     const audio = this.currentAudio;
-    const model = this.speakingModel ?? this.currentModel;
     // 先取走再清空：收尾函式在最後才呼叫（此時狀態已重設完畢），而且只會被
     // 呼叫一次——重複停止不該重複收尾。
     const settle = this.currentSettle;
     this.currentSettle = null;
 
     if (audio) {
-      console.log('[AudioManager] Stopping current audio');
-
-      // Stop audio playback
+      console.log("[AudioManager] Stopping current audio");
       audio.pause();
-      audio.src = '';
+      audio.src = "";
       audio.load();
     }
 
-    // Stop Live2D lip sync even when the final chunk already ended naturally.
-    if (model && model._wavFileHandler) {
-      try {
-        model._wavFileHandler.releasePcmData();
-        console.log('[AudioManager] Called _wavFileHandler.releasePcmData()');
-
-        model._wavFileHandler._lastRms = 0.0;
-        model._wavFileHandler._sampleOffset = 0;
-        model._wavFileHandler._userTimeSeconds = 0.0;
-        if (typeof model._smoothedLipSyncValue === 'number') {
-          model._smoothedLipSyncValue = 0.0;
-        }
-      } catch (e) {
-        console.error('[AudioManager] Error stopping/resetting wavFileHandler:', e);
-      }
-    }
-
-    // Starting Idle through Cubism's motion manager crossfades the looping Talk
-    // motion instead of leaving it active or stopping it abruptly.
-    if (model) {
-      try {
-        if (typeof model.returnToIdleMotion === 'function') {
-          model.returnToIdleMotion();
-        } else if (typeof model.startRandomMotion === 'function') {
-          model.startRandomMotion('Idle', 3);
-        }
-      } catch (e) {
-        console.error('[AudioManager] Error returning model to idle:', e);
-      }
+    // 不管音訊是不是已經自然結束都要叫：最後一段播完了、lipsync 與 Talk 動作
+    // 還掛著，這裡是唯一會把它們收掉的地方。
+    try {
+      getActiveRenderer()?.stop();
+    } catch (e) {
+      console.error("[AudioManager] renderer.stop() failed:", e);
     }
 
     this.currentAudio = null;
-    this.currentModel = null;
-    this.speakingModel = null;
+    this.speaking = false;
 
     if (settle) settle();
   }
