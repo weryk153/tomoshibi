@@ -650,7 +650,11 @@ def scan_and_register_skins() -> dict:
 
 
 def list_all_skins() -> dict:
-    """Live2D 與 VRM 兩邊的掃描結果合併；每筆帶 ``type``，前端角色編輯器靠它分辨。"""
+    """Live2D 與 VRM 兩邊的掃描結果合併；每筆帶 ``type``。
+
+    ``type`` 是給之後與診斷用的：目前前端的皮膚選單（characters.tsx）只取 ``name``
+    跟 ``thumbnail``，會把 ``type`` 丟掉，沒有任何 UI 行為靠它。
+    """
     from .vrm_models import scan_and_register_vrm
 
     live2d = scan_and_register_skins()

@@ -53,12 +53,17 @@ export class AudioManager {
       audio.load();
     }
 
-    // 不管音訊是不是已經自然結束都要叫：最後一段播完了、lipsync 與 Talk 動作
-    // 還掛著，這裡是唯一會把它們收掉的地方。
-    try {
-      getActiveRenderer()?.stop();
-    } catch (e) {
-      console.error("[AudioManager] renderer.stop() failed:", e);
+    // 音訊是不是已經自然結束不重要：最後一段播完了、lipsync 與 Talk 動作還掛著，
+    // 這裡是唯一會把它們收掉的地方，所以 audio 已經清掉也要叫。
+    // 但「這輪根本沒開始講」就不該叫——這條 if 重現的是舊版 `speakingModel ?? currentModel`
+    // 那個守衛：兩個都沒有時舊碼整段跳過，是 no-op。少了它，thinking 階段與
+    // 打斷＋交握那兩次空的 stop 都會多打一次 returnToIdleMotion()。
+    if (this.speaking || audio) {
+      try {
+        getActiveRenderer()?.stop();
+      } catch (e) {
+        console.error("[AudioManager] renderer.stop() failed:", e);
+      }
     }
 
     this.currentAudio = null;

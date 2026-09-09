@@ -140,9 +140,11 @@ clip — same mechanism as Live2D's `[keyword]` motions. To change a clip's keyw
 rename the `.vrma` file (the scanner keys new entries off the filename); to relabel an
 existing mapping, edit the JSON directly.
 
-`PUT /api/live2d/model-config/{name}` (used when saving from the settings page)
-validates both maps against what the `.vrm` file and `motions/` folder actually contain
-— an unknown clip or expression name is rejected.
+`PUT /api/live2d/model-config/{name}` validates both maps against what the `.vrm` file
+and `motions/` folder actually contain — an unknown clip or expression name is rejected.
+The settings page never calls it for a VRM model (that page is read-only, see
+[Settings page](#settings-page) below); the endpoint is there to validate hand-edited
+mappings if something does call it, e.g. tooling.
 
 ## Camera
 
@@ -157,7 +159,9 @@ in `model_dict.json` if the model is framed too close/far or too high/low.
 - **Blinking** is automatic (a built-in blink state machine), independent of your
   `emotionMap`.
 - **Gaze**: if the Live2D "look at pointer" setting is on, the character's eyes follow
-  the mouse pointer; if it's off, the character looks at the camera.
+  the mouse pointer; if it's off, the character looks at the camera. Turning the setting
+  off doesn't snap the gaze back immediately — it returns to the camera on the next
+  pointer move.
 - **Idle**: `motions/idle.vrma` plays looped if present; otherwise a subtle procedural
   sway is used instead.
 - **LLM-triggered motions**: a `[keyword]` from `motionMap` crossfades into that clip and
@@ -177,10 +181,11 @@ For a VRM model, the **Appearance** tab in the Character Manager's model setting
 
 ## Give your character a skin-picker thumbnail (optional)
 
-Identical mechanism to Live2D: drop `thumbnail.png` / `.jpg` / `.jpeg` / `.webp` into the
-model's folder (alongside the `.vrm` file), reopen the Character Manager to rescan, and
-the picker shows it. Skip it and the picker shows a placeholder instead — everything
-else still works.
+Same backend mechanism as Live2D: drop `thumbnail.png` / `.jpg` / `.jpeg` / `.webp` into
+the model's folder (alongside the `.vrm` file), reopen the Character Manager to rescan,
+and the scan records its URL in the skins list it returns. **The picker does not display
+it yet** — no frontend code reads that field today, so adding a thumbnail changes nothing
+on screen for now. Skipping it costs you nothing either; everything else works the same.
 
 ## Where to get a model
 
@@ -365,8 +370,10 @@ Live2D 那樣的索引）。掃描器只有在檔案裡真的有對應的標準 
 `[關鍵字]` 動作一樣。要換某個片段的關鍵字，重新命名那個 `.vrma` 檔即可（掃描器是用檔名
 來產生新條目的 key）；要改既有對應的 label，直接編輯 JSON 就好。
 
-`PUT /api/live2d/model-config/{name}`（從設定頁儲存時會呼叫）會拿這兩份對應表去比對
-`.vrm` 檔與 `motions/` 資料夾裡實際存在的內容——指到不存在的片段或表情名稱會被拒絕。
+`PUT /api/live2d/model-config/{name}` 會拿這兩份對應表去比對 `.vrm` 檔與 `motions/`
+資料夾裡實際存在的內容——指到不存在的片段或表情名稱會被拒絕。設定頁對 VRM 模型不會呼叫
+它（那一頁是唯讀的，見下方[設定頁](#設定頁)）；這個端點的用途是：如果有東西（例如工具腳本）
+去呼叫它，手改的對應表會先被驗過一遍。
 
 ### 相機
 
@@ -380,7 +387,7 @@ Live2D 那樣的索引）。掃描器只有在檔案裡真的有對應的標準 
 - **表情**淡入淡出各 0.2 秒。
 - **眨眼**是自動的（內建一套眨眼狀態機），跟你設的 `emotionMap` 無關。
 - **視線**：如果 Live2D 的「視線跟隨滑鼠」設定是開的，角色的眼睛會跟著滑鼠指標；關閉的話
-  就看向鏡頭。
+  就看向鏡頭。關掉的當下視線不會立刻歸位——要等下一次滑鼠移動才收回鏡頭。
 - **待機**：如果有 `motions/idle.vrma` 就迴圈播放；沒有的話就用內建的簡易搖擺代替。
 - **LLM 觸發的動作**：`motionMap` 裡的 `[關鍵字]` 會讓角色淡入該片段，播完再淡回待機。
 - **載入失敗**：如果 `.vrm` 檔載入失敗，Tomoshibi 會跳一個提示，對話照常繼續，只是沒有
@@ -396,9 +403,10 @@ Live2D 那樣的索引）。掃描器只有在檔案裡真的有對應的標準 
 
 ### 給你的角色一張選皮縮圖（選用）
 
-機制跟 Live2D 完全一樣：把 `thumbnail.png` / `.jpg` / `.jpeg` / `.webp` 放進模型資料夾
-（跟 `.vrm` 檔同一層），重開角色管理器讓它重掃，選皮的地方就會顯示。不放也沒關係，選單
-會顯示一個佔位圖——其他功能都不受影響。
+後端的機制跟 Live2D 完全一樣：把 `thumbnail.png` / `.jpg` / `.jpeg` / `.webp` 放進模型
+資料夾（跟 `.vrm` 檔同一層），重開角色管理器讓它重掃，掃描結果的皮膚清單裡就會帶上這張圖
+的網址。**但選皮的地方目前還不會顯示它**——前端沒有任何程式讀這個欄位，所以現在放了縮圖，
+畫面上不會有任何變化。不放也一樣沒差，其他功能都不受影響。
 
 ### 模型來源
 

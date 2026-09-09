@@ -13,17 +13,25 @@ export default function VrmConfigSummary(): JSX.Element {
   const { baseUrl } = useWebSocket();
   const { modelInfo } = useLive2DConfig();
   const [config, setConfig] = useState<VrmModelConfig | null>(null);
+  // 沒有這個狀態的話，抓失敗會讓畫面永遠停在「…」，看起來像還在載入。
+  const [error, setError] = useState(false);
   const name = modelInfo?.name;
 
   useEffect(() => {
     if (!name) return;
     let cancelled = false;
+    setError(false);
     fetchVrmModelConfig(baseUrl, name).then((r) => {
-      if (!cancelled && r.ok) setConfig(r.data);
+      if (cancelled) return;
+      if (r.ok) setConfig(r.data);
+      else setError(true);
     });
     return () => { cancelled = true; };
   }, [baseUrl, name]);
 
+  if (error) {
+    return <Text fontSize="sm" color="orange.300">{t('settings.live2d.motionConfigLoadError')}</Text>;
+  }
   if (!config) return <Text fontSize="sm">…</Text>;
 
   return (

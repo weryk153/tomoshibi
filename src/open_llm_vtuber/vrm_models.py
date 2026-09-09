@@ -54,6 +54,9 @@ def read_glb_json(path: str) -> Optional[dict]:
             chunk_len, chunk_type = struct.unpack("<II", chunk_header)
             if chunk_type != _JSON_CHUNK:
                 return None
+            # chunk_len 來自檔案本身，是不可信的 uint32；夾到「檔案剩下的位元組數」
+            # （12 byte GLB header + 8 byte chunk header = 20），免得被騙去配置 4GB。
+            chunk_len = min(chunk_len, max(0, os.path.getsize(path) - 20))
             data = json.loads(f.read(chunk_len).decode("utf-8"))
             return data if isinstance(data, dict) else None
     except Exception as e:
@@ -126,6 +129,9 @@ def scan_and_register_vrm() -> dict:
     """
     model_dict = _load_model_dict()
     registered = {m.get("name") for m in model_dict if isinstance(m, dict)}
+    registered_types = {
+        m.get("name"): m.get("type") for m in model_dict if isinstance(m, dict)
+    }
     newly: list[str] = []
     skins: list[dict] = []
 
@@ -149,6 +155,14 @@ def scan_and_register_vrm() -> dict:
                 }
             )
             if name in registered:
+                if registered_types.get(name) != "vrm":
+                    # live2d-models/ 與 vrm-models/ 用同一個資料夾名時，model_dict.json
+                    # 裡只會留先登記的那筆（Live2D），VRM 這邊會被無聲跳過。
+                    logger.warning(
+                        f"[vrm] vrm-models/{name} shadows an existing non-VRM "
+                        f"(type={registered_types.get(name)!r}) model_dict entry named "
+                        f"'{name}' — the VRM folder is skipped; rename one of them."
+                    )
                 continue
             expressions = read_vrm_expressions(vrm_path)
             model_dict.append(

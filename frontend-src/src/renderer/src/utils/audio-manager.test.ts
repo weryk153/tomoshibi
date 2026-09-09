@@ -38,9 +38,25 @@ test("stop 會停音訊、叫 renderer.stop、且 settle 只叫一次", () => {
   unregister();
   assert.deepEqual(audio.calls, ["pause", "load"]);
   assert.equal(audio.src, "");
-  assert.equal(stopped, 2);
+  // 第二次 stop 時已經沒有音訊、也沒在講話，等同舊版 `speakingModel ?? currentModel`
+  // 兩個都沒有的情況——整段跳過，不會再叫一次 renderer.stop()。
+  assert.equal(stopped, 1);
   assert.equal(settled, 1);
   assert.equal(m.hasCurrentAudio(), false);
+});
+
+test("沒音訊也沒開講時，stop 不會叫 renderer.stop", () => {
+  const m = new AudioManager();
+  let stopped = 0;
+  const r: CharacterRenderer = {
+    beginSegment() {},
+    stop() { stopped += 1; },
+    resetExpression() {},
+  };
+  const unregister = registerRenderer(r);
+  m.stopCurrentAudioAndLipSync();
+  unregister();
+  assert.equal(stopped, 0);
 });
 
 test("renderer.stop 丟例外不會讓 settle 漏掉", () => {

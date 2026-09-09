@@ -8,6 +8,8 @@ GLB = 12 bytes 標頭（magic 'glTF'、版本、總長）+ chunk（長度、型�
 import json
 import struct
 
+from loguru import logger
+
 from src.open_llm_vtuber.vrm_models import (
     default_emotion_map,
     list_vrm_clips,
@@ -288,3 +290,42 @@ def test_route_dispatches_on_type(tmp_path, monkeypatch):
 
     tap = write_model_config("kv", {}, {"Head": []})
     assert tap["ok"] is False and "tapMotions" in tap["error"]
+
+
+def test_read_expressions_lying_chunk_length_is_none(tmp_path):
+    """chunk 標頭宣稱 0xFFFFFFFF、實際內容很短。
+
+    沒有夾住的話 f.read(chunk_len) 會直接向 CPython 要 4 GiB 的 buffer；夾住之後
+    只會讀到檔案真正剩下的那幾個 byte，JSON 解不開就照常回 None。
+    """
+    p = tmp_path / "a.vrm"
+    body = b'{"asset": {"vers'  # 截斷的 JSON
+    p.write_bytes(
+        struct.pack("<4sII", b"glTF", 2, 20 + len(body))
+        + struct.pack("<II", 0xFFFFFFFF, JSON_CHUNK)
+        + body
+    )
+    assert read_vrm_expressions(str(p)) is None
+
+
+def test_scan_warns_when_name_collides_with_live2d(tmp_path, monkeypatch, caplog):
+    """live2d-models/x 與 vrm-models/x 同名時，VRM 那筆會被跳過——要留下痕跡。"""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "model_dict.json").write_text(
+        json.dumps([{"name": "x"}], ensure_ascii=False), encoding="utf-8"
+    )
+    d = tmp_path / "vrm-models" / "x"
+    d.mkdir(parents=True)
+    (d / "x.vrm").write_bytes(_vrm1())
+
+    sink = logger.add(caplog.handler, format="{message}", level="WARNING")
+    try:
+        result = scan_and_register_vrm()
+    finally:
+        logger.remove(sink)
+
+    assert result["newly_registered"] == []
+    assert [s["name"] for s in result["skins"]] == ["x"]
+    entries = json.loads((tmp_path / "model_dict.json").read_text(encoding="utf-8"))
+    assert entries == [{"name": "x"}]
+    assert "x" in caplog.text and "shadow" in caplog.text.lower()

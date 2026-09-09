@@ -58,6 +58,12 @@ export function VRMAvatar(): JSX.Element {
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
     renderer.setClearColor(0x000000, 0);
     container.appendChild(renderer.domElement);
+    // setSize(w, h, false) 的 false 是 updateStyle=false：只改 drawing buffer，不寫 CSS 尺寸。
+    // 那 canvas 的 CSS 寬高就只剩瀏覽器預設的 attribute 值（= drawing buffer 的像素數），
+    // 在 Retina（pixelRatio 2）上等於容器的兩倍大。CSS 尺寸交給這三行固定住。
+    renderer.domElement.style.width = "100%";
+    renderer.domElement.style.height = "100%";
+    renderer.domElement.style.display = "block";
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
