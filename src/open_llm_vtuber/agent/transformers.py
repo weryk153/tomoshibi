@@ -3,7 +3,7 @@ from functools import wraps
 from .output_types import Actions, SentenceOutput, DisplayText
 from ..utils.tts_preprocessor import tts_filter as filter_text
 from ..utils.tts_preprocessor import TTSFilterState
-from ..live2d_model import Live2dModel
+from ..avatar_model import AvatarModel
 from ..config_manager import TTSPreprocessorConfig
 from ..utils.sentence_divider import SentenceDivider
 from ..utils.sentence_divider import SentenceWithTags, TagState
@@ -58,7 +58,7 @@ def sentence_divider(
     return decorator
 
 
-def actions_extractor(live2d_model: Live2dModel):
+def actions_extractor(live2d_model: AvatarModel):
     """
     Decorator that extracts actions from sentences, passing through dicts.
     """

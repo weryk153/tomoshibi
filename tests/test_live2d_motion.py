@@ -1,4 +1,4 @@
-"""Motion keyword scanning for Live2dModel.
+"""Motion keyword scanning for AvatarModel.
 
 Mirrors extract_emotion()/emo_map/emo_str, but for timeline motions instead
 of expression overlays. mao_pro's six performable motions all live in the
@@ -18,7 +18,7 @@ import json
 
 import pytest
 
-from src.open_llm_vtuber.live2d_model import Live2dModel
+from src.open_llm_vtuber.avatar_model import AvatarModel
 
 
 def _write_model_dict(tmp_path, models):
@@ -42,7 +42,7 @@ def model(tmp_path):
             }
         ],
     )
-    return Live2dModel("mao_pro", model_dict_path=model_dict_path)
+    return AvatarModel("mao_pro", model_dict_path=model_dict_path)
 
 
 @pytest.fixture()
@@ -57,7 +57,7 @@ def model_without_motion_map(tmp_path):
             }
         ],
     )
-    return Live2dModel("haru", model_dict_path=model_dict_path)
+    return AvatarModel("haru", model_dict_path=model_dict_path)
 
 
 def test_motion_map_keys_lowercased(tmp_path):
@@ -73,7 +73,7 @@ def test_motion_map_keys_lowercased(tmp_path):
             }
         ],
     )
-    m = Live2dModel("mao_pro", model_dict_path=model_dict_path)
+    m = AvatarModel("mao_pro", model_dict_path=model_dict_path)
     assert "special_01" in m.motion_map
     assert "SPECIAL_01" not in m.motion_map
 
@@ -144,7 +144,7 @@ def labelled_model(tmp_path):
             }
         ],
     )
-    return Live2dModel("labelled", model_dict_path=model_dict_path)
+    return AvatarModel("labelled", model_dict_path=model_dict_path)
 
 
 def test_motion_str_appends_label_when_present(labelled_model):
@@ -183,7 +183,7 @@ def test_set_model_normalizes_legacy_tap_motions(tmp_path):
             }
         ],
     )
-    model = Live2dModel("legacy", model_dict_path=model_dict_path)
+    model = AvatarModel("legacy", model_dict_path=model_dict_path)
     assert model.model_info["tapMotions"] == {
         "HitArea": [{"group": "TapBody", "index": None, "weight": 2}]
     }
@@ -202,7 +202,7 @@ def test_set_model_leaves_already_normalized_tap_motions_alone(tmp_path):
             }
         ],
     )
-    model = Live2dModel("modern", model_dict_path=model_dict_path)
+    model = AvatarModel("modern", model_dict_path=model_dict_path)
     assert model.model_info["tapMotions"] == {
         "Body": [{"group": "", "index": 3, "weight": 1}]
     }
@@ -212,5 +212,5 @@ def test_set_model_without_tap_motions_yields_empty_dict(tmp_path):
     model_dict_path = _write_model_dict(
         tmp_path, [{"name": "bare", "emotionMap": {"neutral": 0}}]
     )
-    model = Live2dModel("bare", model_dict_path=model_dict_path)
+    model = AvatarModel("bare", model_dict_path=model_dict_path)
     assert model.model_info["tapMotions"] == {}

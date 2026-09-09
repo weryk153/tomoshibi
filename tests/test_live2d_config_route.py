@@ -16,7 +16,7 @@ from src.open_llm_vtuber.live2d_config_route import (
     build_model_config,
     write_model_config,
 )
-from src.open_llm_vtuber.live2d_model import Live2dModel
+from src.open_llm_vtuber.avatar_model import AvatarModel
 
 
 def _write_model3(tmp_path, folder, filename, *, motions=None, hit_areas=None):
@@ -465,7 +465,7 @@ def test_accepts_empty_maps(tmp_path, monkeypatch):
 
 
 def test_write_refreshes_the_shared_live2d_model_in_place(tmp_path, monkeypatch):
-    # websocket_handler.py hands every fresh session the SAME Live2dModel
+    # websocket_handler.py hands every fresh session the SAME AvatarModel
     # object reference as default_context_cache.live2d_model. Calling
     # set_model() on it in place must make motion_map/motion_str reflect the
     # just-written config, with no restart and no character switch.
@@ -477,7 +477,7 @@ def test_write_refreshes_the_shared_live2d_model_in_place(tmp_path, monkeypatch)
     )
     monkeypatch.chdir(tmp_path)
 
-    shared_model = Live2dModel("haru")  # reads tmp_path/model_dict.json (cwd-relative)
+    shared_model = AvatarModel("haru")  # reads tmp_path/model_dict.json (cwd-relative)
     assert shared_model.motion_map == {}
     fake_cache = SimpleNamespace(live2d_model=shared_model)
 
@@ -513,8 +513,8 @@ def test_write_does_not_touch_sessions_using_a_different_model(tmp_path, monkeyp
     )
     monkeypatch.chdir(tmp_path)
 
-    haru_model = Live2dModel("haru")
-    other_session_model = Live2dModel("hiyori")
+    haru_model = AvatarModel("haru")
+    other_session_model = AvatarModel("hiyori")
     fake_cache = SimpleNamespace(live2d_model=haru_model)
     fake_client_contexts = {
         "session-1": SimpleNamespace(live2d_model=other_session_model),
@@ -537,7 +537,7 @@ def test_write_does_not_touch_sessions_using_a_different_model(tmp_path, monkeyp
 
 
 def test_write_refreshes_a_sessions_own_live2d_model_instance(tmp_path, monkeypatch):
-    # A session that did a character switch holds its OWN Live2dModel
+    # A session that did a character switch holds its OWN AvatarModel
     # instance (not shared with default_context_cache) — it must still be
     # refreshed when it's showing the model that was just edited.
     _write_model3(
@@ -548,8 +548,8 @@ def test_write_refreshes_a_sessions_own_live2d_model_instance(tmp_path, monkeypa
     )
     monkeypatch.chdir(tmp_path)
 
-    default_model = Live2dModel("haru")
-    own_model = Live2dModel("haru")  # a distinct instance, same model name
+    default_model = AvatarModel("haru")
+    own_model = AvatarModel("haru")  # a distinct instance, same model name
     assert default_model is not own_model
 
     result = write_model_config(

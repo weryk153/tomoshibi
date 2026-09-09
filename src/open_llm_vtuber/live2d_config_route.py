@@ -44,7 +44,7 @@ from loguru import logger
 
 # REUSE the localhost+proxy guard — do not diverge (see character_route.py).
 from .api_guard import is_trusted_request as _is_local_request, forbidden as _forbidden
-from .live2d_model import normalize_tap_motions as _normalize_tap_motions
+from .avatar_model import normalize_tap_motions as _normalize_tap_motions
 from .live2d_discovery import is_discoverable_live2d_dir
 
 # REUSE the generic model3.json resolver + model_dict reader/writer — already
@@ -378,7 +378,7 @@ def _validate_tap_motions(
 
 def _refresh_live2d_caches(name: str, default_context_cache, client_contexts) -> None:
     """Reload ``motion_map``/``motion_str``（以及 ``emo_map``/``emo_str``）in
-    place for every live ``Live2dModel`` currently showing ``name``.
+    place for every live ``AvatarModel`` currently showing ``name``.
 
     ``set_model()`` 重建的是整份 ``model_info``，動作與表情兩套對應都是在同一
     個地方建起來的，所以這裡不必分開處理。
@@ -390,7 +390,7 @@ def _refresh_live2d_caches(name: str, default_context_cache, client_contexts) ->
     place refreshes every session still sharing that reference immediately,
     no restart needed. A session that has done a character switch
     (``handle_config_switch`` -> ``load_from_config`` -> ``init_live2d``)
-    builds its OWN ``Live2dModel`` instance instead, so ``client_contexts``
+    builds its OWN ``AvatarModel`` instance instead, so ``client_contexts``
     (``WebSocketHandler.client_contexts: Dict[str, ServiceContext]``) is
     walked separately and each session's own instance refreshed too — but
     only when it is currently showing the model that was just edited; a
@@ -443,7 +443,7 @@ def write_model_config(
     above is never the one written back — a fresh read is fetched immediately
     before mutating and writing.
 
-    On success, refreshes every live ``Live2dModel`` currently showing
+    On success, refreshes every live ``AvatarModel`` currently showing
     ``name`` in place (see ``_refresh_live2d_caches``) so sessions pick up
     the edit with no restart and no character switch required.
 
@@ -617,7 +617,7 @@ def init_live2d_config_route(
     - GET /api/live2d/model-config/{name} -> enumerate motions/hit areas and
       merge in the model's existing motionMap/tapMotions.
     - PUT /api/live2d/model-config/{name} -> validate and persist a new
-      motionMap/tapMotions for that model, then refresh any live Live2dModel
+      motionMap/tapMotions for that model, then refresh any live AvatarModel
       currently showing it (see write_model_config/_refresh_live2d_caches).
 
     Args:
@@ -627,7 +627,7 @@ def init_live2d_config_route(
             the endpoint still works without it (refresh becomes a no-op),
             which keeps this router constructible with no arguments.
         client_contexts: ``WebSocketHandler.client_contexts`` (``Dict[str,
-            ServiceContext]``) — sessions that hold their own Live2dModel
+            ServiceContext]``) — sessions that hold their own AvatarModel
             instance after a character switch. Same optional/no-op fallback.
     """
     router = APIRouter()

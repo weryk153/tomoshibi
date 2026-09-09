@@ -5,7 +5,7 @@ from loguru import logger
 from fastapi import WebSocket
 
 from prompts import prompt_loader
-from .live2d_model import Live2dModel
+from .avatar_model import AvatarModel
 from .asr.asr_interface import ASRInterface
 from .tts.tts_interface import TTSInterface
 from .vad.vad_interface import VADInterface
@@ -47,7 +47,7 @@ class ServiceContext:
         self.system_config: SystemConfig = None
         self.character_config: CharacterConfig = None
 
-        self.live2d_model: Live2dModel = None
+        self.live2d_model: AvatarModel = None
         self.asr_engine: ASRInterface = None
         self.tts_engine: TTSInterface = None
         self.agent_engine: AgentInterface = None
@@ -218,7 +218,7 @@ class ServiceContext:
         config: Config,
         system_config: SystemConfig,
         character_config: CharacterConfig,
-        live2d_model: Live2dModel,
+        live2d_model: AvatarModel,
         asr_engine: ASRInterface,
         tts_engine: TTSInterface,
         vad_engine: VADInterface,
@@ -438,7 +438,7 @@ class ServiceContext:
     def init_live2d(self, live2d_model_name: str) -> None:
         logger.info(f"Initializing Live2D: {live2d_model_name}")
         try:
-            self.live2d_model = Live2dModel(live2d_model_name)
+            self.live2d_model = AvatarModel(live2d_model_name)
             self.character_config.live2d_model_name = live2d_model_name
         except Exception as e:
             logger.critical(f"Error initializing Live2D: {e}")

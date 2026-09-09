@@ -7,7 +7,7 @@ from typing import List, Optional, Dict
 from loguru import logger
 
 from ..agent.output_types import DisplayText, Actions
-from ..live2d_model import Live2dModel
+from ..avatar_model import AvatarModel
 from ..tts.tts_interface import TTSInterface
 from ..utils.stream_audio import prepare_audio_payload
 from .types import WebSocketSend
@@ -47,7 +47,7 @@ class TTSTaskManager:
         tts_text: str,
         display_text: DisplayText,
         actions: Optional[Actions],
-        live2d_model: Live2dModel,
+        live2d_model: AvatarModel,
         tts_engine: TTSInterface,
         websocket_send: WebSocketSend,
         subtitle_text: Optional[str] = None,
@@ -156,7 +156,7 @@ class TTSTaskManager:
         tts_text: str,
         display_text: DisplayText,
         actions: Optional[Actions],
-        live2d_model: Live2dModel,
+        live2d_model: AvatarModel,
         tts_engine: TTSInterface,
         sequence_number: int,
         subtitle_text: Optional[str] = None,

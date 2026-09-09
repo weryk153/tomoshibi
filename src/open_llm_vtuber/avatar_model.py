@@ -46,9 +46,9 @@ def normalize_tap_motions(raw) -> dict:
     return result
 
 
-class Live2dModel:
+class AvatarModel:
     """
-    A class to represent a Live2D model. This class only prepares and stores the information of the Live2D model. It does not send anything to the frontend or server or anything.
+    A class to represent the character's avatar model (Live2D or VRM). This class only prepares and stores the information of the avatar model. It does not send anything to the frontend or server or anything.
 
     Attributes:
         model_dict_path (str): The path to the model dictionary file.
@@ -127,6 +127,11 @@ class Live2dModel:
                 for key, value in self.motion_map.items()
             ]
         )
+
+    @property
+    def type(self) -> str:
+        """``live2d`` 或 ``vrm``。舊的 model_dict.json 項目沒有這欄，缺省是 live2d。"""
+        return self.model_info.get("type", "live2d")
 
     def _load_file_content(self, file_path: str) -> str:
         """Load the content of a file with robust encoding handling."""
@@ -303,9 +308,13 @@ class Live2dModel:
                     # 只回傳前端播放需要的兩個欄位。`label` 是給 prompt 與設定頁
                     # 看的，把它一起送到 WebSocket 上只會讓契約多一個沒人用的欄位。
                     value = self.motion_map[key]
-                    motion_list.append(
-                        {"group": value["group"], "index": value["index"]}
-                    )
+                    if "clip" in value:
+                        # VRM：一個 .vrma 檔名就是一個動作，沒有 group/index。
+                        motion_list.append({"clip": value["clip"]})
+                    else:
+                        motion_list.append(
+                            {"group": value["group"], "index": value["index"]}
+                        )
                     i += len(motion_tag) - 1
                     break
             i += 1
