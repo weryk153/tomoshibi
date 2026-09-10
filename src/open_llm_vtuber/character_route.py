@@ -33,6 +33,7 @@ from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse
 from loguru import logger
 
+from .default_personas import swap_for_model_change
 from .api_guard import (
     forbidden as _forbidden,
     is_trusted_request as _is_local_request,
@@ -364,7 +365,7 @@ def _build_character_config(
     if voice:
         tts = cc.setdefault("tts_config", {})
         tts["edge_tts"] = {"voice": voice}
-    # 語言是角色自己的事：紅莉栖是日本人、貓娘不是。留空就不寫這個鍵，角色
+    # 語言是角色自己的事：日本角色講日文，貓娘不一定。留空就不寫這個鍵，角色
     # 沿用全域預設（system_config.player_language）。
     if reply_language:
         cc["reply_language"] = reply_language
@@ -982,6 +983,17 @@ def init_character_route() -> APIRouter:
             registered = {m.get("name") for m in _load_model_dict()}
             if skin not in registered:
                 return _bad_request(f"Skin '{skin}' is not a registered Live2D model.")
+            # 換模型時，人設若還是某一份預設（沒被使用者改過），跟著換成新模型的預設人設。
+            persona, swapped_name, persona_swapped = swap_for_model_change(
+                existing_cc.get("live2d_model_name"),
+                skin,
+                str(persona),
+                fields["character_name"]
+                if fields["character_name"] is not None
+                else existing_cc.get("character_name"),
+            )
+            if persona_swapped:
+                fields["character_name"] = swapped_name
 
             try:
                 await asyncio.to_thread(
@@ -1069,6 +1081,17 @@ def init_character_route() -> APIRouter:
         registered = {m.get("name") for m in _load_model_dict()}
         if skin not in registered:
             return _bad_request(f"Skin '{skin}' is not a registered Live2D model.")
+        # 換模型時，人設若還是某一份預設（沒被使用者改過），跟著換成新模型的預設人設。
+        persona, swapped_name, persona_swapped = swap_for_model_change(
+            existing_cc.get("live2d_model_name"),
+            skin,
+            str(persona),
+            fields["character_name"]
+            if fields["character_name"] is not None
+            else existing_cc.get("character_name"),
+        )
+        if persona_swapped:
+            fields["character_name"] = swapped_name
 
         cc = _build_character_config(
             conf_name=conf_name,
