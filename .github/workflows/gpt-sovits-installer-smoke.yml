@@ -1,0 +1,52 @@
+# 精靈的「一鍵安裝 GPT-SoVITS」在乾淨機器上實際跑一次：下載、安裝、啟動、合成一句。
+#
+# 單元測試把網路假造掉了，驗不到真正會壞的地方：釘住的檔案還在不在、依賴在沒有
+# 快取的機器上裝不裝得起來、整合包解壓後能不能合成出聲音。開發機上早就有快取和
+# 模型，也沒辦法拿來試。
+#
+# 會下載好幾 GB（Windows 整合包 8.2GB），所以只在手動觸發、或動到安裝器時跑。
+
+name: GPT-SoVITS one-click install
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/open_llm_vtuber/gpt_sovits_installer.py'
+      - 'src/open_llm_vtuber/gpt_sovits_service.py'
+      - 'src/open_llm_vtuber/gpt_sovits_constraints_macos.txt'
+      - '.github/workflows/gpt-sovits-installer-smoke.yml'
+
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --frozen --no-dev
+
+      - name: Install GPT-SoVITS the way the wizard does
+        env:
+          PYTHONUTF8: '1'
+          TOMOSHIBI_GPT_SOVITS_DIR: ${{ runner.temp }}/gpt-sovits
+        run: uv run --frozen python -m src.open_llm_vtuber.gpt_sovits_installer
+
+      - name: Show GPT-SoVITS log and disk usage
+        if: always()
+        shell: bash
+        env:
+          ROOT: ${{ runner.temp }}/gpt-sovits
+        run: |
+          ls -la "$ROOT" || true
+          [ -f "$ROOT/api.log" ] && tail -80 "$ROOT/api.log"
+          du -sh "$ROOT" "$ROOT"/* 2>/dev/null || true
+          df -h . || true

@@ -310,7 +310,7 @@ character_config:
 
   # =================== 文本转语音 ===================
   tts_config:
-    tts_model: 'edge_tts' # 預設免費雲端、零硬體。要本地高品質聲音改 'gpt_sovits_tts'（需 GPU/Apple Silicon，見 README）
+    tts_model: 'edge_tts' # 預設免費雲端、零硬體。本機語音 'gpt_sovits_tts' 可在設定精靈或語音合成分頁一鍵安裝
     # 文本转语音模型选项：
     #   'azure_tts', 'pyttsx3_tts', 'edge_tts', 'bark_tts',
     #   'cosyvoice_tts', 'melo_tts', 'coqui_tts',
@@ -385,7 +385,7 @@ character_config:
     gpt_sovits_tts:
       # 将参考音频放到 GPT-Sovits 的根路径，或在此处设置路径
       api_url: 'http://localhost:9880/tts' # 你的 GPT-SoVITS 端點（本地或同網路的 GPU 機）
-      text_lang: 'all_ja' # 文本語言（翻譯後送進來的是日文）
+      text_lang: 'all_ja' # 要唸的文字是哪種語言；回覆是別的語言時會先翻譯成這個
       ref_audio_path: '' # 你的參考音檔路徑（GPT-SoVITS 用，決定音色）
       prompt_lang: 'ja' # str.(必需) 参考音频提示文本的语言
       prompt_text: '' # str.(必需) 参考音频的转录文本（填入你自己參考音檔實際說的那句話；僅在啟用 gpt_sovits 時需要）

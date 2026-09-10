@@ -6,6 +6,7 @@ the WebSocket connections, serves static files, and manages the web tool.
 It uses FastAPI for the server and Starlette for static file serving.
 """
 
+import asyncio
 import os
 import shutil
 
@@ -25,6 +26,8 @@ from .network_route import init_network_route
 from .voice_route import init_voice_route
 from .memory_route import init_memory_route
 from .perf_route import init_perf_route
+from .gpt_sovits_route import init_gpt_sovits_route
+from . import gpt_sovits_service
 from .topics_route import (
     init_topics_route,
     start_news_refresh_task,
@@ -140,6 +143,7 @@ class WebSocketServer:
         )  # 長期記憶
         self.app.include_router(init_perf_route())  # 引擎與硬體
         self.app.include_router(init_topics_route())  # 主動話題
+        self.app.include_router(init_gpt_sovits_route())  # 一鍵安裝本機語音
 
         # Live2D 的動作與點擊區設定。多帶兩個參數是為了「存檔後立刻生效」：
         # PUT 成功時可以就地更新每一個正在顯示這個模型的連線，不必重啟或切角色。
@@ -169,6 +173,17 @@ class WebSocketServer:
                 await stop_news_refresh_task()
             except Exception:
                 pass
+
+        # 精靈裝好的 GPT-SoVITS 跟著伺服器開關。放到背景：載入模型要幾十秒，不能擋住開機。
+        @self.app.on_event("startup")
+        async def _start_gpt_sovits():  # noqa: D401
+            self._gpt_sovits_autostart = asyncio.create_task(
+                gpt_sovits_service.autostart()
+            )
+
+        @self.app.on_event("shutdown")
+        async def _stop_gpt_sovits():  # noqa: D401
+            await asyncio.to_thread(gpt_sovits_service.stop)
 
         # Initialize and include proxy routes if proxy is enabled
         system_config = config.system_config
