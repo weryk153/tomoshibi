@@ -86,6 +86,17 @@ def detect_language(text: str) -> str:
         return None
 
 
+def has_unclosed_bracket(text: str) -> bool:
+    """左方括號比右方括號多，代表切在一個還沒收尾的控制標籤中間。
+
+    控制標籤帶強度之後長成 ``[joy:0.6]``，裡面那個小數點會被斷句器當成句號，
+    於是一句話被切成 ``[joy:0.`` 和 ``6] 哈哈``。兩半都不成對，清理標籤的
+    正規式（``\[[^\]]*\]``）比對不到，關鍵字就原封不動被唸出來、印在字幕上，
+    而且 actions_extractor 也抽不到，表情整個不會觸發。
+    """
+    return text.count("[") > text.count("]")
+
+
 def is_complete_sentence(text: str) -> bool:
     """
     Check if text ends with sentence-ending punctuation and not abbreviation.
@@ -101,6 +112,10 @@ def is_complete_sentence(text: str) -> bool:
         return False
 
     if any(text.endswith(abbrev) for abbrev in ABBREVIATIONS):
+        return False
+
+    # 標籤還沒收尾就不算完整句：再等下一個 chunk 把 `]` 帶進來。
+    if has_unclosed_bracket(text):
         return False
 
     return any(text.endswith(punct) for punct in END_PUNCTUATIONS)
@@ -204,6 +219,18 @@ def segment_text_by_regex(text: str) -> Tuple[List[str], str]:
             remaining_text = remaining_text[end_pos:].lstrip()
             continue
 
+        # 切點落在還沒收尾的標籤裡（例如 `[joy:0.` 的那個小數點）：不要在這裡
+        # 斷，往後找下一個標點。
+        if has_unclosed_bracket(potential_sentence):
+            next_match = re.search(pattern, remaining_text[end_pos:])
+            if not next_match:
+                break
+            end_pos += next_match.end(1)
+            potential_sentence = remaining_text[:end_pos].strip()
+            if has_unclosed_bracket(potential_sentence):
+                # 標籤一直沒收尾——可能是串流還沒送完，整段留著當 remaining。
+                break
+
         complete_sentences.append(potential_sentence)
         remaining_text = remaining_text[end_pos:].lstrip()
 
@@ -235,6 +262,16 @@ def segment_text_by_pysbd(text: str) -> Tuple[List[str], str]:
 
             if not sentences:
                 return [], text
+
+            # pysbd 一樣會在 `[joy:0.6]` 的小數點切開，所以先把被切散的標籤接回去
+            # 再往下走。
+            merged: list = []
+            for sent in sentences:
+                if merged and has_unclosed_bracket(merged[-1]):
+                    merged[-1] += sent
+                else:
+                    merged.append(sent)
+            sentences = merged
 
             # Process all but the last sentence
             complete_sentences = []
