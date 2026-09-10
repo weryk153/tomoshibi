@@ -1,6 +1,6 @@
 {
   "name": "tomoshibi",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "packageManager": "pnpm@10.16.1",
   "description": "Tomoshibi — 桌面 AI 陪伴，衍生自 Open-LLM-VTuber",
   "main": "./out/main/index.js",
