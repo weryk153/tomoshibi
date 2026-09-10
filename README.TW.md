@@ -1,6 +1,6 @@
 # Tomoshibi
 
-> 一個免費、開源、對新手友善的**桌面 AI 夥伴**，帶 Live2D 或 VRM（3D）角色 —— 長期記憶、主動聊天、自然語音，還有睡眠模式。自備 LLM，其餘開箱即用。
+> 一個免費、開源、對新手友善的**桌面 AI 夥伴**，帶 Live2D 或 VRM（3D）角色 —— AI 自己驅動表情與動作、可設定表達語言，還有長期記憶與主動聊天。自備 LLM，其餘開箱即用。
 
 **語言：** [English](./README.md) | **繁體中文** | [日本語](./README.JP.md) | [한국어](./README.KR.md) | [简体中文](./README.CN.md)
 
@@ -47,7 +47,7 @@ macOS／Windows 安全性警告。
 
 ## 這是什麼？
 
-**Tomoshibi** 把一個角色 —— 手繪的 Live2D 或全 3D 的 VRM —— 變成你真的會去聊天的 AI 桌面陪伴：它記得你、會自己開話題、你說話時它會聽、你說「晚安」它就安靜下來。
+**Tomoshibi** 把一個角色 —— 手繪的 Live2D 或全 3D 的 VRM —— 變成你真的會去聊天的 AI 桌面陪伴：它記得你、會自己開話題、你說話時它會聽，說話時還會自己做表情和動作。
 
 它是把優秀的開源專案 [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) 重新打包成**對小白友善**的版本。我們站在它的肩膀上：上游提供穩定的 Live2D + 語音辨識/合成 + LLM 底層，這個 fork 在旁邊補上 VRM（3D），並把它包成「**下載 → 雙擊 → 開聊**」的體驗，並加上長期記憶、主動話題、自然插話語音、角色管理、首次啟動設定精靈，以及完整的中英雙語介面。
 
@@ -61,10 +61,11 @@ macOS／Windows 安全性警告。
 
 ## 功能亮點
 
+- **AI 驅動表情與動作**：每句話由 LLM 挑表情和動作，還會決定強弱（淺笑或大笑），Live2D 與 VRM 都支援。
+- **可設定表達語言**：每個角色可設定回覆語言（日文、英文⋯）。語音用的語言不同時，會先翻譯再唸。
 - **長期記憶**：它會記得你是誰、你在忙什麼，並隨時間越來越了解你。每個角色有一份「核心記憶」注入人設；每輪結束後由 LLM 決定哪些值得存下來。更新即時生效，不用重啟。記憶上限可調。
 - **主動話題**：沉默一段時間後它會自己開話題。可選擇抓最新的 AI／科技／動漫／遊戲新聞來聊（純標準函式庫，**不需要 API key**）。
 - **自然插話語音對話**：隨時都能開口，不必等麥克風，也能像真人對話一樣中途打斷它。
-- **睡眠／勿擾模式**：說「晚安」它就停止主動發話，下次你跟它說話時恢復。關鍵字可改。
 - **角色管理**：建立／編輯／切換／刪除角色 — 名稱＋人設＋Live2D 或 VRM 模型＋語音＋各自獨立的記憶。
 - **2D 與 3D 角色都支援**：Live2D 與 VRM（以 glTF 為基礎的 3D）並存。VRM 角色有口型、表情、自動眨眼、視線跟隨、`.vrma` 動作片段，以及拖曳與滾輪調整構圖。把資料夾放進 `vrm-models/` 就會自動登記。
 - **首次啟動設定精靈**：貼上 API key（OpenAI／Claude／Gemini）或選本地 Ollama 模型，存檔前會先做一次測試呼叫。
@@ -141,7 +142,7 @@ pnpm --dir frontend-src run build:mac   # Windows 上用 build:win，產物在 f
 | 換一個聲音 | 設定 → 角色 → 編輯 → 參考音（需要 GPT-SoVITS） |
 | 從手機用 | 見下方 Tailscale 教學 |
 | 讓它主動找你聊 | 設定 → 主動發言 |
-| 讓它安靜 | 說「晚安」— 關鍵字可在設定裡改 |
+| 換它說話的語言 | 設定 → 角色 → 編輯 → 回覆語言 |
 
 ---
 
@@ -229,7 +230,6 @@ extra_body:
   - **想要更多角色（選用）**：為了授權安全，Tomoshibi 只內建授權允許再散布的資源：**3 個免費的 Live2D 原創角色**（`mao_pro`、`haru`、`hiyori`），以及**一個 CC0 的 VRM 角色**（`Sendagaya_Shino`，動作片段為 MIT，見 `vrm-models/Sendagaya_Shino/NOTICE.md`）。想要更多 — 包含男管家角色 **Natori（名取）**？你可以自己到官方頁面下載免費的官方 Live2D 範例模型再放進來。請從 **[Live2D 範例模型頁面](https://www.live2d.com/en/learn/sample/)** 依 Live2D 自己的授權下載 — 我們不代為散布。作法見 [`docs/add-live2d-character.md`](docs/add-live2d-character.md)。
 - **效能預設**：輕量／標準／高效能，一鍵搭好引擎、整理頻率與模型常駐。
 - **主動話題與新聞**：可用 `scripts/news_topics.py`（純標準函式庫、不需 key）定時更新話題。
-- **睡眠／勿擾**：說「晚安」停止主動發話，下次對話恢復，關鍵字可改。
 - **翻譯**：可選的跨語言字幕／語音翻譯，預設關閉。
 - **語音**：預設 edge-tts（免費、不需硬體）；要高品質本地／自訂語音可接 GPT-SoVITS（需顯卡或 Apple Silicon）。克隆真人聲音的法律責任由你自負。選 `fun_asr`、`coqui_tts` 或 `silero_vad` 要另外裝 PyTorch：`uv sync --extra torch`。
 
@@ -273,7 +273,7 @@ extra_body:
 沒有上游就沒有這個專案，也請去 **star 並支持 [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber)**。
 
 - **上游：** [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) — 其伺服器端程式碼為 MIT，Copyright (c) 2025 Yi-Ting Chiu。
-- **Tomoshibi 自己新增的部分**（長期記憶、主動開口、睡眠勿擾、群組對話、舞台演出、以及上述全部的應用程式內設定介面、五語言 UI）— MIT。
+- **Tomoshibi 自己新增的部分**（長期記憶、主動開口、群組對話、舞台演出、以及上述全部的應用程式內設定介面、五語言 UI）— MIT。
 - **Tomoshibi 自己的變更**（桌面／網頁前端改以上游 Open-LLM-VTuber-Web 重建、換品牌、五語言介面）— MIT。
 - **內建前端：** `frontend/` 裡的編譯後網頁是 Open-LLM-VTuber-Web 前端，採 **Open-LLM-VTuber License 1.0**（Apache-2.0 + 額外條款）。免費、非商業的使用與再散布是被允許的；商業改名、付費託管／SaaS、或內嵌進付費產品，則需向 Open-LLM-VTuber 團隊另取商業授權。本 fork 免費且非商業，符合該授權允許的範圍。見 [`NOTICE`](./NOTICE)。
 - **Live2D Cubism 與內建範例模型：** 內建的 **mao_pro** / **haru** / **hiyori** 為 Live2D Inc. 範例資料，依 **Live2D 無償提供材料授權**使用（見 [`LICENSE-Live2D.md`](./LICENSE-Live2D.md)），必須保留致謝句：

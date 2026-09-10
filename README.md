@@ -1,6 +1,6 @@
 # Tomoshibi
 
-> A free, open-source, beginner-friendly **desktop AI companion** with a Live2D or VRM (3D) avatar — long-term memory, proactive chat, natural voice, and a sleep mode. Bring your own LLM; everything else works out of the box.
+> A free, open-source, beginner-friendly **desktop AI companion** with a Live2D or VRM (3D) avatar — it acts out its own expressions and gestures, speaks the language you choose, remembers you, and starts conversations on its own. Bring your own LLM; everything else works out of the box.
 
 **Language:** **English** | [繁體中文](./README.TW.md) | [日本語](./README.JP.md) | [한국어](./README.KR.md) | [简体中文](./README.CN.md)
 
@@ -50,7 +50,7 @@ including the macOS / Windows security prompt you'll hit on first launch.
 
 ## What is this?
 
-**Tomoshibi** turns an on-screen character — hand-drawn Live2D or fully 3D VRM — into an AI companion you actually talk to — it remembers you, starts conversations on its own, listens while you speak, and goes quiet when you say goodnight.
+**Tomoshibi** turns an on-screen character — hand-drawn Live2D or fully 3D VRM — into an AI companion you actually talk to — it remembers you, starts conversations on its own, listens while you speak, and acts out what it says with its own expressions and gestures.
 
 It is a **friendly re-packaging** of the excellent [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) project. We stand on its shoulders: upstream provides the rock-solid Live2D + ASR/TTS + LLM plumbing; this fork adds VRM (3D) alongside it, and this fork wraps it into a **download → double-click → chat** experience for non-technical users, and adds a memory system, proactive conversation, natural barge-in voice, character management, an in-app setup wizard, and a fully bilingual (English / 繁體中文) UI.
 
@@ -66,10 +66,11 @@ It is a **friendly re-packaging** of the excellent [Open-LLM-VTuber](https://git
 
 ## Features
 
+- **AI-driven expressions and motions** — the LLM picks an expression and a gesture for each line, with intensity (a faint smile or a big laugh), on both Live2D and VRM avatars.
+- **Choose the language it speaks** — set a reply language per character (Japanese, English, …). If the voice uses a different language, lines are translated before they're spoken.
 - **Long-term memory** — it remembers who you are and what you're working on, and gets to know you over time. A curated per-character "core memory" is injected into the persona; after each turn the LLM decides what's worth saving. Updates take effect immediately (no restart). Tunable memory cap.
 - **Proactive topics** — after a stretch of silence it opens a topic on its own. Optionally pull the latest AI / tech / anime / gaming news to chat about (pure stdlib helper, **no API key needed**).
 - **Natural barge-in voice chat** — talk any time; you don't have to wait for the mic, and you can cut it off mid-sentence like a real conversation.
-- **Sleep / do-not-disturb mode** — say "晚安" (goodnight) and it stops initiating; it resumes the next time you talk to it. The keyword is configurable.
 - **Character management** — create / edit / switch / delete characters: name + persona + Live2D or VRM model + voice + its own separate memory.
 - **2D and 3D avatars** — Live2D and VRM (glTF-based 3D) both work. VRM characters get lip sync, expressions, auto-blink, gaze tracking, `.vrma` motion clips, and drag / scroll-wheel framing. Drop a folder into `vrm-models/` and it registers itself.
 - **First-run setup wizard** — paste an API key (OpenAI / Claude / Gemini) or pick a local Ollama model. The wizard runs a quick test call before saving.
@@ -154,7 +155,7 @@ First launch downloads Python, dependencies (~500 MB) and the speech model (~1 G
 | Give it a different voice | Settings → Characters → Edit → Reference audio (needs GPT-SoVITS) |
 | Use it from your phone | See the Tailscale guide below |
 | Have it start conversations | Settings → Proactive speech |
-| Make it stop initiating | Say "goodnight" — or change the keyword in Settings |
+| Change the language it replies in | Settings → Characters → Edit → Reply language |
 
 ---
 
@@ -258,9 +259,6 @@ For licensing safety, Tomoshibi bundles only assets whose licences allow redistr
 ### Proactive topics & news
 The companion opens topics after idle time. Optionally refresh those topics with current headlines via the bundled news helper (`scripts/news_topics.py`) — pure stdlib, no API key — and schedule it (cron / launchd / Task Scheduler), e.g. every few hours.
 
-### Sleep / quiet mode
-Say "晚安" to stop it initiating; it resumes on your next message. The keyword is configurable.
-
 ### Translation
 Optional cross-language subtitle/voice translation, **off by default** (`tts_preprocessor_config → translator_config` in `conf.yaml`).
 
@@ -307,7 +305,7 @@ The setup wizard connects Claude through a compatibility endpoint that doesn't p
 This project would not exist without the upstream work it builds on. Please **star and support [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber)** too.
 
 - **Upstream:** [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) — its server-side code is MIT, Copyright (c) 2025 Yi-Ting Chiu.
-- **Tomoshibi's own additions** (long-term memory, proactive conversation, sleep mode, group conversation, stage performances, in-app settings for all of it, and the five-language UI) — MIT.
+- **Tomoshibi's own additions** (long-term memory, proactive conversation, group conversation, stage performances, in-app settings for all of it, and the five-language UI) — MIT.
 - **Bundled web frontend** — the compiled web bundle in `frontend/` is the Open-LLM-VTuber-Web frontend, under the **Open-LLM-VTuber License 1.0** (Apache-2.0 + additional conditions). Free, non-commercial use and redistribution is permitted; commercial rebranding, paid hosting/SaaS, or embedding in a paid product needs a separate commercial license from the Open-LLM-VTuber org. This fork is free and non-commercial, which the license permits. See [`NOTICE`](./NOTICE).
 - **Live2D Cubism & bundled sample models** — the bundled **mao_pro** / **haru** / **hiyori** models are Live2D Inc. sample data, used under the **Live2D Free Material License** (see [`LICENSE-Live2D.md`](./LICENSE-Live2D.md)). Required attribution:
   > This content uses sample data owned and copyrighted by Live2D Inc.
