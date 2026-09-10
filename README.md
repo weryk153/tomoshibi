@@ -1,6 +1,6 @@
 # Tomoshibi
 
-> A free, open-source, beginner-friendly **desktop AI companion** with a Live2D or VRM (3D) avatar — it acts out its own expressions and gestures, speaks the language you choose, remembers you, and starts conversations on its own. Bring your own LLM; everything else works out of the box.
+> A free, open-source, beginner-friendly app for **chatting and hanging out with your favorite anime characters**. Give it a Live2D or VRM (3D) model and the character acts out its own expressions and gestures, speaks the language you choose, remembers you, and starts conversations on its own. Bring your own LLM; everything else works out of the box.
 
 **Language:** **English** | [繁體中文](./README.TW.md) | [日本語](./README.JP.md) | [한국어](./README.KR.md) | [简体中文](./README.CN.md)
 
@@ -56,7 +56,7 @@ including the macOS / Windows security prompt you'll hit on first launch.
 
 ## What is this?
 
-**Tomoshibi** turns an on-screen character — hand-drawn Live2D or fully 3D VRM — into an AI companion you actually talk to — it remembers you, starts conversations on its own, listens while you speak, and acts out what it says with its own expressions and gestures.
+**Tomoshibi** lets you actually talk with a character you love — hand-drawn Live2D or fully 3D VRM. It remembers you, starts conversations on its own, listens while you speak, and acts out what it says with its own expressions and gestures.
 
 It is a **friendly re-packaging** of the excellent [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) project. We stand on its shoulders: upstream provides the rock-solid Live2D + ASR/TTS + LLM plumbing; this fork adds VRM (3D) alongside it, and this fork wraps it into a **download → double-click → chat** experience for non-technical users, and adds a memory system, proactive conversation, natural barge-in voice, character management, an in-app setup wizard, and a five-language UI.
 

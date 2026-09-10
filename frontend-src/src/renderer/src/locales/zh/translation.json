@@ -48,7 +48,7 @@
     "ollamaDownloadFailed": "下載失敗：{{error}}",
     "ollamaDownloadFailedGeneric": "下載失敗。請確認 Ollama app 正在執行，再試一次。",
     "title": "歡迎 — 先連線你的 AI",
-    "intro": "你的夥伴需要一個語言模型才能對話。從下面選一個方式。除了你選的供應商，資料不會離開你的電腦。",
+    "intro": "你的角色需要一個語言模型才能對話。從下面選一個方式。除了你選的供應商，資料不會離開你的電腦。",
     "backendUnreachable": "目前還連不到應用程式的後端。你之後也可以在設定裡再設定。",
     "tabApiKey": "貼上 API 金鑰",
     "tabOllama": "使用本機 Ollama",
@@ -635,7 +635,7 @@
     },
     "playerPrompt": {
       "label": "關於你（全域指示）",
-      "help": "套用到所有角色的全域指示——告訴每個夥伴該怎麼稱呼你、怎麼對待你（你的名字、你是誰、你想要的語氣）。它會和每個角色自己的人設一起作用。",
+      "help": "套用到所有角色的全域指示——告訴每個角色該怎麼稱呼你、怎麼對待你（你的名字、你是誰、你想要的語氣）。它會和每個角色自己的人設一起作用。",
       "placeholder": "例如：叫我 Hiro，我是獨立遊戲開發者，語氣輕鬆一點。",
       "save": "儲存",
       "saved": "已儲存你的指示。需重新啟動後端才會生效。",
@@ -826,7 +826,7 @@
     },
     "about": {
       "title": "Tomoshibi",
-      "tagline": "桌面 AI 陪伴 · 衍生自 Open-LLM-VTuber",
+      "tagline": "跟喜歡的動漫角色聊天 · 衍生自 Open-LLM-VTuber",
       "basedOn": "原專案",
       "version": "版本",
       "projectLinks": "專案連結",

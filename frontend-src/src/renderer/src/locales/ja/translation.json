@@ -826,7 +826,7 @@
     },
     "about": {
       "title": "Tomoshibi",
-      "tagline": "デスクトップAIコンパニオン · Open-LLM-VTuberをベースに構築",
+      "tagline": "好きなアニメキャラクターとおしゃべり · Open-LLM-VTuberをベースに構築",
       "basedOn": "上流プロジェクト",
       "version": "バージョン",
       "projectLinks": "プロジェクトリンク",

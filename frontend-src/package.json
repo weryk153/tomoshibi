@@ -2,7 +2,7 @@
   "name": "tomoshibi",
   "version": "1.2.2",
   "packageManager": "pnpm@10.16.1",
-  "description": "Tomoshibi — 桌面 AI 陪伴，衍生自 Open-LLM-VTuber",
+  "description": "Tomoshibi — 跟喜歡的動漫角色聊天、互動，衍生自 Open-LLM-VTuber",
   "main": "./out/main/index.js",
   "author": "",
   "homepage": "",
