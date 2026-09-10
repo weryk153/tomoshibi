@@ -13,7 +13,11 @@ jobs:
       - uses: actions/checkout@v4
 
       - uses: pnpm/action-setup@v4
-        # 版本從 package.json 的 packageManager 欄位讀，不在這裡再寫死一次。
+        with:
+          # 版本從 package.json 的 packageManager 欄位讀，不在這裡再寫死一次。
+          # package.json 在子目錄，要指給它看；預設只找 repo 根目錄，找不到就報
+          # 「No pnpm version is specified」，這個檢查因此從來沒跑起來過。
+          package_json_file: frontend-src/package.json
 
       - uses: actions/setup-node@v4
         with:

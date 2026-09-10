@@ -132,3 +132,62 @@ class _SilentWebSocket:
 
 async def _noop_conversation(*args, **kwargs):
     return ""
+
+
+def test_proactive_prompt_falls_back_when_topics_were_never_saved(monkeypatch):
+    """新裝好的人還沒存過主動話題，prompts/utils/proactive_speak_prompt.txt 不存在。
+
+    這時要用內建的人設指示，不能退成一句 "Please say something."。
+    """
+    import asyncio
+    from types import SimpleNamespace
+
+    from src.open_llm_vtuber import news_topics
+    from src.open_llm_vtuber.conversations import conversation_handler
+
+    captured = {}
+
+    def _capture(*args, **kwargs):
+        captured.update(kwargs)
+        return "prompt"
+
+    def _missing(name):
+        raise FileNotFoundError(name)
+
+    monkeypatch.setattr(conversation_handler.prompt_loader, "load_util", _missing)
+    monkeypatch.setattr(conversation_handler, "build_proactive_prompt", _capture)
+    monkeypatch.setattr(
+        conversation_handler, "process_single_conversation", _noop_conversation
+    )
+
+    context = SimpleNamespace(
+        character_config=SimpleNamespace(
+            conf_uid="character",
+            reply_language="Traditional Chinese (Taiwan)",
+            protected_names={},
+        ),
+        system_config=SimpleNamespace(
+            player_language="",
+            tool_prompts={"proactive_speak_prompt": "proactive_speak_prompt"},
+        ),
+        history_uid="history",
+        agent_engine=SimpleNamespace(),
+    )
+
+    asyncio.run(
+        conversation_handler.handle_conversation_trigger(
+            msg_type="ai-speak-signal",
+            data={"idle_time": 60, "images": None},
+            client_uid="client",
+            context=context,
+            websocket=_SilentWebSocket(),
+            client_contexts={"client": context},
+            client_connections={"client": _SilentWebSocket()},
+            chat_group_manager=SimpleNamespace(get_client_group=lambda _uid: None),
+            received_data_buffers={},
+            current_conversation_tasks={},
+            broadcast_to_group=None,
+        )
+    )
+
+    assert captured["base_prompt"].startswith(news_topics.INSTRUCTION)

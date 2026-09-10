@@ -142,7 +142,9 @@ def test_out_of_order_completion_still_emits_in_sequence_order():
 
     async def _run():
         tts_manager = TTSTaskManager()
-        tts_engine = _FakeTTSEngine(delays={"one": 0.06, "two": 0.01, "three": 0.03})
+        # 同時只合成兩句：three 要等 two 讓出位子才開始，所以 three 約在 0.06 秒完成。
+        # one 必須明顯更晚，不然 CI 機器一慢，下面的前置檢查就會隨機失敗（踩過）。
+        tts_engine = _FakeTTSEngine(delays={"one": 0.3, "two": 0.01, "three": 0.05})
         ws_send = _RecordingWebsocketSend()
 
         for text in ("one", "two", "three"):

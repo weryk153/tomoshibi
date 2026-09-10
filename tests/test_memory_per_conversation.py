@@ -5,6 +5,7 @@
 兩個知道的事。記憶跟著它形成的那段關係走才對。
 """
 
+from pathlib import Path
 import pytest
 
 from src.open_llm_vtuber import memory_core
@@ -13,7 +14,8 @@ from src.open_llm_vtuber import memory_core
 def test_path_includes_the_conversation(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     p = memory_core.core_memory_path("charA", "conv1")
-    assert p.endswith("chat_history/charA/conv1/core_memory.md")
+    # 比對路徑的每一段，不比字串：Windows 的分隔符是反斜線。
+    assert Path(p).parts[-4:] == ("chat_history", "charA", "conv1", "core_memory.md")
 
 
 def test_two_conversations_do_not_share_memory(tmp_path, monkeypatch):

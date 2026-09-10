@@ -14,6 +14,7 @@ from .single_conversation import process_single_conversation
 from .conversation_utils import EMOJI_LIST
 from .types import GroupConversationState
 from prompts import prompt_loader
+from ..news_topics import compose_content as default_proactive_prompt
 from ..conversation_quality import normalize_output_language_variant
 from ..proactive_context import (
     build_proactive_prompt,
@@ -289,7 +290,13 @@ async def handle_conversation_trigger(
             prompt_name = "proactive_speak_prompt"
             prompt_file = context.system_config.tool_prompts.get(prompt_name)
             if prompt_file:
-                user_input = prompt_loader.load_util(prompt_file)
+                try:
+                    user_input = prompt_loader.load_util(prompt_file)
+                except FileNotFoundError:
+                    # 這個檔是主動話題設定存檔時才寫出來的（news_topics.write_prompt），
+                    # 所以不進版控。新裝好、還沒存過話題的人沒有它——以前這裡直接跳到
+                    # 最外層，她只收到一句 "Please say something."，人設護欄全掉。
+                    user_input = default_proactive_prompt()
                 verified_visual_facts = await extract_proactive_visual_facts(
                     context,
                     raw_images,

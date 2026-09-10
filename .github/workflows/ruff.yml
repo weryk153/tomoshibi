@@ -6,3 +6,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/ruff-action@v3
+        with:
+          # 跟 uv.lock 裡的 ruff 同一版。不釘的話會拿最新版，新版的預設規則多了一大堆，
+          # 本機 `uv run ruff check .` 全過、CI 卻報上千個錯，這個檢查就從來沒綠過。
+          version: '0.14.14'
