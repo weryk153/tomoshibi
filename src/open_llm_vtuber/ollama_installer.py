@@ -37,6 +37,7 @@ from pathlib import Path
 from typing import AsyncIterator
 
 import httpx
+import psutil
 
 RELEASES = "https://github.com/ollama/ollama/releases"
 API_VERSION_URL = "http://127.0.0.1:11434/api/version"
@@ -44,6 +45,9 @@ API_VERSION_URL = "http://127.0.0.1:11434/api/version"
 # /Applications 來試。
 APP_DIR_ENV = "TOMOSHIBI_OLLAMA_APP_DIR"
 START_TIMEOUT = 90.0
+# Windows 的安裝程式裝完會自己在背景啟動 Ollama，但第一次啟動可能很慢（例如防毒正在
+# 掃剛裝好的檔案）。這段時間只能等，不能再開一個。
+WINDOWS_START_TIMEOUT = 180.0
 # 替使用者打開 app 之後等這麼久，伺服器還沒起來就改跑內附的 ollama serve。
 APP_START_GRACE = 30.0
 POLL_INTERVAL = 1.0
@@ -131,6 +135,19 @@ def _install_windows(setup: Path) -> None:
         "The Ollama installer failed.",
         timeout=1800,
     )
+
+
+def ollama_app_running() -> bool:
+    """Ollama 的 app 本體有沒有在跑。不算 ollama serve——那是 app 帶起來的伺服器。"""
+    for proc in psutil.process_iter(["name", "exe"]):
+        info = getattr(proc, "info", {}) or {}
+        name = (info.get("name") or "").lower()
+        exe = (info.get("exe") or "").replace("\\", "/")
+        if sys.platform == "win32" and name == "ollama app.exe":
+            return True
+        if sys.platform == "darwin" and exe.endswith("/Contents/MacOS/Ollama"):
+            return True
+    return False
 
 
 def _launch(app: Path | None) -> None:
@@ -272,8 +289,23 @@ async def install(
             await asyncio.to_thread(_install_windows, archive)
 
         yield {"status": "starting"}
-        if not await asyncio.to_thread(api_ready):
-            await asyncio.to_thread(_launch, app)
+        if sys.platform == "win32":
+            # 安裝程式已經在背景啟動 Ollama。這時再開一個，第一個還沒來得及註冊單一
+            # 實例，第二個就擋不住：兩個 app 同時跑、搶同一份設定資料庫，還互相把對方
+            # 的 ollama serve 當成衝突砍掉。使用者在 Windows 上實際遇到——兩個 Ollama
+            # 視窗、其中一個顯示 Failed to fetch settings；CI 的機器啟動得快，碰不到。
+            # 所以只等；等不到而且確定沒有 app 在跑，才替使用者開一次。不跑 ollama
+            # serve 備案：app 啟動時會把外來的 serve 當成衝突砍掉。
+            if not await _wait_until_ready(WINDOWS_START_TIMEOUT):
+                if await asyncio.to_thread(ollama_app_running):
+                    raise InstallError(
+                        "Ollama is still starting. Wait a moment, then check again."
+                    )
+                await asyncio.to_thread(_launch, app)
+        elif not await asyncio.to_thread(api_ready):
+            # 已經有 app 在跑（例如使用者自己剛打開）就不要再開一個。
+            if not await asyncio.to_thread(ollama_app_running):
+                await asyncio.to_thread(_launch, app)
             # 乾淨的 macOS 上第一次打開 Ollama.app，等了 90 秒伺服器都沒起來（CI 實測；
             # 本機早就開過 Ollama，所以測不出來）。app 可能停在第一次啟動的畫面，
             # 所以等一小段還沒好，就直接跑內附的 ollama serve，不靠 app。

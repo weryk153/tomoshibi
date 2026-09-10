@@ -49,6 +49,19 @@ jobs:
         shell: bash
         run: curl -sf http://127.0.0.1:11434/api/version
 
+      # 使用者在 Windows 上實際遇到：安裝程式開的 Ollama 還沒起來，我們又開了一個，
+      # 兩個 app 打架（Failed to fetch settings）。裝完只能有一個 app 本體在跑。
+      - name: Only one Ollama app is running
+        shell: bash
+        run: |
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            n=$(powershell -NoProfile -Command '@(Get-Process -Name "ollama app" -ErrorAction SilentlyContinue).Count')
+          else
+            n=$(pgrep -f "Ollama.app/Contents/MacOS/Ollama" | wc -l | tr -d ' ')
+          fi
+          echo "Ollama app processes: $n"
+          [ "$n" -le 1 ]
+
       # 失敗時看得出卡在哪：app 有沒有在跑、伺服器有沒有被帶起來、log 說了什麼。
       - name: Show Ollama processes and logs
         if: failure()

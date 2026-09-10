@@ -118,6 +118,7 @@ def test_mac_install_downloads_verifies_copies_and_starts(
         up["value"] = True
 
     monkeypatch.setattr(oi, "api_ready", lambda timeout=2.0: up["value"])
+    monkeypatch.setattr(oi, "ollama_app_running", lambda: False)
     monkeypatch.setattr(oi, "_launch", launch)
     monkeypatch.setattr(
         oi,
@@ -234,6 +235,7 @@ def test_falls_back_to_ollama_serve_when_the_app_does_not_start_it(
     up = {"value": False}
     served = []
     monkeypatch.setattr(oi, "api_ready", lambda timeout=2.0: up["value"])
+    monkeypatch.setattr(oi, "ollama_app_running", lambda: False)
     monkeypatch.setattr(oi, "_launch", lambda app: None)  # app 打開了，伺服器卻沒起來
 
     def serve(path):
@@ -255,3 +257,144 @@ def test_serve_binary_points_inside_the_app_bundle(monkeypatch, tmp_path):
     monkeypatch.setattr(oi.sys, "platform", "win32")
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     assert oi._serve_binary(None) == tmp_path / "Programs" / "Ollama" / "ollama.exe"
+
+
+def _windows(monkeypatch):
+    monkeypatch.setattr(oi.sys, "platform", "win32")
+    monkeypatch.setattr(oi.platform, "machine", lambda: "AMD64")
+    monkeypatch.setattr(oi, "_run", lambda cmd, failure, timeout=600: None)
+    monkeypatch.setattr(oi, "POLL_INTERVAL", 0.01)
+    monkeypatch.setattr(
+        oi, "_start_server", lambda binary: pytest.fail("Windows 不該跑 serve 備案")
+    )
+
+
+def test_windows_waits_for_the_app_the_installer_started(monkeypatch):
+    """使用者實際遇到：安裝程式開的 Ollama 還沒起來，我們又開一個 → 兩個 app 打架。"""
+    _windows(monkeypatch)
+    polls = {"n": 0}
+
+    def ready(timeout=2.0):
+        polls["n"] += 1
+        return polls["n"] > 5  # 啟動得慢，問了幾次才就緒
+
+    monkeypatch.setattr(oi, "api_ready", ready)
+    monkeypatch.setattr(oi, "ollama_app_running", lambda: True)
+    monkeypatch.setattr(
+        oi, "_launch", lambda app: pytest.fail("安裝程式已經開了，不該再開一個")
+    )
+
+    events = _collect(_transport("OllamaSetup.exe", b"MZ fake installer"))
+    assert events[-1]["status"] == "success"
+
+
+def test_windows_reports_still_starting_instead_of_opening_another(monkeypatch):
+    _windows(monkeypatch)
+    monkeypatch.setattr(oi, "WINDOWS_START_TIMEOUT", 0.05)
+    monkeypatch.setattr(oi, "api_ready", lambda timeout=2.0: False)
+    monkeypatch.setattr(oi, "ollama_app_running", lambda: True)
+    monkeypatch.setattr(
+        oi, "_launch", lambda app: pytest.fail("app 還在跑，不該再開一個")
+    )
+
+    with pytest.raises(oi.InstallError, match="still starting"):
+        _collect(_transport("OllamaSetup.exe", b"MZ fake installer"))
+
+
+def test_windows_opens_the_app_once_when_nothing_is_running(monkeypatch):
+    _windows(monkeypatch)
+    monkeypatch.setattr(oi, "WINDOWS_START_TIMEOUT", 0.05)
+    up = {"value": False}
+    launched = []
+
+    def launch(app):
+        launched.append(app)
+        up["value"] = True
+
+    monkeypatch.setattr(oi, "api_ready", lambda timeout=2.0: up["value"])
+    monkeypatch.setattr(oi, "ollama_app_running", lambda: False)
+    monkeypatch.setattr(oi, "_launch", launch)
+
+    events = _collect(_transport("OllamaSetup.exe", b"MZ fake installer"))
+    assert events[-1]["status"] == "success"
+    assert len(launched) == 1
+
+
+def test_mac_does_not_open_a_second_app(monkeypatch, tmp_path, fake_mac_zip):
+    monkeypatch.setenv(oi.APP_DIR_ENV, str(tmp_path / "Applications"))
+    monkeypatch.setattr(oi, "POLL_INTERVAL", 0.01)
+    polls = {"n": 0}
+
+    def ready(timeout=2.0):
+        polls["n"] += 1
+        return polls["n"] > 3
+
+    monkeypatch.setattr(oi, "api_ready", ready)
+    monkeypatch.setattr(oi, "ollama_app_running", lambda: True)
+    monkeypatch.setattr(
+        oi, "_launch", lambda app: pytest.fail("已經有 app 在跑，不該再開")
+    )
+
+    events = _collect(_transport("Ollama-darwin.zip", fake_mac_zip))
+    assert events[-1]["status"] == "success"
+
+
+@pytest.mark.parametrize(
+    ("plat", "procs", "expected"),
+    [
+        (
+            "darwin",
+            [
+                {
+                    "name": "Ollama",
+                    "exe": "/Applications/Ollama.app/Contents/MacOS/Ollama",
+                }
+            ],
+            True,
+        ),
+        # ollama serve 是 app 帶起來的伺服器，不是 app 本體
+        (
+            "darwin",
+            [
+                {
+                    "name": "ollama",
+                    "exe": "/Applications/Ollama.app/Contents/Resources/ollama",
+                }
+            ],
+            False,
+        ),
+        (
+            "win32",
+            [
+                {
+                    "name": "ollama app.exe",
+                    "exe": "C:\\Users\\u\\AppData\\Local\\Programs\\Ollama\\ollama app.exe",
+                }
+            ],
+            True,
+        ),
+        (
+            "win32",
+            [
+                {
+                    "name": "ollama.exe",
+                    "exe": "C:\\Users\\u\\AppData\\Local\\Programs\\Ollama\\ollama.exe",
+                }
+            ],
+            False,
+        ),
+        ("win32", [], False),
+    ],
+)
+def test_ollama_app_running_tells_the_app_from_the_server(
+    monkeypatch, plat, procs, expected
+):
+    from types import SimpleNamespace
+
+    monkeypatch.setattr(oi.sys, "platform", plat)
+    monkeypatch.setattr(
+        oi.psutil,
+        "process_iter",
+        lambda attrs=None: [SimpleNamespace(info=p) for p in procs],
+    )
+    assert oi.ollama_app_running() is expected
