@@ -48,3 +48,15 @@ jobs:
       - name: Ollama answers on 11434
         shell: bash
         run: curl -sf http://127.0.0.1:11434/api/version
+
+      # 失敗時看得出卡在哪：app 有沒有在跑、伺服器有沒有被帶起來、log 說了什麼。
+      - name: Show Ollama processes and logs
+        if: failure()
+        shell: bash
+        run: |
+          ps aux | grep -i '[o]llama' || true
+          LAD=$(cygpath -u "${LOCALAPPDATA:-}" 2>/dev/null || echo "${LOCALAPPDATA:-}")
+          for f in "$HOME"/.ollama/logs/*.log "$LAD"/Ollama/*.log; do
+            [ -f "$f" ] && { echo "===== $f"; tail -60 "$f"; }
+          done
+          true

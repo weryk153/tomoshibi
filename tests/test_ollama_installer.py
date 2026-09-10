@@ -109,9 +109,21 @@ def test_mac_install_downloads_verifies_copies_and_starts(
     dest = tmp_path / "Applications"
     monkeypatch.setenv(oi.APP_DIR_ENV, str(dest))
     launched = []
-    ready = iter([False, True])  # 裝完時還沒在跑 → 開啟之後就緒
-    monkeypatch.setattr(oi, "api_ready", lambda timeout=2.0: next(ready))
-    monkeypatch.setattr(oi, "_launch", lambda app: launched.append(app))
+    # 用狀態旗標而不是固定次數的迭代器：等待迴圈會問好幾次，迭代器用完時丟出的
+    # StopIteration 進到 asyncio.to_thread 會讓 future 永遠等不到結果（踩過，測試卡死）。
+    up = {"value": False}  # 裝完時還沒在跑 → 打開 app 之後就緒
+
+    def launch(app):
+        launched.append(app)
+        up["value"] = True
+
+    monkeypatch.setattr(oi, "api_ready", lambda timeout=2.0: up["value"])
+    monkeypatch.setattr(oi, "_launch", launch)
+    monkeypatch.setattr(
+        oi,
+        "_start_server",
+        lambda binary: pytest.fail("app 已經帶起伺服器，不該再跑 serve"),
+    )
 
     events = _collect(_transport("Ollama-darwin.zip", fake_mac_zip))
     statuses = [e["status"] for e in events]
@@ -207,3 +219,39 @@ def test_endpoint_rejects_remote_requests(monkeypatch):
     app.include_router(route.init_llm_config_route())
     monkeypatch.setattr(route, "_is_local_request", lambda request: False)
     assert TestClient(app).post("/api/llm-config/ollama-install").status_code == 403
+
+
+def test_falls_back_to_ollama_serve_when_the_app_does_not_start_it(
+    monkeypatch, tmp_path, fake_mac_zip
+):
+    """乾淨的 macOS 上第一次打開 Ollama.app，伺服器可能一直沒起來（CI 實測）。"""
+    monkeypatch.setenv(oi.APP_DIR_ENV, str(tmp_path / "Applications"))
+    monkeypatch.setattr(oi, "APP_START_GRACE", 0.05)
+    monkeypatch.setattr(oi, "POLL_INTERVAL", 0.01)
+    binary = tmp_path / "ollama"
+    binary.write_text("")
+    monkeypatch.setattr(oi, "_serve_binary", lambda app: binary)
+    up = {"value": False}
+    served = []
+    monkeypatch.setattr(oi, "api_ready", lambda timeout=2.0: up["value"])
+    monkeypatch.setattr(oi, "_launch", lambda app: None)  # app 打開了，伺服器卻沒起來
+
+    def serve(path):
+        served.append(path)
+        up["value"] = True
+
+    monkeypatch.setattr(oi, "_start_server", serve)
+
+    events = _collect(_transport("Ollama-darwin.zip", fake_mac_zip))
+    assert served == [binary]
+    assert {"status": "starting", "fallback": "serve"} in events
+    assert events[-1]["status"] == "success"
+
+
+def test_serve_binary_points_inside_the_app_bundle(monkeypatch, tmp_path):
+    monkeypatch.setattr(oi.sys, "platform", "darwin")
+    app = tmp_path / "Ollama.app"
+    assert oi._serve_binary(app) == app / "Contents" / "Resources" / "ollama"
+    monkeypatch.setattr(oi.sys, "platform", "win32")
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    assert oi._serve_binary(None) == tmp_path / "Programs" / "Ollama" / "ollama.exe"

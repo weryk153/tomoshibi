@@ -44,6 +44,9 @@ API_VERSION_URL = "http://127.0.0.1:11434/api/version"
 # /Applications 來試。
 APP_DIR_ENV = "TOMOSHIBI_OLLAMA_APP_DIR"
 START_TIMEOUT = 90.0
+# 替使用者打開 app 之後等這麼久，伺服器還沒起來就改跑內附的 ollama serve。
+APP_START_GRACE = 30.0
+POLL_INTERVAL = 1.0
 PROGRESS_INTERVAL = 0.3
 _REDIRECTS = (301, 302, 303, 307, 308)
 
@@ -151,12 +154,53 @@ def _launch(app: Path | None) -> None:
         ) from e
 
 
+def _serve_binary(app: Path | None) -> Path | None:
+    """app 內附的 ollama 執行檔。"""
+    if sys.platform == "darwin":
+        return (
+            (app or Path("/Applications/Ollama.app"))
+            / "Contents"
+            / "Resources"
+            / "ollama"
+        )
+    if sys.platform == "win32":
+        return (
+            Path(os.environ.get("LOCALAPPDATA", ""))
+            / "Programs"
+            / "Ollama"
+            / "ollama.exe"
+        )
+    return None
+
+
+def _start_server(binary: Path) -> None:
+    """不靠 app，直接跑 ollama serve。放到自己的 session，Tomoshibi 關掉它也不會跟著停。"""
+    kwargs: dict = {
+        "stdin": subprocess.DEVNULL,
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+        "close_fds": True,
+    }
+    if sys.platform == "win32":
+        kwargs["creationflags"] = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(
+            subprocess, "CREATE_NEW_PROCESS_GROUP", 0
+        )
+    else:
+        kwargs["start_new_session"] = True
+    try:
+        subprocess.Popen([str(binary), "serve"], **kwargs)
+    except OSError as e:
+        raise InstallError(
+            "Ollama was installed but didn't start. Open the Ollama app, then check again."
+        ) from e
+
+
 async def _wait_until_ready(timeout: float) -> bool:
     deadline = time.monotonic() + timeout
     while time.monotonic() < deadline:
         if await asyncio.to_thread(api_ready):
             return True
-        await asyncio.sleep(1)
+        await asyncio.sleep(POLL_INTERVAL)
     return False
 
 
@@ -230,6 +274,17 @@ async def install(
         yield {"status": "starting"}
         if not await asyncio.to_thread(api_ready):
             await asyncio.to_thread(_launch, app)
+            # 乾淨的 macOS 上第一次打開 Ollama.app，等了 90 秒伺服器都沒起來（CI 實測；
+            # 本機早就開過 Ollama，所以測不出來）。app 可能停在第一次啟動的畫面，
+            # 所以等一小段還沒好，就直接跑內附的 ollama serve，不靠 app。
+            if not await _wait_until_ready(APP_START_GRACE):
+                binary = _serve_binary(app)
+                if binary is None or not binary.exists():
+                    raise InstallError(
+                        "Ollama was installed but didn't start. Open the Ollama app, then check again."
+                    )
+                yield {"status": "starting", "fallback": "serve"}
+                await asyncio.to_thread(_start_server, binary)
         if not await _wait_until_ready(START_TIMEOUT):
             raise InstallError(
                 "Ollama was installed but didn't start. Open the Ollama app, then check again."
