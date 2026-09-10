@@ -23,6 +23,13 @@ on:
       - 'frontend-src/electron-builder.yml'
       - 'frontend-src/electron.vite.config.*'
       - 'frontend-src/package.json'
+      - 'frontend-src/scripts/fetch-uv.mjs'
+      - 'frontend-src/scripts/stage-backend.mjs'
+      - 'frontend-src/scripts/smoke-backend.mjs'
+      # 後端一起打包進去了，依賴變動也可能讓某個平台裝不起來。
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'run_server.py'
       - '.github/workflows/desktop-build.yml'
 
 permissions:
@@ -42,7 +49,7 @@ jobs:
             artifact: windows
 
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
+    timeout-minutes: 60
 
     defaults:
       run:
@@ -78,6 +85,12 @@ jobs:
           # 用非零離開碼中斷，而不是像本機那樣只印警告。
           CSC_IDENTITY_AUTO_DISCOVERY: false
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 安裝檔建得出來，不代表使用者打開後後端起得來——依賴裝不裝得起來、
+      # Windows 的編碼問題、payload 漏帶東西，都要實際跑一次才知道。
+      # 用的是剛剛打包進去的同一份 uv 與後端。
+      - name: Smoke-test bundled backend
+        run: node scripts/smoke-backend.mjs
 
       - name: Collect artifacts
         uses: actions/upload-artifact@v4

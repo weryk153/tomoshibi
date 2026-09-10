@@ -18,6 +18,16 @@ asarUnpack:
 win:
   executableName: Tomoshibi
   icon: resources/icon.ico
+  extraResources: &bundledBackend
+    # Python 後端與啟動它用的 uv，由 build:mac／build:win 先跑
+    # scripts/fetch-uv.mjs 與 scripts/stage-backend.mjs 備好。放 extraResources
+    # 而不是 files：files 會進 asar，而 uv 和 Python 讀不了 asar 裡的檔案。
+    # uv 依架構分開放，${os}-${arch} 讓 x64 與 arm64 的 dmg 各拿到自己那份。
+    - from: bundled/backend
+      to: backend
+    - from: bundled/uv/${os}-${arch}
+      to: uv
+      filter: ['uv', 'uv.exe']
 nsis:
   artifactName: ${name}-${version}-setup.${ext}
   shortcutName: ${productName}
@@ -26,6 +36,7 @@ nsis:
   differentialPackage: false
 mac:
   icon: resources/icon.icns
+  extraResources: *bundledBackend
   target:
     - target: dmg
       arch: [x64, arm64]

@@ -57,6 +57,17 @@ pnpm run build:linux   # Build for Linux
 pnpm run build:web     # Build web version
 ```
 
+### The desktop build bundles the Python backend
+
+`build:mac` / `build:win` / `build:unpack` run two extra steps before electron-builder:
+
+- `scripts/fetch-uv.mjs` downloads a pinned `uv` (version + SHA-256 in the script) into `bundled/uv/<os>-<arch>/`
+- `scripts/stage-backend.mjs` copies the backend into `bundled/backend/` — git-tracked files **plus untracked-but-not-ignored ones** (a brand-new module that isn't committed yet must still ship), limited to the runtime directories listed in the script
+
+Both land in `extraResources`, outside the asar. At launch, `src/main/backend-manager.ts` copies the backend into `userData/backend` (the app directory is read-only; the backend writes conf.yaml, history and models relative to its cwd), runs `uv sync --frozen --no-dev`, starts `run_server.py` and waits for `/api/characters` before creating the main window; `src/main/startup-window.ts` shows progress meanwhile. If a Tomoshibi backend already answers on 12393 it is reused. Dev mode (`pnpm run dev`) never spawns anything.
+
+CI runs `scripts/smoke-backend.mjs` after packaging, which repeats those steps headlessly on both OSes. Keep its env and commands in sync with `backend-manager.ts`.
+
 ### Code quality
 ```bash
 pnpm run lint          # Run ESLint

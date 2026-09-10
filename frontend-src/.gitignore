@@ -14,6 +14,8 @@ package-lock.json  # 專案改用 pnpm，見 pnpm-lock.yaml
 
 # Build
 release
+# scripts/fetch-uv.mjs 與 scripts/stage-backend.mjs 的產物，打包時才產生
+bundled
 dist
 dist-ssr
 build

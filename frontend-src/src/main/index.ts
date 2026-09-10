@@ -5,9 +5,12 @@ import { join } from "node:path";
 import { electronApp, optimizer } from "@electron-toolkit/utils";
 import { WindowManager } from "./window-manager";
 import { MenuManager } from "./menu-manager";
+import { BackendManager } from "./backend-manager";
+import { StartupWindow, pickLang } from "./startup-window";
 
 let windowManager: WindowManager;
 let menuManager: MenuManager;
+const backendManager = new BackendManager();
 let isQuitting = false;
 
 interface BackgroundPreferences {
@@ -115,8 +118,19 @@ function setupIPC(): void {
   );
 }
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   electronApp.setAppUserModelId("com.tomoshibi.app");
+
+  // 後端就緒前先顯示啟動畫面，主視窗等後端好了才建。啟動畫面要撐到主視窗出現
+  // 才關：中間要是一個視窗都沒有，Windows 上 window-all-closed 會直接結束 app。
+  const startup = new StartupWindow(pickLang(app.getLocale()));
+  const backend = await backendManager.start((progress) => startup.update(progress));
+  if (isQuitting) return; // 等待期間使用者按了結束
+  if (backend.kind === 'failed' && !(await startup.askAfterFailure(backend))) {
+    startup.close();
+    app.quit();
+    return;
+  }
 
   windowManager = new WindowManager();
   menuManager = new MenuManager((mode) => windowManager.setWindowMode(mode));
@@ -129,6 +143,11 @@ app.whenReady().then(() => {
     },
   });
   menuManager.createTray();
+
+  // 主視窗是等 renderer 回報才顯示的（見 window-manager 的 revealWindow），
+  // 保險起見也設個上限，免得啟動畫面蓋在那裡不走。
+  window.once("show", () => startup.close());
+  setTimeout(() => startup.close(), 15000);
 
   window.on("close", (event) => {
     if (!isQuitting) {
@@ -154,7 +173,7 @@ app.whenReady().then(() => {
   setupIPC();
 
   app.on("activate", () => {
-    const window = windowManager.getWindow();
+    const window = windowManager?.getWindow();
     if (window) {
       window.show();
     }
@@ -181,8 +200,15 @@ app.on("window-all-closed", () => {
   }
 });
 
-app.on("before-quit", () => {
+app.on("before-quit", (event) => {
   isQuitting = true;
-  menuManager.destroy();
+  // 先等後端結束再真的退出，不然 Python 會變成孤兒行程繼續佔著 port。
+  // stop() 完成後再呼叫一次 quit，那時 isRunning() 已是 false，會走到下面。
+  if (backendManager.isRunning()) {
+    event.preventDefault();
+    void backendManager.stop().then(() => app.quit());
+    return;
+  }
+  menuManager?.destroy();
   globalShortcut.unregisterAll();
 });
