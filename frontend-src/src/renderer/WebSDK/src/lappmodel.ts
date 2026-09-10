@@ -169,6 +169,25 @@ export class LAppModel extends CubismUserModel {
           }
         })
         .then((arrayBuffer) => {
+          // [Tomoshibi 本地修改] 抓不到 .moc3 時不要硬著頭皮建模型。
+          //
+          // 上面那個分支在 4xx 時回傳空的 ArrayBuffer，其餘 not-ok 的情況則回傳
+          // undefined，兩者原本都會直接進 loadModel()：CubismMoc.create() 對空資料
+          // 回 null，createModel() 再對 null 取 getId，於是噴
+          // 「Cannot read properties of null (reading 'getId')」。
+          //
+          // 實際的觸發情境是切換角色：Live2D 模型還在載入時就切走，這支
+          // .moc3 的請求變成 404，接著整個 Cubism SDK 被半初始化的模型弄壞，
+          // 連帶讓後面的 LAppDelegate.initialize 在 null 畫布上再炸一次，
+          // 畫面全空，只能重新整理。
+          if (!arrayBuffer || arrayBuffer.byteLength === 0) {
+            CubismLogError(
+              `Aborting model setup: ${this._modelHomeDir}${modelFileName} is empty or unavailable`
+            );
+            this._loadFailed = true;
+            this._updating = false;
+            return;
+          }
           this.loadModel(
             arrayBuffer,
             this._mocConsistency,
@@ -178,6 +197,14 @@ export class LAppModel extends CubismUserModel {
 
           // callback
           loadCubismExpression();
+        })
+        .catch((error) => {
+          // 原本整條鏈沒有 catch：切換角色時請求被中止會變成 unhandled rejection。
+          CubismLogError(
+            `Failed to load model file ${this._modelHomeDir}${modelFileName}: ${error}`
+          );
+          this._loadFailed = true;
+          this._updating = false;
         });
 
       this._state = LoadStep.WaitLoadModel;

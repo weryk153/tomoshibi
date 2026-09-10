@@ -113,6 +113,8 @@ export const useLive2DModel = ({
   // 畫面外——症狀是切回視窗模式之後角色整個不見，而且畫面本身不帶任何線索。
   const prePetPositionRef = useRef<Position | null>(null);
   const prevModelUrlRef = useRef<string | null>(null);
+  // 延遲初始化 Live2D 的計時器；切換角色時要取消，否則會在已拆掉的 canvas 上跑。
+  const initTimerRef = useRef<number | null>(null);
   const isHoveringModelRef = useRef(false);
   const dragMovedRef = useRef(false); // [DRAGDBG]
   const electronApi = (window as any).electron;
@@ -138,6 +140,7 @@ export const useLive2DModel = ({
   }, [isPet]);
 
   useEffect(() => {
+    let cancelled = false;
     const currentUrl = modelInfo?.url;
     const sdkScale = (window as any).LAppDefine?.CurrentKScale;
     const modelScale = modelInfo?.kScale !== undefined ? Number(modelInfo.kScale) : undefined;
@@ -155,7 +158,15 @@ export const useLive2DModel = ({
         if (baseUrl && modelDir) {
           updateModelConfig(baseUrl, modelDir, modelFileName, Number(modelInfo.kScale));
 
-          setTimeout(() => {
+          // 這個 500ms 的延遲原本沒有任何 cleanup：切換角色（尤其切到 VRM）時
+          // 元件已經卸載、canvas 也拆掉了，計時器照樣觸發 initializeLive2D()，
+          // LAppDelegate.initialize 就在 null canvas 上炸
+          // 「Cannot use 'in' operator to search for 'ontouchend' in null」。
+          // 換成可取消的計時器，並在真的要跑之前再確認一次 URL 還是同一個。
+          const scheduledUrl = currentUrl;
+          initTimerRef.current = window.setTimeout(() => {
+            initTimerRef.current = null;
+            if (cancelled || prevModelUrlRef.current !== scheduledUrl) return;
             if ((window as any).LAppLive2DManager?.releaseInstance) {
               (window as any).LAppLive2DManager.releaseInstance();
             }
@@ -166,6 +177,14 @@ export const useLive2DModel = ({
         console.error('Error processing model URL:', error);
       }
     }
+
+    return () => {
+      cancelled = true;
+      if (initTimerRef.current !== null) {
+        window.clearTimeout(initTimerRef.current);
+        initTimerRef.current = null;
+      }
+    };
   }, [modelInfo?.url, modelInfo?.kScale]);
 
   const getModelPosition = useCallback(() => {
