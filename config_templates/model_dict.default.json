@@ -1,128 +1,195 @@
 [
-    {
-        "name": "mao_pro",
-        "description": "",
-        "url": "/live2d-models/mao_pro/runtime/mao_pro.model3.json",
-        "kScale": 0.5,
-        "initialXshift": 0,
-        "initialYshift": 0,
-        "kXOffset": 1150,
-        "idleMotionGroupName": "Idle",
-        "emotionMap": {
-            "neutral": 0,
-            "anger": 2,
-            "disgust": 2,
-            "fear": 1,
-            "joy": 3,
-            "smirk": 3,
-            "sadness": 1,
-            "surprise": 3
-        },
-        "tapMotions": {
-            "HitAreaHead": {
-                "": 1
-            },
-            "HitAreaBody": {
-                "": 1
-            }
-        },
-        "motionMap": {
-            "gesture_1": {
-                "group": "",
-                "index": 0,
-                "label": ""
-            },
-            "gesture_2": {
-                "group": "",
-                "index": 1,
-                "label": ""
-            },
-            "gesture_3": {
-                "group": "",
-                "index": 2,
-                "label": ""
-            },
-            "special_1": {
-                "group": "",
-                "index": 3,
-                "label": ""
-            },
-            "special_2": {
-                "group": "",
-                "index": 4,
-                "label": ""
-            },
-            "special_3": {
-                "group": "",
-                "index": 5,
-                "label": ""
-            }
-        }
+  {
+    "name": "mao_pro",
+    "description": "",
+    "url": "/live2d-models/mao_pro/runtime/mao_pro.model3.json",
+    "kScale": 0.5,
+    "initialXshift": 0,
+    "initialYshift": 0,
+    "kXOffset": 1150,
+    "idleMotionGroupName": "Idle",
+    "emotionMap": {
+      "neutral": 0,
+      "anger": 2,
+      "disgust": 2,
+      "fear": 1,
+      "joy": 3,
+      "smirk": 3,
+      "sadness": 1,
+      "surprise": 3
     },
-    {
-        "name": "haru",
-        "description": "自動偵測並註冊的 Live2D 模型",
-        "url": "/live2d-models/haru/Haru.model3.json",
-        "kScale": 0.5,
-        "initialXshift": 0,
-        "initialYshift": 0,
-        "idleMotionGroupName": "Idle",
-        "emotionMap": {
-            "neutral": 0
-        },
-        "tapMotions": {
-            "HitArea": {
-                "TapBody": 1
-            },
-            "HitArea2": {
-                "TapBody": 1
-            }
-        },
-        "motionMap": {
-            "motion_1": {
-                "group": "TapBody",
-                "index": 0,
-                "label": ""
-            },
-            "motion_2": {
-                "group": "TapBody",
-                "index": 1,
-                "label": ""
-            },
-            "motion_3": {
-                "group": "TapBody",
-                "index": 2,
-                "label": ""
-            },
-            "motion_4": {
-                "group": "TapBody",
-                "index": 3,
-                "label": ""
-            }
-        }
+    "tapMotions": {
+      "HitAreaHead": {
+        "": 1
+      },
+      "HitAreaBody": {
+        "": 1
+      }
     },
-    {
-        "name": "hiyori",
-        "description": "自動偵測並註冊的 Live2D 模型",
-        "url": "/live2d-models/hiyori/Hiyori.model3.json",
-        "kScale": 0.5,
-        "initialXshift": 0,
-        "initialYshift": 0,
-        "idleMotionGroupName": "Idle",
-        "emotionMap": {
-            "neutral": 0
-        },
-        "tapMotions": {
-            "HitArea": {
-                "TapBody": 1
-            }
-        },
-        "motionMap": {
-            "motion_1": {
-                "group": "TapBody",
-                "index": 0,
-                "label": ""
-            }
-        }
+    "motionMap": {
+      "gesture_1": {
+        "group": "",
+        "index": 0,
+        "label": ""
+      },
+      "gesture_2": {
+        "group": "",
+        "index": 1,
+        "label": ""
+      },
+      "gesture_3": {
+        "group": "",
+        "index": 2,
+        "label": ""
+      },
+      "special_1": {
+        "group": "",
+        "index": 3,
+        "label": ""
+      },
+      "special_2": {
+        "group": "",
+        "index": 4,
+        "label": ""
+      },
+      "special_3": {
+        "group": "",
+        "index": 5,
+        "label": ""
+      }
     }
+  },
+  {
+    "name": "haru",
+    "description": "自動偵測並註冊的 Live2D 模型",
+    "url": "/live2d-models/haru/Haru.model3.json",
+    "kScale": 0.5,
+    "initialXshift": 0,
+    "initialYshift": 0,
+    "idleMotionGroupName": "Idle",
+    "emotionMap": {
+      "neutral": 0
+    },
+    "tapMotions": {
+      "HitArea": {
+        "TapBody": 1
+      },
+      "HitArea2": {
+        "TapBody": 1
+      }
+    },
+    "motionMap": {
+      "motion_1": {
+        "group": "TapBody",
+        "index": 0,
+        "label": ""
+      },
+      "motion_2": {
+        "group": "TapBody",
+        "index": 1,
+        "label": ""
+      },
+      "motion_3": {
+        "group": "TapBody",
+        "index": 2,
+        "label": ""
+      },
+      "motion_4": {
+        "group": "TapBody",
+        "index": 3,
+        "label": ""
+      }
+    }
+  },
+  {
+    "name": "hiyori",
+    "description": "自動偵測並註冊的 Live2D 模型",
+    "url": "/live2d-models/hiyori/Hiyori.model3.json",
+    "kScale": 0.5,
+    "initialXshift": 0,
+    "initialYshift": 0,
+    "idleMotionGroupName": "Idle",
+    "emotionMap": {
+      "neutral": 0
+    },
+    "tapMotions": {
+      "HitArea": {
+        "TapBody": 1
+      }
+    },
+    "motionMap": {
+      "motion_1": {
+        "group": "TapBody",
+        "index": 0,
+        "label": ""
+      }
+    }
+  },
+  {
+    "name": "Sendagaya_Shino",
+    "type": "vrm",
+    "description": "隨附的 VRM 範例角色（CC0）。動作與表情對應見 vrm-models/Sendagaya_Shino/NOTICE.md",
+    "url": "/vrm-models/Sendagaya_Shino/Sendagaya_Shino.vrm",
+    "kScale": 1,
+    "initialXshift": 0,
+    "initialYshift": 0,
+    "emotionMap": {
+      "neutral": "neutral",
+      "joy": "happy",
+      "anger": "angry",
+      "sadness": "sad",
+      "relaxed": "relaxed"
+    },
+    "tapMotions": {},
+    "motionMap": {
+      "act_angry": {
+        "clip": "angry",
+        "label": "生氣，情緒激動地表達不滿"
+      },
+      "act_blush": {
+        "clip": "blush",
+        "label": "害羞臉紅，帶點慌張地別開視線"
+      },
+      "act_clapping": {
+        "clip": "clapping",
+        "label": "拍手，為對方喝采或表示贊同"
+      },
+      "act_goodbye": {
+        "clip": "goodbye",
+        "label": "揮手道別"
+      },
+      "act_jump": {
+        "clip": "jump",
+        "label": "原地跳起，興奮或雀躍"
+      },
+      "act_look_around": {
+        "clip": "look_around",
+        "label": "四處張望，好奇或在找東西"
+      },
+      "act_relax": {
+        "clip": "relax",
+        "label": "放鬆張開雙臂，舒展一下"
+      },
+      "act_sad": {
+        "clip": "sad",
+        "label": "難過低落，垂下肩膀"
+      },
+      "act_sleepy": {
+        "clip": "sleepy",
+        "label": "想睡，揉眼睛或打呵欠"
+      },
+      "act_surprised": {
+        "clip": "surprised",
+        "label": "嚇一跳，突然往後縮"
+      },
+      "act_thinking": {
+        "clip": "thinking",
+        "label": "思考中，手托著下巴斟酌"
+      }
+    },
+    "camera": {
+      "distance": 1.6,
+      "height": 1.35
+    }
+  }
 ]

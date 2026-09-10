@@ -30,12 +30,11 @@ conf.yaml.bak*
 
 # 跟 live2d-models 同一條規則：只附帶授權明確、可再散布的範例，其餘都是使用者
 # 本機資產。Sendagaya_Shino 的 VRM 檔案內嵌 licenseName: CC0、allowedUser:
-# Everyone，所以可以隨專案散布；它的 idle.vrma 是 scripts/make_idle_vrma.py
-# 從零生成的，沒有第三方素材。
+# Everyone；動作片段來自 MIT 授權的 tk256ailab/vrm-viewer（授權與聲明附在
+# motions/ 裡）；idle.vrma 是 scripts/make_idle_vrma.py 從零生成的。
+# 三者都可以再散布。
 /vrm-models/*
 !/vrm-models/Sendagaya_Shino
-/vrm-models/Sendagaya_Shino/motions/*
-!/vrm-models/Sendagaya_Shino/motions/idle.vrma
 
 # ignore non-default character configs
 /characters/*
