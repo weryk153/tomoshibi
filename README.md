@@ -1,342 +1,116 @@
 # Tomoshibi
 
-> A free, open-source, beginner-friendly app for **chatting and hanging out with your favorite anime characters**. Give it a Live2D or VRM (3D) model and the character acts out its own expressions and gestures, speaks the language you choose, remembers you, and starts conversations on its own. Bring your own LLM; everything else works out of the box.
+Chat and hang out with your favorite anime characters. Free and open source, for macOS and Windows.
 
-**Language:** **English** | [繁體中文](./README.TW.md) | [日本語](./README.JP.md) | [한국어](./README.KR.md) | [简体中文](./README.CN.md)
+**Language:** English | [繁體中文](./README.TW.md) | [日本語](./README.JP.md) | [한국어](./README.KR.md) | [简体中文](./README.CN.md)
 
-![License](https://img.shields.io/badge/license-MIT%20core%20%2B%20bundled%20terms-blue)
-![Built on Open-LLM-VTuber](https://img.shields.io/badge/built%20on-Open--LLM--VTuber-orange)
-![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)
+![Tomoshibi](assets/tomoshibi-hero.png)
 
----
+## What it does
 
-> ### Status
->
-> **Tomoshibi** builds on **[Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber)**.
-> The desktop and web UI are rebuilt on upstream Open-LLM-VTuber-Web.
->
-> Everything is configured in-app — first-run LLM wizard, character manager,
-> voices, memory, proactive topics, translation, remote access. You should never
-> need to hand-edit `conf.yaml`.
->
-> **Download the app:** [Releases](https://github.com/weryk153/tomoshibi/releases/latest) (macOS / Windows).
-> You can also run from source ([Prefer the terminal?](#prefer-the-terminal-advanced)).
+- The character picks its own expressions and gestures as it talks. Live2D and VRM (3D) models both work.
+- You choose what language the character speaks. If its voice uses a different language, lines are translated before they're read out.
+- It remembers what you've talked about, and starts a conversation if you've been quiet for a while.
+- You can talk to it out loud, and cut in while it's speaking.
+- Add your own model and write a persona, and it's your character.
 
-## Fastest path
+## Install
 
-**Download the app** — easiest.
+Download from [Releases](https://github.com/weryk153/tomoshibi/releases/latest):
 
-1. From [Releases](https://github.com/weryk153/tomoshibi/releases/latest), download `arm64.dmg` (Apple Silicon Mac), `x64.dmg` (Intel Mac) or `setup.exe` (Windows)
-2. Open it. The first launch downloads what it needs, once — a few minutes. Blocked by macOS or
-   Windows? See the security prompts below.
-3. In the wizard click **Install with one click** → pick a 2D or 3D character → start chatting.
-
-**Without installing the app** — about 10 minutes, 8 of them waiting on downloads.
-
-1. On this page: green **`<> Code`** → **Download ZIP** → unzip it
-2. Double-click `start-companion.command` (macOS) or `start-companion.bat` (Windows).
-   **Keep that window open — it *is* the server.**
-3. Your browser opens by itself → in the wizard click **Install with one click** (it sets up
-   Ollama and a free local model) → pick a 2D or 3D character → start chatting.
-
-Don't want to install Ollama? The wizard also takes an OpenAI / Claude / Gemini API key.
-
-**Already have `uv`**
-
-```bash
-git clone https://github.com/weryk153/tomoshibi.git && cd tomoshibi
-uv run run_server.py          # first run does uv sync for you
-# open http://localhost:12393 → wizard → chat
-```
-
-Stuck, or want to know what each choice means? The full walkthrough is below —
-including the macOS / Windows security prompt you'll hit on first launch.
-
----
-
-## What is this?
-
-**Tomoshibi** lets you actually talk with a character you love — hand-drawn Live2D or fully 3D VRM. It remembers you, starts conversations on its own, listens while you speak, and acts out what it says with its own expressions and gestures.
-
-It is a **friendly re-packaging** of the excellent [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) project. We stand on its shoulders: upstream provides the rock-solid Live2D + ASR/TTS + LLM plumbing; this fork adds VRM (3D) alongside it, and this fork wraps it into a **download → double-click → chat** experience for non-technical users, and adds a memory system, proactive conversation, natural barge-in voice, character management, an in-app setup wizard, and a five-language UI.
-
-> Built on Open-LLM-VTuber. See [`NOTICE`](./NOTICE) for full attribution and component licenses, and [`README.upstream.md`](./README.upstream.md) for the original project's docs.
-
----
-
-## Features
-
-- **AI-driven expressions and motions** — the LLM picks an expression and a gesture for each line, with intensity (a faint smile or a big laugh), on both Live2D and VRM avatars.
-- **Choose the language it speaks** — set a reply language per character (Japanese, English, …). If the voice uses a different language, lines are translated before they're spoken.
-- **Long-term memory** — it remembers who you are and what you're working on, and gets to know you over time. A curated per-character "core memory" is injected into the persona; after each turn the LLM decides what's worth saving. Updates take effect immediately (no restart). Tunable memory cap.
-- **Proactive topics** — after a stretch of silence it opens a topic on its own. Optionally pull the latest AI / tech / anime / gaming news to chat about (pure stdlib helper, **no API key needed**).
-- **Natural barge-in voice chat** — talk any time; you don't have to wait for the mic, and you can cut it off mid-sentence like a real conversation.
-- **Character management** — create / edit / switch / delete characters: name + persona + Live2D or VRM model + voice + its own separate memory.
-- **2D and 3D avatars** — Live2D and VRM (glTF-based 3D) both work. VRM characters get lip sync, expressions, auto-blink, gaze tracking, `.vrma` motion clips, and drag / scroll-wheel framing. Drop a folder into `vrm-models/` and it registers itself.
-- **First-run setup wizard** — paste an API key (OpenAI / Claude / Gemini) or pick a local Ollama model. The wizard runs a quick test call before saving.
-- **LLM settings tab** — paste an API key, or pick/type an Ollama model (a local model, or a cloud model served through Ollama).
-- **Performance presets** — Light / Standard / High-performance, bundling ASR/TTS engine choice + memory-consolidation frequency + model keep-alive.
-- **Cross-language translation** — optional subtitle / voice translation (off by default).
-- **Works out of the box** — bundled sample Live2D models + a CC0 VRM character + free cloud TTS (edge-tts) + an auto-downloaded speech-to-text model (~1GB; a one-time, several-minute download on the very first launch). You only have to plug in an LLM.
-- **Five-language UI** — English, 繁體中文, 简体中文, 日本語, 한국어.
-
----
-
-## Screenshots
-
-![Tomoshibi — your AI companion in action](assets/tomoshibi-hero.png)
-
-*Tomoshibi running on the desktop, with the bundled `Sendagaya_Shino` VRM character. Live2D avatars work the same way — pick either in character settings.*
-
----
-
-## Quick start (download → double-click → chat)
-
-The easy path — **no terminal needed.**
-
-> **Before you start: you'll need an AI "brain" (LLM).**
-> Tomoshibi is the **body and face** — the avatar, the voice, the memory. The **brain** that actually thinks and talks is a separate AI that *you* provide. You set it up in the first-run wizard. Options, easiest first:
-> - **(Recommended — free, private, runs on your own machine) A local model via Ollama.** The setup wizard installs the free **[Ollama](https://ollama.com)** app and a small model (`qwen2.5:3b`, ~1.9 GB) with one click — no terminal. Tomoshibi's default already points to it, so it just works — **no account, no API key, no cost, works offline, and your chats never leave your computer.** Fine on a normal 8–16 GB laptop. (Want sharper replies and have the RAM? Pull a bigger model like `qwen2.5:7b` and pick it in Settings.)
-> - **(Optional — better quality if your PC is weak) Ollama Cloud free tier.** Ollama can run a bigger model on *its* servers for free (with limits). Needs a free account — see **Option B** below; you must `ollama pull` the cloud model first.
-> - **(Optional — best free quality) A free hosted API key.** Google AI Studio (Gemini), Cerebras, or Groq give a free key (no credit card). Best quality of the free options, but needs an account + key and your chats go to that provider. See **Option C**.
-> - **(If you already pay for one) A cloud API key** from OpenAI / Claude / Gemini — top quality, a few pennies per chat. See **Option D**.
-
-1. **Get the code.** On the repo page click the green **`<> Code`** button → **Download ZIP**, then unzip it (e.g. to your Desktop). _(Or `git clone` it if you prefer.)_
-2. **Double-click the launcher** inside the unzipped folder:
-   - **macOS:** `start-companion.command`
-   - **Windows:** `start-companion.bat`
-   - The first launch installs everything (`uv`, then dependencies) and can take a few minutes. **Leave that window open — it's the server.**
-3. Your browser opens to **http://localhost:12393**. On first run a **setup wizard** appears: either **paste an API key** (OpenAI / Claude / Gemini) **or** **pick a local Ollama model**. The wizard tests your choice before saving.
-
-   ![Tomoshibi first-run setup wizard](assets/tomoshibi-setup.png)
-
-   *The first-run setup wizard, where you plug in your AI "brain".*
-
-4. **Restart so your new brain kicks in.** Quit by **closing that same launcher/terminal window from step 2** (that stops the server), then **double-click the launcher again** to start it back up with your new LLM. (The app also notes that an LLM change "takes effect after a restart — or after switching the character once.") Then start chatting; click once on the page to enable audio.
-
-> **macOS Gatekeeper (first launch only):** macOS may say it can't verify the app. This is normal for an unsigned open-source app. Click **Done**, then go to **System Settings → Privacy & Security** and click **Open Anyway**. The same goes for the app and for `start-companion.command`. On older macOS, right-click → **Open** also works. (We don't ship a signed/notarized build — this is the free tier.)
-
-> **Windows SmartScreen (first launch only):** double-clicking may show a blue **"Windows protected your PC"** box. This is normal for an unsigned open-source app. Click **More info** → **Run anyway**. After you allow it once, it won't ask again.
-
-Out of the box it uses the bundled **mao** sample Live2D model (the first-run wizard also offers the bundled 3D character instead) and **edge-tts** (free cloud voice, no GPU needed). The first run also downloads a speech-to-text model automatically — it's roughly **~1GB**, so the **very first launch does a one-time download + extract that can take several minutes**. The launcher window may look frozen during this — it isn't, so **leave it open and let it finish**; this only happens once.
-
-### Prefer the terminal? (advanced)
-
-Most people should use the **Download ZIP** path above. If you're comfortable with a terminal, you can clone the repo instead. Requires **Python ≥ 3.10, < 3.13** and [`uv`](https://github.com/astral-sh/uv).
-
-```bash
-git clone https://github.com/weryk153/tomoshibi.git && cd tomoshibi
-uv sync                  # installs dependencies
-uv run run_server.py     # start the server
-# open http://localhost:12393  → setup wizard → chat
-```
-
-The wizard writes your LLM choice into `conf.yaml` for you. You can still edit it by hand (see below).
-
-### Desktop app (build it yourself)
-
-Needs Node 22 and pnpm. The installer includes the backend — no Python or `uv` to install.
-
-```bash
-pnpm --dir frontend-src install
-pnpm --dir frontend-src run build:mac   # on Windows: build:win · output in frontend-src/release/
-```
-
-First launch downloads Python, dependencies (~500 MB) and the speech model (~1 GB), once. If a server is already running on port 12393, the app uses it.
-
----
-
-## Once it's running
-
-| You want to | Go to |
+| Computer | File |
 |---|---|
-| Switch to the 3D character | Settings → Characters → Edit → Appearance |
-| Add your own model | Drop it in `live2d-models/` or `vrm-models/` — see the guides below |
-| Give it a more natural voice | Install GPT-SoVITS with one click — offered at first launch, or in the voice settings |
-| Give it a different voice | Settings → Characters → Edit → Reference audio (needs GPT-SoVITS) |
-| Use it from your phone | See the Tailscale guide below |
-| Have it start conversations | Settings → Proactive speech |
-| Change the language it replies in | Settings → Characters → Edit → Reply language |
+| Mac with Apple Silicon (M1 or later) | `arm64.dmg` |
+| Mac with Intel | `x64.dmg` |
+| Windows 10 / 11 | `setup.exe` |
 
----
+Open it and follow the setup wizard:
 
-## Starting, stopping, and auto-start
+1. Connect an AI. **Install with one click** sets up the free [Ollama](https://ollama.com) app and a local model. No account, and your chats stay on your computer. You can also paste an OpenAI, Claude or Gemini API key.
+2. Pick a 2D or 3D character.
+3. Decide whether to install the local GPT-SoVITS voice. You can also do this later.
 
-**To start it (open the "host"):**
+The first launch downloads Python and a speech recognition model, about 1.5 GB. Later launches skip this.
 
-- **Windows:** double-click **`start-companion.bat`**
-- **macOS:** double-click **`start-companion.command`** — the very first time macOS may block it: click **Done**, then **System Settings → Privacy & Security → Open Anyway**; after that a normal double-click works.
+The app isn't signed, so the system blocks it the first time:
 
-A black command window opens — **that window *is* the server; keep it open while you chat.** Once it's ready it opens the app in your browser by itself (`http://localhost:12393`). Think of it as two parts: the **command window is the engine**, the **browser tab is just the screen**.
+- macOS: click **Done**, then go to **System Settings → Privacy & Security** and click **Open Anyway**.
+- Windows: in the blue box, click **More info → Run anyway**.
 
-> First launch only: it downloads a ~1GB speech model and can take a few minutes — the window may look frozen but isn't. Leave it open and let it finish.
+### Run from source
 
-**To stop it:**
+Needs Python 3.10–3.12 and [uv](https://github.com/astral-sh/uv).
 
-- **Close the black command window** (or press **Ctrl + C** inside it). That fully shuts the companion down.
-- Closing the **browser tab** only hides the screen — the server keeps running. Close the command window to actually stop it.
-- If you installed **Ollama** for a local brain, it keeps running quietly in the background. You can leave it (it's light when idle) or quit it from the system-tray (Windows) / menu-bar (macOS) icon.
+```bash
+git clone https://github.com/weryk153/tomoshibi.git && cd tomoshibi
+uv run run_server.py
+```
 
-**To open it again later:** just run the same launcher again — it's also your daily launcher.
+Then open http://localhost:12393.
 
-**Start it automatically when your computer turns on (optional):**
+If you'd rather not use a terminal, download the ZIP, unzip it, and double-click `start-companion.command` (macOS) or `start-companion.bat` (Windows). The window that opens is the server, so keep it open while you chat.
 
-- **Windows**
-  1. Right-click **`start-companion.bat`** → **Create shortcut**.
-  2. Press **Win + R**, type **`shell:startup`**, press **Enter** — this opens your Startup folder.
-  3. Drag the shortcut into that folder. Tomoshibi now starts at every login. *(To undo: delete the shortcut from that folder.)*
+## Add your own character
 
-- **macOS**
-  1. Open **System Settings → General → Login Items & Extensions**.
-  2. Under **Open at Login**, click **+** and choose **`start-companion.command`** (or drag the file into the list).
-  *(To undo: select it and click **−**.)*
+Put the model folder in `live2d-models/` or `vrm-models/`, then edit a character under **Settings → Characters** and pick it. The persona, reply language and reference audio are on the same page.
 
-Either way the command window (and then the browser) pops up on its own at login. Heads-up: a terminal window appearing every boot is normal — that's the engine starting. If you use a local Ollama brain, the Ollama app already auto-starts after you install it, so the whole companion comes up by itself.
+Step-by-step: [Live2D](docs/add-live2d-character.md), [VRM](docs/add-vrm-character.md).
 
----
+The only bundled models are ones whose licenses allow sharing: the official Live2D samples (mao_pro, haru, hiyori) and the CC0 VRM character Shino. Please don't add copyrighted characters, art or voices to this repo.
 
-## LLM setup (required)
+## AI model
 
-You need **either** an API key for a cloud LLM **or** a running local LLM. A cheap model is plenty for companion chat — you do not need a flagship.
+**Install with one click** uses Ollama's `qwen2.5:3b`, which runs on a normal laptop with 8–16 GB of RAM. For smarter replies, pick a bigger model or use an API key under **Settings → LLM**.
 
-#### Option A — Local Ollama (recommended: free, private, no account)
-In the setup wizard, **Install with one click** installs [Ollama](https://ollama.com/download), downloads `qwen2.5:3b` (~1.9 GB) and switches to it — no terminal, no restart, no API key, no account, no cloud cost, fully offline, and your chats stay on your computer. Runs comfortably on a typical 8–16 GB laptop. For sharper replies, pull a bigger model (e.g. `qwen2.5:7b`) and set it in the LLM settings tab.
+Free APIs work too. Choose **Custom endpoint (advanced)** and enter the base URL:
 
-#### Option B — Cloud models through Ollama (free account; good if your PC is weak)
-Ollama can run a *bigger* model on its own servers, so a slow computer still gets good replies. Free tier, but it needs an account and you must pull the model first:
-1. Install Ollama from [ollama.com/download](https://ollama.com/download) (v0.12+).
-2. Create a free account at [ollama.com](https://ollama.com), then run `ollama signin` in a terminal.
-3. **Run `ollama pull gpt-oss:20b-cloud` — you must pull it before it works.** (Just typing the name in Settings is not enough.)
-4. In the LLM settings tab, choose Ollama and set the model to `gpt-oss:20b-cloud`.
+- Gemini: `https://generativelanguage.googleapis.com/v1beta/openai/`
+- Groq: `https://api.groq.com/openai/v1`
+- Cerebras: `https://api.cerebras.ai/v1`
 
-`gpt-oss:20b-cloud` is the lightest free-tier-friendly model; `qwen3.5:cloud` or `minimax-m3:cloud` are stronger but use up the free limits faster.
-
-> **Honest about "free":** $0 with no credit card, just a free account — but a *light-usage* tier: one cloud model at a time, session limits that reset ~every 5 hours plus weekly limits, and Ollama doesn't publish exact numbers, so heavy chatting can hit a limit until it resets. Inference runs on **Ollama's servers**, so don't send anything you want kept fully private. Cloud models are in preview — **confirm it answers once before relying on it.**
-
-#### Option C — Free hosted API key (Gemini / Cerebras / Groq)
-The best chat quality of the free options. Make a free account (no credit card), create an API key, and paste it in the LLM settings tab with the matching base URL:
-- **Google AI Studio (Gemini):** `https://generativelanguage.googleapis.com/v1beta/openai/` — generous free tier; note Google may use free-tier chats to improve its products.
-- **Cerebras:** `https://api.cerebras.ai/v1` — very fast, ~1M tokens/day free (short context window on the free tier).
-- **Groq:** `https://api.groq.com/openai/v1` — very fast, with daily token caps.
-
-Use a current model name from each provider's docs. Your chats go to that provider, and free tiers have rate limits.
-
-#### Option D — Paid cloud API key (OpenAI / Claude / Gemini)
-If you already pay for one, paste the key in the wizard. Highest quality; a small model is typically just pennies per chat.
-
-### ⚠️ Reasoning ("thinking") models need their reasoning turned off
-
-Reasoning models such as **`glm-4.7:cloud`** put their answer in a separate `reasoning` field and leave the normal `content` field **empty**. This app reads only `content`, so a reasoning model will show up as a **blank reply** — and since there's nothing to read aloud, **no voice either**.
-
-**Recommendation:** pick a normal (non-reasoning) chat model. A small, fast model gives a more natural, lower-latency companion anyway.
-
-**If you want to use one anyway:** most endpoints let you switch the reasoning off, and then the model behaves like a normal chat model. Add `extra_body` to your LLM block in `conf.yaml`:
+Use a regular chat model. Reasoning ("thinking") models put their answer in a separate field the app doesn't read, so you get a blank reply and no voice. If you want one anyway, add this to the LLM section of `conf.yaml`:
 
 ```yaml
 extra_body:
   reasoning_effort: 'none'
 ```
 
-The parameter name differs per provider — check your endpoint's docs. Tested against LM Studio with `qwen3.5`, only `reasoning_effort` worked; `chat_template_kwargs.enable_thinking`, a `/no_think` prefix, and `reasoning.enabled` were all silently ignored. Turning reasoning off also removes a large latency hit: left on, that model spent thousands of characters reasoning before saying a single sentence.
+## Voice
 
-> Manual edit: the LLM config lives under `character_config → agent_config → llm_configs → openai_compatible_llm` in `conf.yaml`. Comments in the file show how to point at OpenAI / Claude / Gemini with your own key. Restart the launcher after editing.
+The default is the free edge-tts voice, which needs an internet connection.
 
----
+For a more natural voice that runs on your computer, install [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) with one click from the wizard or **Settings → TTS**. It works on Macs with Apple Silicon (about 3.8 GB to download) and on Windows (about 8.2 GB). The default voice comes from the Tsukuyomi-chan Corpus (CV: Rei Yumesaki).
 
-## Other settings
+It's installed in `~/Library/Application Support/Tomoshibi/GPT-SoVITS` (macOS) or `%LOCALAPPDATA%\Tomoshibi\GPT-SoVITS` (Windows). Delete that folder to remove it. Already running GPT-SoVITS yourself? See [this guide](docs/custom-voice-gpt-sovits.md).
 
-### Memory (core + deep recall)
-On by default. Each character keeps its own memory at `chat_history/<conf_uid>/core_memory.md` — persona-injected core memory plus per-turn LLM consolidation (the model decides what to keep). Tune the memory cap in settings.
+If you use a real person's voice as the reference, you're responsible for having the right to.
 
-### Characters
-Create / edit / switch / delete characters in the app — each has its own name, persona, avatar model (Live2D **or** VRM), voice, and **separate memory**. To add your own model, drop the folder under `live2d-models/` or `vrm-models/` and open the character settings — the app finds it and registers it for you. Only the three bundled Live2D samples are tracked in git; anything else you drop in there stays on your machine, and so does your `model_dict.json`.
+## FAQ
 
-#### More characters (optional)
-For licensing safety, Tomoshibi bundles only assets whose licences allow redistribution: **3 free Live2D Original Characters** (`mao_pro`, `haru`, `hiyori`) and **one CC0 VRM character** (`Sendagaya_Shino`, with motion clips under MIT — see `vrm-models/Sendagaya_Shino/NOTICE.md`). Want more — including the male butler character **Natori**? You can download free official Live2D sample models yourself from the official page and drop them in. Get them from **[Live2D's sample models page](https://www.live2d.com/en/learn/sample/)** under Live2D's own license — we don't redistribute them. See [`docs/add-live2d-character.md`](docs/add-live2d-character.md) for the how-to.
+**There's text but no voice**
+GPT-SoVITS takes about a minute to load after launch. If there's still no sound, switch back to Edge TTS under **Settings → TTS**.
 
-### Performance presets
-**Light / Standard / High-performance** presets bundle the ASR/TTS engine choice, memory-consolidation frequency, and model keep-alive. Pick Light on a modest machine, High-performance if you have the hardware.
+**The character never replies**
+No AI is connected yet. Set one up under **Settings → LLM**. If you use Ollama, make sure the Ollama app is running.
 
-### Proactive topics & news
-The companion opens topics after idle time. Optionally refresh those topics with current headlines via the bundled news helper (`scripts/news_topics.py`) — pure stdlib, no API key — and schedule it (cron / launchd / Task Scheduler), e.g. every few hours.
+**It won't open, or the window closes right away**
+Update to the latest release first. If that doesn't fix it, open `conf.yaml` and change `asr_model: 'faster_whisper'` to `asr_model: 'sherpa_onnx_asr'`.
 
-### Translation
-Optional cross-language subtitle/voice translation, **off by default** (`tts_preprocessor_config → translator_config` in `conf.yaml`).
+## More docs
 
-### Voice
-Default is **edge-tts** (free, online). For a more natural voice that runs on your computer, install [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) with one click from the first-run setup or the voice settings (macOS on Apple Silicon, or 64-bit Windows; about 3.8 GB to download on macOS, 8.2 GB on Windows). It lives in `~/Library/Application Support/Tomoshibi/GPT-SoVITS` or `%LOCALAPPDATA%\Tomoshibi\GPT-SoVITS` — delete that folder to remove it. The default voice is the Tsukuyomi-chan Corpus (CV: Rei Yumesaki). Already run GPT-SoVITS yourself? See [the guide](docs/custom-voice-gpt-sovits.md). Voice-cloning a real person's voice is your legal responsibility. `fun_asr`, `coqui_tts` and `silero_vad` also need PyTorch: `uv sync --extra torch`.
+- [Use it from your phone or tablet (Tailscale)](docs/remote-access-tailscale.md)
+- [Scenes](docs/scene-management.md), [stage effects](docs/stage-effects.md), [UI guide](docs/ui-features.md)
 
----
+## Credits and license
 
-## Troubleshooting
+Tomoshibi is built on [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber). Please support the original project too.
 
-**The app won't open / the black window closes right away.**
-Usually a settings or engine choice an older build couldn't recover from. Download the **latest release** — it opens even with an old setting. If you'd rather not update: open `conf.yaml` in the app folder, find `asr_model: 'faster_whisper'`, change it to `asr_model: 'sherpa_onnx_asr'`, save, and relaunch. (Don't restore `conf.yaml.backup` — it has the same setting.)
-
-**It replies in text but there's no voice.**
-Update to the latest release (it bundles the audio tools Windows needs) and run the launcher again so dependencies refresh. If you use GPT-SoVITS, give it up to a minute after launch to load (one you run yourself has to be running) — or switch back to **Edge TTS** in Settings → Performance for the free built-in voice.
-
-**On the first launch the browser says "this site can't be reached / connection refused."**
-The server is still starting — the first run downloads a ~1GB speech model, which takes a few minutes. Leave the black window open; once it prints that it's running, refresh `http://localhost:12393`. The latest release opens the browser only when it's ready.
-
-**Windows: "Windows protected your PC" (SmartScreen), or nothing seems to happen.**
-Click **More info → Run anyway** — this is the launcher, not a virus (it's just unsigned). If your antivirus blocked the one-time `uv` install, allow the app and run the launcher again, or install `uv` manually from <https://docs.astral.sh/uv/getting-started/installation/> and retry.
-
-**macOS: "cannot be opened" or "Apple could not verify…"**
-Click **Done**, then **System Settings → Privacy & Security → Open Anyway**. You only need to do this the first time. (On older macOS, right-click → **Open** also works.)
-
-**It opens but never replies / says the AI brain isn't set up.**
-You still need an LLM. Open the setup wizard (or Settings → Model): paste an API key (OpenAI / Claude / Gemini), or pick a local Ollama model. For the local route, make sure the **Ollama app is installed and running** and the model is downloaded.
-
-**Web search / tools don't work with Claude.**
-The setup wizard connects Claude through a compatibility endpoint that doesn't pass tools through, so the experimental web-search/tools toggle may do nothing on Claude. For tools, use a tool-calling model like GPT-4o or Gemini, or a capable local model. (Plain chat with Claude works fine.)
-
----
-
-## Guides
-
-- [Use it from your phone / tablet (Tailscale)](docs/remote-access-tailscale.md) — reach your companion from another device, even off your home network.
-- [Custom voice with GPT-SoVITS](docs/custom-voice-gpt-sovits.md) — give your character a cloned or custom voice.
-- [Add your own Live2D character](docs/add-live2d-character.md) — drop a model in and switch to it.
-- [Add your own VRM (3D) character](docs/add-vrm-character.md) — folder layout, expression and motion mapping, camera framing.
-- [Scene management](docs/scene-management.md) · [Stage effects](docs/stage-effects.md) · [UI features](docs/ui-features.md) — backgrounds, entrance effects, and what each panel does.
-
-## Credits & license
-
-This project would not exist without the upstream work it builds on. Please **star and support [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber)** too.
-
-- **Upstream:** [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) — its server-side code is MIT, Copyright (c) 2025 Yi-Ting Chiu.
-- **Tomoshibi's own additions** (long-term memory, proactive conversation, group conversation, stage performances, in-app settings for all of it, and the five-language UI) — MIT.
-- **Bundled web frontend** — the compiled web bundle in `frontend/` is the Open-LLM-VTuber-Web frontend, under the **Open-LLM-VTuber License 1.0** (Apache-2.0 + additional conditions). Free, non-commercial use and redistribution is permitted; commercial rebranding, paid hosting/SaaS, or embedding in a paid product needs a separate commercial license from the Open-LLM-VTuber org. This fork is free and non-commercial, which the license permits. See [`NOTICE`](./NOTICE).
-- **Live2D Cubism & bundled sample models** — the bundled **mao_pro** / **haru** / **hiyori** models are Live2D Inc. sample data, used under the **Live2D Free Material License** (see [`LICENSE-Live2D.md`](./LICENSE-Live2D.md)). Required attribution:
+- This project's own code is MIT. The upstream server code is also MIT, Copyright (c) 2025 Yi-Ting Chiu.
+- The web frontend in `frontend/` is under the Open-LLM-VTuber License 1.0 (Apache-2.0 plus additional conditions). Commercial use needs a separate license.
+- The bundled Live2D sample models are used under the Live2D Free Material License and must be replaced in any paid or commercial build (see [`LICENSE-Live2D.md`](./LICENSE-Live2D.md)):
   > This content uses sample data owned and copyrighted by Live2D Inc.
+- Licenses for the other components are in [`NOTICE`](./NOTICE).
 
-  They are bundled **unmodified** as a free default. **For any paid/commercial build, replace them** with your own CC0 / licensed / commissioned model.
-- **Other components** (see [`NOTICE`](./NOTICE) for each license): GPT-SoVITS (MIT, optional TTS), sherpa-onnx (Apache-2.0, ASR engine — the SenseVoice model has its own license; or use Whisper), Silero VAD (MIT), edge-tts (uses Microsoft's online TTS service), DeepLX (unofficial DeepL endpoint — use the official DeepL API for production).
+## Support
 
-**Do not ship copyrighted characters, artwork, voices, or trained voice models.** This repo ships only neutral defaults; bring your own.
-
-### License
-
-This fork's own source code is released under the **MIT License**, on top of Open-LLM-VTuber's MIT-licensed server code (Copyright (c) 2025 Yi-Ting Chiu). However, **the whole project is not simply MIT**: the bundled compiled web frontend in `frontend/` is under the **Open-LLM-VTuber License 1.0** (Apache-2.0 + additional conditions), and the bundled Live2D sample models carry their own Live2D terms. See [`LICENSE`](./LICENSE), [`NOTICE`](./NOTICE), and [`LICENSE-Live2D.md`](./LICENSE-Live2D.md) for the full, accurate picture.
-
----
-
-## Support this project
-
-This is a free, open-source project — no paywall. If it's useful to you, a tip is appreciated but never required:
-
-- **Ko-fi:** [ko-fi.com/leonhsueh](https://ko-fi.com/leonhsueh)
-- **GitHub Sponsors:** coming soon
-
-And please support the upstream project this is built on — [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber).
-
----
-
-## Contributing
-
-Issues and pull requests are welcome.
-
-- File bugs and feature ideas in **Issues**.
-- For code changes, open a **Pull Request** with a clear description.
-- Please **do not** add copyrighted characters, artwork, voices, or trained voice models — keep the repo shippable as neutral defaults only.
+If you find it useful, you can chip in on [Ko-fi](https://ko-fi.com/leonhsueh). Questions and ideas are welcome as issues or pull requests.

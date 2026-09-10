@@ -1,338 +1,116 @@
 # Tomoshibi
 
-> 무료 오픈소스, 처음 쓰는 사람도 쉬운 **좋아하는 애니메이션 캐릭터와 대화하고 교감하는 앱**. Live2D 또는 VRM(3D) 모델을 넣으면 캐릭터가 대화에 맞춰 스스로 표정과 동작을 짓고, 말하는 언어도 설정할 수 있어요. 당신을 기억하고 먼저 말을 걸기도 합니다. LLM만 직접 준비하면, 나머지는 설치하자마자 바로 작동합니다.
+좋아하는 애니메이션 캐릭터와 대화하고 교감하는 앱이에요. 무료 오픈소스이고, macOS와 Windows에서 쓸 수 있어요.
 
-**언어:** [English](./README.md) | [繁體中文](./README.TW.md) | [日本語](./README.JP.md) | **한국어** | [简体中文](./README.CN.md)
+**언어:** [English](./README.md) | [繁體中文](./README.TW.md) | [日本語](./README.JP.md) | 한국어 | [简体中文](./README.CN.md)
 
-![License](https://img.shields.io/badge/license-MIT%20core%20%2B%20bundled%20terms-blue)
-![Built on Open-LLM-VTuber](https://img.shields.io/badge/built%20on-Open--LLM--VTuber-orange)
-![Platforms](https://img.shields.io/badge/platform-macOS%20%7C%20Windows-lightgrey)
+![Tomoshibi](assets/tomoshibi-hero.png)
 
----
+## 할 수 있는 것
 
-> ### 현재 상태
->
-> **Tomoshibi**는 **[Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber)** 위에 만들어졌습니다.
-> 데스크톱/웹 UI는 상류의 Open-LLM-VTuber-Web을 기반으로 다시 만들었습니다.
->
-> 모든 설정은 앱 안에서 끝납니다——첫 실행 LLM 마법사, 캐릭터 관리, 음성, 기억,
-> 능동적 화제, 번역, 원격 접속. `conf.yaml`을 직접 편집할 필요가 없습니다.
->
-> **앱 다운로드:** [Releases](https://github.com/weryk153/tomoshibi/releases/latest) (macOS / Windows). 소스에서 실행할 수도 있습니다.
+- 캐릭터가 대화 내용에 맞춰 스스로 표정과 동작을 지어요. Live2D와 VRM(3D) 모델을 모두 지원해요.
+- 캐릭터가 말하는 언어를 직접 정할 수 있어요. 목소리 언어가 다르면 번역한 뒤에 읽어 줘요.
+- 나눈 이야기를 기억하고, 한동안 말이 없으면 먼저 말을 걸어요.
+- 목소리로 말을 걸 수 있고, 캐릭터가 말하는 중간에 끼어들 수도 있어요.
+- 내 모델을 넣고 페르소나를 쓰면 나만의 캐릭터가 돼요.
 
-## 가장 빠른 시작
+## 설치
 
-**앱 다운로드** (가장 쉬움)
+[Releases](https://github.com/weryk153/tomoshibi/releases/latest)에서 내려받으세요.
 
-1. [Releases](https://github.com/weryk153/tomoshibi/releases/latest)에서 다운로드: Apple Silicon Mac은 `arm64.dmg`, Intel Mac은 `x64.dmg`, Windows는 `setup.exe`
-2. 앱을 엽니다. 처음 실행할 때 필요한 것을 한 번만 자동으로 받습니다(몇 분). 시스템이 막으면 아래 보안 경고 설명을 보세요.
-3. 마법사에서 **원클릭 설치** → 2D 또는 3D 캐릭터 선택 → 대화 시작.
-
-**앱을 설치하지 않는 경우** — 약 10분, 그중 8분은 다운로드 대기예요.
-
-1. 이 페이지에서 초록색 **`<> Code`** → **Download ZIP** → 압축 풀기
-2. `start-companion.command`(macOS) 또는 `start-companion.bat`(Windows)를 더블클릭.
-   **그 창은 닫지 마세요. 그게 서버예요.**
-3. 브라우저가 알아서 열려요 → 마법사에서 **원클릭 설치**(Ollama와 무료 로컬 모델을 자동으로 준비) → 2D 또는 3D 캐릭터 선택 → 대화 시작.
-
-Ollama를 설치하기 싫다면, 마법사에 OpenAI／Claude／Gemini API 키를 붙여 넣어도 돼요.
-
-**이미 `uv` 가 있는 분**
-
-```bash
-git clone https://github.com/weryk153/tomoshibi.git && cd tomoshibi
-uv run run_server.py          # 첫 실행 때 uv sync도 알아서 해요
-# http://localhost:12393 열기 → 마법사 → 대화
-```
-
-막혔거나 각 선택지의 차이가 궁금하다면 아래 자세한 단계를 보세요.
-첫 실행 때 반드시 뜨는 macOS／Windows 보안 경고 해결법도 있어요.
-
----
-
-## 이게 뭔가요?
-
-**Tomoshibi**는 좋아하는 캐릭터 — 손으로 그린 Live2D 또는 완전한 3D VRM — 와 진짜로 대화하고 교감할 수 있게 해 줍니다 — 당신을 기억하고, 스스로 먼저 말을 걸고, 당신이 말하는 동안 귀 기울여 듣고, 말할 때는 스스로 표정과 동작을 짓습니다.
-
-이건 훌륭한 [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) 프로젝트를 **친절하게 다시 포장한** 버전입니다. 우리는 그 어깨 위에 서 있습니다: 상류(upstream) 프로젝트가 탄탄한 Live2D + ASR/TTS + LLM 기반을 제공하고, 이 fork는 그 옆에 VRM(3D)을 더한 뒤 그것을 비개발자도 쓸 수 있는 **다운로드 → 더블클릭 → 대화** 경험으로 감싸면서, 기억 시스템, 능동적 대화, 자연스러운 끼어들기(barge-in) 음성, 캐릭터 관리, 앱 내 설정 마법사, 그리고 5개 언어 UI를 더했습니다.
-
-> Open-LLM-VTuber 위에 만들어졌습니다. 전체 출처 표기와 구성 요소별 라이선스는 [`NOTICE`](./NOTICE)를, 원본 프로젝트 문서는 [`README.upstream.md`](./README.upstream.md)를 참고하세요.
-
----
-
-## 기능
-
-- **AI가 움직이는 표정과 동작** — 대사마다 LLM이 표정과 동작을 고르고 강도(살짝 미소인지 크게 웃는지)까지 정합니다. Live2D와 VRM 모두 지원합니다.
-- **말하는 언어 설정** — 캐릭터마다 답변 언어(일본어, 영어 등)를 정할 수 있습니다. 음성 언어가 다르면 읽기 전에 번역합니다.
-- **장기 기억** — 당신이 누구인지, 무엇을 하고 있는지 기억하고, 시간이 지날수록 당신을 더 알아 갑니다. 캐릭터별로 정리된 "핵심 기억"이 페르소나에 주입되며, 매 대화 차례마다 LLM이 무엇을 저장할 가치가 있는지 판단합니다. 변경 사항은 즉시 적용됩니다(재시작 불필요). 기억 용량 상한은 조절 가능합니다.
-- **능동적 화제** — 한동안 조용하면 스스로 화제를 꺼냅니다. 선택적으로 최신 AI / 기술 / 애니메이션 / 게임 뉴스를 가져와 대화 소재로 삼을 수 있습니다(순수 표준 라이브러리 헬퍼, **API 키 불필요**).
-- **자연스러운 끼어들기 음성 대화** — 언제든 말할 수 있습니다. 마이크를 기다릴 필요가 없고, 실제 대화처럼 말하는 도중에 끊을 수도 있습니다.
-- **캐릭터 관리** — 캐릭터를 생성 / 편집 / 전환 / 삭제할 수 있습니다: 이름 + 페르소나 + Live2D 또는 VRM 모델 + 음성 + 각자 분리된 기억.
-- **2D와 3D 모두 지원** — Live2D와 VRM(glTF 기반 3D)이 함께 동작합니다. VRM 캐릭터는 립싱크, 표정, 자동 눈 깜빡임, 시선 추적, `.vrma` 모션 클립, 그리고 드래그와 휠로 화면 구도를 조정하는 기능을 갖췄어요. 폴더를 `vrm-models/` 에 넣으면 자동으로 등록됩니다.
-- **첫 실행 설정 마법사** — API 키(OpenAI / Claude / Gemini)를 붙여넣거나 로컬 Ollama 모델을 고릅니다. 마법사는 저장하기 전에 빠른 테스트 호출을 한 번 실행합니다.
-- **LLM 설정 탭** — API 키를 붙여넣거나, Ollama 모델을 고르거나 직접 입력합니다(로컬 모델, 또는 Ollama를 통해 제공되는 클라우드 모델).
-- **성능 프리셋** — 경량 / 표준 / 고성능, ASR/TTS 엔진 선택 + 기억 정리 빈도 + 모델 keep-alive를 한 번에 묶어 둡니다.
-- **다국어 번역** — 선택적인 자막 / 음성 번역(기본값 꺼짐).
-- **설치하자마자 작동** — 샘플 Live2D 모델 + CC0 라이선스 VRM 캐릭터 + 무료 클라우드 TTS(edge-tts) + 자동으로 내려받는 음성 인식(ASR) 모델(약 1GB이며, 맨 처음 실행할 때 한 번만 내려받고 몇 분 걸립니다)을 기본 제공합니다. 당신은 LLM만 연결하면 됩니다.
-- **5개 언어 UI** — English, 繁體中文, 简体中文, 日本語, 한국어.
-
----
-
-## 스크린샷
-
-![Tomoshibi 실제 작동 화면](assets/tomoshibi-hero.png)
-
-*데스크톱에서 실행 중인 Tomoshibi. 화면은 기본 제공되는 `Sendagaya_Shino`(VRM) 캐릭터예요. Live2D 아바타도 사용법은 같고, 캐릭터 설정에서 아무거나 고를 수 있어요.*
-
----
-
-## 빠른 시작 (다운로드 → 더블클릭 → 대화)
-
-가장 쉬운 길 — **터미널이 필요 없습니다.**
-
-> **시작하기 전에: AI "두뇌"(LLM)가 필요합니다.**
-> Tomoshibi는 **몸과 얼굴**입니다 — 아바타, 음성, 기억. 실제로 생각하고 말하는 **두뇌**는 *당신*이 직접 준비하는 별도의 AI입니다. 첫 실행 마법사에서 설정합니다. 쉬운 순서대로 선택지는 다음과 같습니다:
-> - **(추천 — 무료, 비공개, 당신의 컴퓨터에서 실행) Ollama를 통한 로컬 모델.** 설정 마법사에서 한 번만 누르면 무료 앱 **[Ollama](https://ollama.com)**와 작은 모델(`qwen2.5:3b`, 약 1.9 GB)이 설치됩니다. 터미널은 필요 없어요. Tomoshibi의 기본값이 이미 이것을 가리키고 있어 바로 작동합니다 — **계정 불필요, API 키 불필요, 비용 없음, 오프라인 작동, 그리고 당신의 대화는 절대 컴퓨터를 벗어나지 않습니다.** 보통의 8~16 GB 노트북에서도 잘 돌아갑니다. (더 똑똑한 답변을 원하고 RAM이 넉넉한가요? `qwen2.5:7b` 같은 더 큰 모델을 pull하고 설정에서 고르세요.)
-> - **(선택 — PC가 약하면 품질이 더 좋음) Ollama Cloud 무료 등급.** Ollama는 *자사* 서버에서 더 큰 모델을 무료로 돌릴 수 있습니다(한도 있음). 무료 계정이 필요합니다 — 아래 **옵션 B** 참고. 먼저 그 클라우드 모델을 `ollama pull` 해야 합니다.
-> - **(선택 — 무료 중 최고 품질) 무료 호스팅 API 키.** Google AI Studio(Gemini), Cerebras, 또는 Groq가 무료 키를 줍니다(신용카드 불필요). 무료 선택지 중 품질이 가장 좋지만, 계정 + 키가 필요하고 당신의 대화가 해당 제공업체로 전송됩니다. **옵션 C** 참고.
-> - **(이미 유료로 쓰고 있다면) 클라우드 API 키**: OpenAI / Claude / Gemini의 것 — 최고 품질, 대화 한 번에 몇 원 수준. **옵션 D** 참고.
-
-1. **코드 받기.** 저장소 페이지에서 초록색 **`<> Code`** 버튼 → **Download ZIP**을 선택한 뒤 압축을 풉니다(예: 바탕화면). _(git이 편하다면 `git clone`도 좋습니다.)_
-2. 압축을 푼 폴더 안에서 **런처를 더블클릭**합니다:
-   - **macOS:** `start-companion.command`
-   - **Windows:** `start-companion.bat`
-   - 첫 실행 때 모든 것을 설치하며(`uv` 다음에 의존성), 몇 분 걸릴 수 있습니다. **그 창은 닫지 마세요 — 그게 바로 서버입니다.**
-3. 브라우저가 **http://localhost:12393**으로 열립니다. 첫 실행 시 **설정 마법사**가 나타납니다: **API 키 붙여넣기**(OpenAI / Claude / Gemini) **또는** **로컬 Ollama 모델 선택** 중 하나를 합니다. 마법사는 저장하기 전에 당신의 선택을 테스트합니다.
-
-   ![Tomoshibi 첫 실행 설정 마법사](assets/tomoshibi-setup.png)
-
-   *첫 실행 설정 마법사, 여기서 당신의 AI "두뇌"를 연결합니다.*
-
-4. **새 두뇌가 작동하도록 재시작하세요.** 2단계의 **바로 그 런처/터미널 창을 닫아** 종료하면(서버가 멈춥니다), **다시 런처를 더블클릭**해서 새 LLM과 함께 다시 시작합니다. (앱도 LLM 변경은 "재시작 후 — 또는 캐릭터를 한 번 전환한 후 적용됩니다"라고 안내합니다.) 그런 다음 대화를 시작하세요. 오디오를 켜려면 페이지를 한 번 클릭합니다.
-
-> **macOS Gatekeeper (첫 실행에만):** "확인할 수 없음"이라고 나올 수 있습니다. 서명되지 않은 오픈소스 앱에서는 정상입니다. **완료**를 누른 뒤 **시스템 설정 → 개인정보 보호 및 보안**에서 **그래도 열기**를 누르세요. 앱과 `start-companion.command` 모두 같습니다. 이전 macOS에서는 우클릭 → **열기**로도 됩니다. (우리는 서명/공증된 빌드를 제공하지 않습니다 — 무료 등급이니까요.)
-
-> **Windows SmartScreen (첫 실행에만):** 더블클릭하면 파란색 **"Windows의 PC 보호"** 상자가 나올 수 있습니다. 서명되지 않은 오픈소스 앱에서는 정상입니다. **추가 정보** → **실행**을 누르세요. 한 번 허용하면 다시 묻지 않습니다.
-
-설치하자마자 기본으로 제공되는 **mao** 샘플 Live2D 모델과 **edge-tts**(무료 클라우드 음성, GPU 불필요)를 사용합니다. 첫 실행 때 음성-텍스트 변환(STT) 모델도 자동으로 내려받는데 —— 이 모델은 약 **1GB**라서, **맨 처음 실행에서는 한 번만 일어나는 다운로드 + 압축 해제에 몇 분이 걸릴 수 있습니다**. 이 동안 런처 창이 멈춘 것처럼 보일 수 있지만 멈춘 게 아닙니다. **닫지 말고 끝날 때까지 기다리세요.** 이건 처음 한 번만 일어납니다.
-
-### 터미널이 더 편하신가요? (고급)
-
-대부분의 사람은 위의 **Download ZIP** 경로를 쓰면 됩니다. 터미널이 익숙하다면 대신 repo를 clone할 수 있습니다. **Python ≥ 3.10, < 3.13**과 [`uv`](https://github.com/astral-sh/uv)가 필요합니다.
-
-```bash
-git clone https://github.com/weryk153/tomoshibi.git && cd tomoshibi
-uv sync                  # installs dependencies
-uv run run_server.py     # start the server
-# open http://localhost:12393  → setup wizard → chat
-```
-
-마법사가 당신의 LLM 선택을 `conf.yaml`에 대신 기록해 줍니다. 물론 직접 손으로 편집할 수도 있습니다(아래 참고).
-
-### 데스크톱 앱 (직접 빌드)
-
-Node 22와 pnpm이 필요합니다. 설치 파일에 백엔드가 포함되어 있어 Python이나 `uv`를 따로 설치할 필요가 없습니다.
-
-```bash
-pnpm --dir frontend-src install
-pnpm --dir frontend-src run build:mac   # Windows에서는 build:win, 결과물은 frontend-src/release/
-```
-
-처음 실행할 때 Python, 의존성(약 500MB), 음성 인식 모델(약 1GB)을 한 번만 다운로드합니다. 포트 12393에서 이미 서버가 실행 중이면 앱이 그 서버를 사용합니다.
-
----
-
-## 실행된 다음에는
-
-| 하고 싶은 것 | 어디서 |
+| 컴퓨터 | 파일 |
 |---|---|
-| 3D 캐릭터로 바꾸기 | 설정 → 캐릭터 → 편집 → 외형 |
-| 내 모델 추가하기 | `live2d-models/` 나 `vrm-models/` 에 넣기 (아래 가이드 참고) |
-| 목소리 바꾸기 | 설정 → 캐릭터 → 편집 → 참조 음성 (GPT-SoVITS 필요) |
-| 휴대폰에서 쓰기 | 아래 Tailscale 가이드 참고 |
-| 먼저 말 걸게 하기 | 설정 → 능동적 대화 |
-| 말하는 언어 바꾸기 | 설정 → 캐릭터 → 편집 → 답변 언어 |
+| Apple 실리콘 Mac(M1 이후) | `arm64.dmg` |
+| Intel Mac | `x64.dmg` |
+| Windows 10/11 | `setup.exe` |
 
----
+실행한 뒤 설정 마법사를 따라가면 돼요.
 
-## 시작 / 종료 / 부팅 시 자동 시작
+1. AI를 연결해요. "원클릭 설치"를 누르면 무료 [Ollama](https://ollama.com)와 로컬 모델이 설치돼요. 계정이 필요 없고, 대화가 컴퓨터 밖으로 나가지 않아요. OpenAI, Claude, Gemini API 키를 붙여 넣어도 돼요.
+2. 2D 또는 3D 캐릭터를 골라요.
+3. 로컬 음성 GPT-SoVITS를 설치할지 정해요. 나중에 설치해도 돼요.
 
-**시작하기 (「호스트」 열기):**
+처음 실행할 때 Python과 음성 인식 모델(약 1.5GB)을 내려받아요. 다음부터는 기다리지 않아요.
 
-- **Windows:** **`start-companion.bat`** 더블클릭
-- **macOS:** **`start-companion.command`** 더블클릭 —— 처음에는 macOS가 막을 수 있어요: **완료**를 누르고 **시스템 설정 → 개인정보 보호 및 보안 → 그래도 열기**. 이후로는 평범한 더블클릭으로 됩니다.
+앱에 서명이 없어서 처음 실행할 때 시스템이 막아요.
 
-검은 명령 창이 열립니다 —— **그 창이 곧 서버입니다. 대화하는 동안 계속 열어 두세요.** 준비되면 브라우저로 앱(`http://localhost:12393`)을 알아서 엽니다. 이렇게 생각하면 됩니다: **명령 창은 엔진, 브라우저 탭은 화면일 뿐.**
+- macOS: "완료"를 누른 뒤 "시스템 설정 → 개인정보 보호 및 보안"에서 "그래도 열기"를 눌러요.
+- Windows: 파란 창에서 "추가 정보 → 실행"을 눌러요.
 
-> 첫 실행에만: 약 1GB의 음성 모델을 내려받느라 몇 분 걸립니다. 창이 멈춘 것처럼 보여도 정상이니 —— 열어 둔 채 끝날 때까지 기다리세요.
+### 소스에서 실행하기
 
-**종료하기:**
+Python 3.10~3.12와 [uv](https://github.com/astral-sh/uv)가 필요해요.
 
-- **검은 명령 창을 닫으면**(또는 창 안에서 **Ctrl + C**) 완전히 멈춥니다.
-- **브라우저 탭**만 닫으면 화면만 가려질 뿐 서버는 계속 돕니다. 실제로 멈추려면 명령 창을 닫으세요.
-- 로컬 두뇌용으로 **Ollama**를 설치했다면 백그라운드에서 계속 실행됩니다. 유휴 시 가벼우니 그냥 둬도 되고, 끄려면 작업 표시줄(Windows)/메뉴 막대(macOS) 아이콘에서 Quit 하세요.
+```bash
+git clone https://github.com/weryk153/tomoshibi.git && cd tomoshibi
+uv run run_server.py
+```
 
-**나중에 다시 열려면:** 같은 런처를 다시 실행하면 됩니다(이게 평소 실행 방법입니다).
+그다음 http://localhost:12393 을 열어요.
 
-**컴퓨터를 켤 때 자동으로 시작하기 (선택):**
+터미널을 쓰기 싫다면 ZIP을 내려받아 압축을 풀고 `start-companion.command`(macOS)나 `start-companion.bat`(Windows)를 더블클릭하세요. 열린 창이 서버라서 대화하는 동안 닫으면 안 돼요.
 
-- **Windows**
-  1. **`start-companion.bat`** 우클릭 → **바로 가기 만들기**.
-  2. **Win + R**를 누르고 **`shell:startup`** 입력 후 **Enter** —— 시작프로그램 폴더가 열립니다.
-  3. 바로 가기를 그 폴더에 넣으세요. 이제 로그인할 때마다 자동 시작됩니다. *(취소: 그 폴더에서 바로 가기를 삭제.)*
+## 내 캐릭터 넣기
 
-- **macOS**
-  1. **시스템 설정 → 일반 → 로그인 항목 및 확장 프로그램** 열기.
-  2. **로그인 시 열기** 아래에서 **+**를 클릭하고 **`start-companion.command`** 선택(또는 파일을 목록으로 드래그).
-  *(취소: 선택 후 **−** 클릭.)*
+모델 폴더를 `live2d-models/`나 `vrm-models/`에 넣고 "설정 → 캐릭터"에서 캐릭터를 편집하면 고를 수 있어요. 페르소나, 답변 언어, 참조 음성도 같은 페이지에 있어요.
 
-두 방법 모두 로그인 시 명령 창(이어서 브라우저)이 알아서 뜹니다. 참고: 부팅할 때마다 터미널 창이 뜨는 것은 정상입니다(엔진이 시작되는 것). 로컬 Ollama 두뇌를 쓰면 Ollama는 설치 후 자동 시작되므로 전체가 저절로 켜집니다.
+자세한 방법: [Live2D](docs/add-live2d-character.md), [VRM](docs/add-vrm-character.md)
 
----
+기본으로 들어 있는 모델은 배포가 허락된 것뿐이에요. Live2D 공식 샘플(mao_pro, haru, hiyori)과 CC0 VRM 캐릭터 "시노"예요. 저작권이 있는 캐릭터, 그림, 목소리는 이 저장소에 넣지 말아 주세요.
 
-## LLM 설정 (필수)
+## AI 모델
 
-클라우드 LLM용 API 키 **또는** 실행 중인 로컬 LLM, **둘 중 하나**가 필요합니다. 대화에는 저렴한 모델로도 충분하며, 최상급 모델이 필요하지 않습니다.
+"원클릭 설치"로 들어가는 모델은 Ollama의 `qwen2.5:3b`이고, 메모리 8~16GB인 보통 노트북에서 돌아가요. 더 똑똑한 답변을 원하면 "설정 → LLM"에서 더 큰 모델로 바꾸거나 API 키를 쓰세요.
 
-#### 옵션 A — 로컬 Ollama (추천: 무료, 비공개, 계정 불필요)
-설정 마법사에서 **원클릭 설치**를 누르면 [Ollama](https://ollama.com/download) 설치, `qwen2.5:3b`(약 1.9 GB) 다운로드, 전환까지 자동으로 끝납니다 — 터미널 불필요, 재시작 불필요, API 키 없음, 계정 없음, 클라우드 비용 없음, 완전 오프라인, 그리고 당신의 대화는 컴퓨터에 머뭅니다. 보통의 8~16 GB 노트북에서 편안하게 돌아갑니다. 더 똑똑한 답변을 원하면, 더 큰 모델(예: `qwen2.5:7b`)을 pull한 뒤 LLM 설정 탭에서 설정하세요.
+무료 API도 쓸 수 있어요. "사용자 지정 엔드포인트(고급)"를 고르고 base URL을 입력하세요.
 
-#### 옵션 B — Ollama를 통한 클라우드 모델 (무료 계정; PC가 약하면 좋음)
-Ollama는 자사 서버에서 *더 큰* 모델을 돌릴 수 있어, 느린 컴퓨터에서도 좋은 답변을 받습니다. 무료 등급이지만 계정이 필요하고, 먼저 모델을 pull해야 합니다:
-1. [ollama.com/download](https://ollama.com/download)에서 Ollama를 설치합니다(v0.12+).
-2. [ollama.com](https://ollama.com)에서 무료 계정을 만든 뒤, 터미널에서 `ollama signin`을 실행합니다.
-3. **`ollama pull gpt-oss:20b-cloud`를 실행하세요 — 작동하려면 먼저 pull해야 합니다.** (설정에서 이름만 입력하는 것으로는 충분하지 않습니다.)
-4. LLM 설정 탭에서 Ollama를 선택하고, 모델을 `gpt-oss:20b-cloud`로 설정합니다.
+- Gemini: `https://generativelanguage.googleapis.com/v1beta/openai/`
+- Groq: `https://api.groq.com/openai/v1`
+- Cerebras: `https://api.cerebras.ai/v1`
 
-`gpt-oss:20b-cloud`는 무료 등급에 가장 적합한 가벼운 모델입니다. `qwen3.5:cloud`나 `minimax-m3:cloud`는 더 강력하지만 무료 한도를 더 빨리 소진합니다.
-
-> **"무료"에 대해 솔직히:** 신용카드 없이 $0, 무료 계정만 있으면 됩니다 — 다만 *가벼운 사용*용 등급입니다: 한 번에 클라우드 모델 하나, 세션 한도는 약 5시간마다 초기화되고 주간 한도도 있으며, Ollama가 정확한 수치를 공개하지 않으므로 많이 대화하면 초기화될 때까지 한도에 도달할 수 있습니다. 추론은 **Ollama의 서버**에서 돌아가므로, 완전히 비공개로 두고 싶은 내용은 보내지 마세요. 클라우드 모델은 프리뷰(preview) 단계입니다 — **의존하기 전에, 한 번 제대로 답하는지 확인하세요.**
-
-#### 옵션 C — 무료 호스팅 API 키 (Gemini / Cerebras / Groq)
-무료 선택지 중 채팅 품질이 가장 좋습니다. 무료 계정을 만들고(신용카드 불필요), API 키를 생성한 뒤, LLM 설정 탭에서 해당하는 base URL과 함께 붙여넣습니다:
-- **Google AI Studio(Gemini):** `https://generativelanguage.googleapis.com/v1beta/openai/` — 무료 등급이 넉넉함. 단, Google이 무료 등급 대화를 제품 개선에 사용할 수 있다는 점에 유의하세요.
-- **Cerebras:** `https://api.cerebras.ai/v1` — 매우 빠름, 하루 약 100만 토큰 무료(무료 등급은 context window가 짧음).
-- **Groq:** `https://api.groq.com/openai/v1` — 매우 빠름, 하루 토큰 상한 있음.
-
-각 제공업체 문서에 있는 최신 모델 이름을 사용하세요. 당신의 대화는 해당 제공업체로 전송되며, 무료 등급에는 속도 제한이 있습니다.
-
-#### 옵션 D — 유료 클라우드 API 키 (OpenAI / Claude / Gemini)
-이미 유료로 쓰고 있다면, 마법사에 키를 붙여넣기만 하면 됩니다. 품질이 가장 높고, 작은 모델은 보통 대화 한 번에 몇 원 수준입니다.
-
-### ⚠️ 추론("thinking") 모델은 추론을 꺼야 사용할 수 있습니다
-
-**`glm-4.7:cloud`** 같은 추론 모델은 답변을 별도의 `reasoning` 필드에 넣고, 일반 `content` 필드는 **비워 둡니다**. 이 앱은 `content`만 읽기 때문에, 추론 모델은 **빈 응답**으로 나타납니다 — 그리고 읽어 줄 내용이 없으니 **음성도 나오지 않습니다**.
-
-**권장:** 일반(비추론) 대화 모델을 고르세요. 작고 빠른 모델이 어차피 더 자연스럽고 지연이 적은 대화를 만들어 줍니다.
-
-**그래도 쓰고 싶다면:** 대부분의 엔드포인트에서 추론을 끌 수 있고, 끄면 일반 대화 모델처럼 동작합니다. `conf.yaml`의 LLM 블록에 `extra_body`를 추가하세요:
+일반 대화 모델을 고르세요. 추론(reasoning) 모델은 답을 다른 칸에 넣어서 앱이 읽지 못하고, 답변이 비어 있고 목소리도 안 나와요. 꼭 써야 한다면 `conf.yaml`의 LLM 설정에 아래를 추가하세요.
 
 ```yaml
 extra_body:
   reasoning_effort: 'none'
 ```
 
-파라미터 이름은 제공자마다 다르므로 엔드포인트 문서를 확인하세요. LM Studio에서 `qwen3.5`로 실측한 결과 `reasoning_effort`만 동작했고, `chat_template_kwargs.enable_thinking`, 프롬프트 앞의 `/no_think`, `reasoning.enabled`는 모두 조용히 무시되었습니다. 추론을 끄면 큰 지연도 사라집니다: 켜 둔 상태에서는 한 문장을 말하기까지 수천 자를 추론에 썼습니다.
+## 음성
 
-> 수동 편집: LLM 설정은 `conf.yaml`의 `character_config → agent_config → llm_configs → openai_compatible_llm` 아래에 있습니다. 파일 안의 주석이 자신의 키로 OpenAI / Claude / Gemini를 가리키는 방법을 보여 줍니다. 편집 후에는 런처를 재시작하세요.
+기본은 무료 edge-tts이고, 인터넷 연결이 필요해요.
 
----
+내 컴퓨터에서 돌아가는 더 자연스러운 목소리를 원하면, 마법사나 "설정 → TTS"에서 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)를 원클릭으로 설치할 수 있어요. Apple 실리콘 Mac(다운로드 약 3.8GB)과 Windows(약 8.2GB)를 지원해요. 기본 목소리는 츠쿠요미짱 코퍼스(CV. 유메사키 레이)예요.
 
-## 기타 설정
+설치 위치는 `~/Library/Application Support/Tomoshibi/GPT-SoVITS`(macOS) 또는 `%LOCALAPPDATA%\Tomoshibi\GPT-SoVITS`(Windows)예요. 필요 없어지면 그 폴더를 지우면 돼요. GPT-SoVITS를 이미 직접 돌리고 있다면 [이 문서](docs/custom-voice-gpt-sovits.md)를 보세요.
 
-### 기억 (핵심 + 심층 회상)
-기본으로 켜져 있습니다. 각 캐릭터는 `chat_history/<conf_uid>/core_memory.md`에 자신의 기억을 보관합니다 — 페르소나에 주입되는 핵심 기억에 더해, 매 대화 차례마다 LLM이 정리합니다(무엇을 남길지는 모델이 판단).
+실제 사람의 목소리를 참조 음성으로 쓴다면, 그에 대한 법적 책임은 본인에게 있어요.
 
-### 캐릭터
-앱 안에서 캐릭터를 생성 / 편집 / 전환 / 삭제합니다 — 각자 고유한 이름, 페르소나, 아바타 모델(Live2D **또는** VRM), 음성, 그리고 **분리된 기억**을 가집니다. 자신의 모델을 추가하려면 폴더를 `live2d-models/` 나 `vrm-models/` 에 넣고 캐릭터 설정을 열기만 하면 됩니다 — 앱이 찾아서 등록합니다. 버전 관리에 포함된 것은 동봉된 Live2D 공식 샘플 3개뿐이고, 직접 넣은 모델은 로컬에 남습니다. `model_dict.json` 도 마찬가지입니다.
+## 자주 묻는 질문
 
-#### 더 많은 캐릭터 (선택)
-라이선스 안전을 위해, Tomoshibi는 재배포가 허용된 자산만 기본 제공합니다: **무료 Live2D 오리지널 캐릭터 3개**(`mao_pro`, `haru`, `hiyori`)와 **CC0 VRM 캐릭터 1개**(`Sendagaya_Shino`, 모션 클립은 MIT — `vrm-models/Sendagaya_Shino/NOTICE.md` 참고). 더 많이 원하시나요 — 남성 집사 캐릭터 **Natori**까지 포함해서? 무료 공식 Live2D 샘플 모델을 직접 공식 페이지에서 받아 넣을 수 있습니다. **[Live2D 샘플 모델 페이지](https://www.live2d.com/en/learn/sample/)**에서 Live2D 자체 라이선스에 따라 받으세요 — 우리는 그것들을 재배포하지 않습니다. 방법은 [`docs/add-live2d-character.md`](docs/add-live2d-character.md)를 참고하세요.
+**글자는 나오는데 목소리가 안 나와요**
+GPT-SoVITS는 실행 후 불러오는 데 1분쯤 걸려요. 그래도 안 나오면 "설정 → TTS"에서 Edge TTS로 돌려 놓으세요.
 
-### 성능 프리셋
-**경량 / 표준 / 고성능** 프리셋은 ASR/TTS 엔진 선택, 기억 정리 빈도, 모델 keep-alive를 한 번에 묶어 둡니다. 사양이 낮은 컴퓨터에서는 경량을, 하드웨어가 충분하면 고성능을 고르세요.
+**캐릭터가 대답을 안 해요**
+아직 AI가 연결되지 않았어요. "설정 → LLM"에서 설정하세요. Ollama를 쓴다면 Ollama 앱이 실행 중인지 확인하세요.
 
-### 능동적 화제 & 뉴스
-캐릭터는 일정 시간 동안 조용하면 화제를 꺼냅니다. 선택적으로, 번들된 뉴스 헬퍼(`scripts/news_topics.py`)로 최신 헤드라인을 가져와 그 화제를 갱신할 수 있고 — 순수 표준 라이브러리, API 키 불필요 — 이를 일정에 맞춰(cron / launchd / Task Scheduler) 예를 들어 몇 시간마다 실행할 수 있습니다.
+**앱이 안 열리거나 창이 바로 닫혀요**
+먼저 최신 버전으로 업데이트하세요. 그래도 안 되면 `conf.yaml`에서 `asr_model: 'faster_whisper'`를 `asr_model: 'sherpa_onnx_asr'`로 바꾸세요.
 
-### 번역
-선택적인 다국어 자막/음성 번역, **기본값은 꺼짐**입니다(`conf.yaml`의 `tts_preprocessor_config → translator_config`).
+## 다른 문서
 
-### 음성
-기본값은 **edge-tts**(무료, 하드웨어 불필요)입니다. 고품질의 로컬/맞춤 음성을 원하면 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)를 서비스로 실행하고 설정이 그것을 가리키게 하세요(GPU 또는 Apple Silicon 필요). 실제 사람의 목소리를 음성 복제(voice-cloning)하는 것에 대한 법적 책임은 당신에게 있습니다. `fun_asr`, `coqui_tts`, `silero_vad`를 쓰려면 PyTorch도 필요합니다: `uv sync --extra torch`.
+- [휴대폰이나 태블릿에서 쓰기(Tailscale)](docs/remote-access-tailscale.md)
+- [장면](docs/scene-management.md), [무대 효과](docs/stage-effects.md), [화면 설명](docs/ui-features.md)
 
----
+## 크레딧과 라이선스
 
-## 문제 해결
+Tomoshibi는 [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber)를 바탕으로 만들었어요. 원래 프로젝트도 응원해 주세요.
 
-**앱이 열리지 않거나 검은 창이 바로 닫힙니다.**
-보통 예전 빌드가 복구하지 못하는 설정·엔진 선택이 원인입니다. **최신 릴리스**를 받으세요(예전 설정이어도 열립니다). 업데이트하기 싫다면: 앱 폴더의 `conf.yaml`을 열어 `asr_model: 'faster_whisper'`를 `asr_model: 'sherpa_onnx_asr'`로 바꾸고 저장한 뒤 다시 실행하세요. (`conf.yaml.backup`은 복원하지 마세요 — 같은 잘못된 설정이 들어 있습니다.)
-
-**글로는 답하는데 소리가 안 납니다.**
-최신 릴리스로 업데이트하고(Windows에 필요한 오디오 도구가 포함됨), 런처를 다시 실행해 의존성을 갱신하세요. 음성(TTS) 엔진을 GPT-SoVITS로 바꿨다면 별도 서비스가 필요합니다 —— 설정 → 성능에서 **Edge TTS**로 되돌리면 무료 내장 음성을 쓸 수 있습니다.
-
-**첫 실행에서 브라우저에 "사이트에 연결할 수 없음 / 연결이 거부됨"이 뜹니다.**
-서버가 아직 시작 중입니다 —— 첫 실행은 약 1GB 음성 모델을 내려받느라 몇 분 걸립니다. 검은 창을 열어 두고, 실행 중이라는 메시지가 나오면 `http://localhost:12393`을 새로고침하세요. 최신 릴리스는 준비가 되면 브라우저를 자동으로 엽니다.
-
-**Windows: "Windows의 PC 보호"(SmartScreen)가 뜨거나 아무 일도 안 일어나는 것 같습니다.**
-**추가 정보 → 실행**을 누르세요 —— 이건 런처이지 바이러스가 아닙니다(서명이 없을 뿐). 백신이 일회성 `uv` 설치를 막았다면 앱을 허용하고 다시 실행하거나, <https://docs.astral.sh/uv/getting-started/installation/>에서 `uv`를 수동 설치한 뒤 재시도하세요.
-
-**macOS: "열 수 없음" / "Apple이 확인할 수 없음".**
-**완료**를 누르고 **시스템 설정 → 개인정보 보호 및 보안 → 그래도 열기**. 처음 한 번만 하면 됩니다. (이전 macOS에서는 우클릭 → **열기**로도 됩니다.)
-
-**열리는데 답이 없거나 AI 두뇌가 설정되지 않았다고 나옵니다.**
-아직 LLM 설정이 필요합니다. 설정 마법사(또는 설정 → 모델)를 열어 API 키(OpenAI / Claude / Gemini)를 붙여넣거나 로컬 Ollama 모델을 고르세요. 로컬은 **Ollama 앱이 설치되어 실행 중**이고 모델이 다운로드되어 있어야 합니다.
-
-**Claude에서 웹 검색/도구가 작동하지 않습니다.**
-설정 마법사는 Claude를 호환 엔드포인트로 연결해 도구가 전달되지 않으므로, 실험적 웹 검색/도구 토글이 Claude에서는 효과가 없을 수 있습니다. 도구를 쓰려면 GPT-4o나 Gemini 같은 도구 호출 지원 모델, 또는 성능 있는 로컬 모델을 쓰세요. (Claude로 일반 대화는 정상 동작합니다.)
-
----
-
-## 가이드
-
-- [휴대폰 / 태블릿에서 사용하기 (Tailscale)](docs/remote-access-tailscale.md) — 집 네트워크 밖에서도 다른 기기에서 캐릭터와 대화할 수 있습니다.
-- [GPT-SoVITS로 맞춤 음성 만들기](docs/custom-voice-gpt-sovits.md) — 캐릭터에게 복제하거나 맞춤 제작한 음성을 입혀 보세요.
-- [자신의 Live2D 캐릭터 추가하기](docs/add-live2d-character.md) — 모델을 넣고 그것으로 전환하세요.
-- [자신의 VRM(3D) 캐릭터 추가하기](docs/add-vrm-character.md) — 폴더 구조, 표정과 모션 매핑, 카메라 구도.
-- [장면 관리](docs/scene-management.md)・[무대 연출](docs/stage-effects.md)・[UI 기능](docs/ui-features.md) — 배경, 등장 연출, 각 패널의 역할.
-
-## 크레딧 & 라이선스
-
-이 프로젝트는 그것이 기반으로 삼은 상류(upstream) 작업 없이는 존재할 수 없었습니다. [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber)에도 **star를 누르고 후원해** 주세요.
-
-- **상류(Upstream):** [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) — 그 서버 측 코드는 MIT이며, Copyright (c) 2025 Yi-Ting Chiu입니다.
-- **Tomoshibi가 직접 추가한 것**(장기 기억, 능동적 대화, 그룹 대화, 무대 연출, 그리고 이 모두를 위한 앱 내 설정 화면, 5개 언어 UI) — MIT.
-- **Tomoshibi 자체의 변경**(데스크톱/웹 클라이언트를 상류 Open-LLM-VTuber-Web에서 재구축, 리브랜딩, 5개 언어 UI) — MIT.
-- **번들된 웹 프론트엔드** — `frontend/`에 있는 컴파일된 웹 번들은 Open-LLM-VTuber-Web 프론트엔드이며, **Open-LLM-VTuber License 1.0**(Apache-2.0 + 추가 조건) 하에 있습니다. 무료, 비상업적 사용 및 재배포는 허용됩니다. 상업적 리브랜딩, 유료 호스팅/SaaS, 또는 유료 제품에 임베드하는 경우에는 Open-LLM-VTuber 조직으로부터 별도의 상업 라이선스를 받아야 합니다. 이 fork는 무료이고 비상업적이므로 해당 라이선스가 허용하는 범위 안에 있습니다. [`NOTICE`](./NOTICE)를 참고하세요.
-- **Live2D Cubism & 번들된 샘플 모델** — 번들된 **mao_pro** / **haru** / **hiyori** 모델은 Live2D Inc.의 샘플 데이터이며, **Live2D Free Material License** 하에 사용됩니다(자세한 내용은 [`LICENSE-Live2D.md`](./LICENSE-Live2D.md)). 필수 출처 표기:
+- 이 프로젝트의 자체 코드는 MIT예요. 업스트림 서버 코드도 MIT예요(Copyright (c) 2025 Yi-Ting Chiu).
+- `frontend/`의 웹 프론트엔드는 Open-LLM-VTuber License 1.0(Apache-2.0과 추가 조건)이에요. 상업적으로 쓰려면 별도 라이선스가 필요해요.
+- 들어 있는 Live2D 샘플 모델은 Live2D 무상 제공 자료 라이선스에 따라 쓰고 있어요. 유료 버전이나 상업 버전에서는 반드시 바꿔야 해요([`LICENSE-Live2D.md`](./LICENSE-Live2D.md)).
   > This content uses sample data owned and copyrighted by Live2D Inc.
+- 다른 구성 요소의 라이선스는 [`NOTICE`](./NOTICE)에 있어요.
 
-  이들은 무료 기본값으로 **수정 없이** 번들되어 있습니다. **유료/상업 빌드에서는 반드시** 자신의 CC0 / 라이선스를 받은 / 의뢰 제작한 모델로 **교체하세요.**
-- **기타 구성 요소**(각 라이선스는 [`NOTICE`](./NOTICE) 참고): GPT-SoVITS (MIT, 선택적 TTS), sherpa-onnx (Apache-2.0, ASR 엔진 — SenseVoice 모델은 자체 라이선스가 있음; 또는 Whisper 사용), Silero VAD (MIT), edge-tts (Microsoft의 온라인 TTS 서비스 사용), DeepLX (비공식 DeepL 엔드포인트 — 프로덕션에는 공식 DeepL API 사용).
+## 후원
 
-**저작권 있는 캐릭터, 아트워크, 음성, 또는 학습된 음성 모델을 배포하지 마세요.** 이 repo는 중립적인 기본값만 제공합니다. 나머지는 직접 가져오세요.
-
-### License
-
-이 fork 자체의 소스 코드는 **MIT License** 하에 공개되며, Open-LLM-VTuber의 MIT 라이선스 서버 코드(Copyright (c) 2025 Yi-Ting Chiu) 위에 올라가 있습니다. 다만 **프로젝트 전체가 단순히 MIT인 것은 아닙니다**: `frontend/`에 번들된 컴파일 웹 프론트엔드는 **Open-LLM-VTuber License 1.0**(Apache-2.0 + 추가 조건) 하에 있고, 번들된 Live2D 샘플 모델은 각자의 Live2D 조건을 따릅니다. 완전하고 정확한 내용은 [`LICENSE`](./LICENSE), [`NOTICE`](./NOTICE), 그리고 [`LICENSE-Live2D.md`](./LICENSE-Live2D.md)를 참고하세요.
-
----
-
-## 이 프로젝트 후원하기
-
-이건 무료 오픈소스 프로젝트입니다 — 페이월은 없습니다. 도움이 되었다면 후원은 감사하지만, 절대 필수는 아닙니다:
-
-- **Ko-fi:** [ko-fi.com/leonhsueh](https://ko-fi.com/leonhsueh)
-- **GitHub Sponsors:** 곧 공개
-
-그리고 이 프로젝트가 기반으로 삼은 상류 프로젝트 — [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber)도 후원해 주세요.
-
----
-
-## 기여하기
-
-Issue와 pull request를 환영합니다.
-
-- 버그와 기능 아이디어는 **Issues**에 올려 주세요.
-- 코드 변경은 명확한 설명과 함께 **Pull Request**를 열어 주세요.
-- 저작권 있는 캐릭터, 아트워크, 음성, 또는 학습된 음성 모델은 **추가하지 말아 주세요** — repo가 중립적인 기본값만으로 배포 가능한 상태를 유지하도록 해 주세요.
+도움이 됐다면 [Ko-fi](https://ko-fi.com/leonhsueh)에서 후원해 주세요. 질문이나 아이디어는 issue나 PR로 남겨 주세요.
