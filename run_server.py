@@ -192,6 +192,13 @@ def run(console_log_level: str, open_browser: bool = False):
         else:
             logger.warning("conf.yaml not found and no default template available.")
 
+    # model_dict.json 也是同一個模式（不進版控，首次執行從 config_templates 複製）。
+    # 原本只有角色相關的 API 在讀取時才會補，但開機時 AvatarModel 就直接讀它了——
+    # 全新的 clone 或桌面版的全新工作目錄因此在啟動時就找不到檔案。
+    from src.open_llm_vtuber.character_route import _ensure_model_dict
+
+    _ensure_model_dict()
+
     # Load configurations from yaml file
     config: Config = validate_config(read_yaml("conf.yaml"))
     server_config = config.system_config

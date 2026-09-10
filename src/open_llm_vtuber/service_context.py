@@ -844,6 +844,16 @@ class ServiceContext:
             ):
                 continue
 
+            # 模型載入失敗時 init_live2d 會留下 None 並「繼續跑」，這三份 prompt
+            # 都在描述模型的表情與動作，沒有模型就沒有東西可教——而且下面每一條
+            # 都會去讀 live2d_model 的屬性，不先跳過的話開機就直接炸掉。
+            if self.live2d_model is None and prompt_name in (
+                "live2d_motion_prompt",
+                "vrm_motion_prompt",
+                "live2d_expression_prompt",
+            ):
+                continue
+
             # 動作 prompt 分兩份，依模型類型擇一。兩者的動作清單形狀不同：
             # VRM 的每個關鍵字後面帶一句描述（來自 motionMap 的 label），
             # Live2D 那幾個模型只有 gesture_1／motion_2 這種沒有語意的名字。
