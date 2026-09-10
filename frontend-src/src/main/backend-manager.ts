@@ -81,7 +81,7 @@ async function probe(): Promise<boolean> {
   }
 }
 
-function childEnv(): NodeJS.ProcessEnv {
+function childEnv(uv: string): NodeJS.ProcessEnv {
   const env: NodeJS.ProcessEnv = {
     ...process.env,
     // Windows 的主控台編碼是 cp950／cp936，log 裡的中文和 emoji 寫進 pipe 會直接
@@ -92,6 +92,9 @@ function childEnv(): NodeJS.ProcessEnv {
     // 一律用 uv 自己下載的 Python。否則系統上剛好有個 3.10（Homebrew、conda、
     // Microsoft Store 版）就會被拿去用，每台機器裝出來的環境都不一樣。
     UV_PYTHON_PREFERENCE: 'only-managed',
+    // 設定精靈的「一鍵安裝 GPT-SoVITS」要用 uv 建它自己的 Python 環境
+    // （gpt_sovits_installer.py）。使用者電腦上不一定有 uv，給它內附的這一個。
+    TOMOSHIBI_UV: uv,
   };
   // 從啟用了 venv 的終端機開 app 時，這些會把 uv 和 Python 指到別的環境去。
   for (const key of ['VIRTUAL_ENV', 'UV_PROJECT_ENVIRONMENT', 'PYTHONPATH', 'PYTHONHOME', 'CONDA_PREFIX']) {
@@ -227,7 +230,7 @@ export class BackendManager {
     this.write(`[desktop] $ ${command} ${args.join(' ')}`);
     const proc = spawn(command, args, {
       cwd: this.workspace,
-      env: childEnv(),
+      env: childEnv(this.uvPath()),
       windowsHide: true, // 否則 Windows 會為 uv 和 python 各彈一個黑色主控台視窗
     });
     this.child = proc;

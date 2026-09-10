@@ -3,7 +3,7 @@
 // 刻意不含 React：這些是純資料轉換，所以能用 node:test 驗證。表單元件只負責
 // 呈現與狀態，送出前的欄位組裝與驗證都在這裡。
 
-import { apiGet, apiPost, buildUrl, type ApiResult } from './http.ts'
+import { apiGet, apiPost, postNdjsonStream, type ApiResult } from './http.ts'
 
 export type LlmMode = 'apikey' | 'ollama' | 'custom'
 export type ApiKeyProvider = 'openai' | 'claude' | 'gemini'
@@ -144,88 +144,13 @@ export const applyDetectedModel = (
 // --- Ollama 一鍵下載推薦模型 -------------------------------------------------- //
 //
 // POST /api/llm-config/ollama-pull 把 Ollama 的下載進度逐行轉成 NDJSON 串流
-// 給前端（見 llm_config_route.py 的 stream()）。這條路徑走不了 apiPost：
-// http.ts 的 request() 一次把整個回應當 JSON 讀完，串流要邊收邊解析，所以另外
-// 用一個薄的 fetch + ReadableStream，錯誤處理沿用 http.ts 的風格（絕不讓例外
-// 逸出、一律回傳一個帶 ok 欄位的結果、技術性錯誤訊息用中文字面量而不是 i18n
-// ——跟 buildUrl/normalizeError 旁邊那些逾時／網路錯誤訊息一致）。
+// 給前端（見 llm_config_route.py 的 stream()），解析在 http.ts 的 postNdjsonStream。
 
 export interface OllamaPullEvent {
   status?: string
   error?: string
   completed?: number
   total?: number
-}
-
-// ollama-pull 與 ollama-install 回傳同一種 NDJSON 事件，共用這一段解析。
-async function postNdjsonStream(
-  baseUrl: string,
-  path: string,
-  body: unknown,
-  onEvent: (event: OllamaPullEvent) => void,
-  messages: { failed: string; incomplete: string },
-): Promise<{ ok: boolean; error?: string }> {
-  let res: Response
-  try {
-    res = await fetch(buildUrl(baseUrl, path), {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : '網路錯誤' }
-  }
-
-  // 目前的後端實作一律回 200，失敗都包成 NDJSON 裡的 {"status":"error",...}
-  // （見 llm_config_route.py 的 stream()）。這裡多檢查一次 res.ok 只是防禦——
-  // 萬一請求被中間層擋下（例如反向代理回 502 HTML 頁），不要把那份 HTML
-  // 當成串流逐行硬解析，直接用狀態碼給一句看得懂的錯誤。
-  if (!res.ok) {
-    return { ok: false, error: `請求失敗（HTTP ${res.status}）` }
-  }
-
-  if (!res.body) {
-    return { ok: false, error: '瀏覽器不支援串流回應。' }
-  }
-
-  const reader = res.body.getReader()
-  const decoder = new TextDecoder()
-  let buffer = ''
-  let sawError: string | null = null
-  let sawSuccess = false
-
-  try {
-    for (;;) {
-      // eslint-disable-next-line no-await-in-loop
-      const { done, value } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() ?? ''
-      for (const line of lines) {
-        if (!line.trim()) continue
-        let parsed: OllamaPullEvent
-        try {
-          parsed = JSON.parse(line)
-        } catch {
-          continue
-        }
-        onEvent(parsed)
-        if (parsed.error || parsed.status === 'error') {
-          sawError = parsed.error || messages.failed
-        }
-        if (parsed.status === 'success') {
-          sawSuccess = true
-        }
-      }
-    }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : '串流中斷。' }
-  }
-
-  if (sawError) return { ok: false, error: sawError }
-  if (!sawSuccess) return { ok: false, error: messages.incomplete }
-  return { ok: true }
 }
 
 export const pullOllamaModel = (

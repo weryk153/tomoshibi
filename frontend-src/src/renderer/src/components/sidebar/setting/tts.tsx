@@ -59,6 +59,7 @@ import {
 import { gptSovitsLangLabelKey } from '@/utils/gpt-sovits-langs';
 // 這個對照原本寫死在這裡，角色編輯器也要用，抽到 utils 共用避免兩份漂移。
 import { ttsModelLabelKey } from '@/utils/tts-models';
+import GptSovitsInstall from '@/components/llm/gpt-sovits-install';
 
 
 // 這個引擎沒有 api_url／ref_audio_path 就跑不起來——service_context.py
@@ -349,6 +350,14 @@ function TTS({ active = true }: TTSProps): JSX.Element {
   const characterOverride = perf?.engine_overrides_by_character?.[confName]?.tts_model
     || null;
 
+  // 一鍵裝好之後，後端已經把引擎切到 GPT-SoVITS。重新讀一次，讓選單和欄位跟上。
+  const handleVoiceInstalled = useCallback(async () => {
+    const result = await fetchPerf(baseUrl);
+    if (!result.ok) return;
+    setPendingEngine(null);
+    applySaveResult({ ...result.data, restart_required: false });
+  }, [baseUrl, applySaveResult]);
+
   return (
     <Stack {...settingStyles.common.container} gap={2}>
       <Heading size="sm">{t('settings.perf.ttsSectionTitle')}</Heading>
@@ -369,6 +378,9 @@ function TTS({ active = true }: TTSProps): JSX.Element {
         </Text>
       )}
       <Text fontSize="xs" color="whiteAlpha.600">{t('settings.perf.ttsEngineHelp')}</Text>
+
+      {/* 還沒裝 GPT-SoVITS 的人在這裡也能一鍵裝：精靈裡跳過的人不必自己找教學。 */}
+      <GptSovitsInstall baseUrl={baseUrl} onInstalled={handleVoiceInstalled} />
 
       {loadError && (
         <Text fontSize="sm" color="red.300">{loadError}</Text>

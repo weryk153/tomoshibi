@@ -20,6 +20,7 @@ import { useLocalStorage } from '@/hooks/utils/use-local-storage';
 import { fetchLlmConfig, type LlmSaveResult } from '@/api/llm-config.ts';
 import LlmForm from './llm-form';
 import AvatarKindStep from './avatar-kind-step';
+import GptSovitsInstall from './gpt-sovits-install';
 import { useSwitchCharacter } from '@/hooks/utils/use-switch-character';
 
 const SKIP_STORAGE_KEY = 'setupWizardSkipped';
@@ -43,6 +44,8 @@ function FirstRunWizard(): JSX.Element | null {
   // Live2D，不去角色設定翻的人不會知道有 3D。AvatarKindStep 在沒得選（只有一種
   // 類型）或查詢失敗時會自己呼叫 onDone，所以這裡不必重複判斷。
   const [avatarPicked, setAvatarPicked] = useState(false);
+  // 最後問要不要裝本機語音。沒得裝時 GptSovitsInstall 自己會呼叫 onDone。
+  const [voiceDone, setVoiceDone] = useState(false);
   // 必須在下面的提早 return 之前呼叫——hook 的數量每次渲染都要一樣，放在 return
   // null 之後的話，精靈從隱藏變顯示那一次會多一個 hook，React 直接讓整個 app 崩潰。
   const { reloadCharacter } = useSwitchCharacter();
@@ -108,6 +111,8 @@ function FirstRunWizard(): JSX.Element | null {
 
         {savedResult && !avatarPicked ? (
           <AvatarKindStep baseUrl={baseUrl} onDone={() => setAvatarPicked(true)} />
+        ) : savedResult && !voiceDone ? (
+          <GptSovitsInstall baseUrl={baseUrl} onDone={() => setVoiceDone(true)} />
         ) : savedResult ? (
           <Stack gap={4}>
             <Stack gap={1}>

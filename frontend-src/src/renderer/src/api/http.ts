@@ -75,3 +75,85 @@ export const apiPut = <T>(
   body: unknown,
   timeoutMs = DEFAULT_TIMEOUT_MS,
 ) => request<T>('PUT', baseUrl, path, body, timeoutMs)
+
+// --- NDJSON 串流 --------------------------------------------------------------- //
+//
+// 安裝與下載的進度逐行以 NDJSON 串流回來（ollama-pull、ollama-install、
+// gpt-sovits/install）。request() 一次把整個回應當 JSON 讀完，串流要邊收邊解析，
+// 所以另外用一個薄的 fetch + ReadableStream。錯誤處理跟 request() 一樣：絕不讓
+// 例外逸出、一律回傳帶 ok 欄位的結果、技術性錯誤訊息用中文字面量而不是 i18n。
+
+export interface StreamEvent {
+  status?: string
+  error?: string
+}
+
+export async function postNdjsonStream<E extends StreamEvent>(
+  baseUrl: string,
+  path: string,
+  body: unknown,
+  onEvent: (event: E) => void,
+  messages: { failed: string; incomplete: string },
+): Promise<{ ok: boolean; error?: string }> {
+  let res: Response
+  try {
+    res = await fetch(buildUrl(baseUrl, path), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '網路錯誤' }
+  }
+
+  // 目前的後端實作一律回 200，失敗都包成 NDJSON 裡的 {"status":"error",...}
+  // （見 llm_config_route.py 的 stream()）。這裡多檢查一次 res.ok 只是防禦——
+  // 萬一請求被中間層擋下（例如反向代理回 502 HTML 頁），不要把那份 HTML
+  // 當成串流逐行硬解析，直接用狀態碼給一句看得懂的錯誤。
+  if (!res.ok) {
+    return { ok: false, error: `請求失敗（HTTP ${res.status}）` }
+  }
+
+  if (!res.body) {
+    return { ok: false, error: '瀏覽器不支援串流回應。' }
+  }
+
+  const reader = res.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let sawError: string | null = null
+  let sawSuccess = false
+
+  try {
+    for (;;) {
+      // eslint-disable-next-line no-await-in-loop
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+      for (const line of lines) {
+        if (!line.trim()) continue
+        let parsed: E
+        try {
+          parsed = JSON.parse(line)
+        } catch {
+          continue
+        }
+        onEvent(parsed)
+        if (parsed.error || parsed.status === 'error') {
+          sawError = parsed.error || messages.failed
+        }
+        if (parsed.status === 'success') {
+          sawSuccess = true
+        }
+      }
+    }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '串流中斷。' }
+  }
+
+  if (sawError) return { ok: false, error: sawError }
+  if (!sawSuccess) return { ok: false, error: messages.incomplete }
+  return { ok: true }
+}
