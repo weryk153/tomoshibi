@@ -66,6 +66,8 @@ pnpm run build:web     # Build web version
 
 Both land in `extraResources`, outside the asar. At launch, `src/main/backend-manager.ts` copies the backend into `userData/backend` (the app directory is read-only; the backend writes conf.yaml, history and models relative to its cwd), runs `uv sync --frozen --no-dev`, starts `run_server.py` and waits for `/api/characters` before creating the main window; `src/main/startup-window.ts` shows progress meanwhile. If a Tomoshibi backend already answers on 12393 it is reused. Dev mode (`pnpm run dev`) never spawns anything.
 
+macOS builds are ad-hoc signed by `scripts/adhoc-sign.cjs` (electron-builder `afterPack`). Without it, packaging invalidates Electron's own ad-hoc signature and Apple Silicon reports a downloaded app as **"damaged"** with no way to allow it; with it, users get the ordinary "Apple could not verify" prompt they can override in System Settings → Privacy & Security. Check a build with `codesign --verify --deep --strict <app>`.
+
 CI runs `scripts/smoke-backend.mjs` after packaging, which repeats those steps headlessly on both OSes. Keep its env and commands in sync with `backend-manager.ts`.
 
 ### Code quality
