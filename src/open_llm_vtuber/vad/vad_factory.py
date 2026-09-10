@@ -1,5 +1,6 @@
 from typing import Type
 from .vad_interface import VADInterface
+from ..utils.optional_deps import reraise_if_torch_missing
 
 
 class VADFactory:
@@ -8,7 +9,10 @@ class VADFactory:
         if engine_type is None:
             return None
         if engine_type == "silero_vad":
-            from .silero import VADEngine as SileroVADEngine
+            try:
+                from .silero import VADEngine as SileroVADEngine
+            except ModuleNotFoundError as e:
+                reraise_if_torch_missing(e, "silero_vad")
 
             return SileroVADEngine(
                 kwargs.get("orig_sr"),

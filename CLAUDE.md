@@ -157,3 +157,4 @@ Uses **uv** (modern Python package manager):
 - Lock file: `uv.lock`
 - Generated requirements: `requirements.txt` (auto-generated)
 - Optional dependencies for specific features (e.g., `bilibili` extra)
+- **torch is an optional extra, not a default dependency**: only `fun_asr`, `coqui_tts` and `silero_vad` import it, and only when selected. Use `uv sync --extra torch` for those; the factories raise a message saying so when it is missing. Keeping it out of the default install saves ~350MB for everyone, including the desktop app's first launch.

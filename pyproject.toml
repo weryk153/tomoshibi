@@ -33,9 +33,6 @@ dependencies = [
     "sherpa-onnx>=1.10.39",
     "soundfile>=0.12.1",
     "tomli>=2.2.1",
-    "torch==2.2.2; sys_platform == 'darwin' and platform_machine == 'x86_64'",
-    "torch>=2.6.0; sys_platform == 'darwin' and platform_machine == 'arm64'",
-    "torch>=2.6.0; sys_platform != 'darwin'",
     "tqdm>=4.67.1",
     "uvicorn[standard]>=0.33.0",
     "websocket-client>=1.8.0",
@@ -46,6 +43,15 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# torch 只有 fun_asr、coqui_tts、silero_vad 會用到，而且都是選到才 import。
+# 預設設定（sherpa_onnx_asr + edge_tts、不開 VAD）完全不載入它，放在必裝裡
+# 等於讓每個人（包括桌面版首次啟動）多下載約 350MB。要用上面三者：
+#     uv sync --extra torch
+torch = [
+    "torch==2.2.2; sys_platform == 'darwin' and platform_machine == 'x86_64'",
+    "torch>=2.6.0; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "torch>=2.6.0; sys_platform != 'darwin'",
+]
 bilibili = [
     "aiohttp>=3.10.0",
     "Brotli~=1.1.0",

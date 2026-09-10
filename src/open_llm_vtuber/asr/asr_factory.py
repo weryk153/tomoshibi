@@ -1,5 +1,6 @@
 from typing import Type
 from .asr_interface import ASRInterface
+from ..utils.optional_deps import reraise_if_torch_missing
 
 
 class ASRFactory:
@@ -25,7 +26,10 @@ class ASRFactory:
 
             return WhisperASR(**kwargs)
         elif system_name == "fun_asr":
-            from .fun_asr import VoiceRecognition as FunASR
+            try:
+                from .fun_asr import VoiceRecognition as FunASR
+            except ModuleNotFoundError as e:
+                reraise_if_torch_missing(e, "fun_asr")
 
             return FunASR(
                 model_name=kwargs.get("model_name"),

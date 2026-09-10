@@ -1,5 +1,6 @@
 from typing import Type
 from .tts_interface import TTSInterface
+from ..utils.optional_deps import reraise_if_torch_missing
 
 
 class TTSFactory:
@@ -104,7 +105,10 @@ class TTSFactory:
                 gain=kwargs.get("gain"),
             )
         elif engine_type == "coqui_tts":
-            from .coqui_tts import TTSEngine as CoquiTTSEngine
+            try:
+                from .coqui_tts import TTSEngine as CoquiTTSEngine
+            except ModuleNotFoundError as e:
+                reraise_if_torch_missing(e, "coqui_tts")
 
             return CoquiTTSEngine(
                 model_name=kwargs.get("model_name"),
