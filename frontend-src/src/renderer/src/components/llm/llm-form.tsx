@@ -23,6 +23,7 @@ import {
   detectModels,
   applyDetectedModel,
   pullOllamaModel,
+  installOllama,
   type LlmMode,
   type ApiKeyProvider,
   type LlmFormState,
@@ -31,6 +32,8 @@ import {
   type DetectedModel,
   type OllamaPullEvent,
 } from '@/api/llm-config.ts';
+
+const OLLAMA_DOWNLOAD_URL = 'https://ollama.com/download';
 
 interface LlmFormProps {
   onSaved: (result: LlmSaveResult) => void
@@ -186,10 +189,15 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
     note: string | null
   } | null>(null);
 
-  type PullPhase = 'idle' | 'preparing' | 'downloading' | 'error';
+  type PullPhase = 'idle' | 'preparing' | 'downloading' | 'applying' | 'error';
   const [pullPhase, setPullPhase] = useState<PullPhase>('idle');
   const [pullPercent, setPullPercent] = useState<number | null>(null);
   const [pullError, setPullError] = useState<string | null>(null);
+
+  type InstallPhase = 'idle' | 'resolving' | 'downloading' | 'verifying' | 'installing' | 'starting' | 'error';
+  const [installPhase, setInstallPhase] = useState<InstallPhase>('idle');
+  const [installPercent, setInstallPercent] = useState<number | null>(null);
+  const [installError, setInstallError] = useState<string | null>(null);
 
   // /api/llm-config/detect 的 ollama_available／lmstudio_available 曾經是
   // 「探測到至少一顆模型」（bool(models)），跟「daemon 有沒有在跑」是兩件事——
@@ -272,9 +280,9 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
     });
   }, [appliedInfo, onSaved]);
 
-  const handlePullRecommended = useCallback(async () => {
-    if (!detectResult) return;
-    const modelName = detectResult.recommended_pull;
+  // 下載完直接套用，而不是只重新掃一次讓使用者再選。按鈕寫的是「使用 qwen2.5:3b」，
+  // 按完卻還要在清單裡再選一次、再按套用，對新手等於又多了兩個會卡住的地方。
+  const pullAndApply = useCallback(async (modelName: string) => {
     setPullPhase('preparing');
     setPullError(null);
     setPullPercent(null);
@@ -300,11 +308,83 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
       );
       return;
     }
-    // 下載完成：重新掃一次，讓剛下載的模型出現在清單裡可以選。
+
+    setPullPhase('applying');
+    const detected = await detectModels(backendBaseUrl);
+    const chosen = detected.ok
+      ? detected.data.models.find((m) => m.backend === 'ollama' && m.id === modelName)
+      : undefined;
+    const applied = chosen
+      ? await applyDetectedModel(backendBaseUrl, chosen.backend, chosen.id)
+      : null;
     setPullPhase('idle');
     setPullPercent(null);
-    await runDetect();
-  }, [detectResult, backendBaseUrl, runDetect, t]);
+    if (!chosen || !applied || !applied.ok || !applied.data.ok || !applied.data.applied) {
+      // 自動套用不成就退回原本的流程：重新掃描，讓剛下載的模型出現在清單裡手動選。
+      await runDetect();
+      return;
+    }
+    setAppliedInfo({
+      model: applied.data.applied.model,
+      baseUrl: chosen.base_url,
+      note: applied.data.note ?? null,
+    });
+    setApplyPhase('applied');
+  }, [backendBaseUrl, runDetect, t]);
+
+  const handlePullRecommended = useCallback(async () => {
+    if (!detectResult) return;
+    await pullAndApply(detectResult.recommended_pull);
+  }, [detectResult, pullAndApply]);
+
+  // 一鍵：安裝 Ollama → 下載推薦模型 → 套用。整串不用離開 app、不用打指令。
+  const handleOneClickInstall = useCallback(async () => {
+    if (!detectResult) return;
+    const modelName = detectResult.recommended_pull;
+    setInstallPhase('resolving');
+    setInstallError(null);
+    setInstallPercent(null);
+
+    const result = await installOllama(backendBaseUrl, (event: OllamaPullEvent) => {
+      if (event.status === 'downloading' && typeof event.completed === 'number'
+        && typeof event.total === 'number' && event.total > 0) {
+        setInstallPhase('downloading');
+        setInstallPercent(Math.round((event.completed / event.total) * 100));
+      } else if (event.status === 'resolving' || event.status === 'verifying'
+        || event.status === 'installing' || event.status === 'starting') {
+        setInstallPhase(event.status);
+      }
+    });
+
+    if (!result.ok) {
+      setInstallPhase('error');
+      setInstallError(
+        result.error
+          ? t('setup.ollamaOneClickFailed', { error: result.error })
+          : t('setup.ollamaOneClickFailedGeneric'),
+      );
+      return;
+    }
+    setInstallPhase('idle');
+    setInstallPercent(null);
+    await pullAndApply(modelName);
+  }, [detectResult, backendBaseUrl, pullAndApply, t]);
+
+  // 一鍵流程跨兩個階段（裝 Ollama、下載模型），畫面上只顯示目前這一步。
+  const oneClickProgress = (): string | null => {
+    switch (installPhase) {
+      case 'resolving': return t('setup.ollamaOneClickPreparing');
+      case 'downloading': return t('setup.ollamaOneClickDownloading', { percent: installPercent ?? 0 });
+      case 'verifying': return t('setup.ollamaOneClickVerifying');
+      case 'installing': return t('setup.ollamaOneClickInstalling');
+      case 'starting': return t('setup.ollamaOneClickStarting');
+      default: break;
+    }
+    if (pullPhase === 'preparing') return t('setup.ollamaDownloadPreparing');
+    if (pullPhase === 'downloading') return t('setup.ollamaDownloading', { percent: pullPercent ?? 0 });
+    if (pullPhase === 'applying') return t('setup.ollamaApplying');
+    return null;
+  };
 
   const providerCollection = useMemo(
     // 明確標注泛型為 { label: string; value: string }——SelectField 的 collection
@@ -369,7 +449,7 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
             </Text>
             {appliedInfo.note && <NoticeBox text={appliedInfo.note} tone="blue" />}
             <Text fontSize="sm" color="whiteAlpha.700">
-              {t('setup.savedRestart')}
+              {t('setup.savedReady')}
             </Text>
             <Button tone="blue" onClick={handleContinueAfterApply} className="self-start">
               {t('setup.startChatting')}
@@ -459,6 +539,11 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
                       {t('setup.ollamaDownloading', { percent: pullPercent ?? 0 })}
                     </Text>
                   )}
+                  {pullPhase === 'applying' && (
+                    <Text fontSize="sm" color="whiteAlpha.700">
+                      {t('setup.ollamaApplying')}
+                    </Text>
+                  )}
                   {pullPhase === 'error' && pullError && (
                     <Text fontSize="sm" color="red.300">{pullError}</Text>
                   )}
@@ -472,7 +557,59 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
 
             {detectStatus === 'ready' && detectResult && detectResult.models.length === 0
               && !detectResult.ollama_available && !detectResult.lmstudio_available && (
-                <Text fontSize="sm" color="orange.300">{t('setup.detectNothingRunning')}</Text>
+                // 沒裝跟裝了沒開，下一步完全不同。原本兩種都只有一行「請先安裝
+                // Ollama 或 LM Studio」，沒有連結、也沒有重新偵測的按鈕——不會用
+                // 終端機的人卡在這裡，已經裝好只是沒開的人還會以為自己裝失敗。
+                <Stack gap={2}>
+                  {detectResult.ollama_installed ? (
+                    <>
+                      <Text fontWeight="semibold">{t('setup.ollamaNotRunningTitle')}</Text>
+                      <Text fontSize="sm" color="whiteAlpha.700">
+                        {t('setup.ollamaNotRunningDesc')}
+                      </Text>
+                      <Button tone="blue" onClick={() => { void runDetect(); }} className="self-start">
+                        {t('setup.ollamaRecheck')}
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Text fontWeight="semibold">{t('setup.ollamaInstallTitle')}</Text>
+                      <Text fontSize="sm" color="whiteAlpha.700">
+                        {detectResult.ollama_install_supported
+                          ? t('setup.ollamaOneClickDesc', { model: detectResult.recommended_pull })
+                          : t('setup.ollamaInstallDesc')}
+                      </Text>
+                      {oneClickProgress() ? (
+                        <Text fontSize="sm" color="whiteAlpha.700">{oneClickProgress()}</Text>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          {detectResult.ollama_install_supported && (
+                            <Button tone="blue" onClick={() => { void handleOneClickInstall(); }}>
+                              {t('setup.ollamaOneClickButton')}
+                            </Button>
+                          )}
+                          {/* 自己裝的備案。桌面版由 window-manager 的 setWindowOpenHandler 交給系統瀏覽器開 */}
+                          <Button
+                            tone={detectResult.ollama_install_supported ? 'gray' : 'blue'}
+                            variant={detectResult.ollama_install_supported ? 'outline' : 'solid'}
+                            onClick={() => window.open(OLLAMA_DOWNLOAD_URL, '_blank')}
+                          >
+                            {t('setup.ollamaInstallDownloadLink')}
+                          </Button>
+                          <Button tone="gray" variant="outline" onClick={() => { void runDetect(); }}>
+                            {t('setup.ollamaInstallRecheck')}
+                          </Button>
+                        </div>
+                      )}
+                      {installPhase === 'error' && installError && (
+                        <Text fontSize="sm" color="red.300">{installError}</Text>
+                      )}
+                      {pullPhase === 'error' && pullError && (
+                        <Text fontSize="sm" color="red.300">{pullError}</Text>
+                      )}
+                    </>
+                  )}
+                </Stack>
             )}
           </Stack>
         )}

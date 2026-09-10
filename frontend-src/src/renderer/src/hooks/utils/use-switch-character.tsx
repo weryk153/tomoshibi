@@ -37,5 +37,15 @@ export function useSwitchCharacter() {
     console.log('Switch Character fileName: ', fileName);
   }, [confName, getFilenameByName, sendMessage, interrupt, stopMic, setSubtitleText, setAiState, t]);
 
-  return { switchCharacter };
+  // 不換角色，只讓後端重讀一次 conf.yaml 與目前的角色檔——存好 LLM 或外觀之後
+  // 用這個讓設定立刻生效，不必重啟。後端回的是 config-reloaded，不會像
+  // config-switched 那樣跳「角色已切換」或開新對話。
+  const reloadCharacter = useCallback(() => {
+    interrupt();
+    stopMic();
+    setAiState('loading');
+    sendMessage({ type: 'reload-config' });
+  }, [sendMessage, interrupt, stopMic, setAiState]);
+
+  return { switchCharacter, reloadCharacter };
 }

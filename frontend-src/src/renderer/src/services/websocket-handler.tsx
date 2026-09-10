@@ -178,6 +178,10 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
           setConfigFiles(message.configs);
         }
         break;
+      case 'config-reloaded':
+        setAiState('idle');
+        break;
+
       case 'config-switched':
         setAiState('idle');
         setSubtitleText(t('notification.characterLoaded'), 4000);

@@ -20,6 +20,7 @@ import { useLocalStorage } from '@/hooks/utils/use-local-storage';
 import { fetchLlmConfig, type LlmSaveResult } from '@/api/llm-config.ts';
 import LlmForm from './llm-form';
 import AvatarKindStep from './avatar-kind-step';
+import { useSwitchCharacter } from '@/hooks/utils/use-switch-character';
 
 const SKIP_STORAGE_KEY = 'setupWizardSkipped';
 
@@ -42,6 +43,9 @@ function FirstRunWizard(): JSX.Element | null {
   // Live2D，不去角色設定翻的人不會知道有 3D。AvatarKindStep 在沒得選（只有一種
   // 類型）或查詢失敗時會自己呼叫 onDone，所以這裡不必重複判斷。
   const [avatarPicked, setAvatarPicked] = useState(false);
+  // 必須在下面的提早 return 之前呼叫——hook 的數量每次渲染都要一樣，放在 return
+  // null 之後的話，精靈從隱藏變顯示那一次會多一個 hook，React 直接讓整個 app 崩潰。
+  const { reloadCharacter } = useSwitchCharacter();
 
   useEffect(() => {
     if (wsState !== 'OPEN' || checkState !== 'pending') {
@@ -67,7 +71,12 @@ function FirstRunWizard(): JSX.Element | null {
   }
 
   const handleSkip = (): void => setSkipped(true);
-  const handleClose = (): void => setDismissed(true);
+  // 精靈裡存了 LLM、也可能換了 2D/3D 外觀。關掉時請後端重讀一次，兩者立刻生效，
+  // 不用再叫使用者重啟。
+  const handleClose = (): void => {
+    if (savedResult) reloadCharacter();
+    setDismissed(true);
+  };
 
   return (
     <Box
@@ -104,7 +113,7 @@ function FirstRunWizard(): JSX.Element | null {
             <Stack gap={1}>
               <Text fontWeight="bold">{t('setup.savedTitle')}</Text>
               <Text fontSize="sm" color="whiteAlpha.700">
-                {t('setup.savedRestart')}
+                {t('setup.savedReady')}
               </Text>
             </Stack>
             <Button tone="blue" onClick={handleClose} className="self-start">

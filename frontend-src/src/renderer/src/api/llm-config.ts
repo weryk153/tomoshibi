@@ -102,6 +102,10 @@ export interface DetectResponse {
   models: DetectedModel[]
   lmstudio_available: boolean
   ollama_available: boolean
+  /** 連不上時用來分「沒裝」和「裝了沒開」。舊版後端沒有這欄，當作沒裝。 */
+  ollama_installed?: boolean
+  /** 這個平台能不能一鍵安裝 Ollama（macOS、Windows x64）。舊版後端沒有這欄。 */
+  ollama_install_supported?: boolean
   recommended_pull: string
 }
 
@@ -153,17 +157,20 @@ export interface OllamaPullEvent {
   total?: number
 }
 
-export async function pullOllamaModel(
+// ollama-pull 與 ollama-install 回傳同一種 NDJSON 事件，共用這一段解析。
+async function postNdjsonStream(
   baseUrl: string,
-  model: string,
+  path: string,
+  body: unknown,
   onEvent: (event: OllamaPullEvent) => void,
+  messages: { failed: string; incomplete: string },
 ): Promise<{ ok: boolean; error?: string }> {
   let res: Response
   try {
-    res = await fetch(buildUrl(baseUrl, '/api/llm-config/ollama-pull'), {
+    res = await fetch(buildUrl(baseUrl, path), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model }),
+      body: JSON.stringify(body),
     })
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : '網路錯誤' }
@@ -205,7 +212,7 @@ export async function pullOllamaModel(
         }
         onEvent(parsed)
         if (parsed.error || parsed.status === 'error') {
-          sawError = parsed.error || '下載失敗。'
+          sawError = parsed.error || messages.failed
         }
         if (parsed.status === 'success') {
           sawSuccess = true
@@ -217,6 +224,25 @@ export async function pullOllamaModel(
   }
 
   if (sawError) return { ok: false, error: sawError }
-  if (!sawSuccess) return { ok: false, error: '下載未完成就中斷了，請再試一次。' }
+  if (!sawSuccess) return { ok: false, error: messages.incomplete }
   return { ok: true }
 }
+
+export const pullOllamaModel = (
+  baseUrl: string,
+  model: string,
+  onEvent: (event: OllamaPullEvent) => void,
+) => postNdjsonStream(baseUrl, '/api/llm-config/ollama-pull', { model }, onEvent, {
+  failed: '下載失敗。',
+  incomplete: '下載未完成就中斷了，請再試一次。',
+})
+
+// 一鍵安裝 Ollama 本體（下載官方安裝檔→驗校驗碼→安裝→啟動）。事件的 status 依序是
+// resolving、downloading、verifying、installing、starting、success。
+export const installOllama = (
+  baseUrl: string,
+  onEvent: (event: OllamaPullEvent) => void,
+) => postNdjsonStream(baseUrl, '/api/llm-config/ollama-install', {}, onEvent, {
+  failed: '安裝失敗。',
+  incomplete: '安裝未完成就中斷了，請再試一次。',
+})
