@@ -1,0 +1,18 @@
+{
+  "mcp_servers": {
+    "ddg-search": {
+      "command": "uvx",
+      "args": [
+        "duckduckgo-mcp-server"
+      ]
+    },
+    "time": {
+      "command": "uvx",
+      "args": [
+        "--with",
+        "mcp<1.10",
+        "mcp-server-time"
+      ]
+    }
+  }
+}

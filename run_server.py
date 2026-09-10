@@ -2,6 +2,7 @@ import os
 import sys
 import time
 import atexit
+import shutil
 import socket
 import asyncio
 import argparse
@@ -168,20 +169,16 @@ def run(console_log_level: str, open_browser: bool = False):
     # Check if the frontend submodule is initialized
     check_frontend_submodule(lang)
 
-    # Sync user config with default config
-    try:
-        upgrade_manager.sync_user_config()
-    except Exception as e:
-        logger.error(f"Error syncing user config: {e}")
-
-    atexit.register(WebSocketServer.clean_cache)
-
     # First run: if conf.yaml is missing (e.g. a fresh download where conf.yaml is
     # not shipped), create it from the bundled default template so every entry
     # point works — the double-click launcher AND a plain `uv run run_server.py`.
+    #
+    # 必須在 sync_user_config() 之前。它發現 conf.yaml 不存在時，會依系統語言複製
+    # 上游的 conf.default.yaml／conf.ZH.default.yaml，這裡的 Tomoshibi 預設就永遠
+    # 輪不到——英文系統因此拿到 use_mcpp: True，又沒有 mcp_servers.json，開機直接
+    # 失敗（CI 在 macOS 與 Windows 上都重現了）。雙擊啟動器沒事，是因為啟動器自己
+    # 先複製了範本。
     if not os.path.exists("conf.yaml"):
-        import shutil
-
         _template = "config_templates/conf.tomoshibi.default.yaml"
         if os.path.exists(_template):
             shutil.copy(_template, "conf.yaml")
@@ -192,12 +189,27 @@ def run(console_log_level: str, open_browser: bool = False):
         else:
             logger.warning("conf.yaml not found and no default template available.")
 
+    # Sync user config with default config
+    try:
+        upgrade_manager.sync_user_config()
+    except Exception as e:
+        logger.error(f"Error syncing user config: {e}")
+
+    atexit.register(WebSocketServer.clean_cache)
+
     # model_dict.json 也是同一個模式（不進版控，首次執行從 config_templates 複製）。
     # 原本只有角色相關的 API 在讀取時才會補，但開機時 AvatarModel 就直接讀它了——
     # 全新的 clone 或桌面版的全新工作目錄因此在啟動時就找不到檔案。
     from src.open_llm_vtuber.character_route import _ensure_model_dict
 
     _ensure_model_dict()
+
+    # mcp_servers.json 也不進版控（使用者會加自己的伺服器，可能帶金鑰）。開啟 MCP 時
+    # ServerRegistry 找不到它會讓整個後端初始化失敗，所以一樣從範本補。
+    _mcp_template = "config_templates/mcp_servers.default.json"
+    if not os.path.exists("mcp_servers.json") and os.path.exists(_mcp_template):
+        shutil.copy(_mcp_template, "mcp_servers.json")
+        logger.info(f"mcp_servers.json not found — created it from {_mcp_template}.")
 
     # Load configurations from yaml file
     config: Config = validate_config(read_yaml("conf.yaml"))
