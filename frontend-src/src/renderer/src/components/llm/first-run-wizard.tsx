@@ -19,6 +19,7 @@ import { useWebSocket } from '@/context/websocket-context';
 import { useLocalStorage } from '@/hooks/utils/use-local-storage';
 import { fetchLlmConfig, type LlmSaveResult } from '@/api/llm-config.ts';
 import LlmForm from './llm-form';
+import AvatarKindStep from './avatar-kind-step';
 
 const SKIP_STORAGE_KEY = 'setupWizardSkipped';
 
@@ -37,6 +38,10 @@ function FirstRunWizard(): JSX.Element | null {
   // 顯示條件本身就會擋掉精靈，不需要額外的持久旗標。
   const [savedResult, setSavedResult] = useState<LlmSaveResult | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  // LLM 存好之後多問一步「2D 還是 3D」。兩種模型都隨附了，但預設角色寫死指向
+  // Live2D，不去角色設定翻的人不會知道有 3D。AvatarKindStep 在沒得選（只有一種
+  // 類型）或查詢失敗時會自己呼叫 onDone，所以這裡不必重複判斷。
+  const [avatarPicked, setAvatarPicked] = useState(false);
 
   useEffect(() => {
     if (wsState !== 'OPEN' || checkState !== 'pending') {
@@ -92,7 +97,9 @@ function FirstRunWizard(): JSX.Element | null {
           </Text>
         </Stack>
 
-        {savedResult ? (
+        {savedResult && !avatarPicked ? (
+          <AvatarKindStep baseUrl={baseUrl} onDone={() => setAvatarPicked(true)} />
+        ) : savedResult ? (
           <Stack gap={4}>
             <Stack gap={1}>
               <Text fontWeight="bold">{t('setup.savedTitle')}</Text>

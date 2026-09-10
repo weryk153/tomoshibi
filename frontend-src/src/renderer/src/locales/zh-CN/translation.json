@@ -72,7 +72,14 @@
     "customModelLabel": "模型名称",
     "customKeyLabel": "API 密钥",
     "customKeyHelp": "本机服务的密钥可填写任意占位字符串，但不能为空。",
-    "inactiveProvider": "当前实际使用 {{active}}；此表单显示的是 openai_compatible_llm。点击“测试并保存”后会将它设为新的活动 provider，重启后生效。"
+    "inactiveProvider": "当前实际使用 {{active}}；此表单显示的是 openai_compatible_llm。点击“测试并保存”后会将它设为新的活动 provider，重启后生效。",
+    "avatarKindTitle": "2D 还是 3D？",
+    "avatarKindIntro": "两种都内置了，之后在角色设置随时可以换。",
+    "avatarKind2d": "2D（Live2D）",
+    "avatarKind3d": "3D（VRM）",
+    "avatarKindApplying": "应用中…",
+    "avatarKindHelp": "2D 是手绘的，吃显卡少。3D 会转动整个身体、能播动作片段，还可以拖拽和滚轮调整构图。",
+    "avatarKindFailed": "存不进去。你还是可以在角色设置里挑模型。"
   },
   "effects": {
     "characterEntrance": {

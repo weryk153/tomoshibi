@@ -72,7 +72,14 @@
     "customModelLabel": "Model name",
     "customKeyLabel": "API key",
     "customKeyHelp": "A local service can use any placeholder key, but the field cannot be blank.",
-    "inactiveProvider": "The conversation currently uses {{active}}; this form shows openai_compatible_llm. Test & Save will make it the active provider after restart."
+    "inactiveProvider": "The conversation currently uses {{active}}; this form shows openai_compatible_llm. Test & Save will make it the active provider after restart.",
+    "avatarKindTitle": "2D or 3D?",
+    "avatarKindIntro": "Both come bundled. You can switch any time in character settings.",
+    "avatarKind2d": "2D (Live2D)",
+    "avatarKind3d": "3D (VRM)",
+    "avatarKindApplying": "Applying…",
+    "avatarKindHelp": "2D is hand-drawn and light on the GPU. 3D turns its whole body, plays motion clips, and you can drag and scroll to reframe it.",
+    "avatarKindFailed": "Couldn't save that. You can still pick a model in character settings."
   },
   "effects": {
     "characterEntrance": {

@@ -2,7 +2,7 @@
 
 > Live2D 또는 VRM(3D) 아바타를 가진 무료 오픈소스 입문자 친화 **데스크톱 AI 컴패니언** — 장기 기억, 능동적 대화, 자연스러운 음성, 그리고 수면 모드까지. LLM만 직접 준비하면, 나머지는 설치하자마자 바로 작동합니다.
 
-**언어:** [English](./README.md) | [繁體中文](./README.md#繁體中文) | [日本語](./README.JP.md) | **한국어** | [简体中文](./README.CN.md)
+**언어:** [English](./README.md) | [繁體中文](./README.TW.md) | [日本語](./README.JP.md) | **한국어** | [简体中文](./README.CN.md)
 
 ![License](https://img.shields.io/badge/license-MIT%20core%20%2B%20bundled%20terms-blue)
 ![Built on Open-LLM-VTuber](https://img.shields.io/badge/built%20on-Open--LLM--VTuber-orange)
@@ -23,15 +23,15 @@
 
 ## 이게 뭔가요?
 
-**Tomoshibi**는 화면 위의 Live2D 캐릭터를, 진짜로 대화하게 되는 AI 컴패니언으로 만들어 줍니다 — 당신을 기억하고, 스스로 먼저 말을 걸고, 당신이 말하는 동안 귀 기울여 듣고, 당신이 잘 자라고 인사하면 조용해집니다.
+**Tomoshibi**는 화면 위의 캐릭터 — 손으로 그린 Live2D 또는 완전한 3D VRM — 를 진짜로 대화하게 되는 AI 컴패니언으로 만들어 줍니다 — 당신을 기억하고, 스스로 먼저 말을 걸고, 당신이 말하는 동안 귀 기울여 듣고, 당신이 잘 자라고 인사하면 조용해집니다.
 
-이건 훌륭한 [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) 프로젝트를 **친절하게 다시 포장한** 버전입니다. 우리는 그 어깨 위에 서 있습니다: 상류(upstream) 프로젝트가 탄탄한 Live2D + ASR/TTS + LLM 기반을 제공하고, 이 fork는 그것을 비개발자도 쓸 수 있는 **다운로드 → 더블클릭 → 대화** 경험으로 감싸면서, 기억 시스템, 능동적 대화, 자연스러운 끼어들기(barge-in) 음성, 캐릭터 관리, 앱 내 설정 마법사, 그리고 완전한 이중 언어(English / 繁體中文) UI를 더했습니다.
+이건 훌륭한 [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) 프로젝트를 **친절하게 다시 포장한** 버전입니다. 우리는 그 어깨 위에 서 있습니다: 상류(upstream) 프로젝트가 탄탄한 Live2D + ASR/TTS + LLM 기반을 제공하고, 이 fork는 그 옆에 VRM(3D)을 더한 뒤 그것을 비개발자도 쓸 수 있는 **다운로드 → 더블클릭 → 대화** 경험으로 감싸면서, 기억 시스템, 능동적 대화, 자연스러운 끼어들기(barge-in) 음성, 캐릭터 관리, 앱 내 설정 마법사, 그리고 완전한 이중 언어(English / 繁體中文) UI를 더했습니다.
 
 **우리의 원칙 — 그리고 우리가 의도적으로 하지 않는 것:**
 
 - **무료 오픈소스, 기부는 선택.** 유료 등급도, 페이월(paywall)도 없습니다.
 - **모바일 버전 없음.** 데스크톱 전용입니다 (macOS / Windows).
-- **모델 마켓플레이스 / 저작권 있는 캐릭터 번들 없음.** 이렇게 해서 Live2D 상업 라이선스의 함정을 피합니다 — 우리는 중립적인 무료 기본값만 제공하고, 캐릭터·음성·LLM은 당신이 직접 가져옵니다.
+- **모델 마켓플레이스 / 저작권 있는 캐릭터 번들 없음.** 이렇게 해서 Live2D 상업 라이선스의 함정을 피합니다 — 재배포가 허용된 기본값만 제공하고(무료 Live2D 오리지널 3개와 CC0 VRM 캐릭터 1개), 캐릭터·음성·LLM은 당신이 직접 가져옵니다.
 
 > Open-LLM-VTuber 위에 만들어졌습니다. 전체 출처 표기와 구성 요소별 라이선스는 [`NOTICE`](./NOTICE)를, 원본 프로젝트 문서는 [`README.upstream.md`](./README.upstream.md)를 참고하세요.
 
@@ -199,7 +199,7 @@ extra_body:
 앱 안에서 캐릭터를 생성 / 편집 / 전환 / 삭제합니다 — 각자 고유한 이름, 페르소나, 아바타 모델(Live2D **또는** VRM), 음성, 그리고 **분리된 기억**을 가집니다. 자신의 모델을 추가하려면 폴더를 `live2d-models/` 나 `vrm-models/` 에 넣고 캐릭터 설정을 열기만 하면 됩니다 — 앱이 찾아서 등록합니다. 버전 관리에 포함된 것은 동봉된 Live2D 공식 샘플 3개뿐이고, 직접 넣은 모델은 로컬에 남습니다. `model_dict.json` 도 마찬가지입니다.
 
 #### 더 많은 캐릭터 (선택)
-라이선스 안전을 위해, Tomoshibi는 **무료 Live2D 오리지널 캐릭터 3개**(`mao_pro`, `haru`, `hiyori`)만 기본 제공합니다. 더 많이 원하시나요 — 남성 집사 캐릭터 **Natori**까지 포함해서? 무료 공식 Live2D 샘플 모델을 직접 공식 페이지에서 받아 넣을 수 있습니다. **[Live2D 샘플 모델 페이지](https://www.live2d.com/en/learn/sample/)**에서 Live2D 자체 라이선스에 따라 받으세요 — 우리는 그것들을 재배포하지 않습니다. 방법은 [`docs/add-live2d-character.md`](docs/add-live2d-character.md)를 참고하세요.
+라이선스 안전을 위해, Tomoshibi는 재배포가 허용된 자산만 기본 제공합니다: **무료 Live2D 오리지널 캐릭터 3개**(`mao_pro`, `haru`, `hiyori`)와 **CC0 VRM 캐릭터 1개**(`Sendagaya_Shino`, 모션 클립은 MIT — `vrm-models/Sendagaya_Shino/NOTICE.md` 참고). 더 많이 원하시나요 — 남성 집사 캐릭터 **Natori**까지 포함해서? 무료 공식 Live2D 샘플 모델을 직접 공식 페이지에서 받아 넣을 수 있습니다. **[Live2D 샘플 모델 페이지](https://www.live2d.com/en/learn/sample/)**에서 Live2D 자체 라이선스에 따라 받으세요 — 우리는 그것들을 재배포하지 않습니다. 방법은 [`docs/add-live2d-character.md`](docs/add-live2d-character.md)를 참고하세요.
 
 ### 성능 프리셋
 **경량 / 표준 / 고성능** 프리셋은 ASR/TTS 엔진 선택, 기억 정리 빈도, 모델 keep-alive를 한 번에 묶어 둡니다. 사양이 낮은 컴퓨터에서는 경량을, 하드웨어가 충분하면 고성능을 고르세요.

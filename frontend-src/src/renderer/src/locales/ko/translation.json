@@ -72,7 +72,14 @@
     "customModelLabel": "모델 이름",
     "customKeyLabel": "API 키",
     "customKeyHelp": "로컬 서비스 키는 임의의 자리표시자 값을 사용할 수 있지만 비워 둘 수는 없어요.",
-    "inactiveProvider": "현재 대화는 {{active}}을 사용 중이며, 이 폼은 openai_compatible_llm을 표시합니다. 테스트 후 저장하면 재시작 뒤 이 provider가 활성화됩니다."
+    "inactiveProvider": "현재 대화는 {{active}}을 사용 중이며, 이 폼은 openai_compatible_llm을 표시합니다. 테스트 후 저장하면 재시작 뒤 이 provider가 활성화됩니다.",
+    "avatarKindTitle": "2D인가요, 3D인가요?",
+    "avatarKindIntro": "둘 다 기본 제공돼요. 나중에 캐릭터 설정에서 언제든 바꿀 수 있어요.",
+    "avatarKind2d": "2D(Live2D)",
+    "avatarKind3d": "3D(VRM)",
+    "avatarKindApplying": "적용 중…",
+    "avatarKindHelp": "2D는 손으로 그린 방식이라 GPU 부담이 적어요. 3D는 몸 전체가 움직이고 모션 클립을 재생하며, 드래그와 휠로 화면 구도를 조정할 수 있어요.",
+    "avatarKindFailed": "저장하지 못했어요. 캐릭터 설정에서 모델을 고를 수도 있어요."
   },
   "effects": {
     "characterEntrance": {

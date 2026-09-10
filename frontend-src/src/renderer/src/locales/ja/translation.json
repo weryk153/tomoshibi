@@ -72,7 +72,14 @@
     "customModelLabel": "モデル名",
     "customKeyLabel": "APIキー",
     "customKeyHelp": "ローカルサービスのキーは任意のプレースホルダーで構いませんが、空欄にはできません。",
-    "inactiveProvider": "現在の会話では {{active}} を使用中です。このフォームは openai_compatible_llm を表示しています。「テストして保存」すると、再起動後にこちらが有効な provider になります。"
+    "inactiveProvider": "現在の会話では {{active}} を使用中です。このフォームは openai_compatible_llm を表示しています。「テストして保存」すると、再起動後にこちらが有効な provider になります。",
+    "avatarKindTitle": "2D と 3D、どちらにしますか？",
+    "avatarKindIntro": "どちらも同梱されています。あとからキャラクター設定でいつでも変えられます。",
+    "avatarKind2d": "2D（Live2D）",
+    "avatarKind3d": "3D（VRM）",
+    "avatarKindApplying": "適用中…",
+    "avatarKindHelp": "2D は手描きで、GPU への負荷が軽めです。3D は全身が動き、モーションクリップを再生でき、ドラッグとホイールで画角を調整できます。",
+    "avatarKindFailed": "保存できませんでした。キャラクター設定からモデルを選ぶこともできます。"
   },
   "effects": {
     "characterEntrance": {

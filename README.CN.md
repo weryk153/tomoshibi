@@ -2,7 +2,7 @@
 
 > 一个免费、开源、对新手友好的**桌面 AI 伙伴**，带 Live2D 或 VRM（3D）形象 —— 长期记忆、主动聊天、自然语音，还有睡眠模式。自带你的 LLM，其余一切开箱即用。
 
-**语言:** [English](./README.md) | [繁體中文](./README.md#繁體中文) | [日本語](./README.JP.md) | [한국어](./README.KR.md) | **简体中文**
+**语言：** [English](./README.md) | [繁體中文](./README.TW.md) | [日本語](./README.JP.md) | [한국어](./README.KR.md) | **简体中文**
 
 ![License](https://img.shields.io/badge/license-MIT%20core%20%2B%20bundled%20terms-blue)
 ![Built on Open-LLM-VTuber](https://img.shields.io/badge/built%20on-Open--LLM--VTuber-orange)
@@ -23,15 +23,15 @@
 
 ## 这是什么？
 
-**Tomoshibi** 把屏幕上的一个 Live2D 角色变成你真的会去聊天的 AI 伙伴 —— 它记得你、会自己开启对话、你说话时它会听、你说晚安它就安静下来。
+**Tomoshibi** 把屏幕上的一个角色 —— 手绘的 Live2D 或全 3D 的 VRM —— 变成你真的会去聊天的 AI 伙伴 —— 它记得你、会自己开启对话、你说话时它会听、你说晚安它就安静下来。
 
-它是把优秀的开源项目 [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) **重新打包成对新手友好**的版本。我们站在它的肩膀上：上游提供稳定可靠的 Live2D + 语音识别/合成 + LLM 底层；这个 fork 则把它包装成「**下载 → 双击 → 开聊**」的体验，面向非技术用户，并加上了记忆系统、主动对话、自然插话语音、角色管理、应用内设置向导，以及完整的中英双语（English / 繁體中文）界面。
+它是把优秀的开源项目 [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) **重新打包成对新手友好**的版本。我们站在它的肩膀上：上游提供稳定可靠的 Live2D + 语音识别/合成 + LLM 底层；这个 fork 在旁边补上 VRM（3D），并把它包装成「**下载 → 双击 → 开聊**」的体验，面向非技术用户，并加上了记忆系统、主动对话、自然插话语音、角色管理、应用内设置向导，以及完整的中英双语（English / 繁體中文）界面。
 
 **我们的原则 —— 以及我们刻意不做的事：**
 
 - **免费开源，可选捐款。** 没有付费档位，没有付费墙。
 - **不做手机版。** 只做桌面（macOS / Windows）。
-- **不做模型市集 / 不附带有版权的角色。** 借此避开 Live2D 商用授权的陷阱 —— 我们只附带中性的免费默认资源；角色、语音、LLM 都由你自己带。
+- **不做模型市集 / 不附带有版权的角色。** 借此避开 Live2D 商用授权的陷阱 —— 我们只附带授权允许再分发的默认资源（三个免费 Live2D 原创角色和一个 CC0 的 VRM 角色）；角色、语音、LLM 都由你自己带。
 
 > 本项目构建于 Open-LLM-VTuber 之上。完整致谢与各组件许可证见 [`NOTICE`](./NOTICE)，原项目文档保留在 [`README.upstream.md`](./README.upstream.md)。
 
@@ -199,7 +199,7 @@ extra_body:
 在应用里创建 / 编辑 / 切换 / 删除角色 —— 每个角色有自己的名称、人设、角色模型（Live2D **或** VRM）、语音，以及**独立的记忆**。要添加你自己的模型，把文件夹放进 `live2d-models/` 或 `vrm-models/`，再打开角色设置，app 会自己找到并登记。版本控制里只有随附的三个 Live2D 官方示例，你放进去的其他模型留在本机，`model_dict.json` 也是。
 
 #### 更多角色（可选）
-为了授权安全，Tomoshibi 只内置 **3 个免费的 Live2D 原创角色**（`mao_pro`、`haru`、`hiyori`）。想要更多 —— 包括男管家角色 **Natori（名取）**？你可以自己从官方页面下载免费的官方 Live2D 示例模型再放进来。请从 **[Live2D 示例模型页面](https://www.live2d.com/en/learn/sample/)** 按 Live2D 自己的授权下载 —— 我们不代为分发。具体做法见 [`docs/add-live2d-character.md`](docs/add-live2d-character.md)。
+为了授权安全，Tomoshibi 只内置授权允许再分发的资源：**3 个免费 Live2D 原创角色**（`mao_pro`、`haru`、`hiyori`）和**一个 CC0 的 VRM 角色**（`Sendagaya_Shino`，动作片段为 MIT，见 `vrm-models/Sendagaya_Shino/NOTICE.md`）。想要更多 —— 包括男管家角色 **Natori（名取）**？你可以自己从官方页面下载免费的官方 Live2D 示例模型再放进来。请从 **[Live2D 示例模型页面](https://www.live2d.com/en/learn/sample/)** 按 Live2D 自己的授权下载 —— 我们不代为分发。具体做法见 [`docs/add-live2d-character.md`](docs/add-live2d-character.md)。
 
 ### 性能预设
 **轻量 / 标准 / 高性能** 预设打包了 ASR/TTS 引擎选择、记忆整理频率，以及模型常驻。机器一般就选轻量，硬件够强就选高性能。
