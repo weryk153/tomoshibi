@@ -58,13 +58,7 @@ including the macOS / Windows security prompt you'll hit on first launch.
 
 **Tomoshibi** turns an on-screen character — hand-drawn Live2D or fully 3D VRM — into an AI companion you actually talk to — it remembers you, starts conversations on its own, listens while you speak, and acts out what it says with its own expressions and gestures.
 
-It is a **friendly re-packaging** of the excellent [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) project. We stand on its shoulders: upstream provides the rock-solid Live2D + ASR/TTS + LLM plumbing; this fork adds VRM (3D) alongside it, and this fork wraps it into a **download → double-click → chat** experience for non-technical users, and adds a memory system, proactive conversation, natural barge-in voice, character management, an in-app setup wizard, and a fully bilingual (English / 繁體中文) UI.
-
-**Our principles — and what we deliberately do NOT do:**
-
-- **Free and open source, with optional donations.** No paid tier, no paywall.
-- **No mobile version.** Desktop only (macOS / Windows).
-- **No model marketplace / bundled copyrighted characters.** This avoids the Live2D commercial-licensing trap — we ship only defaults whose licences allow redistribution (three free Live2D Originals and one CC0 VRM character); you bring your own character, voice, and LLM.
+It is a **friendly re-packaging** of the excellent [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) project. We stand on its shoulders: upstream provides the rock-solid Live2D + ASR/TTS + LLM plumbing; this fork adds VRM (3D) alongside it, and this fork wraps it into a **download → double-click → chat** experience for non-technical users, and adds a memory system, proactive conversation, natural barge-in voice, character management, an in-app setup wizard, and a five-language UI.
 
 > Built on Open-LLM-VTuber. See [`NOTICE`](./NOTICE) for full attribution and component licenses, and [`README.upstream.md`](./README.upstream.md) for the original project's docs.
 
@@ -84,7 +78,7 @@ It is a **friendly re-packaging** of the excellent [Open-LLM-VTuber](https://git
 - **Performance presets** — Light / Standard / High-performance, bundling ASR/TTS engine choice + memory-consolidation frequency + model keep-alive.
 - **Cross-language translation** — optional subtitle / voice translation (off by default).
 - **Works out of the box** — bundled sample Live2D models + a CC0 VRM character + free cloud TTS (edge-tts) + an auto-downloaded speech-to-text model (~1GB; a one-time, several-minute download on the very first launch). You only have to plug in an LLM.
-- **Fully bilingual UI** — Traditional Chinese (zh) and English (en).
+- **Five-language UI** — English, 繁體中文, 简体中文, 日本語, 한국어.
 
 ---
 
