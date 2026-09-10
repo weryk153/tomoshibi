@@ -50,7 +50,7 @@ window.TomoshibiEffects.stop()
   "type": "stage-effect",
   "effect": "characterEntrance",
   "effect_options": {
-    "characterId": "kurisu_fan",
+    "characterId": "my_character",
     "scale": "scene",
     "intensity": 1
   }
@@ -116,10 +116,6 @@ Cubism 有標準參數 ID 與檔案格式，但沒有跨模型通用的完整動
 cue 同時帶有 Tomoshibi 語意動作 `actionId`（例如 `greeting`、`thinking`、
 `signature`）與可選的 Cubism `group/index` 回退。3a 應優先依目前人物解析
 `actionId`，找不到映射時才播放回退 motion。
-
-Kurisu 目前只綁 `characterEntrance`：顯示 `LAB MEM 004 / MAKISE KURISU`
-的研究介面式登場卡，並在時間軸中送出 `Signature` 動作 cue。
-`cinematicBurst` 沒有綁 Kurisu。
 
 ## 自訂演出配樂
 

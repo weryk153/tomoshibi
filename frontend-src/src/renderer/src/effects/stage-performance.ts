@@ -140,27 +140,6 @@ export const BUILTIN_STAGE_PERFORMANCES: readonly StagePerformancePreset[] = [
     musicFadeOutMs: 650,
   },
   {
-    id: 'kurisu-lab-mem-004',
-    builtin: true,
-    name: 'LAB MEM 004',
-    description: 'Kurisu laboratory identity scan and signature entrance.',
-    effectId: 'characterEntrance',
-    scale: 'scene',
-    intensity: 1,
-    sound: true,
-    title: 'LAB MEM 004',
-    subtitle: 'MAKISE KURISU',
-    characterIds: ['kurisu_fan'],
-    triggers: ['entrance', 'manual'],
-    weight: 1,
-    cooldownMs: 15_000,
-    probability: 1,
-    conditions: { keywords: [], timePeriods: [] },
-    musicVolume: 0.5,
-    musicFadeInMs: 450,
-    musicFadeOutMs: 650,
-  },
-  {
     id: 'cinematic-burst',
     builtin: true,
     name: 'Cinematic Burst',
@@ -319,12 +298,11 @@ export function createStagePerformanceRuntimeState(): StagePerformanceRuntimeSta
 }
 
 export function createDefaultStagePerformancePool(
-  characterId: string | undefined,
+  // 內建方案不分人物；參數保留給呼叫端，日後若要替特定人物預選方案再用。
+  _characterId: string | undefined,
   trigger: StagePerformanceTrigger,
 ): StagePerformancePool {
-  const entranceId = characterId === 'kurisu_fan'
-    ? 'kurisu-lab-mem-004'
-    : 'character-entrance';
+  const entranceId = 'character-entrance';
   return {
     enabled: false,
     mode: 'shuffle',

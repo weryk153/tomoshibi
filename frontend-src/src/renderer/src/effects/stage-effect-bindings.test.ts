@@ -8,24 +8,6 @@ import {
   STAGE_MOTION_CUE_EVENT,
 } from './stage-effect-bindings.ts';
 
-test('Kurisu 只在人物登場演出綁定 Signature 動作', () => {
-  const binding = resolveStageEffectBinding('kurisu_fan', 'characterEntrance');
-  assert.equal(binding.title, 'LAB MEM 004');
-  assert.deepEqual(binding.motionCues, [{
-    atMs: 1450,
-    actionId: 'signature',
-    group: 'Signature',
-    index: 0,
-    priority: 3,
-  }]);
-});
-
-test('Kurisu 不會錯綁通用必殺技特效', () => {
-  const binding = resolveStageEffectBinding('kurisu_fan', 'cinematicBurst');
-  assert.deepEqual(binding.motionCues, []);
-  assert.equal(binding.title, undefined);
-});
-
 test('未知人物會回退成沒有硬綁身體動作的通用演出', () => {
   const binding = resolveStageEffectBinding('new_character', 'cinematicBurst');
   assert.deepEqual(binding.motionCues, []);
@@ -71,10 +53,10 @@ test('3a 與 3b 的整合事件名稱固定', () => {
 
 test('人物 ID 優先使用名稱，舊模型資料可從 URL 回退', () => {
   assert.equal(resolveStageEffectCharacterId({
-    name: 'kurisu_fan',
+    name: 'my_character',
     url: '/live2d-models/other/model.model3.json',
-  }), 'kurisu_fan');
+  }), 'my_character');
   assert.equal(resolveStageEffectCharacterId({
-    url: 'http://127.0.0.1:12393/live2d-models/kurisu_fan/kurisu.model3.json',
-  }), 'kurisu_fan');
+    url: 'http://127.0.0.1:12393/live2d-models/my_character/model.model3.json',
+  }), 'my_character');
 });

@@ -43,11 +43,11 @@ function pool(overrides: Partial<StagePerformancePool> = {}): StagePerformancePo
   };
 }
 
-test('預設人物登場池選好角色專屬方案但不擅自啟用', () => {
-  assert.deepEqual(createDefaultStagePerformancePool('kurisu_fan', 'entrance'), {
+test('預設登場池選通用登場方案但不擅自啟用', () => {
+  assert.deepEqual(createDefaultStagePerformancePool('my_character', 'entrance'), {
     enabled: false,
     mode: 'shuffle',
-    selectedIds: ['kurisu-lab-mem-004'],
+    selectedIds: ['character-entrance'],
     avoidRecent: 1,
   });
 });

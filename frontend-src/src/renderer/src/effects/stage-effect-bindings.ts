@@ -119,36 +119,9 @@ const DEFAULT_CHARACTER_ENTRANCE: CharacterStageEffectBinding = {
   ],
 };
 
-// A character is bound only to effects that fit that character. Kurisu has an
-// entrance card, not a combat finisher.
-const CHARACTER_BINDINGS: Record<string, CharacterBindings> = {
-  kurisu_fan: {
-    characterEntrance: {
-      title: 'LAB MEM 004',
-      subtitle: 'MAKISE KURISU',
-      palette: {
-        primary: '#b52249',
-        accent: '#f0d39a',
-        glow: '#70d9e8',
-        void: '#070911',
-      },
-      motionCues: [{
-        atMs: 1450,
-        actionId: 'signature',
-        group: 'Signature',
-        index: 0,
-        priority: 3,
-      }],
-      interactionCues: DEFAULT_CHARACTER_ENTRANCE.interactionCues,
-      music: {
-        volume: 0.5,
-        fadeInMs: 450,
-        fadeOutMs: 650,
-        startAtMs: 0,
-      },
-    },
-  },
-};
+// 人物專屬綁定。內建不帶任何人物，全部走通用演出；使用者替自己的角色設定的
+// 綁定在執行期寫進這裡（見下方的 register 函式）。
+const CHARACTER_BINDINGS: Record<string, CharacterBindings> = {};
 
 function cloneBinding(binding: CharacterStageEffectBinding): CharacterStageEffectBinding {
   return {

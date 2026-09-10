@@ -8,8 +8,8 @@ import {
 
 test('人物與演出組成互不衝突的音樂槽 key', () => {
   assert.equal(
-    stageEffectMusicKey('kurisu_fan', 'characterEntrance'),
-    'kurisu_fan::characterEntrance',
+    stageEffectMusicKey('my_character', 'characterEntrance'),
+    'my_character::characterEntrance',
   );
 });
 
