@@ -56,9 +56,9 @@
 
 ## 스크린샷
 
-![Tomoshibi — 실제로 작동하는 당신의 Live2D AI 컴패니언](assets/tomoshibi-hero.png)
+![Tomoshibi — 실제로 작동하는 당신의 AI 컴패니언](assets/tomoshibi-hero.png)
 
-*데스크톱에서 실행 중인 Tomoshibi: 진짜로 대화하게 되는 Live2D 아바타.*
+*데스크톱에서 실행 중인 Tomoshibi. 화면은 기본 제공되는 `Sendagaya_Shino`(VRM) 캐릭터예요. Live2D 아바타도 사용법은 같고, 캐릭터 설정에서 아무거나 고를 수 있어요.*
 
 ---
 

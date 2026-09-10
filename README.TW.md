@@ -23,7 +23,7 @@
 
 ## 這是什麼？
 
-**Tomoshibi** 把一個 Live2D 角色變成你真的會去聊天的 AI 桌面陪伴：它記得你、會自己開話題、你說話時它會聽、你說「晚安」它就安靜下來。
+**Tomoshibi** 把一個角色 —— 手繪的 Live2D 或全 3D 的 VRM —— 變成你真的會去聊天的 AI 桌面陪伴：它記得你、會自己開話題、你說話時它會聽、你說「晚安」它就安靜下來。
 
 它是把優秀的開源專案 [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTuber) 重新打包成**對小白友善**的版本。我們站在它的肩膀上：上游提供穩定的 Live2D + 語音辨識/合成 + LLM 底層，這個 fork 在旁邊補上 VRM（3D），並把它包成「**下載 → 雙擊 → 開聊**」的體驗，並加上長期記憶、主動話題、自然插話語音、角色管理、首次啟動設定精靈，以及完整的中英雙語介面。
 
@@ -31,7 +31,7 @@
 
 - **免費開源 + 捐款**：沒有付費版、沒有付費牆。
 - **不做手機版**：只做桌面（macOS / Windows）。
-- **不做模型市集、不附帶有版權的角色**：藉此避開 Live2D 商用授權的陷阱 — 我們只附中性的免費預設，角色、語音、LLM 都由你自己帶。
+- **不做模型市集、不附帶有版權的角色**：藉此避開 Live2D 商用授權的陷阱 — 我們只附**授權允許再散布**的預設（三個免費 Live2D 原創角色，加一個 CC0 的 VRM 角色），角色、語音、LLM 都由你自己帶。
 
 > 本專案建構於 Open-LLM-VTuber 之上。完整致謝與各元件授權見 [`NOTICE`](./NOTICE)，原專案文件保留於 [`README.upstream.md`](./README.upstream.md)。
 
@@ -52,9 +52,9 @@
 
 ## 截圖
 
-![Tomoshibi — 你的 Live2D AI 陪伴實際運作畫面](assets/tomoshibi-hero.png)
+![Tomoshibi — 你的 AI 陪伴實際運作畫面](assets/tomoshibi-hero.png)
 
-*Tomoshibi 在桌面上運作：一個你真的會去聊天的 Live2D 角色。*
+*Tomoshibi 在桌面上運作，畫面是隨附的 `Sendagaya_Shino` VRM 角色。Live2D 角色的用法完全相同 — 在角色設定裡挑就好。*
 
 ## 快速開始（下載 → 雙擊 → 開聊）
 
@@ -84,7 +84,7 @@
 
 > **Windows SmartScreen（僅第一次）：** 雙擊時可能跳出藍色的「**Windows 已保護您的電腦**」視窗。這對未簽章的開源 app 是正常的。請點 **其他資訊** → **仍要執行**。允許一次之後就不會再問了。
 
-開箱使用內建的 **mao** 範例 Live2D 模型與 **edge-tts**（免費雲端語音，不需顯卡）。第一次啟動也會自動下載一個語音辨識模型 —— 它大約 **1GB**，所以**第一次啟動會做一次性的下載＋解壓，可能要好幾分鐘**。這段期間啟動器視窗看起來像卡住了，其實沒有，**請別關掉、讓它跑完**；這只會發生一次。
+開箱使用內建的 **mao** 範例 Live2D 模型（首次啟動精靈也會讓你改用內建的 3D 角色）與 **edge-tts**（免費雲端語音，不需顯卡）。第一次啟動也會自動下載一個語音辨識模型 —— 它大約 **1GB**，所以**第一次啟動會做一次性的下載＋解壓，可能要好幾分鐘**。這段期間啟動器視窗看起來像卡住了，其實沒有，**請別關掉、讓它跑完**；這只會發生一次。
 
 ### 習慣用終端機？（進階）
 
@@ -178,7 +178,7 @@ extra_body:
 
 - **記憶**：預設開啟，每個角色記憶獨立存在 `chat_history/<conf_uid>/core_memory.md`，每輪由 LLM 決定要存什麼。記憶上限可在設定調整。
 - **角色**：在 app 內建立／編輯／切換／刪除，每個角色有獨立的名稱、人設、角色模型（Live2D **或** VRM）、語音與記憶。要加自己的模型，把資料夾放進 `live2d-models/` 或 `vrm-models/` 再打開角色設定，app 會自己找到並登記。版控裡只有隨附的三個 Live2D 官方範例，你放進去的其他模型留在本機，`model_dict.json` 也是。
-  - **想要更多角色（選用）**：為了授權安全，Tomoshibi 只內建 **3 個免費的 Live2D 原創角色**（`mao_pro`、`haru`、`hiyori`）。想要更多 — 包含男管家角色 **Natori（名取）**？你可以自己到官方頁面下載免費的官方 Live2D 範例模型再放進來。請從 **[Live2D 範例模型頁面](https://www.live2d.com/en/learn/sample/)** 依 Live2D 自己的授權下載 — 我們不代為散布。作法見 [`docs/add-live2d-character.md`](docs/add-live2d-character.md)。
+  - **想要更多角色（選用）**：為了授權安全，Tomoshibi 只內建授權允許再散布的資源：**3 個免費的 Live2D 原創角色**（`mao_pro`、`haru`、`hiyori`），以及**一個 CC0 的 VRM 角色**（`Sendagaya_Shino`，動作片段為 MIT，見 `vrm-models/Sendagaya_Shino/NOTICE.md`）。想要更多 — 包含男管家角色 **Natori（名取）**？你可以自己到官方頁面下載免費的官方 Live2D 範例模型再放進來。請從 **[Live2D 範例模型頁面](https://www.live2d.com/en/learn/sample/)** 依 Live2D 自己的授權下載 — 我們不代為散布。作法見 [`docs/add-live2d-character.md`](docs/add-live2d-character.md)。
 - **效能預設**：輕量／標準／高效能，一鍵搭好引擎、整理頻率與模型常駐。
 - **主動話題與新聞**：可用 `scripts/news_topics.py`（純標準函式庫、不需 key）定時更新話題。
 - **睡眠／勿擾**：說「晚安」停止主動發話，下次對話恢復，關鍵字可改。
@@ -215,6 +215,8 @@ extra_body:
 - [從手機／平板遠端使用（Tailscale）](docs/remote-access-tailscale.md) — 即使不在家，也能從別的裝置開啟你的虛擬角色。
 - [用 GPT-SoVITS 自訂聲音](docs/custom-voice-gpt-sovits.md) — 讓角色用克隆或自訂的聲音說話。
 - [自己加 Live2D 角色](docs/add-live2d-character.md) — 把模型放進來並切換使用。
+- [自己加 VRM（3D）角色](docs/add-vrm-character.md) — 目錄結構、表情與動作對應、相機構圖。
+- [場景管理](docs/scene-management.md)・[舞台特效](docs/stage-effects.md)・[介面功能](docs/ui-features.md) — 背景、登場演出，以及各個面板在做什麼。
 - [自己加 VRM（3D）角色](docs/add-vrm-character.md) — 目錄結構、表情與動作對應、相機構圖。
 - [場景管理](docs/scene-management.md)・[舞台特效](docs/stage-effects.md)・[介面功能](docs/ui-features.md) — 背景、登場演出，以及各個面板在做什麼。
 

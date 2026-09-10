@@ -57,9 +57,9 @@
 
 ## スクリーンショット
 
-![Tomoshibi — あなたの Live2D AI コンパニオンが実際に動いているところ](assets/tomoshibi-hero.png)
+![Tomoshibi — あなたの AI コンパニオンが実際に動いているところ](assets/tomoshibi-hero.png)
 
-*デスクトップで動く Tomoshibi：本当に会話できる Live2D アバター。*
+*デスクトップで動く Tomoshibi。同梱の `Sendagaya_Shino`（VRM）を表示しています。Live2D のアバターも使い方は同じで、キャラクター設定でどちらでも選べます。*
 
 ---
 

@@ -56,9 +56,9 @@
 
 ## 截图
 
-![Tomoshibi —— 运行中的 Live2D AI 伙伴](assets/tomoshibi-hero.png)
+![Tomoshibi —— 运行中的 AI 伙伴](assets/tomoshibi-hero.png)
 
-*Tomoshibi 在桌面上运行：一个你真的会去聊天的 Live2D 形象。*
+*Tomoshibi 在桌面上运行，画面是内置的 `Sendagaya_Shino` VRM 角色。Live2D 角色用法完全相同 —— 在角色设置里挑就好。*
 
 ---
 

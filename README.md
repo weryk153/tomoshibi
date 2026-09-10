@@ -57,9 +57,9 @@ It is a **friendly re-packaging** of the excellent [Open-LLM-VTuber](https://git
 
 ## Screenshots
 
-![Tomoshibi — your Live2D AI companion in action](assets/tomoshibi-hero.png)
+![Tomoshibi — your AI companion in action](assets/tomoshibi-hero.png)
 
-*Tomoshibi running on the desktop: a Live2D avatar you actually talk to.*
+*Tomoshibi running on the desktop, with the bundled `Sendagaya_Shino` VRM character. Live2D avatars work the same way — pick either in character settings.*
 
 ---
 
