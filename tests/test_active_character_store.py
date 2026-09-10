@@ -10,17 +10,17 @@ from src.open_llm_vtuber import active_character_store
 def test_active_character_round_trip(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
-    active_character_store.set_active_character_filename("kurisu.yaml")
+    active_character_store.set_active_character_filename("aoi.yaml")
 
-    assert active_character_store.get_active_character_filename() == "kurisu.yaml"
+    assert active_character_store.get_active_character_filename() == "aoi.yaml"
     state = json.loads(
         (tmp_path / "characters" / ".active-character.json").read_text(encoding="utf-8")
     )
-    assert state == {"version": 1, "filename": "kurisu.yaml"}
+    assert state == {"version": 1, "filename": "aoi.yaml"}
 
 
 @pytest.mark.parametrize(
-    "filename", ["", "../kurisu.yaml", "characters/kurisu.yaml", "kurisu.json"]
+    "filename", ["", "../aoi.yaml", "characters/aoi.yaml", "aoi.json"]
 )
 def test_active_character_rejects_unsafe_filenames(tmp_path, monkeypatch, filename):
     monkeypatch.chdir(tmp_path)

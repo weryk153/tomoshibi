@@ -3,7 +3,7 @@ import pytest
 from src.open_llm_vtuber.live2d_discovery import is_discoverable_live2d_dir
 
 
-@pytest.mark.parametrize("name", ["mao", "kurisu", "Hiyori_Pro_t11"])
+@pytest.mark.parametrize("name", ["mao", "aoi", "Hiyori_Pro_t11"])
 def test_normal_live2d_directories_are_discoverable(name: str) -> None:
     assert is_discoverable_live2d_dir(name)
 

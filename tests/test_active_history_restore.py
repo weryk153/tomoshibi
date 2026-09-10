@@ -21,7 +21,7 @@ from src.open_llm_vtuber.chat_history_manager import (
 from src.open_llm_vtuber.websocket_handler import WebSocketHandler
 
 
-CONF_UID = "kurisu"
+CONF_UID = "aoi"
 
 
 class _FakeAgent:

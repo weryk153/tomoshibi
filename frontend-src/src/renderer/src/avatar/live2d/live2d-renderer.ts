@@ -88,12 +88,10 @@ export function createLive2DRenderer(): CharacterRenderer {
         console.warn("LAppDefine.PriorityNormal not found - cannot start talk motion");
       }
 
-      // Full rigs benefit from the historical sensitivity boost. Kurisu's
-      // compact two-state mouth needs the raw envelope so it does not slam
-      // into its maximum open sprite on every syllable.
-      const lipSyncScale = /\/(?:kurisu_fan)\/$/.test(model._modelHomeDir ?? "")
-        ? 1.0
-        : 2.0;
+      // Full rigs benefit from the historical sensitivity boost. A compact
+      // two-state mouth (model_dict "compactRig": true) needs the raw envelope
+      // so it does not slam into its maximum open sprite on every syllable.
+      const lipSyncScale = model._compactRig ? 1.0 : 2.0;
 
       if (model._wavFileHandler) {
         if (!model._wavFileHandler._initialized) {

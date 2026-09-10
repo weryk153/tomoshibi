@@ -1,6 +1,6 @@
 """每個角色可以自己決定用什麼語言說話。
 
-先前只有全域的 system_config.player_language。把它設成日文，是為了讓牧瀨紅莉栖
+先前只有全域的 system_config.player_language。把它設成日文，是為了讓日本角色
 用母語說話——但那會讓 mao_pro 之類的角色也一起講日文。語言屬於角色本身，全域
 設定應該只是「沒特別指定時的預設」。
 
@@ -51,12 +51,12 @@ def test_incoming_character_wins_during_a_character_switch():
     """load_from_config builds the new agent before replacing self.character_config.
 
     Prompt construction therefore needs the incoming character explicitly; using
-    the old one made every Kurisu switch inherit Mao's Traditional Chinese output.
+    the old one made every switch to a Japanese character inherit Mao's Traditional Chinese output.
     """
     context = _build("", "Traditional Chinese (Taiwan)")
     incoming = SimpleNamespace(
         long_term_memory_enabled=False,
-        conf_uid="kurisu",
+        conf_uid="aoi",
         reply_language="Japanese",
     )
 

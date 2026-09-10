@@ -93,6 +93,12 @@ export interface ModelInfo {
 
   /** Initial scale */
   initialScale?: number;
+
+  /**
+   * 精簡 rig：嘴巴只有開／合兩段、脖子沒做成可變形網格的模型。開啟後關掉大幅度的頭部
+   * 擺動與呼吸，口型改用較平滑、較小的幅度。在 model_dict.json 的項目加 "compactRig": true。
+   */
+  compactRig?: boolean;
 }
 
 /**

@@ -19,7 +19,7 @@ from src.open_llm_vtuber import memory_route as mr
 
 CONF = """\
 character_config:
-  conf_uid: kurisu
+  conf_uid: aoi
   long_term_memory_enabled: False
   core_memory_max_chars: 3000
   memory_consolidation_interval: 3
@@ -51,14 +51,14 @@ def conf(monkeypatch):
 def test_reads_the_saved_values(conf):
     conf(CONF)
 
-    assert mr._base_conf_uid() == "kurisu"
+    assert mr._base_conf_uid() == "aoi"
     assert mr._memory_enabled_from_conf() is False
     assert mr._cap_from_conf() == 3000
     assert mr._interval_from_conf() == 3
 
 
 def test_missing_keys_fall_back_to_code_defaults(conf):
-    conf("character_config:\n  conf_uid: kurisu\n")
+    conf("character_config:\n  conf_uid: aoi\n")
 
     # 記憶預設是開的（跟 Pydantic 的預設一致）。
     assert mr._memory_enabled_from_conf() is True
@@ -82,7 +82,7 @@ def test_out_of_range_values_are_clamped_on_read(conf):
     # UI 顯示的數字永遠要在合法範圍內，就算 conf.yaml 被手改成離譜的值。
     conf(
         "character_config:\n"
-        "  conf_uid: kurisu\n"
+        "  conf_uid: aoi\n"
         "  core_memory_max_chars: 999999\n"
         "  memory_consolidation_interval: 4\n"
     )
@@ -97,20 +97,20 @@ def test_out_of_range_values_are_clamped_on_read(conf):
 def test_blank_falls_back_to_the_base_character(conf, monkeypatch):
     conf(CONF)
 
-    assert mr._resolve_conf_uid(None) == ("kurisu", None)
-    assert mr._resolve_conf_uid("   ") == ("kurisu", None)
+    assert mr._resolve_conf_uid(None) == ("aoi", None)
+    assert mr._resolve_conf_uid("   ") == ("aoi", None)
 
 
 def test_known_uid_is_accepted(conf, monkeypatch):
     conf(CONF)
-    monkeypatch.setattr(mr, "_existing_conf_uids", lambda: {"kurisu", "frieren"})
+    monkeypatch.setattr(mr, "_existing_conf_uids", lambda: {"aoi", "frieren"})
 
     assert mr._resolve_conf_uid("frieren") == ("frieren", None)
 
 
 def test_unknown_uid_is_rejected(conf, monkeypatch):
     conf(CONF)
-    monkeypatch.setattr(mr, "_existing_conf_uids", lambda: {"kurisu"})
+    monkeypatch.setattr(mr, "_existing_conf_uids", lambda: {"aoi"})
 
     uid, err = mr._resolve_conf_uid("someone-else")
 

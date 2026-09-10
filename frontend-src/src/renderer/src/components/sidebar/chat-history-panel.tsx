@@ -207,7 +207,7 @@ function ChatHistoryPanel(): JSX.Element {
                               width: '100%',
                               height: '100%',
                               borderRadius: '50%',
-                              // Character avatars are portrait crops (kurisu.png is
+                              // Character avatars are portrait crops (a typical one is
                               // 260x400), so the default object-fit: fill squashes the
                               // face sideways. Anchor to the top: a centred cover crop
                               // on a 2:3 portrait lands on the chest and cuts the head.

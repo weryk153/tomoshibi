@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Measure whether replies actually obey the persona's length rule.
 
-kurisu.yaml says 「平常講一到三句就好」. Whether that is working can only be
+A persona that says 「平常講一到三句就好」 is only obeyed if real replies show it. Whether that is working can only be
 answered from real conversations, so this reads chat_history/ and reports the
 distribution.
 
@@ -17,7 +17,7 @@ flattering but meaningless number:
 Usage:
     uv run scripts/reply_length_report.py [conf_uid] [--since ISO8601]
 
-    uv run scripts/reply_length_report.py kurisu --since 2026-08-01T03:43
+    uv run scripts/reply_length_report.py default_001 --since 2026-08-01T03:43
 """
 
 import argparse
@@ -31,8 +31,8 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.open_llm_vtuber.llm_error_sentinel import is_llm_error_placeholder  # noqa: E402
 
-TARGET_MAX_SENTENCES = 3  # kurisu.yaml：「平常講一到三句就好」
-TARGET_MAX_QUESTIONS = 1  # kurisu.yaml：「一次最多問一個問題」
+TARGET_MAX_SENTENCES = 3  # 人設寫的「平常講一到三句就好」
+TARGET_MAX_QUESTIONS = 1  # 人設寫的「一次最多問一個問題」
 
 
 def _sentences(text: str) -> int:
@@ -104,7 +104,7 @@ def report(rows, kind: str, label: str, rule: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser()
-    parser.add_argument("conf_uid", nargs="?", default="kurisu")
+    parser.add_argument("conf_uid", nargs="?", default="default_001")
     parser.add_argument("--since", default=None, help="只算這個時間之後的（ISO8601）")
     args = parser.parse_args()
 

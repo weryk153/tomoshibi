@@ -96,8 +96,8 @@ def test_lists_hit_areas_with_id_and_name(tmp_path, monkeypatch):
 def test_merges_existing_motion_map(tmp_path, monkeypatch):
     _write_model3(
         tmp_path,
-        "kurisu_fan",
-        "kurisu.model3.json",
+        "compact_rig",
+        "compact_rig.model3.json",
         motions={
             "Acknowledge": [{"File": "motions/nod.motion3.json"}],
         },
@@ -106,7 +106,7 @@ def test_merges_existing_motion_map(tmp_path, monkeypatch):
         tmp_path,
         [
             {
-                "name": "kurisu_fan",
+                "name": "compact_rig",
                 "motionMap": {
                     "acknowledge": {
                         "group": "Acknowledge",
@@ -119,7 +119,7 @@ def test_merges_existing_motion_map(tmp_path, monkeypatch):
     )
     monkeypatch.chdir(tmp_path)
 
-    result = build_model_config("kurisu_fan")
+    result = build_model_config("compact_rig")
 
     motion = next(
         m for m in result["motions"] if m["group"] == "Acknowledge" and m["index"] == 0
@@ -173,15 +173,15 @@ def test_two_keywords_pointing_at_same_motion_both_survive(tmp_path, monkeypatch
     # a singular "primary keyword" field would silently drop one.
     _write_model3(
         tmp_path,
-        "kurisu_fan",
-        "kurisu.model3.json",
+        "compact_rig",
+        "compact_rig.model3.json",
         motions={"Acknowledge": [{"File": "motions/nod.motion3.json"}]},
     )
     _write_model_dict(
         tmp_path,
         [
             {
-                "name": "kurisu_fan",
+                "name": "compact_rig",
                 "motionMap": {
                     "acknowledge": {
                         "group": "Acknowledge",
@@ -199,7 +199,7 @@ def test_two_keywords_pointing_at_same_motion_both_survive(tmp_path, monkeypatch
     )
     monkeypatch.chdir(tmp_path)
 
-    result = build_model_config("kurisu_fan")
+    result = build_model_config("compact_rig")
 
     motion = next(
         m for m in result["motions"] if m["group"] == "Acknowledge" and m["index"] == 0
@@ -233,18 +233,20 @@ def test_excludes_nothing_from_the_listing(tmp_path, monkeypatch):
     # `reserved`).
     _write_model3(
         tmp_path,
-        "kurisu_fan",
-        "kurisu.model3.json",
+        "compact_rig",
+        "compact_rig.model3.json",
         motions={
             "Idle": [{"File": "motions/idle_00.motion3.json"}],
             "Talk": [{"File": "motions/talk_00.motion3.json"}],
             "Signature": [{"File": "motions/sig_00.motion3.json"}],
         },
     )
-    _write_model_dict(tmp_path, [{"name": "kurisu_fan", "idleMotionGroupName": "Idle"}])
+    _write_model_dict(
+        tmp_path, [{"name": "compact_rig", "idleMotionGroupName": "Idle"}]
+    )
     monkeypatch.chdir(tmp_path)
 
-    result = build_model_config("kurisu_fan")
+    result = build_model_config("compact_rig")
 
     groups_present = {m["group"] for m in result["motions"]}
     assert groups_present == {"Idle", "Talk", "Signature"}

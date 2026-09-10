@@ -36,7 +36,7 @@ system_config:
   port: 12393
   # 底下是角色設定
 character_config:
-  conf_uid: kurisu
+  conf_uid: aoi
   long_term_memory_enabled: True  # 開著
   core_memory_max_chars: 1500
   tts_preprocessor_config:
@@ -158,7 +158,7 @@ def test_upsert_inserts_a_missing_leaf_with_matching_indent(conf):
 
     assert "  memory_consolidation_interval: 3" in text
     # 既有內容一個字都沒被動到
-    assert "  conf_uid: kurisu" in text
+    assert "  conf_uid: aoi" in text
     assert "# 底下是角色設定" in text
 
 

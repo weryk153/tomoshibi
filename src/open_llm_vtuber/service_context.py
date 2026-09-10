@@ -582,7 +582,7 @@ class ServiceContext:
         # During a character switch, load_from_config intentionally keeps the old
         # character on ``self`` until every engine has compared old vs new. Prompt
         # construction must nevertheless use the incoming character; otherwise a
-        # Kurisu switch inherits Mao's reply language, memory UID, avatar and TTS
+        # character switch inherits the previous character's reply language, memory UID, avatar and TTS
         # preprocessor for the freshly-created agent.
         target_character = character_config or self.character_config
 
@@ -882,7 +882,7 @@ class ServiceContext:
             ):
                 # Same reasoning as the motion guard above, for the case that
                 # actually ships: a model whose emotionMap holds a single entry
-                # (kurisu_fan has only `neutral`). One keyword cannot express a
+                # (a hand-made rig can have only `neutral`). One keyword cannot express a
                 # contrast — setting the sole expression is always a no-op — so
                 # the prompt buys nothing. It is not merely wasted tokens: the
                 # prompt says "use them regularly", the model complies, and the
@@ -935,7 +935,7 @@ class ServiceContext:
         # 正規回覆（= 字幕 + 對話紀錄 + 記憶）因此都會是玩家語言；語音另由 translate_audio 路徑
         # 翻成各角色 voice 語言（此處不動語音行為）。
         # 角色自己的 reply_language 優先，沒設才用全域的 player_language。
-        # 語言屬於角色本身（紅莉栖是日本人、貓娘不是），全域設定只是「沒特別
+        # 語言屬於角色本身（日本角色講日文，貓娘不一定），全域設定只是「沒特別
         # 指定時的預設」。見 CharacterConfig.reply_language 的說明。
         character_language = (
             getattr(target_character, "reply_language", "") or ""

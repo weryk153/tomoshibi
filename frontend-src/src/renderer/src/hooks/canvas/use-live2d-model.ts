@@ -156,7 +156,7 @@ export const useLive2DModel = ({
         const { baseUrl, modelDir, modelFileName } = parseModelUrl(currentUrl);
 
         if (baseUrl && modelDir) {
-          updateModelConfig(baseUrl, modelDir, modelFileName, Number(modelInfo.kScale));
+          updateModelConfig(baseUrl, modelDir, modelFileName, Number(modelInfo.kScale), modelInfo.compactRig === true);
 
           // 這個 500ms 的延遲原本沒有任何 cleanup：切換角色（尤其切到 VRM）時
           // 元件已經卸載、canvas 也拆掉了，計時器照樣觸發 initializeLive2D()，

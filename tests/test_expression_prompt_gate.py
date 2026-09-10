@@ -1,6 +1,6 @@
 """live2d_expression_prompt is skipped for models that have nothing to express.
 
-A model whose emotionMap holds a single entry (kurisu_fan ships with only
+A model whose emotionMap holds a single entry (a hand-made rig can ship with only
 `neutral`) gains nothing from the expression prompt: one keyword cannot express
 a contrast, so setting the sole expression is always a no-op.
 
@@ -79,7 +79,7 @@ def _build(emo_map: dict) -> ServiceContext:
 def test_single_expression_model_does_not_load_the_prompt(recorder):
     context = _build({"neutral": 0})
 
-    result = asyncio.run(context.construct_system_prompt("你是紅莉栖。"))
+    result = asyncio.run(context.construct_system_prompt("你是詠梨。"))
 
     assert recorder.requested == []
     assert "<<live2d_expression_prompt>>" not in result
@@ -88,7 +88,7 @@ def test_single_expression_model_does_not_load_the_prompt(recorder):
 def test_empty_expression_map_does_not_load_the_prompt(recorder):
     context = _build({})
 
-    result = asyncio.run(context.construct_system_prompt("你是紅莉栖。"))
+    result = asyncio.run(context.construct_system_prompt("你是詠梨。"))
 
     assert recorder.requested == []
     assert "<<live2d_expression_prompt>>" not in result

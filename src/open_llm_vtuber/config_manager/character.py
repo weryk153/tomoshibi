@@ -19,7 +19,7 @@ class CharacterConfig(I18nMixin):
     character_name: str = Field(default="", alias="character_name")
     human_name: str = Field(default="Human", alias="human_name")
     avatar: str = Field(default="", alias="avatar")
-    # Danbooru character tag used when she draws herself, e.g. "makise kurisu".
+    # Danbooru character tag used when she draws herself, e.g. "your_character_name".
     # animagine-xl-4.0 is danbooru-trained, so this one tag pins her appearance
     # far better than any description — measured, the 9B's own attempts at her
     # looks were wrong every time (glasses, short hair, white hair). Empty means
@@ -44,7 +44,7 @@ class CharacterConfig(I18nMixin):
     # 這個角色說話用的語言。留空＝沿用 system_config.player_language。
     #
     # 為什麼要在角色層級：player_language 是全域的，設成日文會讓每一個角色都
-    # 講日文。但語言屬於角色本身——牧瀨紅莉栖是日本人，貓娘不是。全域設定該
+    # 講日文。但語言屬於角色本身——日本角色講日文，貓娘不一定。全域設定該
     # 是「沒特別指定時的預設」，不是「所有人都得照做」。
     #
     # 跟 tts_config 的 text_lang 是兩件事：這裡是「她用什麼語言想事情、寫回覆」

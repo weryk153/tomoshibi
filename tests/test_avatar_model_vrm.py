@@ -23,9 +23,9 @@ def vrm(tmp_path):
     return _model(
         tmp_path,
         {
-            "name": "kurisu_vrm",
+            "name": "my_vrm",
             "type": "vrm",
-            "url": "/vrm-models/kurisu_vrm/kurisu_vrm.vrm",
+            "url": "/vrm-models/my_vrm/my_vrm.vrm",
             "emotionMap": {"neutral": "neutral", "joy": "happy", "anger": "angry"},
             "motionMap": {
                 "wave": {"clip": "wave", "label": "揮手"},

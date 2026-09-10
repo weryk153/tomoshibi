@@ -68,11 +68,11 @@ def test_named_idle_group_still_wins_over_unnamed(tmp_path, monkeypatch):
 
 
 def test_first_named_group_wins_when_there_is_no_idle(tmp_path, monkeypatch):
-    # kurisu_fan 沒有無名群組；有具名群組時就用第一個，行為不變。
+    # 這個模型沒有無名群組；有具名群組時就用第一個，行為不變。
     _write_model3(
         tmp_path,
-        "kurisu_fan",
-        "kurisu.model3.json",
+        "compact_rig",
+        "compact_rig.model3.json",
         motions={"Talk": [{"File": "talk.motion3.json"}]},
     )
     (tmp_path / "model_dict.json").write_text("[]", encoding="utf-8")
@@ -80,7 +80,7 @@ def test_first_named_group_wins_when_there_is_no_idle(tmp_path, monkeypatch):
 
     scan_and_register_skins()
 
-    assert _registered(tmp_path, "kurisu_fan")["idleMotionGroupName"] == "Talk"
+    assert _registered(tmp_path, "compact_rig")["idleMotionGroupName"] == "Talk"
 
 
 def test_model_with_no_motions_at_all_falls_back_to_idle(tmp_path, monkeypatch):

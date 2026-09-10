@@ -83,7 +83,7 @@ def test_the_user_side_is_not_normalised():
 def test_okabe_chuuni_title_keeps_its_official_character():
     """「鳳凰院凶真」的「凶」會被 s2twp 轉成「兇」。
 
-    跟紅莉栖的名字同一個坑：OpenCC 把專有名詞當一般詞彙做台灣用語轉換。
+    跟角色名字被改成同音字是同一個坑：OpenCC 把專有名詞當一般詞彙做台灣用語轉換。
     這是岡部自封的稱號，官方寫法就是「凶真」。
     """
     from src.open_llm_vtuber.conversation_quality import (

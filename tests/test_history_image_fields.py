@@ -11,7 +11,7 @@ from src.open_llm_vtuber.chat_history_manager import (
 )
 
 
-CONF_UID = "kurisu"
+CONF_UID = "aoi"
 
 
 @pytest.fixture(autouse=True)

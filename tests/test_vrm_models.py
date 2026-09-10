@@ -105,30 +105,30 @@ def test_list_clips_sorted_excluding_idle(tmp_path):
 def test_scan_registers_new_model_idempotently(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     (tmp_path / "model_dict.json").write_text("[]", encoding="utf-8")
-    d = tmp_path / "vrm-models" / "kurisu_vrm"
+    d = tmp_path / "vrm-models" / "my_vrm"
     (d / "motions").mkdir(parents=True)
-    (d / "kurisu_vrm.vrm").write_bytes(_vrm1())
+    (d / "my_vrm.vrm").write_bytes(_vrm1())
     (d / "motions" / "wave.vrma").write_bytes(b"")
     (d / "motions" / "idle.vrma").write_bytes(b"")
     (d / "thumbnail.png").write_bytes(b"")
 
     first = scan_and_register_vrm()
-    assert first["newly_registered"] == ["kurisu_vrm"]
+    assert first["newly_registered"] == ["my_vrm"]
     assert first["skins"] == [
         {
-            "name": "kurisu_vrm",
+            "name": "my_vrm",
             "registered": True,
-            "thumbnail": "/vrm-models/kurisu_vrm/thumbnail.png",
+            "thumbnail": "/vrm-models/my_vrm/thumbnail.png",
             "type": "vrm",
         }
     ]
     entries = json.loads((tmp_path / "model_dict.json").read_text(encoding="utf-8"))
     assert entries == [
         {
-            "name": "kurisu_vrm",
+            "name": "my_vrm",
             "type": "vrm",
             "description": "自動偵測並註冊的 VRM 模型",
-            "url": "/vrm-models/kurisu_vrm/kurisu_vrm.vrm",
+            "url": "/vrm-models/my_vrm/my_vrm.vrm",
             "kScale": 1,
             "initialXshift": 0,
             "initialYshift": 0,

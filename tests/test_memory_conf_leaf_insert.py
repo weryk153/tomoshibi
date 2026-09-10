@@ -23,12 +23,12 @@ system_config:
   port: 12393
 
 character_config:
-  conf_name: 'kurisu'   # 角色名
-  conf_uid: 'kurisu'
+  conf_name: 'aoi'   # 角色名
+  conf_uid: 'aoi'
 
   # 一段註解
   persona_prompt: |
-    你是紅莉栖。
+    你是詠梨。
 
   agent_config:
     conversation_agent_choice: 'basic_memory_agent'
@@ -36,7 +36,7 @@ character_config:
 
 CONF_WITH_LEAVES = """\
 character_config:
-  conf_name: 'kurisu'
+  conf_name: 'aoi'
   core_memory_max_chars: 1500   # 保留這個註解
   long_term_memory_enabled: false
   memory_consolidation_interval: 1
@@ -89,9 +89,9 @@ def test_insert_preserves_existing_content(conf):
     mr._write_core_memory_cap(3000)
     text = path.read_text(encoding="utf-8")
     assert "# 一段註解" in text
-    assert "conf_name: 'kurisu'   # 角色名" in text
+    assert "conf_name: 'aoi'   # 角色名" in text
     assert "conversation_agent_choice: 'basic_memory_agent'" in text
-    assert "你是紅莉栖。" in text
+    assert "你是詠梨。" in text
 
 
 def test_existing_leaf_is_rewritten_not_duplicated(conf):
@@ -132,5 +132,5 @@ def test_inserted_conf_still_parses_as_yaml(conf):
     assert cc["long_term_memory_enabled"] is True
     assert cc["memory_consolidation_interval"] == 3
     # 既有內容沒被破壞
-    assert cc["conf_uid"] == "kurisu"
+    assert cc["conf_uid"] == "aoi"
     assert data["system_config"]["port"] == 12393

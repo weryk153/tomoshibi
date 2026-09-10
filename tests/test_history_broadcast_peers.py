@@ -37,7 +37,7 @@ def test_never_includes_the_client_that_just_spoke():
 def test_skips_clients_on_a_different_character():
     contexts = {
         "pc": _ctx("frieren", "hist-1"),
-        "other": _ctx("kurisu", "hist-1"),
+        "other": _ctx("aoi", "hist-1"),
     }
     assert select_history_peers(contexts, "pc") == []
 

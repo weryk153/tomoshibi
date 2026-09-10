@@ -27,7 +27,7 @@ def test_reports_only_characters_that_pin_an_engine(tmp_path, monkeypatch):
         tmp_path,
         "pinned.yaml",
         "character_config:\n"
-        "  conf_name: 牧瀨紅莉栖\n"
+        "  conf_name: 月島詠梨\n"
         "  tts_config:\n"
         "    tts_model: gpt_sovits_tts\n"
         "    gpt_sovits_tts:\n"
@@ -43,7 +43,7 @@ def test_reports_only_characters_that_pin_an_engine(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
 
     assert _engine_overrides_by_character() == {
-        "牧瀨紅莉栖": {"tts_model": "gpt_sovits_tts"},
+        "月島詠梨": {"tts_model": "gpt_sovits_tts"},
     }
 
 

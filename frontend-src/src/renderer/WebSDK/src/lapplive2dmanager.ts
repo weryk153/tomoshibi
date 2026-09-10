@@ -346,7 +346,7 @@ export class LAppLive2DManager {
 
     this.releaseAllModel();
     this._models.pushBack(new LAppModel());
-    this._models.at(0).loadAssets(modelPath, modelJsonName);
+    this._models.at(0).loadAssets(modelPath, modelJsonName, undefined, LAppDefine.CurrentCompactRig);
   }
 
   public setViewMatrix(m: CubismMatrix44) {

@@ -86,7 +86,7 @@ def test_consolidation_payload_carries_extra_body(monkeypatch, tmp_path):
 
     asyncio.run(
         mc.consolidate_core_memory(
-            "kurisu",
+            "aoi",
             "conv-1",
             "我在做 Live2D",
             "加油",

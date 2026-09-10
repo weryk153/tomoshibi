@@ -26,10 +26,10 @@ from src.open_llm_vtuber.character_route import (
 
 def _build(**kwargs) -> dict:
     base = dict(
-        conf_name="紅莉栖",
-        conf_uid="kurisu",
+        conf_name="詠梨",
+        conf_uid="aoi",
         persona_prompt="PERSONA",
-        live2d_model_name="kurisu_fan",
+        live2d_model_name="compact_rig",
         voice=None,
         character_name=None,
         avatar=None,
@@ -125,9 +125,9 @@ system_config:
   # 這行註解要活下來——ruamel round-trip 的重點就在這裡
   player_language: 'Traditional Chinese (Taiwan)'
 character_config:
-  conf_name: '紅莉栖'
+  conf_name: '詠梨'
   persona_prompt: 'PERSONA'
-  live2d_model_name: 'kurisu_fan'
+  live2d_model_name: 'compact_rig'
   reply_language: 'Japanese'
   tts_config:
     gpt_sovits_tts:
@@ -154,9 +154,9 @@ def conf(tmp_path, monkeypatch):
 
 def _update(**kwargs) -> None:
     base = dict(
-        conf_name="紅莉栖",
+        conf_name="詠梨",
         persona_prompt="PERSONA",
-        live2d_model_name="kurisu_fan",
+        live2d_model_name="compact_rig",
         voice=None,
         character_name=None,
         avatar=None,

@@ -3,8 +3,8 @@
 這些設定的共同點是它們跨越所有角色——換角色不會換掉它們：
 
 - **玩家語言**（system_config.player_language）：沒有指定語言的角色會用它。
-  角色自己的 reply_language 蓋過它，因為語言屬於角色本身（紅莉栖是日本人，
-  貓娘不是），全域設定只是「沒特別指定時的預設」。
+  角色自己的 reply_language 蓋過它，因為語言屬於角色本身（日本角色講日文，
+  貓娘不一定），全域設定只是「沒特別指定時的預設」。
 - **玩家提示**（system_config.player_prompt）：一句關於你的話，會被注入每一個
   角色的 system prompt。
 - **工具開關**（…basic_memory_agent.use_mcpp）：讓角色能用 MCP 工具（網路搜尋等）。

@@ -60,7 +60,7 @@ from ...context_window import detect_context_window
 # 預算怎麼來的（2026-08，開發機實測，qwen/qwen3.5-9b on LM Studio）：
 #
 #     loaded_context_length            20,992 token（該模型 max 262,144）
-#   - kurisu 的 system prompt           5,479 token
+#   - 長人設角色的 system prompt           5,479 token
 #       persona 2,007 / CORE_CONVERSATION_PROMPT 854 / think_tag 602
 #       / live2d_expression 505 / mcp 388 / core_memory 滿載 1,123
 #   - 留給生成                          1,500 token
@@ -268,7 +268,7 @@ class BasicMemoryAgent(AgentInterface):
 
         問得到 window 就照實算，問不到退回 MEMORY_MAX_CHARS。用 self._system
         當場量 system prompt，而不是寫死一個保留值——每個角色的人設長度差很多
-        （實測 kurisu 的 persona 2,007 token、Mao 只有 55），寫死等於對其中一個
+        （實測長人設的 persona 2,007 token、Mao 只有 55），寫死等於對其中一個
         算錯。system prompt 每輪會被重新組（記憶刷新），所以每次都重算。
 
         偵測到的值可以比保守預設更小：window 真的只有 4k 時就該勒緊，那正是

@@ -126,13 +126,13 @@ def test_explicit_japanese_we_stays_plural(monkeypatch):
     )
 
 
-def test_kurisu_name_is_not_rewritten_as_homophones(monkeypatch):
+def test_character_name_is_not_rewritten_as_homophones(monkeypatch):
     monkeypatch.setattr(
         "src.open_llm_vtuber.translate.llm_translate.httpx.post",
-        lambda *args, **kwargs: _Response("我是「紅麗棲」。"),
+        lambda *args, **kwargs: _Response("我是「詠莉」。"),
     )
 
     # 名字由角色設定提供；引擎本身不認得任何角色（見 test_translate_protected_names.py）。
-    translator = _translator(protected_names={"紅莉栖": ["紅麗棲", "紅莉棲", "紅麗栖"]})
+    translator = _translator(protected_names={"詠梨": ["詠莉", "泳梨", "詠利"]})
 
-    assert translator.translate("私は「紅莉栖」です。") == "我是「紅莉栖」。"
+    assert translator.translate("私は「詠梨」です。") == "我是「詠梨」。"

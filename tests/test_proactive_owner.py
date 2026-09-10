@@ -41,7 +41,7 @@ def test_clients_on_other_conversations_do_not_compete():
 
 
 def test_clients_on_other_characters_do_not_compete():
-    contexts = {"pc": _ctx("frieren", "h1"), "other": _ctx("kurisu", "h1")}
+    contexts = {"pc": _ctx("frieren", "h1"), "other": _ctx("aoi", "h1")}
     last = {"pc": 100.0, "other": 999.0}
     assert is_proactive_owner(contexts, last, "pc") is True
 

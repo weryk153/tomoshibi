@@ -128,7 +128,6 @@ frontend-src/out/
 docs/superpowers/
 
 # 個人角色 rig 的工作用 skill。它的每個步驟都指向 assets/live2d-work/ 底下
-# 沒進版控的有版權角色素材（SKILL.md 的說明就寫著「接手這個 repo 的 Kurisu
-# 模型」），跟 NOTICE 的「bring your own，不要放有版權角色」相牴觸，對 clone
+# 沒進版控的有版權角色素材（SKILL.md 寫的是作者本機的角色模型），跟 NOTICE 的「bring your own，不要放有版權角色」相牴觸，對 clone
 # 下來的人也沒有用——那些路徑在他們機器上不存在。留在本機就好。
 /skills/

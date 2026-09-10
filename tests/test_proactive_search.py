@@ -65,7 +65,7 @@ def _context(
         mcp_client=mcp_client if mcp_client is not None else _FakeMCPClient(),
         tool_manager=tool_manager,
         character_config=SimpleNamespace(
-            conf_uid="kurisu",
+            conf_uid="aoi",
             agent_config=SimpleNamespace(
                 agent_settings=SimpleNamespace(
                     basic_memory_agent=SimpleNamespace(
@@ -82,7 +82,7 @@ ANCHOR = "使用者：最近在玩空洞騎士的新 DLC\n角色：絲之歌嗎�
 
 
 def _run(context, anchor=ANCHOR, uid="search-test"):
-    clear_proactive_context("kurisu", uid)
+    clear_proactive_context("aoi", uid)
     return asyncio.run(
         extract_proactive_search_facts(
             context,
@@ -169,24 +169,24 @@ def test_facts_are_truncated():
 
 
 def test_cooldown_blocks_second_search_in_window():
-    clear_proactive_context("kurisu", "cool")
-    assert search_cooldown_active("kurisu", "cool") is False
-    note_search_performed("kurisu", "cool", "絲之歌 發售")
-    assert search_cooldown_active("kurisu", "cool") is True
+    clear_proactive_context("aoi", "cool")
+    assert search_cooldown_active("aoi", "cool") is False
+    note_search_performed("aoi", "cool", "絲之歌 發售")
+    assert search_cooldown_active("aoi", "cool") is True
 
 
 def test_cooldown_query_is_remembered():
-    clear_proactive_context("kurisu", "cool2")
-    note_search_performed("kurisu", "cool2", "絲之歌 發售")
+    clear_proactive_context("aoi", "cool2")
+    note_search_performed("aoi", "cool2", "絲之歌 發售")
     # 同 session 走冷卻擋，不需要比對查詢詞也會被擋；這裡驗證清除後恢復
-    clear_proactive_context("kurisu", "cool2")
-    assert search_cooldown_active("kurisu", "cool2") is False
+    clear_proactive_context("aoi", "cool2")
+    assert search_cooldown_active("aoi", "cool2") is False
 
 
 def test_cooldown_gate_skips_without_llm_call():
     context = _context(llm_reply="絲之歌 發售日")
-    clear_proactive_context("kurisu", "cool3")
-    note_search_performed("kurisu", "cool3", "任何查詢")
+    clear_proactive_context("aoi", "cool3")
+    note_search_performed("aoi", "cool3", "任何查詢")
     result = asyncio.run(
         extract_proactive_search_facts(
             context,
@@ -203,10 +203,10 @@ def test_cooldown_gate_skips_without_llm_call():
 
 
 def test_search_facts_block_appears_in_proactive_prompt():
-    clear_proactive_context("kurisu", "prompt-test")
+    clear_proactive_context("aoi", "prompt-test")
     prompt = build_proactive_prompt(
         "基本指令",
-        conf_uid="kurisu",
+        conf_uid="aoi",
         client_uid="prompt-test",
         conversation_anchor=ANCHOR,
         output_language="Traditional Chinese (Taiwan)",
@@ -219,10 +219,10 @@ def test_search_facts_block_appears_in_proactive_prompt():
 
 
 def test_no_search_facts_no_block():
-    clear_proactive_context("kurisu", "prompt-test2")
+    clear_proactive_context("aoi", "prompt-test2")
     prompt = build_proactive_prompt(
         "基本指令",
-        conf_uid="kurisu",
+        conf_uid="aoi",
         client_uid="prompt-test2",
         conversation_anchor=ANCHOR,
         output_language="Traditional Chinese (Taiwan)",
@@ -239,10 +239,10 @@ def test_no_search_facts_no_block():
 
 
 def _anchor_prompt(**kw):
-    clear_proactive_context("kurisu", "topic-shift")
+    clear_proactive_context("aoi", "topic-shift")
     return build_proactive_prompt(
         "基本指令",
-        conf_uid="kurisu",
+        conf_uid="aoi",
         client_uid="topic-shift",
         conversation_anchor="使用者：拜託跟我說\n角色：拜託我這種事，你腦袋大概壞了吧。",
         output_language="Traditional Chinese (Taiwan)",
@@ -299,10 +299,10 @@ def test_topic_switch_must_not_be_announced():
 
 
 def _answered_anchor_prompt(**kw):
-    clear_proactive_context("kurisu", "already-answered")
+    clear_proactive_context("aoi", "already-answered")
     return build_proactive_prompt(
         "基本指令",
-        conf_uid="kurisu",
+        conf_uid="aoi",
         client_uid="already-answered",
         conversation_anchor=(
             "使用者：當然，這就是一番賞\n"
@@ -336,10 +336,10 @@ def test_addressing_the_user_is_offered_as_a_third_option():
 
 def test_unanswered_user_line_is_not_wrongly_marked_as_answered():
     """錨點最後一句還是使用者的話時，那句確實還沒回過——不能叫她別回。"""
-    clear_proactive_context("kurisu", "unanswered")
+    clear_proactive_context("aoi", "unanswered")
     prompt = build_proactive_prompt(
         "基本指令",
-        conf_uid="kurisu",
+        conf_uid="aoi",
         client_uid="unanswered",
         conversation_anchor="角色：你要不要看看那個模型？\n使用者：我在想",
     )

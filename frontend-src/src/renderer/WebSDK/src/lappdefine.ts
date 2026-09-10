@@ -17,6 +17,8 @@ export const CanvasSize: { width: number; height: number } | 'auto' = 'auto';
 // 画面
 export const ViewScale = 1.0;
 export let CurrentKScale = ViewScale;
+// 目前角色是不是精簡 rig（model_dict 的 compactRig）。見 LAppModel.usesCompactRig。
+export let CurrentCompactRig = false;
 export const ViewMaxScale = 2.0;
 export const ViewMinScale = 0.8;
 
@@ -38,7 +40,7 @@ export let ModelDir: string[] = [];
 export let ModelFileNames: string[] = []; // New array to store model file names
 
 // Function to update model configuration with both directory and file name
-export function updateModelConfig(resourcePath: string, modelDirectory: string, modelFileName: string, kScale?: number) {
+export function updateModelConfig(resourcePath: string, modelDirectory: string, modelFileName: string, kScale?: number, compactRig?: boolean) {
   console.log('Updating model config:', { resourcePath, modelDirectory, modelFileName, kScale });
   ResourcesPath = resourcePath;
   ModelDir = [modelDirectory];
@@ -46,6 +48,7 @@ export function updateModelConfig(resourcePath: string, modelDirectory: string, 
   if (kScale !== undefined) {
     CurrentKScale = kScale;
   }
+  CurrentCompactRig = compactRig === true;
   // Update ModelDirSize when ModelDir changes
   ModelDirSize = ModelDir.length;
 }

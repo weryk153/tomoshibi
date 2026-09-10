@@ -44,8 +44,8 @@ def test_no_character_name_is_hardcoded_in_the_prompt():
     """沒給名單時，system prompt 不可以提到任何具體的角色名字。"""
     prompt = _translator()._system_prompt()
 
-    assert "紅莉栖" not in prompt
-    assert "牧瀨" not in prompt
+    assert "詠梨" not in prompt
+    assert "月島" not in prompt
 
 
 def test_supplied_names_appear_in_the_prompt():

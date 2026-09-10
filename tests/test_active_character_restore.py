@@ -32,14 +32,14 @@ def test_server_startup_restores_the_last_character(monkeypatch):
     server = _server(context)
     monkeypatch.setattr(
         "src.open_llm_vtuber.server.get_active_character_filename",
-        lambda: "kurisu.yaml",
+        lambda: "aoi.yaml",
     )
 
     asyncio.run(server.initialize())
 
     assert context.loaded == [
         ("base", server.config),
-        ("character", "kurisu.yaml"),
+        ("character", "aoi.yaml"),
     ]
 
 

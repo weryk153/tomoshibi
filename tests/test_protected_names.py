@@ -1,6 +1,6 @@
 """專有名詞保護必須由角色資料驅動，不能寫死在共用程式碼裡。
 
-小模型會把專有名詞改成同音字（實測反覆把「紅莉栖」寫成「紅麗棲」），OpenCC 的
+小模型會把專有名詞改成同音字（實測反覆把角色名字寫成同音字），OpenCC 的
 s2twp 也會把專有名詞當一般詞彙做台灣用語轉換。所以「把正確寫法釘回去」這個機制
 是需要的——需要被移出去的是「哪些名字」這份資料，那屬於角色，不屬於引擎。
 """
@@ -33,9 +33,9 @@ def test_no_character_name_is_hardcoded():
 
     這條是這次重構的重點：引擎裡不可以內建任何特定作品的角色名字。
     """
-    out = normalize_output_language_variant("我是紅麗棲。", ZH_TW)
+    out = normalize_output_language_variant("我是詠莉。", ZH_TW)
 
-    assert out == "我是紅麗棲。"
+    assert out == "我是詠莉。"
 
 
 def test_words_outside_the_list_are_untouched():

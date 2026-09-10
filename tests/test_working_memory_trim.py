@@ -108,7 +108,7 @@ def test_budget_falls_back_when_window_unknown():
 
 
 def test_big_window_widens_the_budget(monkeypatch):
-    """20,992 的 window 配 kurisu 等級的 system prompt，應該比保守預設寬。"""
+    """20,992 的 window 配 長人設等級的 system prompt，應該比保守預設寬。"""
     monkeypatch.setattr(bma, "detect_context_window", lambda *a, **k: 20992)
     agent = _agent(system="人" * 5000)  # 約 3,200 token 的 system prompt
     assert agent._memory_budget_chars() > MEMORY_MAX_CHARS

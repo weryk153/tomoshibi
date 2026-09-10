@@ -4,7 +4,7 @@ set -eu
 # Read-only release checks. Deliberately do not expose CLI-Anything edit,
 # migrate, flatten, or batch commands from this project wrapper.
 repo_root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
-model=${1:-"$repo_root/live2d-models/kurisu_fan/kurisu.model3.json"}
+model=${1:-"$repo_root/live2d-models/mao_pro/runtime/mao_pro.model3.json"}
 python_bin="$repo_root/.venv/bin/python"
 native_validator="$repo_root/skills/live2d-cubism-character-rig/scripts/validate_live2d_runtime.py"
 

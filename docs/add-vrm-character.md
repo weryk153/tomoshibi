@@ -79,10 +79,10 @@ a template — the shape is fixed):
 
 ```json
 {
-  "name": "kurisu_vrm",
+  "name": "my_vrm",
   "type": "vrm",
   "description": "自動偵測並註冊的 VRM 模型",
-  "url": "/vrm-models/kurisu_vrm/kurisu_vrm.vrm",
+  "url": "/vrm-models/my_vrm/my_vrm.vrm",
   "kScale": 1,
   "initialXshift": 0,
   "initialYshift": 0,
@@ -316,10 +316,10 @@ vrm-models/
 
 ```json
 {
-  "name": "kurisu_vrm",
+  "name": "my_vrm",
   "type": "vrm",
   "description": "自動偵測並註冊的 VRM 模型",
-  "url": "/vrm-models/kurisu_vrm/kurisu_vrm.vrm",
+  "url": "/vrm-models/my_vrm/my_vrm.vrm",
   "kScale": 1,
   "initialXshift": 0,
   "initialYshift": 0,

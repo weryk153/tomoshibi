@@ -86,12 +86,12 @@ export class LAppModel extends CubismUserModel {
   public static lookAtPointer = true;
 
   /**
-   * Kurisu is currently a compact cutout rig.  Until the neck/collar and mouth
-   * are rebuilt as deformable meshes, large generic SDK motion exposes layer
-   * seams and makes the two-state mouth pop.
+   * 精簡 rig：脖子、衣領與嘴巴還是剪紙式分層、沒有做成可變形網格的模型。SDK 預設的
+   * 大幅度動作會露出圖層接縫，兩段式的嘴巴也會一閃一閃。由 model_dict.json 項目的
+   * "compactRig": true 宣告，不看模型名稱。
    */
-  private usesCompactKurisuRig(): boolean {
-    return /\/(?:kurisu_fan)\/$/.test(this._modelHomeDir ?? "");
+  private usesCompactRig(): boolean {
+    return this._compactRig;
   }
 
   /**
@@ -102,9 +102,11 @@ export class LAppModel extends CubismUserModel {
   public loadAssets(
     dir: string,
     fileName: string,
-    modelScale?: number
+    modelScale?: number,
+    compactRig = false
   ): void {
     this._modelHomeDir = dir;
+    this._compactRig = compactRig;
     this._modelScale = modelScale;
     this._loadFailed = false;
 
@@ -351,7 +353,7 @@ export class LAppModel extends CubismUserModel {
       this._breath = CubismBreath.create();
 
       const breathParameters: csmVector<BreathParameterData> = new csmVector();
-      if (!this.usesCompactKurisuRig()) {
+      if (!this.usesCompactRig()) {
         breathParameters.pushBack(
           new BreathParameterData(this._idParamAngleX, 0.0, 15.0, 6.5345, 0.5)
         );
@@ -659,7 +661,7 @@ export class LAppModel extends CubismUserModel {
     // モデルを切り替えても設定は維持される。
     if (!LAppModel.lookAtPointer) {
       // 何も加算しない＝ドラッグしても正面のまま。
-    } else if (!this.usesCompactKurisuRig()) {
+    } else if (!this.usesCompactRig()) {
       // ドラッグによる変化
       // ドラッグによる顔の向きの調整
       this._model.addParameterValueById(this._idParamAngleX, this._dragX * 30); // -30から30の値を加える
@@ -697,15 +699,15 @@ export class LAppModel extends CubismUserModel {
       let value = 0.0;
       this._wavFileHandler.update(deltaTimeSeconds);
       value = this._wavFileHandler.getRms();
-      const compactKurisu = this.usesCompactKurisuRig();
-      const targetValue = compactKurisu
-        // The Kurisu Official v1 rig cross-fades Mouth_Closed/Mouth_Open across the
+      const compactRig = this.usesCompactRig();
+      const targetValue = compactRig
+        // Compact rigs typically cross-fade Mouth_Closed/Mouth_Open across the
         // full 0..1 range. Raw speech RMS is usually far below that range, so
         // the previous 0.38 cap left the open-mouth layer almost invisible.
         ? Math.min(1.0, value * 9.0)
         : Math.min(1.0, value * 1.5);
 
-      if (compactKurisu) {
+      if (compactRig) {
         // Quick attack, gentler release: speech follows syllables without
         // flashing between the two available opacity states every frame.
         const rate = targetValue > this._smoothedLipSyncValue ? 22.0 : 14.0;
@@ -717,7 +719,7 @@ export class LAppModel extends CubismUserModel {
         value = targetValue;
       }
 
-      const lipSyncWeight = compactKurisu ? 1.0 : 4.0;
+      const lipSyncWeight = compactRig ? 1.0 : 4.0;
 
       for (let i = 0; i < this._lipSyncIds.getSize(); ++i) {
         this._model.addParameterValueById(
@@ -1433,6 +1435,7 @@ export class LAppModel extends CubismUserModel {
   _allMotionCount: number; // モーション総数
   _wavFileHandler: LAppWavFileHandler; //wavファイルハンドラ
   _smoothedLipSyncValue: number = 0.0;
+  _compactRig = false;
   _consistency: boolean; // MOC3一貫性チェック管理用
   _modelScale?: number;
   _loadFailed: boolean;
