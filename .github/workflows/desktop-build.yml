@@ -79,7 +79,9 @@ jobs:
         run: pnpm run typecheck
 
       - name: Build desktop app
-        run: pnpm run ${{ matrix.script }}
+        # --publish never：有 GH_TOKEN 又是推標籤時，electron-builder 預設會自己上傳到
+        # release。發布交給下面的 release job 統一做，否則同一批檔案會被傳兩次。
+        run: pnpm run ${{ matrix.script }} --publish never
         env:
           # 沒有憑證就不要嘗試簽章，否則 electron-builder 會在找不到身分時
           # 用非零離開碼中斷，而不是像本機那樣只印警告。
@@ -103,11 +105,22 @@ jobs:
             frontend-src/release/*/*.exe
             frontend-src/release/*/*.zip
 
-      - name: Attach to draft release
-        if: startsWith(github.ref, 'refs/tags/v')
-        uses: softprops/action-gh-release@v2
+  # 兩個平台都建好、後端實測都過了，才建一份 release 草稿。
+  # 不在各平台 job 裡各自上傳：GitHub 用標籤查不到草稿，兩個 job 會各建一份。
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - uses: softprops/action-gh-release@v2
         with:
           draft: true
+          fail_on_unmatched_files: true
           files: |
-            frontend-src/release/*/*.dmg
-            frontend-src/release/*/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.exe
