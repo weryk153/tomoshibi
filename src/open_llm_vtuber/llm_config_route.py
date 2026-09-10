@@ -50,10 +50,12 @@ from .model_probe import (
     describe_ollama_model,
     list_lmstudio_models,
     list_ollama_models,
+    ollama_installed,
     probe_lmstudio,
     probe_ollama,
 )
 from .model_profiles import profile_for, recommended_model
+from . import ollama_installer
 from .system_probe import total_ram_bytes
 
 CONF_PATH = "conf.yaml"
@@ -690,6 +692,51 @@ def init_llm_config_route() -> APIRouter:
         result["recommended"] = recommended_model(ram)
         return JSONResponse(result)
 
+    # 同時只允許一個安裝在跑。使用者連按兩下、或開了兩個分頁，不該跑出兩個安裝程式。
+    install_lock = asyncio.Lock()
+
+    @router.post("/api/llm-config/ollama-install")
+    async def install_ollama(request: Request):
+        """一鍵安裝 Ollama，進度用 NDJSON 串流回傳，事件格式同 ollama-pull。
+
+        會下載並執行安裝程式，所以跟其他寫入端點一樣只接受本機請求。
+        """
+        if not _is_local_request(request):
+            return _forbidden()
+
+        def line(event: dict) -> str:
+            return json.dumps(event) + "\n"
+
+        async def stream():
+            if install_lock.locked():
+                yield line(
+                    {"status": "error", "error": "Ollama is already being installed."}
+                )
+                return
+            async with install_lock:
+                try:
+                    async for event in ollama_installer.install():
+                        yield line(event)
+                except ollama_installer.InstallError as e:
+                    yield line({"status": "error", "error": str(e)})
+                except httpx.TimeoutException:
+                    yield line(
+                        {
+                            "status": "error",
+                            "error": "The download stalled. Check your connection and try again.",
+                        }
+                    )
+                except Exception as e:
+                    logger.warning(f"ollama-install failed: {type(e).__name__}: {e}")
+                    yield line(
+                        {
+                            "status": "error",
+                            "error": "Installing Ollama failed. Try again, or download it from ollama.com.",
+                        }
+                    )
+
+        return StreamingResponse(stream(), media_type="application/x-ndjson")
+
     @router.post("/api/llm-config/ollama-pull")
     async def pull_ollama_model(request: Request):
         """幫使用者下載模型，把 Ollama 的進度原樣轉給前端。
@@ -803,6 +850,9 @@ def init_llm_config_route() -> APIRouter:
                 "models": [asdict(m) for m in [*lms, *olm]],
                 "lmstudio_available": lms_reachable,
                 "ollama_available": olm_reachable,
+                # 只有連不上時才有意義：用來分「請下載 Ollama」和「請打開 Ollama」。
+                "ollama_installed": olm_reachable or ollama_installed(),
+                "ollama_install_supported": ollama_installer.supported(),
                 "recommended_pull": recommended_model(ram),
             }
         )

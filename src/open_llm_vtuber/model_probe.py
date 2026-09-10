@@ -10,7 +10,11 @@ context_window 是執行期問「目前載入的 window 多大」（懶惰、有
 避免兩個地方各自知道端點形狀；快取與冷卻的語意留在 context_window。
 """
 
+import os
+import shutil
+import sys
 from dataclasses import dataclass
+from pathlib import Path
 
 import httpx
 from loguru import logger
@@ -134,6 +138,32 @@ def fetch_ollama_show(base_url: str, model_id: str) -> dict:
     url = f"{ollama_root(base_url)}/api/show"
     with httpx.Client(timeout=_TIMEOUT) as client:
         return client.post(url, json={"model": model_id}).json()
+
+
+def ollama_installed() -> bool:
+    """這台電腦上有沒有裝 Ollama，跟它有沒有在跑無關。
+
+    連不上 11434 時，「沒裝」和「裝了但沒開」要給的建議不同：前者要下載連結，
+    後者只要打開 app。精靈原本一律顯示「請先安裝」，已經裝好只是沒開的人會以為
+    自己裝失敗了。
+
+    只看常見的安裝位置，找不到就當沒裝——最壞情況是多顯示一個下載連結，不會
+    擋住任何事。
+    """
+    if shutil.which("ollama"):
+        return True
+    candidates: list[Path] = []
+    if sys.platform == "darwin":
+        candidates += [
+            Path("/Applications/Ollama.app"),
+            Path.home() / "Applications" / "Ollama.app",
+        ]
+    elif sys.platform == "win32":
+        local = os.environ.get("LOCALAPPDATA")
+        if local:
+            candidates.append(Path(local) / "Programs" / "Ollama" / "ollama app.exe")
+            candidates.append(Path(local) / "Programs" / "Ollama" / "ollama.exe")
+    return any(c.exists() for c in candidates)
 
 
 def probe_ollama(base_url: str) -> tuple[bool, list[DetectedModel]]:

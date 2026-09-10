@@ -1,0 +1,50 @@
+# 精靈的「一鍵安裝 Ollama」在乾淨機器上實際跑一次。
+#
+# 單元測試把網路和安裝程式都假造掉了，驗不到真正會出錯的地方：官方安裝檔的檔名與
+# 校驗碼格式有沒有改、Windows 的靜默安裝參數還管不管用、裝完 Ollama 會不會真的
+# 在 11434 回應。開發機上已經裝了 Ollama，也沒辦法拿來試。
+#
+# 會下載官方安裝檔（Windows 約 1.5GB），所以只在手動觸發、或動到安裝器時跑。
+
+name: Ollama one-click install
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'src/open_llm_vtuber/ollama_installer.py'
+      - '.github/workflows/ollama-installer-smoke.yml'
+
+jobs:
+  install:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install dependencies
+        run: uv sync --frozen --no-dev
+
+      - name: Ollama is not installed yet
+        shell: bash
+        run: |
+          if curl -sf -m 3 http://127.0.0.1:11434/api/version; then
+            echo "runner 上已經有 Ollama 在跑，這樣測不出安裝流程" >&2
+            exit 1
+          fi
+
+      - name: Install Ollama the way the wizard does
+        env:
+          PYTHONUTF8: '1'
+        run: uv run --frozen python -m src.open_llm_vtuber.ollama_installer
+
+      - name: Ollama answers on 11434
+        shell: bash
+        run: curl -sf http://127.0.0.1:11434/api/version

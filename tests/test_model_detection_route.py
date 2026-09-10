@@ -281,3 +281,44 @@ def test_apply_rejects_model_id_with_control_characters(client, monkeypatch):
 
 async def _ok_validate(base_url, model, api_key):
     return True, ""
+
+
+def test_detect_reports_installed_but_not_running(client, monkeypatch):
+    """連不上 Ollama 時，要分得出「沒裝」和「裝了沒開」——兩者給使用者的建議不同。"""
+    c, _ = client
+    monkeypatch.setattr(route, "probe_lmstudio", lambda base_url: (False, []))
+    monkeypatch.setattr(route, "probe_ollama", lambda base_url: (False, []))
+
+    monkeypatch.setattr(route, "ollama_installed", lambda: True)
+    body = c.get("/api/llm-config/detect").json()
+    assert body["ollama_available"] is False
+    assert body["ollama_installed"] is True
+
+    monkeypatch.setattr(route, "ollama_installed", lambda: False)
+    assert c.get("/api/llm-config/detect").json()["ollama_installed"] is False
+
+
+def test_detect_running_ollama_counts_as_installed(client, monkeypatch):
+    c, _ = client
+    monkeypatch.setattr(route, "probe_lmstudio", lambda base_url: (False, []))
+    monkeypatch.setattr(route, "probe_ollama", lambda base_url: (True, []))
+    monkeypatch.setattr(route, "ollama_installed", lambda: False)
+    assert c.get("/api/llm-config/detect").json()["ollama_installed"] is True
+
+
+def test_ollama_installed_finds_the_cli_or_the_app(monkeypatch, tmp_path):
+    from src.open_llm_vtuber import model_probe
+
+    monkeypatch.setattr(
+        model_probe.shutil, "which", lambda name: "/usr/local/bin/ollama"
+    )
+    assert model_probe.ollama_installed() is True
+
+    monkeypatch.setattr(model_probe.shutil, "which", lambda name: None)
+    monkeypatch.setattr(model_probe.sys, "platform", "win32")
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    assert model_probe.ollama_installed() is False
+    app = tmp_path / "Programs" / "Ollama" / "ollama app.exe"
+    app.parent.mkdir(parents=True)
+    app.write_bytes(b"")
+    assert model_probe.ollama_installed() is True
