@@ -40,7 +40,10 @@ mac:
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
 dmg:
-  artifactName: ${name}-${version}.${ext}
+  # 一定要帶 ${arch}：mac target 同時建 x64 與 arm64，檔名不分架構的話兩者會寫到
+  # 同一個檔案互相覆蓋，electron-builder 會反覆「retrying 5 more times」，
+  # 最後只留下一個（誰後建誰贏），而且沒有任何地方說得出它是哪個架構。
+  artifactName: ${name}-${version}-${arch}.${ext}
   writeUpdateInfo: false
 linux:
   target:
@@ -50,7 +53,7 @@ linux:
   maintainer: Kuren Peng <weryk153@users.noreply.github.com>
   category: Utility
 appImage:
-  artifactName: ${name}-${version}.${ext}
+  artifactName: ${name}-${version}-${arch}.${ext}
 npmRebuild: false
 publish:
   provider: github

@@ -21,6 +21,31 @@
 > **目前還沒有打包好的釋出版。** 請從原始碼執行（見下方「**習慣用終端機？（進階）**」），
 > 或自己打包。
 
+## 最短路徑
+
+**完全沒裝過這類東西** — 大約 10 分鐘，其中 8 分鐘在等下載。
+
+1. 裝 **[Ollama](https://ollama.com)**，開終端機跑 `ollama pull qwen2.5:3b`
+2. 這個頁面點綠色 **`<> Code`** → **Download ZIP** → 解壓縮
+3. 雙擊 `start-companion.command`（macOS）或 `start-companion.bat`（Windows）。
+   **那個視窗別關，它就是伺服器。**
+4. 瀏覽器會自己開 → 精靈選 **使用本機 Ollama** → 挑 2D 或 3D 角色 → 開始聊天。
+
+不想裝 Ollama？精靈也吃 OpenAI／Claude／Gemini 的 API key，貼上就能用。
+
+**已經有 `uv`**
+
+```bash
+git clone https://github.com/weryk153/tomoshibi.git && cd tomoshibi
+uv run run_server.py          # 首次會自己 uv sync
+# 開 http://localhost:12393 → 精靈 → 開聊
+```
+
+卡住了，或想知道每個選項差在哪？完整步驟在下面，包含第一次啟動一定會遇到的
+macOS／Windows 安全性警告。
+
+---
+
 ## 這是什麼？
 
 **Tomoshibi** 把一個角色 —— 手繪的 Live2D 或全 3D 的 VRM —— 變成你真的會去聊天的 AI 桌面陪伴：它記得你、會自己開話題、你說話時它會聽、你說「晚安」它就安靜下來。
@@ -96,6 +121,19 @@ uv sync                  # 安裝相依套件
 uv run run_server.py     # 啟動伺服器
 # 開 http://localhost:12393  → 設定精靈 → 開聊
 ```
+
+## 跑起來之後
+
+| 想做什麼 | 去哪 |
+|---|---|
+| 換成 3D 角色 | 設定 → 角色 → 編輯 → 外觀 |
+| 加自己的模型 | 丟進 `live2d-models/` 或 `vrm-models/`，見下方教學 |
+| 換一個聲音 | 設定 → 角色 → 編輯 → 參考音（需要 GPT-SoVITS） |
+| 從手機用 | 見下方 Tailscale 教學 |
+| 讓它主動找你聊 | 設定 → 主動發言 |
+| 讓它安靜 | 說「晚安」— 關鍵字可在設定裡改 |
+
+---
 
 ## 開啟、關閉、開機自動啟動
 

@@ -22,6 +22,32 @@
 > **There is no packaged release yet.** Run from source (see
 > [Prefer the terminal?](#prefer-the-terminal-advanced)) or package it yourself.
 
+## Fastest path
+
+**Never installed anything like this** — about 10 minutes, 8 of them waiting on downloads.
+
+1. Install **[Ollama](https://ollama.com)**, then in a terminal: `ollama pull qwen2.5:3b`
+2. On this page: green **`<> Code`** → **Download ZIP** → unzip it
+3. Double-click `start-companion.command` (macOS) or `start-companion.bat` (Windows).
+   **Keep that window open — it *is* the server.**
+4. Your browser opens by itself → in the wizard pick **Use local Ollama** → pick a 2D or 3D
+   character → start chatting.
+
+Don't want to install Ollama? The wizard also takes an OpenAI / Claude / Gemini API key.
+
+**Already have `uv`**
+
+```bash
+git clone https://github.com/weryk153/tomoshibi.git && cd tomoshibi
+uv run run_server.py          # first run does uv sync for you
+# open http://localhost:12393 → wizard → chat
+```
+
+Stuck, or want to know what each choice means? The full walkthrough is below —
+including the macOS / Windows security prompt you'll hit on first launch.
+
+---
+
 ## What is this?
 
 **Tomoshibi** turns an on-screen character — hand-drawn Live2D or fully 3D VRM — into an AI companion you actually talk to — it remembers you, starts conversations on its own, listens while you speak, and goes quiet when you say goodnight.
@@ -105,6 +131,19 @@ uv run run_server.py     # start the server
 ```
 
 The wizard writes your LLM choice into `conf.yaml` for you. You can still edit it by hand (see below).
+
+---
+
+## Once it's running
+
+| You want to | Go to |
+|---|---|
+| Switch to the 3D character | Settings → Characters → Edit → Appearance |
+| Add your own model | Drop it in `live2d-models/` or `vrm-models/` — see the guides below |
+| Give it a different voice | Settings → Characters → Edit → Reference audio (needs GPT-SoVITS) |
+| Use it from your phone | See the Tailscale guide below |
+| Have it start conversations | Settings → Proactive speech |
+| Make it stop initiating | Say "goodnight" — or change the keyword in Settings |
 
 ---
 

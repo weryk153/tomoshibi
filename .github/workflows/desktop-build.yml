@@ -1,0 +1,100 @@
+# 桌面版打包。macOS 與 Windows 各自在自己的 runner 上建——這是唯一能確定兩邊
+# 都建得起來的方法：electron-builder 在 macOS 上要靠 Wine 才能產生 Windows 安裝檔，
+# 那條路既脆弱又沒辦法真的驗證產物，所以不用。
+#
+# 預設只建不發布。推一個 v* 標籤才會把產物附成 GitHub Release 的**草稿**——
+# 要不要公開由人按下去決定（electron-builder.yml 的 releaseType 也是 draft）。
+#
+# 沒有簽章與公證：這是免費方案，使用者第一次開會遇到 Gatekeeper／SmartScreen 警告，
+# README 有寫怎麼放行。所以這裡也不設 CSC_* 密鑰。
+
+name: Desktop build
+
+on:
+  workflow_dispatch:      # 手動觸發，用來確認兩邊都還建得起來
+  push:
+    tags:
+      - 'v*'
+  pull_request:
+    paths:
+      # 只有動到桌面版真正相依的東西才跑——這個 job 每次要花十幾分鐘。
+      - 'frontend-src/src/main/**'
+      - 'frontend-src/src/preload/**'
+      - 'frontend-src/electron-builder.yml'
+      - 'frontend-src/electron.vite.config.*'
+      - 'frontend-src/package.json'
+      - '.github/workflows/desktop-build.yml'
+
+permissions:
+  contents: write         # 建立 release 草稿需要
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false    # 一邊壞掉時，另一邊的結果仍然有參考價值
+      matrix:
+        include:
+          - os: macos-latest
+            script: build:mac
+            artifact: macos
+          - os: windows-latest
+            script: build:win
+            artifact: windows
+
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 40
+
+    defaults:
+      run:
+        working-directory: frontend-src
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: frontend-src/pnpm-lock.yaml
+
+      # Electron 的二進位檔在 postinstall 下載，而 pnpm 預設擋掉相依套件的
+      # install script。package.json 的 onlyBuiltDependencies 已經放行，
+      # 這裡不需要額外處理——但如果哪天出現 "Error: Electron uninstall"，
+      # 就是那份允許清單掉了。
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Build desktop app
+        run: pnpm run ${{ matrix.script }}
+        env:
+          # 沒有憑證就不要嘗試簽章，否則 electron-builder 會在找不到身分時
+          # 用非零離開碼中斷，而不是像本機那樣只印警告。
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Collect artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tomoshibi-${{ matrix.artifact }}
+          retention-days: 14
+          if-no-files-found: error   # 建置「成功」但沒產出任何檔案也算失敗
+          path: |
+            frontend-src/release/*/*.dmg
+            frontend-src/release/*/*.exe
+            frontend-src/release/*/*.zip
+
+      - name: Attach to draft release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: |
+            frontend-src/release/*/*.dmg
+            frontend-src/release/*/*.exe
