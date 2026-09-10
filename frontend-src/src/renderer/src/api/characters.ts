@@ -27,6 +27,12 @@ export interface CharacterRecord {
   // conf.yaml 的 tts_model。以前後端根本不回這個欄位，而寫入端又無條件把它
   // 塞成 edge_tts，所以角色面板存一次檔就會把訓練好的音色換掉。
   tts_model: string
+  // 「用誰的聲音」。GPT-SoVITS 是 zero-shot 克隆，聲線由 ref_audio_path 這段
+  // 參考音決定；prompt_text 是那段音檔的逐字稿，prompt_lang 是它的語言——三者
+  // 是一組，逐字稿給錯音色就會歪。空字串＝沒設，沿用 conf.yaml 的全域參考音。
+  ref_audio_path: string
+  prompt_text: string
+  prompt_lang: string
 }
 
 export interface CharacterEdits {
@@ -50,6 +56,9 @@ export interface CharacterCreate {
   reply_language?: string
   voice_lang?: string
   tts_model?: string
+  ref_audio_path?: string
+  prompt_text?: string
+  prompt_lang?: string
 }
 
 // 只用在 buildCharacterUpdate 的第三參數。這兩個欄位在後端是「省略就保留現值」
@@ -62,6 +71,9 @@ export type OptionalCharacterFields = {
   reply_language?: string
   voice_lang?: string
   tts_model?: string
+  ref_audio_path?: string
+  prompt_text?: string
+  prompt_lang?: string
 }
 
 // 這幾個鍵共用「省略＝保留現值、空字串＝清除」的語意。列成陣列而不是寫四段
@@ -72,6 +84,9 @@ const OPTIONAL_KEYS = [
   'reply_language',
   'voice_lang',
   'tts_model',
+  'ref_audio_path',
+  'prompt_text',
+  'prompt_lang',
 ] as const satisfies readonly (keyof OptionalCharacterFields)[]
 
 const str = (v: string | null | undefined): string => (v == null ? '' : v)

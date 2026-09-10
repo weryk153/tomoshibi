@@ -62,6 +62,14 @@ interface VoiceOption {
   label: string
 }
 
+// GPT-SoVITS 的參考音。path 是絕對路徑（後端要的），label 是檔名（給人看的），
+// prompt_text 來自同名的 .txt sidecar——選了就一起填，兩者是一組的。
+interface ReferenceVoice {
+  path: string
+  label: string
+  prompt_text: string
+}
+
 // 建立表單的草稿。跟 CharacterEdits 的四個必填欄位相同，另外多一個 slug——
 // 這是建立獨有的（更新不能改檔名/slug），所以不併進 CharacterEdits。
 // voice 一樣用畫面用的哨兵值（INHERIT_VOICE），送出前才轉換。character_name／
@@ -78,6 +86,9 @@ interface CreateDraft {
   reply_language: string
   voice_lang: string
   tts_model: string
+  ref_audio_path: string
+  prompt_text: string
+  prompt_lang: string
 }
 
 // 編輯表單的草稿。在 CharacterEdits 的四個必填欄位之外，多帶 character_name／
@@ -89,6 +100,9 @@ interface EditDraft extends CharacterEdits {
   reply_language: string
   voice_lang: string
   tts_model: string
+  ref_audio_path: string
+  prompt_text: string
+  prompt_lang: string
 }
 
 // 後端試聽逾時 12 秒（VOICE_SAMPLE_TIMEOUT in character_route.py），前端多留
@@ -129,6 +143,8 @@ function Characters(): JSX.Element {
   // single source of truth（後端 perf_route.py 的 GPT_SOVITS_LANGS）。抓不到就
   // 留空，下面的欄位會整個不顯示，而不是給一份會漂移的硬編清單。
   const [voiceLangs, setVoiceLangs] = useState<string[]>([]);
+  // 可直接選用的參考音（後端掃 conf.yaml 那個 ref_audio_path 的所在資料夾）。
+  const [referenceVoices, setReferenceVoices] = useState<ReferenceVoice[]>([]);
   // 可選的 TTS 引擎清單，跟 voiceLangs 同一次 GET /api/perf 拿到。
   const [ttsModels, setTtsModels] = useState<string[]>([]);
   const [skinsError, setSkinsError] = useState<string | null>(null);
@@ -227,6 +243,9 @@ function Characters(): JSX.Element {
         const data = result.data as PerfState;
         setVoiceLangs(Array.isArray(data.gpt_sovits_langs) ? data.gpt_sovits_langs : []);
         setTtsModels(Array.isArray(data.tts_models) ? data.tts_models : []);
+        setReferenceVoices(
+          Array.isArray(data.reference_voices) ? data.reference_voices : [],
+        );
       }
       // 失敗不顯示錯誤：這只是一個選填欄位的選項來源，表單其餘部分照常可用。
     })();
@@ -321,6 +340,47 @@ function Characters(): JSX.Element {
     return createListCollection({ items });
   }, [voiceLangs, t, draft?.voice_lang, createDraft?.voice_lang]);
 
+  // 參考音下拉。第一項是「沿用全域設定」（＝清掉，用 conf.yaml 那份），後面是
+  // 掃到的檔案。手寫在 YAML 裡、不在資料夾內的路徑要有保底項，否則觸發器只顯示
+  // placeholder，看起來像沒設定，一存檔就真的被清掉。
+  const refAudioCollection = useMemo(() => {
+    const items = [
+      { label: t('settings.characters.refAudioInherit'), value: INHERIT_VOICE },
+      ...referenceVoices.map((v) => ({ label: v.label, value: v.path })),
+    ];
+    const current = draft?.ref_audio_path ?? createDraft?.ref_audio_path;
+    if (current && !items.some((i) => i.value === current)) {
+      // 只顯示檔名，完整路徑太長會把觸發器撐爆
+      items.push({ label: current.split('/').pop() || current, value: current });
+    }
+    return createListCollection({ items });
+  }, [referenceVoices, t, draft?.ref_audio_path, createDraft?.ref_audio_path]);
+
+  // 選了參考音就順手把逐字稿填上。參考音跟逐字稿是一組的，分開填等於留一個
+  // 「對不起來就靜默壞掉」的機會給使用者。
+  const promptTextFor = useCallback(
+    (path: string) => referenceVoices.find((v) => v.path === path)?.prompt_text ?? '',
+    [referenceVoices],
+  );
+
+  // 參考音的語言。值域跟發聲語言同一份（都是 GPT-SoVITS 的語言代碼），但保底項
+  // 必須跟著 prompt_lang 自己的現值走，所以不能共用 voiceLangCollection——共用的
+  // 話，角色檔裡手寫的 prompt_lang 若不在後端清單內就會被靜默清掉。
+  const promptLangCollection = useMemo(() => {
+    const items = [
+      { label: t('settings.characters.promptLangInherit'), value: INHERIT_LANG },
+      ...voiceLangs.map((code) => {
+        const key = gptSovitsLangLabelKey(code);
+        return { label: key ? t(key) : code, value: code };
+      }),
+    ];
+    const current = draft?.prompt_lang ?? createDraft?.prompt_lang;
+    if (current && current !== INHERIT_LANG && !items.some((item) => item.value === current)) {
+      items.push({ label: current, value: current });
+    }
+    return createListCollection({ items });
+  }, [voiceLangs, t, draft?.prompt_lang, createDraft?.prompt_lang]);
+
   // TTS 引擎下拉。值域用後端 GET /api/perf 回的 tts_models，跟合成分頁
   // （tts.tsx）同一份來源，不另外寫死一張清單。第一項是「沿用全域設定」。
   const engineCollection = useMemo(() => {
@@ -368,6 +428,10 @@ function Characters(): JSX.Element {
       reply_language: record.reply_language ?? '',
       voice_lang: record.voice_lang || INHERIT_LANG,
       tts_model: record.tts_model || INHERIT_ENGINE,
+      // 參考音三件套是自由輸入，沒有 Select 的空字串陷阱，直接用現值即可。
+      ref_audio_path: record.ref_audio_path || '',
+      prompt_text: record.prompt_text || '',
+      prompt_lang: record.prompt_lang || INHERIT_LANG,
     });
     setSaveError(null);
     setPreviewError(null);
@@ -401,6 +465,9 @@ function Characters(): JSX.Element {
       reply_language: '',
       voice_lang: INHERIT_LANG,
       tts_model: INHERIT_ENGINE,
+      ref_audio_path: '',
+      prompt_text: '',
+      prompt_lang: INHERIT_LANG,
     });
     setCreateError(null);
     // 修正 Task 2 review 抓到的資料殘留：openEdit 一直有清 previewError，
@@ -490,6 +557,20 @@ function Characters(): JSX.Element {
     if (ttsModel !== (selectedRecord.tts_model ?? '')) {
       optional.tts_model = ttsModel;
     }
+    // 參考音三件套走跟上面完全一樣的規則：沒改就整個鍵不送（後端退回磁碟現值），
+    // 改成空字串才是「清掉，改回沿用 conf.yaml 的全域參考音」。
+    const refAudio = draft.ref_audio_path.trim();
+    if (refAudio !== (selectedRecord.ref_audio_path ?? '').trim()) {
+      optional.ref_audio_path = refAudio;
+    }
+    const promptText = draft.prompt_text.trim();
+    if (promptText !== (selectedRecord.prompt_text ?? '').trim()) {
+      optional.prompt_text = promptText;
+    }
+    const promptLang = draft.prompt_lang === INHERIT_LANG ? '' : draft.prompt_lang;
+    if (promptLang !== (selectedRecord.prompt_lang ?? '')) {
+      optional.prompt_lang = promptLang;
+    }
     const body = buildCharacterUpdate(selectedRecord, edits, optional);
     const result = await updateCharacter(baseUrl, selectedRecord.filename, body);
     setSaving(false);
@@ -546,6 +627,23 @@ function Characters(): JSX.Element {
     }
     if (createDraft.voice_lang && createDraft.voice_lang !== INHERIT_LANG) {
       body.voice_lang = createDraft.voice_lang;
+    }
+    // 建立表單一直有 TTS 引擎選單，但這裡從來沒把它送出去——選了 gpt_sovits_tts
+    // 建出來的角色仍然沿用 conf.yaml 的引擎，畫面上沒有任何線索。
+    if (createDraft.tts_model && createDraft.tts_model !== INHERIT_ENGINE) {
+      body.tts_model = createDraft.tts_model;
+    }
+    // 參考音三件套：決定「用誰的聲音」。留空＝沿用 conf.yaml 的全域參考音。
+    const trimmedRefAudio = createDraft.ref_audio_path.trim();
+    if (trimmedRefAudio) {
+      body.ref_audio_path = trimmedRefAudio;
+    }
+    const trimmedPromptText = createDraft.prompt_text.trim();
+    if (trimmedPromptText) {
+      body.prompt_text = trimmedPromptText;
+    }
+    if (createDraft.prompt_lang && createDraft.prompt_lang !== INHERIT_LANG) {
+      body.prompt_lang = createDraft.prompt_lang;
     }
     const result = await createCharacter(baseUrl, body);
     setCreating(false);
@@ -842,6 +940,57 @@ function Characters(): JSX.Element {
           </Stack>
         )}
 
+        {/* 「用誰的聲音」——只對 GPT-SoVITS 有意義。三者是一組：聲線由參考音決定，
+            逐字稿要跟那段音檔對得上，否則克隆出來的音色會歪。 */}
+        <Stack gap={2}>
+          <SelectField
+            label={t('settings.characters.refAudioPath')}
+            value={[createDraft.ref_audio_path || INHERIT_VOICE]}
+            onChange={(value) => setCreateDraft((d) => {
+              if (!d) return d;
+              const picked = value[0] === INHERIT_VOICE ? '' : (value[0] ?? '');
+              // 換了參考音就換逐字稿。挑不到（手寫路徑、或沒有 sidecar）就維持原值，
+              // 不要拿空字串把使用者自己打的逐字稿洗掉。
+              const transcript = promptTextFor(picked);
+              return {
+                ...d,
+                ref_audio_path: picked,
+                prompt_text: transcript || d.prompt_text,
+              };
+            })}
+            collection={refAudioCollection}
+            placeholder={t('settings.characters.refAudioPath')}
+          />
+          <Text fontSize="xs" color="whiteAlpha.600">
+            {t('settings.characters.refAudioPathHelp')}
+          </Text>
+        </Stack>
+
+        <InputField
+          label={t('settings.characters.promptText')}
+          value={createDraft.prompt_text}
+          onChange={(value) => setCreateDraft((d) => (d ? { ...d, prompt_text: value } : d))}
+          placeholder={t('settings.characters.promptTextPlaceholder')}
+          help={t('settings.characters.promptTextHelp')}
+        />
+
+        {voiceLangs.length > 0 && (
+          <Stack gap={2}>
+            <SelectField
+              label={t('settings.characters.promptLang')}
+              value={[createDraft.prompt_lang]}
+              onChange={(value) => setCreateDraft((d) => (
+                d ? { ...d, prompt_lang: value[0] ?? INHERIT_LANG } : d
+              ))}
+              collection={promptLangCollection}
+              placeholder={t('settings.characters.promptLang')}
+            />
+            <Text fontSize="xs" color="whiteAlpha.600">
+              {t('settings.characters.promptLangHelp')}
+            </Text>
+          </Stack>
+        )}
+
         <InputField
           label={t('settings.characters.slug')}
           value={createDraft.slug}
@@ -1056,6 +1205,57 @@ function Characters(): JSX.Element {
             />
             <Text fontSize="xs" color="whiteAlpha.600">
               {t('settings.characters.voiceLangHelp')}
+            </Text>
+          </Stack>
+        )}
+
+        {/* 「用誰的聲音」——只對 GPT-SoVITS 有意義。三者是一組：聲線由參考音決定，
+            逐字稿要跟那段音檔對得上，否則克隆出來的音色會歪。 */}
+        <Stack gap={2}>
+          <SelectField
+            label={t('settings.characters.refAudioPath')}
+            value={[draft.ref_audio_path || INHERIT_VOICE]}
+            onChange={(value) => setDraft((d) => {
+              if (!d) return d;
+              const picked = value[0] === INHERIT_VOICE ? '' : (value[0] ?? '');
+              // 換了參考音就換逐字稿。挑不到（手寫路徑、或沒有 sidecar）就維持原值，
+              // 不要拿空字串把使用者自己打的逐字稿洗掉。
+              const transcript = promptTextFor(picked);
+              return {
+                ...d,
+                ref_audio_path: picked,
+                prompt_text: transcript || d.prompt_text,
+              };
+            })}
+            collection={refAudioCollection}
+            placeholder={t('settings.characters.refAudioPath')}
+          />
+          <Text fontSize="xs" color="whiteAlpha.600">
+            {t('settings.characters.refAudioPathHelp')}
+          </Text>
+        </Stack>
+
+        <InputField
+          label={t('settings.characters.promptText')}
+          value={draft.prompt_text}
+          onChange={(value) => setDraft((d) => (d ? { ...d, prompt_text: value } : d))}
+          placeholder={t('settings.characters.promptTextPlaceholder')}
+          help={t('settings.characters.promptTextHelp')}
+        />
+
+        {voiceLangs.length > 0 && (
+          <Stack gap={2}>
+            <SelectField
+              label={t('settings.characters.promptLang')}
+              value={[draft.prompt_lang]}
+              onChange={(value) => setDraft((d) => (
+                d ? { ...d, prompt_lang: value[0] ?? INHERIT_LANG } : d
+              ))}
+              collection={promptLangCollection}
+              placeholder={t('settings.characters.promptLang')}
+            />
+            <Text fontSize="xs" color="whiteAlpha.600">
+              {t('settings.characters.promptLangHelp')}
             </Text>
           </Stack>
         )}

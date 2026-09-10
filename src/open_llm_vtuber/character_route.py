@@ -297,6 +297,23 @@ def _read_character_fields(path: str, *, is_base: bool) -> Optional[dict]:
         "reply_language": cc.get("reply_language") or "",
         # 語音語言埋在 gpt_sovits_tts 底下——只有這個引擎有 text_lang。
         "voice_lang": _dig(cc, "tts_config", "gpt_sovits_tts", "text_lang", default=""),
+        # 「用誰的聲音」三件套，同樣住在 gpt_sovits_tts 底下。GPT-SoVITS 是
+        # zero-shot 克隆：聲線完全由 ref_audio_path 這段參考音決定，prompt_text
+        # 是那段音檔的逐字稿、prompt_lang 是它的語言。三者是一組，逐字稿給錯
+        # 音色就會歪。
+        #
+        # 這三個欄位原本只在「設定→語音合成」那頁有，而那頁寫的是 conf.yaml
+        # 的全域值——於是角色面板選了 gpt_sovits_tts 卻沒有任何地方能挑聲音，
+        # 每個角色都共用同一把嗓子。
+        "ref_audio_path": _dig(
+            cc, "tts_config", "gpt_sovits_tts", "ref_audio_path", default=""
+        ),
+        "prompt_text": _dig(
+            cc, "tts_config", "gpt_sovits_tts", "prompt_text", default=""
+        ),
+        "prompt_lang": _dig(
+            cc, "tts_config", "gpt_sovits_tts", "prompt_lang", default=""
+        ),
         # 這個角色釘了哪個 TTS 引擎。空＝沒釘，沿用 conf.yaml 的 tts_model。
         #
         # 這個欄位曾經完全沒被讀出來，於是 UI 不知道角色檔裡有覆寫，而寫入端又
@@ -318,6 +335,9 @@ def _build_character_config(
     reply_language: Optional[str] = None,
     voice_lang: Optional[str] = None,
     tts_model: Optional[str] = None,
+    ref_audio_path: Optional[str] = None,
+    prompt_text: Optional[str] = None,
+    prompt_lang: Optional[str] = None,
 ) -> dict:
     """組出角色管理擁有的那幾個欄位。
 
@@ -353,6 +373,16 @@ def _build_character_config(
     if voice_lang:
         tts = cc.setdefault("tts_config", {})
         tts.setdefault("gpt_sovits_tts", {})["text_lang"] = voice_lang
+    # 參考音三件套跟 voice_lang 同住 gpt_sovits_tts，一樣用 setdefault 疊上去。
+    # 每個都各自判斷有沒有值：使用者可能只想換聲音、不動語言。
+    for key, value in (
+        ("ref_audio_path", ref_audio_path),
+        ("prompt_text", prompt_text),
+        ("prompt_lang", prompt_lang),
+    ):
+        if value:
+            tts = cc.setdefault("tts_config", {})
+            tts.setdefault("gpt_sovits_tts", {})[key] = value
     # 引擎：留空＝不釘，角色沿用 conf.yaml 的 tts_model（deep_merge 時繼承）。
     # 這是唯一會寫 tts_config.tts_model 的地方。
     if tts_model:
@@ -431,6 +461,9 @@ def _update_base_character_config(
     reply_language: Optional[str] = None,
     voice_lang: Optional[str] = None,
     tts_model: Optional[str] = None,
+    ref_audio_path: Optional[str] = None,
+    prompt_text: Optional[str] = None,
+    prompt_lang: Optional[str] = None,
 ) -> None:
     """就地更新底稿 conf.yaml 的 character_config。
 
@@ -483,6 +516,20 @@ def _update_base_character_config(
         else:
             _dig(cc, "tts_config", "gpt_sovits_tts", default={}).pop("text_lang", None)
 
+    # 參考音三件套跟 voice_lang 同一套規則：None（缺鍵）＝這次沒動，
+    # ""＝清掉那個鍵，改回沿用 conf.yaml 的全域參考音。
+    for key, value in (
+        ("ref_audio_path", ref_audio_path),
+        ("prompt_text", prompt_text),
+        ("prompt_lang", prompt_lang),
+    ):
+        if value is None:
+            continue
+        if value:
+            _tts_leaf(cc, "gpt_sovits_tts")[key] = value
+        else:
+            _dig(cc, "tts_config", "gpt_sovits_tts", default={}).pop(key, None)
+
     # 引擎：空字串＝改回沿用 conf.yaml 的全域設定。
     if tts_model is not None:
         if tts_model:
@@ -526,6 +573,11 @@ def _extract_body_fields(body: dict) -> dict:
         "reply_language": text("reply_language"),
         "voice_lang": text("voice_lang"),
         "tts_model": text("tts_model"),
+        # 「用誰的聲音」——只對 gpt_sovits_tts 有意義。prompt_text 不 strip 掉
+        # 內部空白，但頭尾的要去掉（text() 已經做了）：逐字稿要跟參考音對得上。
+        "ref_audio_path": text("ref_audio_path"),
+        "prompt_text": text("prompt_text"),
+        "prompt_lang": text("prompt_lang"),
     }
 
 
@@ -731,6 +783,9 @@ def init_character_route() -> APIRouter:
             reply_language=fields["reply_language"] or None,
             voice_lang=fields["voice_lang"] or None,
             tts_model=fields["tts_model"] or None,
+            ref_audio_path=fields["ref_audio_path"] or None,
+            prompt_text=fields["prompt_text"] or None,
+            prompt_lang=fields["prompt_lang"] or None,
         )
         try:
             await asyncio.to_thread(_write_character_yaml, path, cc)
@@ -944,6 +999,9 @@ def init_character_route() -> APIRouter:
                     reply_language=fields["reply_language"],
                     voice_lang=fields["voice_lang"],
                     tts_model=fields["tts_model"],
+                    ref_audio_path=fields["ref_audio_path"],
+                    prompt_text=fields["prompt_text"],
+                    prompt_lang=fields["prompt_lang"],
                 )
             except Exception as e:
                 logger.error(f"base character update failed: {type(e).__name__}: {e}")
@@ -1047,6 +1105,30 @@ def init_character_route() -> APIRouter:
                 fields["tts_model"]
                 if fields["tts_model"] is not None
                 else (existing_cc.get("tts_config", {}) or {}).get("tts_model")
+            ),
+            # 跟 voice_lang 同一個理由：覆寫檔是整份重寫的，這次沒帶就必須退回
+            # 磁碟現值，否則改個頭像就把手寫的聲線設定清掉——芙莉蓮與表情測試
+            # 那兩份完整的 gpt_sovits_tts 區塊就是這樣被洗掉的。
+            ref_audio_path=(
+                fields["ref_audio_path"]
+                if fields["ref_audio_path"] is not None
+                else (existing_cc.get("tts_config", {}) or {})
+                .get("gpt_sovits_tts", {})
+                .get("ref_audio_path")
+            ),
+            prompt_text=(
+                fields["prompt_text"]
+                if fields["prompt_text"] is not None
+                else (existing_cc.get("tts_config", {}) or {})
+                .get("gpt_sovits_tts", {})
+                .get("prompt_text")
+            ),
+            prompt_lang=(
+                fields["prompt_lang"]
+                if fields["prompt_lang"] is not None
+                else (existing_cc.get("tts_config", {}) or {})
+                .get("gpt_sovits_tts", {})
+                .get("prompt_lang")
             ),
         )
         try:

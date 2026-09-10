@@ -100,6 +100,9 @@ export interface PerfState {
   // gpt_sovits_tts 的 text_lang／prompt_lang 下拉選單的允許清單——見上方檔頭
   // 說明，跟後端 perf_route.py 的 GPT_SOVITS_LANGS 同一份 single source of truth。
   gpt_sovits_langs: string[]
+  // GPT-SoVITS 可直接選用的參考音（後端掃 conf.yaml 那個 ref_audio_path 的
+  // 所在資料夾）。prompt_text 來自同名的 .txt sidecar，沒有就是空字串。
+  reference_voices?: { path: string; label: string; prompt_text: string }[]
   presets: string[]
   // 角色檔自己釘住的引擎，key 是 conf_name。角色的 asr_config／tts_config 會
   // 蓋掉 conf.yaml（service_context 的 init_tts／init_asr 拿的是角色那份），

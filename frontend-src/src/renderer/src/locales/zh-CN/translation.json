@@ -232,7 +232,17 @@
       "showAllVoices": "显示全部语音（约 150 个）",
       "loadingOptions": "加载中…",
       "errLoadFailed": "加载失败，请稍后再试。",
-      "use": "切换"
+      "use": "切换",
+      "refAudioPath": "参考音频",
+      "refAudioPathPlaceholder": "/路径/到/声音.wav",
+      "refAudioPathHelp": "只对 GPT-SoVITS 有效。这段音频就是音色本身——换文件就换嗓子，不需要训练。选了会一并把下面的逐字稿填好。选「沿用全局设置」就用 conf.yaml 里那份。要加新音色，把 .wav 放到同一个文件夹就会出现在这里；再放一个同名 .txt，逐字稿也会自动带入。",
+      "promptText": "参考音频逐字稿",
+      "promptTextPlaceholder": "音频里一字不差说了什么",
+      "promptTextHelp": "参考音频实际说出来的内容，要一字不差。GPT-SoVITS 拿它来对齐音色，逐字稿给错克隆出来的声音就会歪。",
+      "promptLang": "参考音频语言",
+      "promptLangHelp": "参考音频说的是哪种语言。这说的是那段音频，不是她要说什么。",
+      "promptLangInherit": "沿用全局设置",
+      "refAudioInherit": "沿用全局设置"
     },
     "personas": {
       "description": "创建与切换独立人设，不必复制角色。",

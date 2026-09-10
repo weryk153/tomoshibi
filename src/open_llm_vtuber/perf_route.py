@@ -24,6 +24,7 @@ restart_required 對這裡的每一個改動都是誠實的 True：引擎設定�
 """
 
 import asyncio
+import os
 from pathlib import Path
 from typing import Any, Optional
 
@@ -449,6 +450,56 @@ async def _write_or_error(fn, *args, what: str):
 # --- 端點 ------------------------------------------------------------------- #
 
 
+def _reference_voices() -> list:
+    """列出可以直接選用的參考音。
+
+    GPT-SoVITS 是 zero-shot 克隆：聲線完全由參考音決定，所以「換聲音」等於
+    「換這個檔案」。原本 UI 只能手打絕對路徑——打錯了不會有任何錯誤訊息，
+    只是合成時靜默失敗。
+
+    掃描的目錄是 conf.yaml 裡那個全域 ref_audio_path 的所在資料夾：使用者本來
+    就把參考音放在一起，不必再多一個設定項。
+
+    每個 wav 可以有一個同名的 .txt 當逐字稿（sidecar）。有的話一併回傳，前端
+    選了就自動把 prompt_text 填上——參考音跟它的逐字稿是一組的，分開填等於
+    給使用者一個對不起來就會壞掉的機會。
+    """
+    conf = read_yaml(CONF_PATH) or {}
+    node: Any = conf
+    for key in ("character_config", "tts_config", "gpt_sovits_tts", "ref_audio_path"):
+        node = node.get(key) if isinstance(node, dict) else None
+    global_ref = str(node or "").strip()
+    if not global_ref:
+        return []
+    folder = os.path.dirname(global_ref)
+    if not folder or not os.path.isdir(folder):
+        return []
+
+    voices = []
+    for name in sorted(os.listdir(folder)):
+        if not name.lower().endswith((".wav", ".mp3", ".flac", ".m4a", ".ogg")):
+            continue
+        path = os.path.join(folder, name)
+        if not os.path.isfile(path):
+            continue
+        transcript = ""
+        sidecar = os.path.splitext(path)[0] + ".txt"
+        if os.path.isfile(sidecar):
+            try:
+                with open(sidecar, encoding="utf-8") as f:
+                    transcript = f.read().strip()
+            except Exception as e:
+                logger.warning(f"[perf] 讀不了逐字稿 {sidecar}：{type(e).__name__}")
+        voices.append(
+            {
+                "path": path,
+                "label": os.path.splitext(name)[0],
+                "prompt_text": transcript,
+            }
+        )
+    return voices
+
+
 def init_perf_route() -> APIRouter:
     """引擎與硬體設定的端點。只接受可信來源。
 
@@ -459,6 +510,7 @@ def init_perf_route() -> APIRouter:
     - POST /api/perf/consolidation    -> set memory_consolidation_interval
     - POST /api/perf/preset           -> apply a named preset bundle (atomic, one write)
     """
+
     router = APIRouter()
 
     @router.get("/api/perf")
@@ -481,6 +533,7 @@ def init_perf_route() -> APIRouter:
                 "asr_models": sorted(ASR_MODELS),
                 "tts_models": sorted(TTS_MODELS),
                 "gpt_sovits_langs": sorted(GPT_SOVITS_LANGS),
+                "reference_voices": _reference_voices(),
                 "presets": sorted(PRESETS.keys()),
                 "engine_overrides_by_character": _engine_overrides_by_character(),
             }

@@ -232,7 +232,17 @@
       "showAllVoices": "모든 음성 보기(약 150개)",
       "loadingOptions": "불러오는 중…",
       "errLoadFailed": "불러오지 못했어요. 다시 시도해 주세요.",
-      "use": "전환"
+      "use": "전환",
+      "refAudioPath": "참조 음성",
+      "refAudioPathPlaceholder": "/경로/voice.wav",
+      "refAudioPathHelp": "GPT-SoVITS 전용이에요. 이 음성이 곧 목소리 자체예요 — 파일을 바꾸면 목소리 주인이 바뀌고 학습은 필요 없어요. 고르면 아래 대본도 함께 채워져요. '전역 설정 따르기'를 고르면 conf.yaml의 참조 음성을 써요. 새 목소리는 .wav를 같은 폴더에 넣으면 여기 나타나요. 같은 이름의 .txt를 두면 대본도 자동으로 채워져요.",
+      "promptText": "참조 음성 대본",
+      "promptTextPlaceholder": "음성에서 말한 내용 그대로",
+      "promptTextHelp": "참조 음성이 실제로 말하는 내용을 한 글자도 빠짐없이 적어요. GPT-SoVITS가 이걸로 음색을 맞추기 때문에 대본이 틀리면 복제된 목소리가 흔들려요.",
+      "promptLang": "참조 음성 언어",
+      "promptLangHelp": "참조 음성이 말하는 언어예요. 그녀가 무엇을 말할지가 아니라 그 음성에 대한 설정이에요.",
+      "promptLangInherit": "전역 설정 따르기",
+      "refAudioInherit": "전역 설정 따르기"
     },
     "personas": {
       "description": "캐릭터를 복제하지 않고 독립된 페르소나를 만들고 전환하세요.",

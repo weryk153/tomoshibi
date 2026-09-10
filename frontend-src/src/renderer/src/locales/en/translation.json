@@ -232,7 +232,17 @@
       "showAllVoices": "Show all voices (~150)",
       "loadingOptions": "Loading…",
       "errLoadFailed": "Could not load. Please try again.",
-      "use": "Use"
+      "use": "Use",
+      "refAudioPath": "Reference audio",
+      "refAudioPathPlaceholder": "/path/to/voice.wav",
+      "refAudioPathHelp": "GPT-SoVITS only. This clip *is* the voice — swapping the file swaps who she sounds like, no training needed. Picking one also fills in its transcript below. Choose \"Use global setting\" to fall back to the reference audio in conf.yaml. Drop new .wav files next to the others to see them here; add a matching .txt to have the transcript filled in for you.",
+      "promptText": "Reference transcript",
+      "promptTextPlaceholder": "Exactly what is said in the clip",
+      "promptTextHelp": "What the reference audio actually says, word for word. GPT-SoVITS aligns the timbre against it — a wrong transcript makes the cloned voice drift.",
+      "promptLang": "Reference language",
+      "promptLangHelp": "The language spoken in the reference audio. This is about the clip, not about what she says.",
+      "promptLangInherit": "Use global setting",
+      "refAudioInherit": "Use global setting"
     },
     "personas": {
       "description": "Create and switch personas without duplicating characters.",

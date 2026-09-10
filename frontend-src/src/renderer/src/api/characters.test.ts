@@ -19,6 +19,9 @@ const current: CharacterRecord = {
   reply_language: '',
   voice_lang: '',
   tts_model: '',
+  ref_audio_path: '',
+  prompt_text: '',
+  prompt_lang: '',
 }
 
 test('只改一個欄位時，其他欄位必須沿用現值——這是資料遺失的主要來源', () => {
@@ -57,6 +60,7 @@ const rec: CharacterRecord = {
   conf_uid: 'mao_001', persona_prompt: '你是一隻貓。',
   live2d_model_name: 'mao_pro', voice: 'zh-TW-HsiaoChenNeural',
   reply_language: '', voice_lang: '', tts_model: '',
+  ref_audio_path: '', prompt_text: '', prompt_lang: '',
 }
 
 test('不傳 optional 時，酬載不含 character_name 與 avatar——後端會因此保留現值', () => {

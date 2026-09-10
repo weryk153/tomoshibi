@@ -232,7 +232,17 @@
       "showAllVoices": "すべての音声を表示（約150件）",
       "loadingOptions": "読み込み中…",
       "errLoadFailed": "読み込みに失敗しました。もう一度お試しください。",
-      "use": "切り替え"
+      "use": "切り替え",
+      "refAudioPath": "参照音声",
+      "refAudioPathPlaceholder": "/パス/to/voice.wav",
+      "refAudioPathHelp": "GPT-SoVITS のみ有効です。この音声そのものが声色になります——ファイルを差し替えれば声の主が変わり、学習は不要です。選ぶと下の書き起こしも自動で入ります。「全体設定に従う」を選ぶと conf.yaml の参照音声を使います。新しい声を追加するには .wav を同じフォルダに置いてください。同名の .txt を添えると書き起こしも自動で入ります。",
+      "promptText": "参照音声の書き起こし",
+      "promptTextPlaceholder": "音声で話している内容をそのまま",
+      "promptTextHelp": "参照音声が実際に話している内容を一字一句そのまま入れます。GPT-SoVITS はこれを使って音色を揃えるため、書き起こしが違うと複製した声がぶれます。",
+      "promptLang": "参照音声の言語",
+      "promptLangHelp": "参照音声が話している言語です。彼女が何を話すかではなく、その音声についての設定です。",
+      "promptLangInherit": "全体設定に従う",
+      "refAudioInherit": "全体設定に従う"
     },
     "personas": {
       "description": "キャラクターを複製せず、独立したペルソナを作成・切り替えます。",
