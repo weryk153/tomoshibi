@@ -28,8 +28,14 @@ conf.yaml.bak*
 !/live2d-models/haru
 !/live2d-models/hiyori
 
-# VRM 模型跟 live2d-models 一樣是使用者本機資產，不進版控（沒有隨附的預設模型，所以整個目錄忽略）。
-/vrm-models/
+# 跟 live2d-models 同一條規則：只附帶授權明確、可再散布的範例，其餘都是使用者
+# 本機資產。Sendagaya_Shino 的 VRM 檔案內嵌 licenseName: CC0、allowedUser:
+# Everyone，所以可以隨專案散布；它的 idle.vrma 是 scripts/make_idle_vrma.py
+# 從零生成的，沒有第三方素材。
+/vrm-models/*
+!/vrm-models/Sendagaya_Shino
+/vrm-models/Sendagaya_Shino/motions/*
+!/vrm-models/Sendagaya_Shino/motions/idle.vrma
 
 # ignore non-default character configs
 /characters/*

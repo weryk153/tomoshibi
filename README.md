@@ -1,6 +1,6 @@
 # Tomoshibi
 
-> A free, open-source, beginner-friendly **desktop AI companion** with a Live2D avatar — long-term memory, proactive chat, natural voice, and a sleep mode. Bring your own LLM; everything else works out of the box.
+> A free, open-source, beginner-friendly **desktop AI companion** with a Live2D or VRM (3D) avatar — long-term memory, proactive chat, natural voice, and a sleep mode. Bring your own LLM; everything else works out of the box.
 
 **Language:** **English** | [繁體中文](#繁體中文) | [日本語](./README.JP.md) | [한국어](./README.KR.md) | [简体中文](./README.CN.md)
 
@@ -44,12 +44,13 @@ It is a **friendly re-packaging** of the excellent [Open-LLM-VTuber](https://git
 - **Proactive topics** — after a stretch of silence it opens a topic on its own. Optionally pull the latest AI / tech / anime / gaming news to chat about (pure stdlib helper, **no API key needed**).
 - **Natural barge-in voice chat** — talk any time; you don't have to wait for the mic, and you can cut it off mid-sentence like a real conversation.
 - **Sleep / do-not-disturb mode** — say "晚安" (goodnight) and it stops initiating; it resumes the next time you talk to it. The keyword is configurable.
-- **Character management** — create / edit / switch / delete characters: name + persona + Live2D skin + voice + its own separate memory.
+- **Character management** — create / edit / switch / delete characters: name + persona + Live2D or VRM model + voice + its own separate memory.
+- **2D and 3D avatars** — Live2D and VRM (glTF-based 3D) both work. VRM characters get lip sync, expressions, auto-blink, gaze tracking, `.vrma` motion clips, and drag / scroll-wheel framing. Drop a folder into `vrm-models/` and it registers itself.
 - **First-run setup wizard** — paste an API key (OpenAI / Claude / Gemini) or pick a local Ollama model. The wizard runs a quick test call before saving.
 - **LLM settings tab** — paste an API key, or pick/type an Ollama model (a local model, or a cloud model served through Ollama).
 - **Performance presets** — Light / Standard / High-performance, bundling ASR/TTS engine choice + memory-consolidation frequency + model keep-alive.
 - **Cross-language translation** — optional subtitle / voice translation (off by default).
-- **Works out of the box** — bundled sample Live2D model + free cloud TTS (edge-tts) + an auto-downloaded speech-to-text model (~1GB; a one-time, several-minute download on the very first launch). You only have to plug in an LLM.
+- **Works out of the box** — bundled sample Live2D models + a CC0 VRM character + free cloud TTS (edge-tts) + an auto-downloaded speech-to-text model (~1GB; a one-time, several-minute download on the very first launch). You only have to plug in an LLM.
 - **Fully bilingual UI** — Traditional Chinese (zh) and English (en).
 
 ---
@@ -196,7 +197,7 @@ The parameter name differs per provider — check your endpoint's docs. Tested a
 On by default. Each character keeps its own memory at `chat_history/<conf_uid>/core_memory.md` — persona-injected core memory plus per-turn LLM consolidation (the model decides what to keep). Tune the memory cap in settings.
 
 ### Characters
-Create / edit / switch / delete characters in the app — each has its own name, persona, Live2D skin, voice, and **separate memory**. To add your own Live2D model, drop the folder under `live2d-models/` and open the character settings — the app finds it and registers it for you. Only the three bundled Live2D samples are tracked in git; anything else you drop in there stays on your machine, and so does your `model_dict.json`.
+Create / edit / switch / delete characters in the app — each has its own name, persona, avatar model (Live2D **or** VRM), voice, and **separate memory**. To add your own model, drop the folder under `live2d-models/` or `vrm-models/` and open the character settings — the app finds it and registers it for you. Only the three bundled Live2D samples are tracked in git; anything else you drop in there stays on your machine, and so does your `model_dict.json`.
 
 #### More characters (optional)
 For licensing safety, Tomoshibi bundles only **3 free Live2D Original Characters** (`mao_pro`, `haru`, `hiyori`). Want more — including the male butler character **Natori**? You can download free official Live2D sample models yourself from the official page and drop them in. Get them from **[Live2D's sample models page](https://www.live2d.com/en/learn/sample/)** under Live2D's own license — we don't redistribute them. See [`docs/add-live2d-character.md`](docs/add-live2d-character.md) for the how-to.
@@ -248,6 +249,8 @@ The setup wizard connects Claude through a compatibility endpoint that doesn't p
 - [Use it from your phone / tablet (Tailscale)](docs/remote-access-tailscale.md) — reach your companion from another device, even off your home network.
 - [Custom voice with GPT-SoVITS](docs/custom-voice-gpt-sovits.md) — give your character a cloned or custom voice.
 - [Add your own Live2D character](docs/add-live2d-character.md) — drop a model in and switch to it.
+- [Add your own VRM (3D) character](docs/add-vrm-character.md) — folder layout, expression and motion mapping, camera framing.
+- [Scene management](docs/scene-management.md) · [Stage effects](docs/stage-effects.md) · [UI features](docs/ui-features.md) — backgrounds, entrance effects, and what each panel does.
 
 ## Credits & license
 
@@ -327,12 +330,13 @@ Issues and pull requests are welcome.
 - **主動話題**：沉默一段時間後它會自己開話題。可選擇抓最新的 AI／科技／動漫／遊戲新聞來聊（純標準函式庫，**不需要 API key**）。
 - **自然插話語音對話**：隨時都能開口，不必等麥克風，也能像真人對話一樣中途打斷它。
 - **睡眠／勿擾模式**：說「晚安」它就停止主動發話，下次你跟它說話時恢復。關鍵字可改。
-- **角色管理**：建立／編輯／切換／刪除角色 — 名稱＋人設＋Live2D 皮＋語音＋各自獨立的記憶。
+- **角色管理**：建立／編輯／切換／刪除角色 — 名稱＋人設＋Live2D 或 VRM 模型＋語音＋各自獨立的記憶。
+- **2D 與 3D 角色都支援**：Live2D 與 VRM（以 glTF 為基礎的 3D）並存。VRM 角色有口型、表情、自動眨眼、視線跟隨、`.vrma` 動作片段，以及拖曳與滾輪調整構圖。把資料夾放進 `vrm-models/` 就會自動登記。
 - **首次啟動設定精靈**：貼上 API key（OpenAI／Claude／Gemini）或選本地 Ollama 模型，存檔前會先做一次測試呼叫。
 - **LLM 設定分頁**：貼上 API key，或選擇／手動填入一個 Ollama 模型（本地模型，或透過 Ollama 提供的雲端模型）。
 - **效能預設**：輕量／標準／高效能三檔，一鍵搭配好 ASR/TTS 引擎＋記憶整理頻率＋模型常駐。
 - **跨語言翻譯**：可選的字幕／語音翻譯（預設關閉）。
-- **開箱即用**：內建範例 Live2D 模型＋免費雲端語音（edge-tts）＋自動下載的語音辨識模型（約 1GB，僅在第一次啟動時下載一次、需數分鐘），你只要插上一個 LLM。
+- **開箱即用**：內建範例 Live2D 模型＋一個 CC0 授權的 VRM 角色＋免費雲端語音（edge-tts）＋自動下載的語音辨識模型（約 1GB，僅在第一次啟動時下載一次、需數分鐘），你只要插上一個 LLM。
 - **完整中英雙語介面**：繁體中文（zh）與英文（en）。
 
 ## 截圖
@@ -462,7 +466,7 @@ extra_body:
 ## 其他設定
 
 - **記憶**：預設開啟，每個角色記憶獨立存在 `chat_history/<conf_uid>/core_memory.md`，每輪由 LLM 決定要存什麼。記憶上限可在設定調整。
-- **角色**：在 app 內建立／編輯／切換／刪除，每個角色有獨立的名稱、人設、Live2D 皮、語音與記憶。要加自己的模型，把資料夾放進 `live2d-models/` 再打開角色設定，app 會自己找到並登記。版控裡只有隨附的三個 Live2D 官方範例，你放進去的其他模型留在本機，`model_dict.json` 也是。
+- **角色**：在 app 內建立／編輯／切換／刪除，每個角色有獨立的名稱、人設、角色模型（Live2D **或** VRM）、語音與記憶。要加自己的模型，把資料夾放進 `live2d-models/` 或 `vrm-models/` 再打開角色設定，app 會自己找到並登記。版控裡只有隨附的三個 Live2D 官方範例，你放進去的其他模型留在本機，`model_dict.json` 也是。
   - **想要更多角色（選用）**：為了授權安全，Tomoshibi 只內建 **3 個免費的 Live2D 原創角色**（`mao_pro`、`haru`、`hiyori`）。想要更多 — 包含男管家角色 **Natori（名取）**？你可以自己到官方頁面下載免費的官方 Live2D 範例模型再放進來。請從 **[Live2D 範例模型頁面](https://www.live2d.com/en/learn/sample/)** 依 Live2D 自己的授權下載 — 我們不代為散布。作法見 [`docs/add-live2d-character.md`](docs/add-live2d-character.md)。
 - **效能預設**：輕量／標準／高效能，一鍵搭好引擎、整理頻率與模型常駐。
 - **主動話題與新聞**：可用 `scripts/news_topics.py`（純標準函式庫、不需 key）定時更新話題。
@@ -500,6 +504,8 @@ extra_body:
 - [從手機／平板遠端使用（Tailscale）](docs/remote-access-tailscale.md) — 即使不在家，也能從別的裝置開啟你的虛擬角色。
 - [用 GPT-SoVITS 自訂聲音](docs/custom-voice-gpt-sovits.md) — 讓角色用克隆或自訂的聲音說話。
 - [自己加 Live2D 角色](docs/add-live2d-character.md) — 把模型放進來並切換使用。
+- [自己加 VRM（3D）角色](docs/add-vrm-character.md) — 目錄結構、表情與動作對應、相機構圖。
+- [場景管理](docs/scene-management.md)・[舞台特效](docs/stage-effects.md)・[介面功能](docs/ui-features.md) — 背景、登場演出，以及各個面板在做什麼。
 
 ## 致謝與授權
 

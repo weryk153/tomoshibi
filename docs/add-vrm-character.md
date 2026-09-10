@@ -55,8 +55,12 @@ vrm-models/
 
 - The `.vrm` file's own name doesn't matter — only the **folder name** becomes the model
   name, and the scanner just takes the first `.vrm` it finds at the folder's top level.
-- `motions/` is optional. Inside it, `idle.vrma` is a **reserved name**: if present, it
-  plays as the looping idle animation instead of the built-in procedural sway. Every
+- `motions/` holds the animations. Inside it, `idle.vrma` is a **reserved name**: it
+  plays as the looping idle animation. It is effectively **required** — a VRM's rest
+  pose is the T-pose, and with no idle clip the character just stands there with its
+  arms out (there is a built-in procedural sway, but it only nudges the spine and
+  chest by about half a degree; it does not lower the arms). `scripts/make_idle_vrma.py`
+  generates a seamless one from scratch if you don't have a clip to use. Every
   *other* `.vrma` file in `motions/` becomes an LLM-triggerable one-shot clip, keyed by
   its filename (without `.vrma`) as the default keyword.
 - `thumbnail.png` / `.jpg` / `.jpeg` / `.webp` is optional, same as Live2D — see
@@ -162,8 +166,9 @@ in `model_dict.json` if the model is framed too close/far or too high/low.
   the mouse pointer; if it's off, the character looks at the camera. Turning the setting
   off doesn't snap the gaze back immediately — it returns to the camera on the next
   pointer move.
-- **Idle**: `motions/idle.vrma` plays looped if present; otherwise a subtle procedural
-  sway is used instead.
+- **Idle**: `motions/idle.vrma` plays looped. Without it the character holds the
+  T-pose — the fallback procedural sway only rotates spine and chest by ~0.5°, so it
+  does not stand in for a real idle clip.
 - **LLM-triggered motions**: a `[keyword]` from `motionMap` crossfades into that clip and
   back to idle when it finishes.
 - **Load failure**: if the `.vrm` file fails to load, Tomoshibi shows a toast and the
@@ -291,8 +296,11 @@ vrm-models/
 
 - `.vrm` 檔本身叫什麼名字不重要——只有**資料夾名稱**會變成模型名稱，掃描器只是抓資料夾
   頂層第一個找到的 `.vrm`。
-- `motions/` 是選用的。裡面的 `idle.vrma` 是一個**保留檔名**：如果存在，它會取代內建的
-  簡易搖擺，成為迴圈播放的待機動畫。`motions/` 裡**其他**每一個 `.vrma` 檔都會變成一個
+- `motions/` 放的是動畫。裡面的 `idle.vrma` 是一個**保留檔名**：它會成為迴圈播放的待機
+  動畫，而且形同**必要**——VRM 的靜止姿勢是 T-pose，沒有 idle 片段角色就只會張著雙臂
+  站在那裡。（是有一段內建的程序式微擺，但它只把 spine 與 chest 轉大約半度，不會把手臂
+  放下來。）手邊沒有合適片段的話，`scripts/make_idle_vrma.py` 可以從零生成一段無縫的。
+  `motions/` 裡**其他**每一個 `.vrma` 檔都會變成一個
   LLM 可觸發的一次性動作片段，預設關鍵字就是它的檔名（去掉 `.vrma`）。
 - `thumbnail.png` / `.jpg` / `.jpeg` / `.webp` 是選用的，跟 Live2D 一樣——見下方
   [給你的角色一張選皮縮圖（選用）](#給你的角色一張選皮縮圖選用)。
@@ -388,7 +396,8 @@ Live2D 那樣的索引）。掃描器只有在檔案裡真的有對應的標準 
 - **眨眼**是自動的（內建一套眨眼狀態機），跟你設的 `emotionMap` 無關。
 - **視線**：如果 Live2D 的「視線跟隨滑鼠」設定是開的，角色的眼睛會跟著滑鼠指標；關閉的話
   就看向鏡頭。關掉的當下視線不會立刻歸位——要等下一次滑鼠移動才收回鏡頭。
-- **待機**：如果有 `motions/idle.vrma` 就迴圈播放；沒有的話就用內建的簡易搖擺代替。
+- **待機**：`motions/idle.vrma` 會迴圈播放。沒有它角色會維持 T-pose——內建的程序式
+  搖擺只把 spine 與 chest 轉約 0.5 度，代替不了真正的待機片段。
 - **LLM 觸發的動作**：`motionMap` 裡的 `[關鍵字]` 會讓角色淡入該片段，播完再淡回待機。
 - **載入失敗**：如果 `.vrm` 檔載入失敗，Tomoshibi 會跳一個提示，對話照常繼續，只是沒有
   角色畫面——不會卡住聊天。
