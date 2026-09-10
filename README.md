@@ -19,12 +19,19 @@
 > voices, memory, proactive topics, translation, remote access. You should never
 > need to hand-edit `conf.yaml`.
 >
-> **No published installer yet.** Run from source ([Prefer the terminal?](#prefer-the-terminal-advanced))
-> or build the [desktop app](#desktop-app-build-it-yourself) yourself.
+> **Download the app:** [Releases](https://github.com/weryk153/tomoshibi/releases/latest) (macOS / Windows).
+> You can also run from source ([Prefer the terminal?](#prefer-the-terminal-advanced)).
 
 ## Fastest path
 
-**Never installed anything like this** — about 10 minutes, 8 of them waiting on downloads.
+**Download the app** — easiest.
+
+1. From [Releases](https://github.com/weryk153/tomoshibi/releases/latest), download `arm64.dmg` (Apple Silicon Mac), `x64.dmg` (Intel Mac) or `setup.exe` (Windows)
+2. Open it. The first launch downloads what it needs, once — a few minutes. Blocked by macOS or
+   Windows? See the security prompts below.
+3. In the wizard click **Install with one click** → pick a 2D or 3D character → start chatting.
+
+**Without installing the app** — about 10 minutes, 8 of them waiting on downloads.
 
 1. On this page: green **`<> Code`** → **Download ZIP** → unzip it
 2. Double-click `start-companion.command` (macOS) or `start-companion.bat` (Windows).
@@ -113,7 +120,7 @@ The easy path — **no terminal needed.**
 
 4. **Restart so your new brain kicks in.** Quit by **closing that same launcher/terminal window from step 2** (that stops the server), then **double-click the launcher again** to start it back up with your new LLM. (The app also notes that an LLM change "takes effect after a restart — or after switching the character once.") Then start chatting; click once on the page to enable audio.
 
-> **macOS Gatekeeper (first launch only):** double-clicking may show *"can't be opened because it is from an unidentified developer."* This is normal for an unsigned open-source app. **Right-click** `start-companion.command` → **Open** → **Open** in the dialog. After you allow it once, double-clicking works from then on. (We don't ship a signed/notarized build — this is the free tier.)
+> **macOS Gatekeeper (first launch only):** macOS may say it can't verify the app. This is normal for an unsigned open-source app. Click **Done**, then go to **System Settings → Privacy & Security** and click **Open Anyway**. The same goes for the app and for `start-companion.command`. On older macOS, right-click → **Open** also works. (We don't ship a signed/notarized build — this is the free tier.)
 
 > **Windows SmartScreen (first launch only):** double-clicking may show a blue **"Windows protected your PC"** box. This is normal for an unsigned open-source app. Click **More info** → **Run anyway**. After you allow it once, it won't ask again.
 
@@ -163,7 +170,7 @@ First launch downloads Python, dependencies (~500 MB) and the speech model (~1 G
 **To start it (open the "host"):**
 
 - **Windows:** double-click **`start-companion.bat`**
-- **macOS:** double-click **`start-companion.command`** — the very first time macOS may block it, so right-click the file → **Open** → **Open**; after that a normal double-click works.
+- **macOS:** double-click **`start-companion.command`** — the very first time macOS may block it: click **Done**, then **System Settings → Privacy & Security → Open Anyway**; after that a normal double-click works.
 
 A black command window opens — **that window *is* the server; keep it open while you chat.** Once it's ready it opens the app in your browser by itself (`http://localhost:12393`). Think of it as two parts: the **command window is the engine**, the **browser tab is just the screen**.
 
@@ -280,8 +287,8 @@ The server is still starting — the first run downloads a ~1GB speech model, wh
 **Windows: "Windows protected your PC" (SmartScreen), or nothing seems to happen.**
 Click **More info → Run anyway** — this is the launcher, not a virus (it's just unsigned). If your antivirus blocked the one-time `uv` install, allow the app and run the launcher again, or install `uv` manually from <https://docs.astral.sh/uv/getting-started/installation/> and retry.
 
-**macOS: "cannot be opened because it is from an unidentified developer."**
-Right-click `start-companion.command` → **Open** → **Open**. You only need to do this the first time.
+**macOS: "cannot be opened" or "Apple could not verify…"**
+Click **Done**, then **System Settings → Privacy & Security → Open Anyway**. You only need to do this the first time. (On older macOS, right-click → **Open** also works.)
 
 **It opens but never replies / says the AI brain isn't set up.**
 You still need an LLM. Open the setup wizard (or Settings → Model): paste an API key (OpenAI / Claude / Gemini), or pick a local Ollama model. For the local route, make sure the **Ollama app is installed and running** and the model is downloaded.

@@ -18,11 +18,17 @@
 > 所有設定都在應用程式裡完成——首次啟動的 LLM 精靈、角色管理、語音、記憶、
 > 主動話題、翻譯、遠端存取。你不需要手動編輯 `conf.yaml`。
 >
-> **目前還沒有公開的安裝檔。** 請從原始碼執行，或自己建置桌面版（見下方「**桌面版（自行建置）**」）。
+> **下載 app：** 到 [Releases](https://github.com/weryk153/tomoshibi/releases/latest)（macOS／Windows）。也可以從原始碼執行。
 
 ## 最短路徑
 
-**完全沒裝過這類東西** — 大約 10 分鐘，其中 8 分鐘在等下載。
+**下載 app**（最簡單）
+
+1. 到 [Releases](https://github.com/weryk153/tomoshibi/releases/latest) 下載：Apple Silicon Mac 選 `arm64.dmg`、Intel Mac 選 `x64.dmg`、Windows 選 `setup.exe`
+2. 打開 app。第一次會自動下載需要的東西，只需一次，約幾分鐘。被系統擋住的話，看下方的安全性警告說明。
+3. 精靈按 **一鍵安裝** → 挑 2D 或 3D 角色 → 開始聊天。
+
+**不裝 app** — 大約 10 分鐘，其中 8 分鐘在等下載。
 
 1. 這個頁面點綠色 **`<> Code`** → **Download ZIP** → 解壓縮
 2. 雙擊 `start-companion.command`（macOS）或 `start-companion.bat`（Windows）。
@@ -104,7 +110,7 @@ macOS／Windows 安全性警告。
 
 4. **重啟一次，新的大腦才會接上。** 請**把步驟 2 那個啟動器／終端機視窗關掉**結束它（這會停掉伺服器），再**重新雙擊一次啟動器**，讓新的 LLM 接上。（app 裡也會提示，LLM 的變更「會在重啟之後生效 — 或切換一次角色之後生效」。）接著就能開始聊天；點一下頁面以解鎖音訊。
 
-> **macOS Gatekeeper（僅第一次）：** 雙擊時可能跳出「**無法打開，因為來自未識別的開發者**」。這對未簽章的開源 app 是正常的。請對 `start-companion.command` **按右鍵 → 打開 → 打開**。允許一次之後，往後就能直接雙擊了。（我們不提供簽章／公證版本 — 這是免費版。）
+> **macOS Gatekeeper（僅第一次）：** 可能會說「無法驗證」這個 app。這對未簽章的開源 app 是正常的。先按 **完成**，再到 **系統設定 → 隱私權與安全性** 按 **強制打開**。app 和 `start-companion.command` 都一樣。舊版 macOS 也可以按右鍵 → **打開**。（我們不提供簽章／公證版本 — 這是免費版。）
 
 > **Windows SmartScreen（僅第一次）：** 雙擊時可能跳出藍色的「**Windows 已保護您的電腦**」視窗。這對未簽章的開源 app 是正常的。請點 **其他資訊** → **仍要執行**。允許一次之後就不會再問了。
 
@@ -150,7 +156,7 @@ pnpm --dir frontend-src run build:mac   # Windows 上用 build:win，產物在 f
 **怎麼開（啟動「主機」）：**
 
 - **Windows：** 雙擊 **`start-companion.bat`**
-- **macOS：** 雙擊 **`start-companion.command`** —— 第一次系統可能會擋，對檔案按右鍵 → **打開** → 再按一次 **打開**；之後正常雙擊就行。
+- **macOS：** 雙擊 **`start-companion.command`** —— 第一次系統可能會擋：按 **完成**，再到 **系統設定 → 隱私權與安全性 → 強制打開**；之後正常雙擊就行。
 
 會跳出一個黑色命令視窗 —— **那個視窗就是伺服器，聊天期間要一直開著。** 等它準備好，會自己用瀏覽器打開 app（`http://localhost:12393`）。可以這樣想：**命令視窗是引擎，瀏覽器分頁只是畫面。**
 
@@ -246,8 +252,8 @@ extra_body:
 **Windows：「Windows 已保護您的電腦」（SmartScreen），或按了沒反應。**
 按 **其他資訊 → 仍要執行** —— 這是啟動器、不是病毒（只是沒簽章）。若防毒擋掉了一次性的 `uv` 安裝，把這個 app 加進允許清單再跑一次，或到 <https://docs.astral.sh/uv/getting-started/installation/> 手動裝 `uv` 後重試。
 
-**macOS：「無法打開，因為來自未識別的開發者」。**
-對 `start-companion.command` 按右鍵 → **打開** → **打開**。只有第一次需要這樣。
+**macOS：「無法打開」或「Apple 無法驗證」。**
+按 **完成**，再到 **系統設定 → 隱私權與安全性 → 強制打開**。只有第一次需要。（舊版 macOS 也可以按右鍵 → **打開**。）
 
 **開得起來但都不回覆／顯示 AI 大腦尚未設定。**
 你還沒設定 LLM。打開設定精靈（或 設定 → 模型）：貼一個 API 金鑰（OpenAI / Claude / Gemini），或選一個本地 Ollama 模型。走本地路線要確認 **Ollama app 已安裝並在執行**、而且模型已下載。
