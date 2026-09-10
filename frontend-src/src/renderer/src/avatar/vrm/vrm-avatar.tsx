@@ -16,6 +16,14 @@ import { VRMRenderer } from "./vrm-renderer";
 
 const DEFAULT_CAMERA = { distance: 1.6, height: 1.35 };
 
+// 拖曳平移與滾輪縮放的邊界。距離就是 model_dict 的 camera.distance——變大＝鏡頭
+// 拉遠＝角色變小。夾在這個範圍內，免得滾過頭把角色縮成一點或穿進臉裡再也找不回來。
+const MIN_DISTANCE = 0.4;
+const MAX_DISTANCE = 8;
+// 每一格滾輪改變距離的比例。用乘法而不是加法：拉遠時一格跨得多、湊近時跨得少，
+// 手感才會從頭到尾一致。
+const WHEEL_STEP = 0.0015;
+
 export function VRMAvatar(): JSX.Element {
   const { t } = useTranslation();
   const { modelInfo } = useLive2DConfig();
@@ -24,6 +32,13 @@ export function VRMAvatar(): JSX.Element {
   const lookAtPointer = modelInfo?.lookAtPointer !== false;
   const lookAtPointerRef = useRef(lookAtPointer);
   lookAtPointerRef.current = lookAtPointer;
+  // 拖曳平移與滾輪縮放各自受設定頁的開關控制（跟 Live2D 同兩個欄位）。
+  // 跟 lookAtPointer 同樣用 ref 帶進 effect：放進依賴陣列的話，使用者每切一次
+  // 開關就會重建整個 WebGL context、模型重載一次。
+  const pointerInteractiveRef = useRef(true);
+  pointerInteractiveRef.current = modelInfo?.pointerInteractive !== false;
+  const scrollToResizeRef = useRef(true);
+  scrollToResizeRef.current = modelInfo?.scrollToResize !== false;
 
   const url = modelInfo?.url ?? "";
   const camDistance = modelInfo?.camera?.distance ?? DEFAULT_CAMERA.distance;
@@ -67,16 +82,34 @@ export function VRMAvatar(): JSX.Element {
 
     const scene = new THREE.Scene();
     const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 50);
-    camera.position.set(0, camHeight, camDistance);
-    camera.lookAt(0, camHeight, 0);
     scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.0));
     const key = new THREE.DirectionalLight(0xffffff, 1.2);
     key.position.set(1, 2, 3);
     scene.add(key);
 
     const lookTarget = new THREE.Object3D();
-    lookTarget.position.set(0, camHeight, camDistance);
     scene.add(lookTarget);
+
+    // 使用者拖出來的平移與縮放。Live2D 的縮放也只活在當次工作階段（見
+    // use-live2d-resize.ts 的 lastScaleRef），這裡刻意比照：不寫回 model_dict。
+    //
+    // 用 effect 內的區域變數而不是 React state——state 一變整個 effect 會重跑，
+    // WebGL context 跟著重建，畫面會閃一下而且模型要重載。換角色時 effect 本來
+    // 就會重跑，等於自動復位。
+    let panX = 0;
+    let panY = 0;
+    let distance = camDistance;
+
+    // 視線的休息位置要跟著鏡頭走，否則一拖曳角色就會盯著原本鏡頭在的地方看。
+    const restGaze = () => lookTarget.position.set(panX, camHeight + panY, distance);
+
+    const applyView = () => {
+      camera.position.set(panX, camHeight + panY, distance);
+      camera.lookAt(panX, camHeight + panY, 0);
+      if (!lookAtPointerRef.current) restGaze();
+    };
+    applyView();
+    restGaze();
 
     const resize = () => {
       const w = Math.max(1, container.clientWidth);
@@ -94,15 +127,88 @@ export function VRMAvatar(): JSX.Element {
         // 關掉跟隨時要把視線收回鏡頭，否則會凍在游標最後停的地方。復位放在這裡
         // 而不是另開 effect，是為了不讓 lookAtPointer 進依賴陣列——那會重建整個
         // WebGL context。下一次滑鼠動就會歸位。
-        lookTarget.position.set(0, camHeight, camDistance);
+        restGaze();
         return;
       }
       const r = container.getBoundingClientRect();
       const nx = ((e.clientX - r.left) / r.width) * 2 - 1;
       const ny = -(((e.clientY - r.top) / r.height) * 2 - 1);
-      lookTarget.position.set(nx * 0.6, camHeight + ny * 0.4, camDistance * 0.6);
+      lookTarget.position.set(
+        panX + nx * 0.6,
+        camHeight + panY + ny * 0.4,
+        distance * 0.6,
+      );
     };
     window.addEventListener("pointermove", onPointer);
+
+    // --- 拖曳平移 / 滾輪縮放 ---------------------------------------------
+    //
+    // 移動的是鏡頭，不是模型：角色永遠站在原點，拖曳讓鏡頭往反方向平移，看起來
+    // 就是角色跟著游標走。Live2D 那套是改 Cubism 的 _modelMatrix，3D 這邊沒有
+    // 對應的東西，所以完全是另一套實作。
+    let dragging = false;
+    let lastX = 0;
+    let lastY = 0;
+
+    const onDragStart = (e: PointerEvent) => {
+      if (e.button !== 0 || !pointerInteractiveRef.current) return;
+      dragging = true;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      container.setPointerCapture?.(e.pointerId);
+    };
+
+    const onDragMove = (e: PointerEvent) => {
+      if (!dragging) return;
+      // 拖到一半被關掉開關：當場收手，不要繼續跟著游標跑。
+      if (!pointerInteractiveRef.current) {
+        dragging = false;
+        return;
+      }
+      // 螢幕像素換算成世界單位：可視高度 = 2 · distance · tan(fov/2)，除以容器
+      // 高度就是「一像素等於幾公尺」。不這樣換算的話，拉遠時角色會追不上游標、
+      // 湊近時又會飛出去。
+      const h = Math.max(1, container.clientHeight);
+      const worldPerPx = (2 * distance * Math.tan((camera.fov * Math.PI) / 360)) / h;
+      panX -= (e.clientX - lastX) * worldPerPx;
+      panY += (e.clientY - lastY) * worldPerPx;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      applyView();
+    };
+
+    const onDragEnd = (e: PointerEvent) => {
+      if (!dragging) return;
+      dragging = false;
+      container.releasePointerCapture?.(e.pointerId);
+    };
+
+    const onWheel = (e: WheelEvent) => {
+      // 關掉滾輪縮放時就不要攔截，讓事件照常冒泡去捲動頁面。
+      if (!scrollToResizeRef.current) return;
+      // 不 preventDefault 的話，在角色上滾滾輪會連帶捲動整個頁面。
+      e.preventDefault();
+      distance = Math.min(
+        MAX_DISTANCE,
+        Math.max(MIN_DISTANCE, distance * (1 + e.deltaY * WHEEL_STEP)),
+      );
+      applyView();
+    };
+
+    // 沒有持久化，所以一定要留一條回頭路：拖到畫面外就再也拉不回來了。
+    const onResetView = () => {
+      panX = 0;
+      panY = 0;
+      distance = camDistance;
+      applyView();
+    };
+
+    container.addEventListener("pointerdown", onDragStart);
+    container.addEventListener("pointermove", onDragMove);
+    container.addEventListener("pointerup", onDragEnd);
+    container.addEventListener("pointercancel", onDragEnd);
+    container.addEventListener("wheel", onWheel, { passive: false });
+    container.addEventListener("dblclick", onResetView);
 
     const loader = new GLTFLoader();
     loader.register((parser) => new VRMLoaderPlugin(parser));
@@ -175,6 +281,12 @@ export function VRMAvatar(): JSX.Element {
       window.cancelAnimationFrame(frameId);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("pointermove", onPointer);
+      container.removeEventListener("pointerdown", onDragStart);
+      container.removeEventListener("pointermove", onDragMove);
+      container.removeEventListener("pointerup", onDragEnd);
+      container.removeEventListener("pointercancel", onDragEnd);
+      container.removeEventListener("wheel", onWheel);
+      container.removeEventListener("dblclick", onResetView);
       observer.disconnect();
       unregister?.();
       motions?.dispose();
