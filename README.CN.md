@@ -18,8 +18,7 @@
 > 所有设置都在应用内完成——首次启动的 LLM 向导、角色管理、语音、记忆、
 > 主动话题、翻译、远程访问。你不需要手动编辑 `conf.yaml`。
 >
-> **目前还没有打包好的发布版。** 请从源码运行（见下方「**更喜欢用终端？（进阶）**」），
-> 或自己打包。
+> **目前还没有公开的安装包。** 请从源码运行，或自己构建桌面版（见下方「**桌面版（自行构建）**」）。
 
 ## 最短路径
 
@@ -129,6 +128,17 @@ uv run run_server.py     # start the server
 ```
 
 向导会替你把 LLM 的选择写进 `conf.yaml`。你仍然可以手动编辑它（见下文）。
+
+### 桌面版（自行构建）
+
+需要 Node 22 和 pnpm。安装包已内置后端，无需另装 Python 或 `uv`。
+
+```bash
+pnpm --dir frontend-src install
+pnpm --dir frontend-src run build:mac   # Windows 上用 build:win，产物在 frontend-src/release/
+```
+
+首次打开会下载 Python、依赖（约 500MB）和语音模型（约 1GB），只需一次。12393 端口已有服务器在运行时，app 会直接沿用。
 
 ---
 
@@ -252,7 +262,7 @@ extra_body:
 可选的跨语言字幕 / 语音翻译，**默认关闭**（`conf.yaml` 中的 `tts_preprocessor_config → translator_config`）。
 
 ### 语音
-默认是 **edge-tts**（免费，无需硬件）。要高质量的本地 / 自定义语音，可以把 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) 作为一个服务运行，并把配置指向它（需要显卡或 Apple Silicon）。克隆真人声音的法律责任由你自负。
+默认是 **edge-tts**（免费，无需硬件）。要高质量的本地 / 自定义语音，可以把 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) 作为一个服务运行，并把配置指向它（需要显卡或 Apple Silicon）。克隆真人声音的法律责任由你自负。选 `fun_asr`、`coqui_tts` 或 `silero_vad` 需要另外安装 PyTorch：`uv sync --extra torch`。
 
 ---
 

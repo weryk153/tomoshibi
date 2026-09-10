@@ -18,8 +18,8 @@
 > 모든 설정은 앱 안에서 끝납니다——첫 실행 LLM 마법사, 캐릭터 관리, 음성, 기억,
 > 능동적 화제, 번역, 원격 접속. `conf.yaml`을 직접 편집할 필요가 없습니다.
 >
-> **아직 패키징된 릴리스가 없습니다.** 소스에서 실행하거나(아래 "**터미널이 더
-> 편하신가요? (고급)**" 참고), 직접 패키징하세요.
+> **아직 공개된 설치 파일이 없습니다.** 소스에서 실행하거나 데스크톱 앱을 직접 빌드하세요
+> (아래 "**데스크톱 앱 (직접 빌드)**" 참고).
 
 ## 가장 빠른 시작
 
@@ -129,6 +129,17 @@ uv run run_server.py     # start the server
 ```
 
 마법사가 당신의 LLM 선택을 `conf.yaml`에 대신 기록해 줍니다. 물론 직접 손으로 편집할 수도 있습니다(아래 참고).
+
+### 데스크톱 앱 (직접 빌드)
+
+Node 22와 pnpm이 필요합니다. 설치 파일에 백엔드가 포함되어 있어 Python이나 `uv`를 따로 설치할 필요가 없습니다.
+
+```bash
+pnpm --dir frontend-src install
+pnpm --dir frontend-src run build:mac   # Windows에서는 build:win, 결과물은 frontend-src/release/
+```
+
+처음 실행할 때 Python, 의존성(약 500MB), 음성 인식 모델(약 1GB)을 한 번만 다운로드합니다. 포트 12393에서 이미 서버가 실행 중이면 앱이 그 서버를 사용합니다.
 
 ---
 
@@ -252,7 +263,7 @@ extra_body:
 선택적인 다국어 자막/음성 번역, **기본값은 꺼짐**입니다(`conf.yaml`의 `tts_preprocessor_config → translator_config`).
 
 ### 음성
-기본값은 **edge-tts**(무료, 하드웨어 불필요)입니다. 고품질의 로컬/맞춤 음성을 원하면 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)를 서비스로 실행하고 설정이 그것을 가리키게 하세요(GPU 또는 Apple Silicon 필요). 실제 사람의 목소리를 음성 복제(voice-cloning)하는 것에 대한 법적 책임은 당신에게 있습니다.
+기본값은 **edge-tts**(무료, 하드웨어 불필요)입니다. 고품질의 로컬/맞춤 음성을 원하면 [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS)를 서비스로 실행하고 설정이 그것을 가리키게 하세요(GPU 또는 Apple Silicon 필요). 실제 사람의 목소리를 음성 복제(voice-cloning)하는 것에 대한 법적 책임은 당신에게 있습니다. `fun_asr`, `coqui_tts`, `silero_vad`를 쓰려면 PyTorch도 필요합니다: `uv sync --extra torch`.
 
 ---
 

@@ -18,8 +18,7 @@
 > 所有設定都在應用程式裡完成——首次啟動的 LLM 精靈、角色管理、語音、記憶、
 > 主動話題、翻譯、遠端存取。你不需要手動編輯 `conf.yaml`。
 >
-> **目前還沒有打包好的釋出版。** 請從原始碼執行（見下方「**習慣用終端機？（進階）**」），
-> 或自己打包。
+> **目前還沒有公開的安裝檔。** 請從原始碼執行，或自己建置桌面版（見下方「**桌面版（自行建置）**」）。
 
 ## 最短路徑
 
@@ -122,6 +121,17 @@ uv run run_server.py     # 啟動伺服器
 # 開 http://localhost:12393  → 設定精靈 → 開聊
 ```
 
+### 桌面版（自行建置）
+
+需要 Node 22 與 pnpm。安裝檔已內建後端，不用另外裝 Python 或 `uv`。
+
+```bash
+pnpm --dir frontend-src install
+pnpm --dir frontend-src run build:mac   # Windows 上用 build:win，產物在 frontend-src/release/
+```
+
+第一次開啟會下載 Python、相依套件（約 500MB）與語音模型（約 1GB），只需一次。12393 已有伺服器在跑時，app 會直接沿用。
+
 ## 跑起來之後
 
 | 想做什麼 | 去哪 |
@@ -221,7 +231,7 @@ extra_body:
 - **主動話題與新聞**：可用 `scripts/news_topics.py`（純標準函式庫、不需 key）定時更新話題。
 - **睡眠／勿擾**：說「晚安」停止主動發話，下次對話恢復，關鍵字可改。
 - **翻譯**：可選的跨語言字幕／語音翻譯，預設關閉。
-- **語音**：預設 edge-tts（免費、不需硬體）；要高品質本地／自訂語音可接 GPT-SoVITS（需顯卡或 Apple Silicon）。克隆真人聲音的法律責任由你自負。
+- **語音**：預設 edge-tts（免費、不需硬體）；要高品質本地／自訂語音可接 GPT-SoVITS（需顯卡或 Apple Silicon）。克隆真人聲音的法律責任由你自負。選 `fun_asr`、`coqui_tts` 或 `silero_vad` 要另外裝 PyTorch：`uv sync --extra torch`。
 
 ## 疑難排解
 

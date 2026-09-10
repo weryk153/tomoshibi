@@ -19,8 +19,8 @@
 > voices, memory, proactive topics, translation, remote access. You should never
 > need to hand-edit `conf.yaml`.
 >
-> **There is no packaged release yet.** Run from source (see
-> [Prefer the terminal?](#prefer-the-terminal-advanced)) or package it yourself.
+> **No published installer yet.** Run from source ([Prefer the terminal?](#prefer-the-terminal-advanced))
+> or build the [desktop app](#desktop-app-build-it-yourself) yourself.
 
 ## Fastest path
 
@@ -131,6 +131,17 @@ uv run run_server.py     # start the server
 ```
 
 The wizard writes your LLM choice into `conf.yaml` for you. You can still edit it by hand (see below).
+
+### Desktop app (build it yourself)
+
+Needs Node 22 and pnpm. The installer includes the backend — no Python or `uv` to install.
+
+```bash
+pnpm --dir frontend-src install
+pnpm --dir frontend-src run build:mac   # on Windows: build:win · output in frontend-src/release/
+```
+
+First launch downloads Python, dependencies (~500 MB) and the speech model (~1 GB), once. If a server is already running on port 12393, the app uses it.
 
 ---
 
@@ -254,7 +265,7 @@ Say "晚安" to stop it initiating; it resumes on your next message. The keyword
 Optional cross-language subtitle/voice translation, **off by default** (`tts_preprocessor_config → translator_config` in `conf.yaml`).
 
 ### Voice
-Default is **edge-tts** (free, no hardware). For a high-quality local/custom voice, run [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) as a service and point the config at it (needs a GPU or Apple Silicon). Voice-cloning a real person's voice is your legal responsibility.
+Default is **edge-tts** (free, no hardware). For a high-quality local/custom voice, run [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) as a service and point the config at it (needs a GPU or Apple Silicon). Voice-cloning a real person's voice is your legal responsibility. `fun_asr`, `coqui_tts` and `silero_vad` also need PyTorch: `uv sync --extra torch`.
 
 ---
 
