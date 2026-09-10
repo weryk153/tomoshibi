@@ -101,6 +101,9 @@ def actions_extractor(live2d_model: AvatarModel):
                         expressions = live2d_model.extract_emotion(sentence.text)
                         if expressions:
                             actions.expressions = expressions
+                            actions.expression_intensities = (
+                                live2d_model.extract_emotion_intensities(sentence.text)
+                            )
                         keys = live2d_model.extract_emotion_keys(sentence.text)
                         if keys:
                             reply_emotion = keys[0]

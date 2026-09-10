@@ -54,6 +54,8 @@ export interface Message {
 
 export interface Actions {
   expressions?: string[] | number [];
+  // 跟 expressions 一一對應的強度（0..1）。只有 VRM 吃得到。
+  expression_intensities?: number[];
   motions?: MotionRequest[];
   pictures?: string[];
   sounds?: string[];

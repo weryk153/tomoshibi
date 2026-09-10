@@ -6,9 +6,12 @@
 // 已經換掉，所以必須在 canplaythrough 那一刻才讀，不能在 render 時抓。
 
 /** 後端解析好的動作。Live2D 是 (group, index)，VRM 是 .vrma 檔名（不含副檔名）。 */
+// intensity 是「這個動作做多大」，0..1，沒給＝1。後端只在不是 1 的時候才附上
+// 這個鍵（見 avatar_model.extract_motions）。Live2D 的動作沒有權重的概念，
+// 那條路徑會忽略它。
 export type MotionRequest =
-  | { group: string; index: number }
-  | { clip: string };
+  | { group: string; index: number; intensity?: number }
+  | { clip: string; intensity?: number };
 
 export function isClipMotion(m: MotionRequest): m is { clip: string } {
   return "clip" in m;
@@ -17,6 +20,8 @@ export function isClipMotion(m: MotionRequest): m is { clip: string } {
 export interface SpeakCues {
   /** Live2D：表情名或索引；VRM：expression preset／自訂名。 */
   expression?: string | number;
+  /** 表情強度 0..1，沒給＝1。Live2D 的表情是獨立檔案，那邊會忽略。 */
+  intensity?: number;
   motion?: MotionRequest;
 }
 

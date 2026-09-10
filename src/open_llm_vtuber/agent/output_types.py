@@ -8,6 +8,9 @@ class Actions:
     """Represents actions that can be performed alongside text output"""
 
     expressions: Optional[List[str] | List[int]] = None
+    # 跟 expressions 一一對應的強度（0..1）。只有 VRM 用得到——它的表情是連續
+    # 權重；Live2D 的表情是獨立檔案，沒有「七成的笑」。
+    expression_intensities: Optional[List[float]] = None
     motions: Optional[List[dict]] = None
     pictures: Optional[List[str]] = None
     sounds: Optional[List[str]] = None

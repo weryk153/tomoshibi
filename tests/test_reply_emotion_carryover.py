@@ -19,6 +19,11 @@ class _FakeLive2D:
         return [3] if "[happy]" in text else []
 
     @staticmethod
+    def extract_emotion_intensities(text):
+        # 跟 extract_emotion 一一對應。這個替身只用不帶強度的 [happy]，所以永遠是滿的。
+        return [1.0] if "[happy]" in text else []
+
+    @staticmethod
     def extract_emotion_keys(text):
         return ["happy"] if "[happy]" in text else []
 

@@ -1,4 +1,6 @@
 import json
+import re
+
 import chardet
 from loguru import logger
 
@@ -224,6 +226,37 @@ class AvatarModel:
 
         return matched_model
 
+    # [關鍵字] 或 [關鍵字:強度]。強度 0..1，沒寫就是 1.0。
+    #
+    # 原本四個地方各寫一份逐字元的比對迴圈（掃情緒、掃名字、掃動作、清關鍵字），
+    # 加一個語法就要同步改四份、漏一份不會有錯誤訊息——只是那個地方悄悄失效。
+    # 全部收斂到這裡。
+    _TAG_RE = re.compile(r"\[([^\[\]]{1,64})\]")
+
+    @staticmethod
+    def _parse_tag(body: str) -> tuple:
+        """把方括號裡的內容拆成 (關鍵字, 強度)。"""
+        key, _, raw = body.partition(":")
+        key = key.strip()
+        if not raw:
+            return key, 1.0
+        try:
+            # 夾在 0..1：LLM 給 1.5 或 -0.3 的話照收會讓權重爆掉。
+            return key, max(0.0, min(1.0, float(raw.strip())))
+        except ValueError:
+            # [joy:超開心] 這種寫不出數字的情況，當作沒指定強度而不是丟掉整個標籤
+            # ——關鍵字本身仍然是使用者要的表達。
+            return key, 1.0
+
+    def _scan_tags(self, str_to_check: str, keys) -> list:
+        """依出現順序回傳 [(關鍵字, 強度)]，只留 keys 裡認得的。"""
+        found = []
+        for match in self._TAG_RE.finditer(str_to_check.lower()):
+            key, intensity = self._parse_tag(match.group(1))
+            if key in keys:
+                found.append((key, intensity))
+        return found
+
     def _scan_emotion_keys(self, str_to_check: str) -> list:
         """掃出字串裡出現過的情緒關鍵字（名字，不是索引），依出現順序。
 
@@ -232,21 +265,7 @@ class AvatarModel:
         反查名字會有歧義（多個關鍵字可以指向同一個表情），所以掃描時就把名字
         留下來，不要繞一圈再倒推。
         """
-        keys = []
-        str_to_check = str_to_check.lower()
-        i = 0
-        while i < len(str_to_check):
-            if str_to_check[i] != "[":
-                i += 1
-                continue
-            for key in self.emo_map.keys():
-                emo_tag = f"[{key}]"
-                if str_to_check[i : i + len(emo_tag)] == emo_tag:
-                    keys.append(key)
-                    i += len(emo_tag) - 1
-                    break
-            i += 1
-        return keys
+        return [key for key, _ in self._scan_tags(str_to_check, self.emo_map)]
 
     def extract_emotion_keys(self, str_to_check: str) -> list:
         """公開版的關鍵字掃描；語音那條路徑用它挑參考音。"""
@@ -263,22 +282,19 @@ class AvatarModel:
             list: A list of values of the emotions found in the string. An empty list is returned if no emotions are found.
         """
 
-        expression_list = []
-        str_to_check = str_to_check.lower()
+        return [
+            self.emo_map[key] for key, _ in self._scan_tags(str_to_check, self.emo_map)
+        ]
 
-        i = 0
-        while i < len(str_to_check):
-            if str_to_check[i] != "[":
-                i += 1
-                continue
-            for key in self.emo_map.keys():
-                emo_tag = f"[{key}]"
-                if str_to_check[i : i + len(emo_tag)] == emo_tag:
-                    expression_list.append(self.emo_map[key])
-                    i += len(emo_tag) - 1
-                    break
-            i += 1
-        return expression_list
+    def extract_emotion_intensities(self, str_to_check: str) -> list:
+        """跟 extract_emotion 一一對應的強度清單（0..1）。
+
+        強度只有 VRM 用得到——它的表情是連續權重。Live2D 的表情是一個個獨立的
+        檔案，沒有「七成的笑」這種東西，所以那邊會忽略這個清單。刻意做成平行的
+        兩個清單而不是改 extract_emotion 的元素型別：後者會動到 Live2D 那整條
+        路徑，而它根本用不到強度。
+        """
+        return [i for _, i in self._scan_tags(str_to_check, self.emo_map)]
 
     def extract_motions(self, str_to_check: str) -> list:
         """
@@ -295,29 +311,20 @@ class AvatarModel:
         """
 
         motion_list = []
-        str_to_check = str_to_check.lower()
-
-        i = 0
-        while i < len(str_to_check):
-            if str_to_check[i] != "[":
-                i += 1
-                continue
-            for key in self.motion_map.keys():
-                motion_tag = f"[{key}]"
-                if str_to_check[i : i + len(motion_tag)] == motion_tag:
-                    # 只回傳前端播放需要的兩個欄位。`label` 是給 prompt 與設定頁
-                    # 看的，把它一起送到 WebSocket 上只會讓契約多一個沒人用的欄位。
-                    value = self.motion_map[key]
-                    if "clip" in value:
-                        # VRM：一個 .vrma 檔名就是一個動作，沒有 group/index。
-                        motion_list.append({"clip": value["clip"]})
-                    else:
-                        motion_list.append(
-                            {"group": value["group"], "index": value["index"]}
-                        )
-                    i += len(motion_tag) - 1
-                    break
-            i += 1
+        for key, intensity in self._scan_tags(str_to_check, self.motion_map):
+            # 只回傳前端播放需要的欄位。`label` 是給 prompt 與設定頁看的，把它一起
+            # 送到 WebSocket 上只會讓契約多一個沒人用的欄位。
+            value = self.motion_map[key]
+            if "clip" in value:
+                # VRM：一個 .vrma 檔名就是一個動作，沒有 group/index。
+                motion = {"clip": value["clip"]}
+            else:
+                motion = {"group": value["group"], "index": value["index"]}
+            # 動作本來就是 dict，強度直接掛進去，不必再開一條平行清單。
+            # Live2D 沒有動作權重的概念，那邊會忽略它。
+            if intensity != 1.0:
+                motion["intensity"] = intensity
+            motion_list.append(motion)
         return motion_list
 
     def remove_emotion_keywords(self, target_str: str) -> str:
@@ -331,13 +338,10 @@ class AvatarModel:
             str: The cleaned string with the emotion keywords removed.
         """
 
-        lower_str = target_str.lower()
-
-        for key in self.emo_map.keys():
-            lower_key = f"[{key}]".lower()
-            while lower_key in lower_str:
-                start_index = lower_str.find(lower_key)
-                end_index = start_index + len(lower_key)
-                target_str = target_str[:start_index] + target_str[end_index:]
-                lower_str = lower_str[:start_index] + lower_str[end_index:]
+        # 從後往前刪，前面的位移才不會被後面的刪除影響。認得 [joy] 也認得
+        # [joy:0.4]——漏掉帶強度的寫法，那串標籤就會被原封不動唸出來。
+        for match in reversed(list(self._TAG_RE.finditer(target_str.lower()))):
+            key, _ = self._parse_tag(match.group(1))
+            if key in self.emo_map:
+                target_str = target_str[: match.start()] + target_str[match.end() :]
         return target_str

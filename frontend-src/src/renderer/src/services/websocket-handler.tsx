@@ -245,6 +245,7 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
             displayText: message.display_text || null,
             subtitleText: message.subtitle_text,
             expressions: message.actions?.expressions || null,
+            expressionIntensities: message.actions?.expression_intensities || null,
             motions: message.actions?.motions || null,
             forwarded: message.forwarded || false,
           });

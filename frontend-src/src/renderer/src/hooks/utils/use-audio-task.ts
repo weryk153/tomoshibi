@@ -25,6 +25,7 @@ interface AudioTaskOptions {
   displayText?: DisplayText | null
   subtitleText?: string
   expressions?: string[] | number[] | null
+  expressionIntensities?: number[] | null
   motions?: MotionRequest[] | null
   speaker_uid?: string
   forwarded?: boolean
@@ -87,7 +88,7 @@ export const useAudioTask = () => {
     }
 
     const {
-      audioBase64, displayText, subtitleText, expressions, motions, forwarded,
+      audioBase64, displayText, subtitleText, expressions, expressionIntensities, motions, forwarded,
     } = options;
 
     // Update display text
@@ -209,7 +210,12 @@ export const useAudioTask = () => {
           try {
             renderer.beginSegment(
               audio,
-              { expression: expressions?.[0], motion: motions?.[0] ?? undefined },
+              {
+                expression: expressions?.[0],
+                // 跟 expression 取同一個索引；沒給就是最滿。
+                intensity: expressionIntensities?.[0],
+                motion: motions?.[0] ?? undefined,
+              },
               first,
             );
           } catch (e) {

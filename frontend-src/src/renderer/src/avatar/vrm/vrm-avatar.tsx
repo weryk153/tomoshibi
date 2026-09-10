@@ -240,6 +240,8 @@ export function VRMAvatar(): JSX.Element {
         const expressions = new ExpressionController({
           has: (name) => !!vrm?.expressionManager?.getExpression(name),
           setValue: (name, w) => vrm?.expressionManager?.setValue(name, w),
+          overrideMouth: (name) => vrm?.expressionManager?.getExpression(name)?.overrideMouth,
+          overrideBlink: (name) => vrm?.expressionManager?.getExpression(name)?.overrideBlink,
         });
         avatarRenderer = new VRMRenderer(vrm, motions, expressions);
         unregister = registerRenderer(avatarRenderer);

@@ -21,10 +21,10 @@ export class VRMRenderer implements CharacterRenderer {
   beginSegment(audio: HTMLAudioElement, cues: SpeakCues): void {
     this.lip.begin(audio);
     if (cues.expression !== undefined) {
-      this.expressions.setEmotion(String(cues.expression));
+      this.expressions.setEmotion(String(cues.expression), cues.intensity ?? 1);
     }
     if (cues.motion && isClipMotion(cues.motion)) {
-      this.motions.playOnce(cues.motion.clip);
+      this.motions.playOnce(cues.motion.clip, cues.motion.intensity ?? 1);
     }
   }
 
@@ -42,7 +42,12 @@ export class VRMRenderer implements CharacterRenderer {
     this.elapsed += dt;
     this.expressions.setMouth(this.lip.update(dt));
     this.expressions.update(dt);
-    this.vrm.expressionManager?.setValue("blink", this.blink.update(dt));
+    // 眨眼也會被 overrideBlink 壓掉（sample 模型的 happy 就是 blend），所以跟嘴型
+    // 一樣要先除掉待會 three-vrm 會乘的那個倍率，否則笑的時候等於不眨眼。
+    this.vrm.expressionManager?.setValue(
+      "blink",
+      ExpressionController.compensate(this.blink.update(dt), this.expressions.blinkMultiplier()),
+    );
     if (!this.motions.hasClip(IDLE_CLIP)) {
       // 沒有 idle 動畫時的程序式微擺，免得像人偶。
       const spine = this.vrm.humanoid?.getNormalizedBoneNode("spine");

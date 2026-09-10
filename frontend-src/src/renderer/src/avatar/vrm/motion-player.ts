@@ -55,8 +55,13 @@ export class MotionPlayer {
     return this.actions.has(name);
   }
 
-  private crossfadeTo(next: THREE.AnimationAction): void {
-    next.reset().fadeIn(FADE).play();
+  private crossfadeTo(next: THREE.AnimationAction, weight = 1): void {
+    // 直接設 .weight 而不是 setEffectiveWeight()——後者會順手 stopFading()，
+    // 把下一行的 fadeIn 當場取消掉，動作變成瞬間切換。three.js 每幀算的是
+    // weight × 淡入插值，所以這樣設完再 fadeIn，兩者會正確相乘。
+    next.reset();
+    next.weight = weight;
+    next.fadeIn(FADE).play();
     if (this.current && this.current !== next) this.current.fadeOut(FADE);
     this.current = next;
   }
@@ -72,13 +77,21 @@ export class MotionPlayer {
     this.crossfadeTo(idle);
   }
 
-  playOnce(name: string): boolean {
+  /**
+   * `intensity` 是「這個動作做多大」，0..1，預設 1。用 setEffectiveWeight 調——
+   * 權重不滿時 idle 會從底下透出來，所以 0.4 的揮手就是小幅度的揮手，而不是另外
+   * 準備一個小幅度的片段。
+   */
+  playOnce(name: string, intensity = 1): boolean {
     const action = this.actions.get(name);
     if (!action) {
       console.warn(`[VRM] motion clip "${name}" not loaded; staying idle`);
       return false;
     }
-    this.crossfadeTo(action);
+    // 太小的話動作幾乎看不見，卻仍然佔著「正在播動作」的狀態擋住 idle，
+    // 看起來就只是僵住。低於這個值直接當作沒有這個動作。
+    if (intensity < 0.05) return false;
+    this.crossfadeTo(action, Math.max(0, Math.min(1, intensity)));
     return true;
   }
 
