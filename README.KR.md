@@ -111,6 +111,6 @@ Tomoshibi는 [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LLM-VTube
   > This content uses sample data owned and copyrighted by Live2D Inc.
 - 다른 구성 요소의 라이선스는 [`NOTICE`](./NOTICE)에 있어요.
 
-## 후원
+## 피드백
 
-도움이 됐다면 [Ko-fi](https://ko-fi.com/leonhsueh)에서 후원해 주세요. 질문이나 아이디어는 issue나 PR로 남겨 주세요.
+질문이나 아이디어는 issue나 PR로 남겨 주세요.

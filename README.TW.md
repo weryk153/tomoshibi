@@ -111,6 +111,6 @@ Tomoshibi 建立在 [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-LL
   > This content uses sample data owned and copyrighted by Live2D Inc.
 - 其他元件的授權見 [`NOTICE`](./NOTICE)。
 
-## 支持
+## 回饋
 
-覺得好用，歡迎到 [Ko-fi](https://ko-fi.com/leonhsueh) 贊助。有問題或想法，歡迎開 issue 或 PR。
+有問題或想法，歡迎開 issue 或 PR。

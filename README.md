@@ -111,6 +111,6 @@ Tomoshibi is built on [Open-LLM-VTuber](https://github.com/Open-LLM-VTuber/Open-
   > This content uses sample data owned and copyrighted by Live2D Inc.
 - Licenses for the other components are in [`NOTICE`](./NOTICE).
 
-## Support
+## Feedback
 
-If you find it useful, you can chip in on [Ko-fi](https://ko-fi.com/leonhsueh). Questions and ideas are welcome as issues or pull requests.
+Questions and ideas are welcome as issues or pull requests.
