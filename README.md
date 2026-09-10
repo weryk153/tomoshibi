@@ -26,12 +26,11 @@
 
 **Never installed anything like this** — about 10 minutes, 8 of them waiting on downloads.
 
-1. Install **[Ollama](https://ollama.com)**, then in a terminal: `ollama pull qwen2.5:3b`
-2. On this page: green **`<> Code`** → **Download ZIP** → unzip it
-3. Double-click `start-companion.command` (macOS) or `start-companion.bat` (Windows).
+1. On this page: green **`<> Code`** → **Download ZIP** → unzip it
+2. Double-click `start-companion.command` (macOS) or `start-companion.bat` (Windows).
    **Keep that window open — it *is* the server.**
-4. Your browser opens by itself → in the wizard pick **Use local Ollama** → pick a 2D or 3D
-   character → start chatting.
+3. Your browser opens by itself → in the wizard click **Install with one click** (it sets up
+   Ollama and a free local model) → pick a 2D or 3D character → start chatting.
 
 Don't want to install Ollama? The wizard also takes an OpenAI / Claude / Gemini API key.
 
@@ -96,7 +95,7 @@ The easy path — **no terminal needed.**
 
 > **Before you start: you'll need an AI "brain" (LLM).**
 > Tomoshibi is the **body and face** — the avatar, the voice, the memory. The **brain** that actually thinks and talks is a separate AI that *you* provide. You set it up in the first-run wizard. Options, easiest first:
-> - **(Recommended — free, private, runs on your own machine) A local model via Ollama.** Install the free **[Ollama](https://ollama.com)** app, then run `ollama pull qwen2.5:3b` in a terminal (a small ~1.9 GB model). Tomoshibi's default already points to it, so it just works — **no account, no API key, no cost, works offline, and your chats never leave your computer.** Fine on a normal 8–16 GB laptop. (Want sharper replies and have the RAM? Pull a bigger model like `qwen2.5:7b` and pick it in Settings.)
+> - **(Recommended — free, private, runs on your own machine) A local model via Ollama.** The setup wizard installs the free **[Ollama](https://ollama.com)** app and a small model (`qwen2.5:3b`, ~1.9 GB) with one click — no terminal. Tomoshibi's default already points to it, so it just works — **no account, no API key, no cost, works offline, and your chats never leave your computer.** Fine on a normal 8–16 GB laptop. (Want sharper replies and have the RAM? Pull a bigger model like `qwen2.5:7b` and pick it in Settings.)
 > - **(Optional — better quality if your PC is weak) Ollama Cloud free tier.** Ollama can run a bigger model on *its* servers for free (with limits). Needs a free account — see **Option B** below; you must `ollama pull` the cloud model first.
 > - **(Optional — best free quality) A free hosted API key.** Google AI Studio (Gemini), Cerebras, or Groq give a free key (no credit card). Best quality of the free options, but needs an account + key and your chats go to that provider. See **Option C**.
 > - **(If you already pay for one) A cloud API key** from OpenAI / Claude / Gemini — top quality, a few pennies per chat. See **Option D**.
@@ -199,7 +198,7 @@ Either way the command window (and then the browser) pops up on its own at login
 You need **either** an API key for a cloud LLM **or** a running local LLM. A cheap model is plenty for companion chat — you do not need a flagship.
 
 #### Option A — Local Ollama (recommended: free, private, no account)
-Install [Ollama](https://ollama.com/download), then run `ollama pull qwen2.5:3b` in a terminal (~1.9 GB). Tomoshibi's default already uses `qwen2.5:3b`, so once the download finishes it works after the next restart — no API key, no account, no cloud cost, fully offline, and your chats stay on your computer. Runs comfortably on a typical 8–16 GB laptop. For sharper replies, pull a bigger model (e.g. `qwen2.5:7b`) and set it in the LLM settings tab.
+In the setup wizard, **Install with one click** installs [Ollama](https://ollama.com/download), downloads `qwen2.5:3b` (~1.9 GB) and switches to it — no terminal, no restart, no API key, no account, no cloud cost, fully offline, and your chats stay on your computer. Runs comfortably on a typical 8–16 GB laptop. For sharper replies, pull a bigger model (e.g. `qwen2.5:7b`) and set it in the LLM settings tab.
 
 #### Option B — Cloud models through Ollama (free account; good if your PC is weak)
 Ollama can run a *bigger* model on its own servers, so a slow computer still gets good replies. Free tier, but it needs an account and you must pull the model first:

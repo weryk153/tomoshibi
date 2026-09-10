@@ -24,11 +24,10 @@
 
 **完全沒裝過這類東西** — 大約 10 分鐘，其中 8 分鐘在等下載。
 
-1. 裝 **[Ollama](https://ollama.com)**，開終端機跑 `ollama pull qwen2.5:3b`
-2. 這個頁面點綠色 **`<> Code`** → **Download ZIP** → 解壓縮
-3. 雙擊 `start-companion.command`（macOS）或 `start-companion.bat`（Windows）。
+1. 這個頁面點綠色 **`<> Code`** → **Download ZIP** → 解壓縮
+2. 雙擊 `start-companion.command`（macOS）或 `start-companion.bat`（Windows）。
    **那個視窗別關，它就是伺服器。**
-4. 瀏覽器會自己開 → 精靈選 **使用本機 Ollama** → 挑 2D 或 3D 角色 → 開始聊天。
+3. 瀏覽器會自己開 → 精靈按 **一鍵安裝**（自動裝好 Ollama 和免費的本機模型）→ 挑 2D 或 3D 角色 → 開始聊天。
 
 不想裝 Ollama？精靈也吃 OpenAI／Claude／Gemini 的 API key，貼上就能用。
 
@@ -87,7 +86,7 @@ macOS／Windows 安全性警告。
 
 > **開始前先準備好：你需要一顆 AI「大腦」（LLM）。**
 > Tomoshibi 是**身體和臉** — 角色外型、聲音、記憶都有了。但真正會思考、會講話的**大腦**，是一個另外的 AI，要由**你**來提供。你會在首次啟動精靈裡設定它。選項由簡到繁：
-> - **（推薦 — 免費、私密、跑在你自己的電腦上）透過 Ollama 用本地模型。** 安裝免費的 **[Ollama](https://ollama.com)** app，然後在終端機執行 `ollama pull qwen2.5:3b`（一個約 1.9 GB 的小模型）。Tomoshibi 的預設本來就指向它，所以直接就能用 — **不用帳號、不用 API key、零費用、可離線、而且你的對話永遠不會離開你的電腦。** 一般 8–16 GB 的筆電就跑得動。（想要更聰明的回覆、記憶體也夠？拉一個更大的模型，例如 `qwen2.5:7b`，再到設定裡選它。）
+> - **（推薦 — 免費、私密、跑在你自己的電腦上）透過 Ollama 用本地模型。** 設定精靈按一下就會裝好免費的 **[Ollama](https://ollama.com)** app 和一個小模型（`qwen2.5:3b`，約 1.9 GB），不用打指令。Tomoshibi 的預設本來就指向它，所以直接就能用 — **不用帳號、不用 API key、零費用、可離線、而且你的對話永遠不會離開你的電腦。** 一般 8–16 GB 的筆電就跑得動。（想要更聰明的回覆、記憶體也夠？拉一個更大的模型，例如 `qwen2.5:7b`，再到設定裡選它。）
 > - **（選用 — 電腦較弱時品質更好）Ollama Cloud 免費方案。** Ollama 可以在*它的*伺服器上免費跑一個更大的模型（有額度限制）。需要一個免費帳號 — 見下方**方案 B**；你必須先 `ollama pull` 那個雲端模型。
 > - **（選用 — 免費中品質最好）免費的雲端 API key。** Google AI Studio（Gemini）、Cerebras 或 Groq 提供免費 key（免綁信用卡）。免費選項中品質最好，但需要帳號 + key，而且你的對話會送到該供應商。見**方案 C**。
 > - **（如果你本來就有付費的）雲端 API key**：來自 OpenAI／Claude／Gemini — 頂級品質，一次聊天幾分錢。見**方案 D**。
@@ -184,7 +183,7 @@ pnpm --dir frontend-src run build:mac   # Windows 上用 build:win，產物在 f
 你需要**擇一**：雲端 LLM 的 API key，**或**一個本地 LLM。陪伴聊天用便宜的模型就很夠，不需要旗艦級。
 
 #### 方案 A — 本地 Ollama（推薦：免費、私密、不用帳號）
-安裝 [Ollama](https://ollama.com/download)，然後在終端機執行 `ollama pull qwen2.5:3b`（約 1.9 GB）。Tomoshibi 的預設本來就用 `qwen2.5:3b`，所以下載完成後、下次重啟就能用 —— 不用 API key、不用帳號、零雲端費用、完全離線，而且你的對話都留在你的電腦上。一般 8–16 GB 的筆電就跑得很順。想要更聰明的回覆，可以拉一個更大的模型（例如 `qwen2.5:7b`），再到 LLM 設定分頁裡選它。
+在設定精靈按 **一鍵安裝**，會自動裝好 [Ollama](https://ollama.com/download)、下載 `qwen2.5:3b`（約 1.9 GB）並切換過去 —— 不用打指令、不用重啟、不用 API key、不用帳號、零雲端費用、完全離線，而且你的對話都留在你的電腦上。一般 8–16 GB 的筆電就跑得很順。想要更聰明的回覆，可以拉一個更大的模型（例如 `qwen2.5:7b`），再到 LLM 設定分頁裡選它。
 
 #### 方案 B — 透過 Ollama 用雲端模型（免費帳號；電腦較弱時很適合）
 Ollama 可以在它自己的伺服器上跑一個*更大的*模型，所以慢的電腦也能得到不錯的回覆。免費方案，但需要一個帳號、而且你必須先把模型拉下來：
