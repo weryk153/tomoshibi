@@ -52,7 +52,7 @@ class MessageType(Enum):
         "delete-history",
     ]
     CONVERSATION = ["mic-audio-end", "text-input", "ai-speak-signal"]
-    CONFIG = ["fetch-configs", "switch-config", "switch-persona"]
+    CONFIG = ["fetch-configs", "switch-config", "reload-config", "switch-persona"]
     CONTROL = ["interrupt-signal", "audio-play-start"]
     DATA = ["mic-audio-data"]
 
@@ -184,6 +184,7 @@ class WebSocketHandler:
             "ai-speak-signal": self._handle_conversation_trigger,
             "fetch-configs": self._handle_fetch_configs,
             "switch-config": self._handle_config_switch,
+            "reload-config": self._handle_config_reload,
             "switch-persona": self._handle_persona_switch,
             "configure-stage-director": self._handle_stage_director_config,
             "fetch-backgrounds": self._handle_fetch_backgrounds,
@@ -891,6 +892,27 @@ class WebSocketHandler:
         if config_file_name:
             context = self.client_contexts[client_uid]
             await context.handle_config_switch(websocket, config_file_name)
+
+    async def _handle_config_reload(
+        self, websocket: WebSocket, client_uid: str, data: WSMessage
+    ) -> None:
+        """重新讀 conf.yaml 與目前的角色，讓剛存好的設定不用重啟就生效。
+
+        設定精靈與 LLM 設定頁存檔後會送這個。原本只能叫使用者「關掉終端機、重新
+        執行 start-companion」，桌面版使用者根本沒有終端機可關。
+        """
+        # 新連線是從 default_context_cache 複製引擎的（見 _init_service_context）。
+        # 只重載這個連線的話，使用者一重新整理頁面就又拿到舊的 LLM。
+        try:
+            await self.default_context_cache.load_character_config(
+                self.default_context_cache.active_config_file or "conf.yaml"
+            )
+        except Exception as e:
+            logger.warning(
+                f"Could not reload the shared context ({type(e).__name__}: {e})"
+            )
+        context = self.client_contexts[client_uid]
+        await context.handle_config_reload(websocket)
 
     async def _handle_persona_switch(
         self, websocket: WebSocket, client_uid: str, data: WSMessage

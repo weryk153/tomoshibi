@@ -1021,6 +1021,44 @@ class ServiceContext:
         await self.load_from_config(new_config)
         self.active_config_file = config_file_name
 
+    async def _send_model_and_conf(self, websocket: WebSocket) -> None:
+        await websocket.send_text(
+            json.dumps(
+                {
+                    "type": "set-model-and-conf",
+                    "model_info": self.live2d_model.model_info,
+                    "conf_name": self.character_config.conf_name,
+                    "conf_uid": self.character_config.conf_uid,
+                }
+            )
+        )
+
+    async def handle_config_reload(self, websocket: WebSocket) -> None:
+        """用磁碟上的設定重新載入目前的角色，不換角色。
+
+        跟 handle_config_switch 差在回給前端的是 config-reloaded 而不是
+        config-switched：前端收到後者會跳「角色已切換」並開一段新對話，存個設定
+        不該有這些副作用。失敗時只回錯誤、不往外丟，連線要留著。
+        """
+        file_name = self.active_config_file or "conf.yaml"
+        try:
+            await self.load_character_config(file_name)
+            await self._send_model_and_conf(websocket)
+            await websocket.send_text(
+                json.dumps({"type": "config-reloaded", "file": file_name})
+            )
+            logger.info(f"Configuration reloaded from {file_name}")
+        except Exception as e:
+            logger.error(f"Error reloading configuration: {e}")
+            await websocket.send_text(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "message": f"Error reloading configuration: {str(e)}",
+                    }
+                )
+            )
+
     async def handle_config_switch(
         self,
         websocket: WebSocket,
@@ -1047,16 +1085,7 @@ class ServiceContext:
             logger.debug(f"New character config: {self.character_config.model_dump()}")
 
             # Send responses to client
-            await websocket.send_text(
-                json.dumps(
-                    {
-                        "type": "set-model-and-conf",
-                        "model_info": self.live2d_model.model_info,
-                        "conf_name": self.character_config.conf_name,
-                        "conf_uid": self.character_config.conf_uid,
-                    }
-                )
-            )
+            await self._send_model_and_conf(websocket)
 
             await websocket.send_text(
                 json.dumps(
