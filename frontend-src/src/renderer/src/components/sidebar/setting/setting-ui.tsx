@@ -61,7 +61,7 @@ const TABS: SettingsTab[] = [
   { value: 'general', labelKey: 'settings.tabs.general', group: 'companion', render: ({ onCancel }) => <General onCancel={onCancel} /> },
   { value: 'characters', labelKey: 'settings.tabs.characters', group: 'companion', render: () => <Characters /> },
   { value: 'personas', labelKey: 'settings.tabs.personas', group: 'companion', render: () => <Personas /> },
-  { value: 'live2d', labelKey: 'settings.tabs.live2d', group: 'stage', render: () => <Live2D /> },
+  { value: 'live2d', labelKey: 'settings.tabs.avatar', group: 'stage', render: () => <Live2D /> },
   { value: 'performances', labelKey: 'settings.tabs.performances', group: 'stage', render: () => <Performances /> },
   { value: 'scenes', labelKey: 'settings.tabs.scenes', group: 'stage', render: () => <Scenes /> },
   { value: 'llm', labelKey: 'settings.tabs.llm', group: 'intelligence', render: () => <LLM /> },

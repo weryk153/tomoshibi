@@ -98,7 +98,8 @@
       "agent": "自発発話",
       "memory": "メモリー",
       "perf": "パフォーマンス",
-      "about": "について"
+      "about": "について",
+      "avatar": "アバター"
     },
     "groups": {
       "companion": "コンパニオン",
@@ -304,7 +305,7 @@
         "saveFailed": "この音声ファイルを保存できませんでした。"
       },
       "previewSettingsSectionTitle": "キャンバス操作の設定",
-      "previewSettingsSectionDesc": "この2つのスイッチは変更するとすぐ反映されます。このタブの他の設定と同じです。",
+      "previewSettingsSectionDesc": "この3つのスイッチは、このタブの他の設定と同じくすぐに反映されます。Live2D と VRM のどちらのキャラクターにも適用されます。",
       "motionConfigSectionTitle": "モーション一覧",
       "motionConfigSectionNote": "ここでの変更はその都度すぐ保存されます。",
       "vrmReadOnlyNote": "VRM のマッピングは現在読み取り専用です。キーワードは motions/ 内のファイル名で、ラベルや表情の対応は model_dict.json で編集してください。",
@@ -348,7 +349,10 @@
       "tapAreaMotionSelectPlaceholder": "モーションを選択…",
       "tapAreaAddButton": "追加",
       "tapAreaRemoveButton": "削除",
-      "tapAreaIndexRandom": "（グループ内でランダム）"
+      "tapAreaIndexRandom": "（グループ内でランダム）",
+      "sharedBadge": "（Live2D と VRM で共通）",
+      "live2dOnlySectionTitle": "モーションと表情の対応（Live2D 専用）",
+      "vrmOnlySectionTitle": "モーションと表情の対応（VRM 専用）"
     },
     "performances": {
       "title": "演出プリセット管理",

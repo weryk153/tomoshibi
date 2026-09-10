@@ -98,7 +98,8 @@
       "agent": "Proactive speech",
       "memory": "Memory",
       "perf": "Performance",
-      "about": "About"
+      "about": "About",
+      "avatar": "Avatar"
     },
     "groups": {
       "companion": "Companion",
@@ -304,7 +305,7 @@
         "saveFailed": "Could not save this audio file."
       },
       "previewSettingsSectionTitle": "Canvas interaction",
-      "previewSettingsSectionDesc": "These two switches take effect immediately, like everything else on this tab.",
+      "previewSettingsSectionDesc": "These three switches take effect immediately, like everything else on this tab. They apply to both Live2D and VRM characters.",
       "motionConfigSectionTitle": "Motion list",
       "motionConfigSectionNote": "Every change here saves itself immediately.",
       "vrmReadOnlyNote": "VRM mappings are read-only for now. Rename files in motions/ to change keywords; edit model_dict.json for labels or expression mappings.",
@@ -348,7 +349,10 @@
       "tapAreaMotionSelectPlaceholder": "Choose a motion…",
       "tapAreaAddButton": "Add",
       "tapAreaRemoveButton": "Remove",
-      "tapAreaIndexRandom": "(random within group)"
+      "tapAreaIndexRandom": "(random within group)",
+      "sharedBadge": "(shared by Live2D and VRM)",
+      "live2dOnlySectionTitle": "Motion and expression mapping (Live2D only)",
+      "vrmOnlySectionTitle": "Motion and expression mapping (VRM only)"
     },
     "performances": {
       "title": "Performance Manager",

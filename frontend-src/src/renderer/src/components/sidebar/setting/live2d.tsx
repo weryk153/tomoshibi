@@ -106,7 +106,13 @@ function live2D(): JSX.Element {
   return (
     <Stack {...settingStyles.common.container}>
       <Stack gap={2}>
-        <Heading size="sm">{t('settings.live2d.previewSettingsSectionTitle')}</Heading>
+        <Heading size="sm">
+          {t('settings.live2d.previewSettingsSectionTitle')}
+          {' '}
+          <Text as="span" fontSize="xs" fontWeight="normal" color="whiteAlpha.600">
+            {t('settings.live2d.sharedBadge')}
+          </Text>
+        </Heading>
         <Text fontSize="xs" color="whiteAlpha.600">{t('settings.live2d.previewSettingsSectionDesc')}</Text>
 
         <SwitchField
@@ -138,7 +144,13 @@ function live2D(): JSX.Element {
         borderRadius="lg"
         p="4"
       >
-        <Text fontWeight="semibold">{t('settings.live2d.effectPreviewTitle')}</Text>
+        <Text fontWeight="semibold">
+          {t('settings.live2d.effectPreviewTitle')}
+          {' '}
+          <Text as="span" fontSize="xs" fontWeight="normal" color="whiteAlpha.600">
+            {t('settings.live2d.sharedBadge')}
+          </Text>
+        </Text>
         <Text mt="1" mb="3" fontSize="sm" color="fg.muted">
           {t('settings.live2d.effectPreviewDescription')}
         </Text>
@@ -201,7 +213,17 @@ function live2D(): JSX.Element {
         </Box>
       </Box>
 
-      {modelInfo?.type === 'vrm' ? <VrmConfigSummary /> : <MotionConfig />}
+      {/* 這一塊是唯一真正依模型分歧的：Live2D 有動作編輯器，VRM 目前唯讀。
+          上面兩塊（畫布互動、特效演出）兩種模型都吃，所以標了「共用」——
+          分頁名稱改成中性的「角色外觀」之後，這個區分靠這幾個標籤說清楚。 */}
+      <Stack gap={2}>
+        <Heading size="sm">
+          {modelInfo?.type === 'vrm'
+            ? t('settings.live2d.vrmOnlySectionTitle')
+            : t('settings.live2d.live2dOnlySectionTitle')}
+        </Heading>
+        {modelInfo?.type === 'vrm' ? <VrmConfigSummary /> : <MotionConfig />}
+      </Stack>
     </Stack>
   );
 }

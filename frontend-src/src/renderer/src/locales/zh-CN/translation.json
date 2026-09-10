@@ -98,7 +98,8 @@
       "agent": "主动发言",
       "memory": "记忆",
       "perf": "性能",
-      "about": "关于"
+      "about": "关于",
+      "avatar": "角色外观"
     },
     "groups": {
       "companion": "陪伴设置",
@@ -304,7 +305,7 @@
         "saveFailed": "无法保存这个音频。"
       },
       "previewSettingsSectionTitle": "画布交互设置",
-      "previewSettingsSectionDesc": "这两个开关改了就立刻生效，跟这个标签页其他设置一样。",
+      "previewSettingsSectionDesc": "这三个开关改了就立刻生效，跟这个分页其他设置一样。Live2D 与 VRM 角色都适用。",
       "motionConfigSectionTitle": "动作列表",
       "motionConfigSectionNote": "这里的每一笔修改都会自己立刻保存。",
       "vrmReadOnlyNote": "VRM 模型的映射目前只读。换关键字请改 motions/ 里的文件名；加显示名称或改表情映射请编辑 model_dict.json。",
@@ -348,7 +349,10 @@
       "tapAreaMotionSelectPlaceholder": "选择一个动作…",
       "tapAreaAddButton": "加入",
       "tapAreaRemoveButton": "移除",
-      "tapAreaIndexRandom": "（组内随机）"
+      "tapAreaIndexRandom": "（组内随机）",
+      "sharedBadge": "（Live2D 与 VRM 共用）",
+      "live2dOnlySectionTitle": "动作与表情对应（Live2D 专属）",
+      "vrmOnlySectionTitle": "动作与表情对应（VRM 专属）"
     },
     "performances": {
       "title": "演出方案管理",
