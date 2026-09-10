@@ -152,6 +152,7 @@ First launch downloads Python, dependencies (~500 MB) and the speech model (~1 G
 |---|---|
 | Switch to the 3D character | Settings → Characters → Edit → Appearance |
 | Add your own model | Drop it in `live2d-models/` or `vrm-models/` — see the guides below |
+| Give it a more natural voice | Install GPT-SoVITS with one click — offered at first launch, or in the voice settings |
 | Give it a different voice | Settings → Characters → Edit → Reference audio (needs GPT-SoVITS) |
 | Use it from your phone | See the Tailscale guide below |
 | Have it start conversations | Settings → Proactive speech |
@@ -263,7 +264,7 @@ The companion opens topics after idle time. Optionally refresh those topics with
 Optional cross-language subtitle/voice translation, **off by default** (`tts_preprocessor_config → translator_config` in `conf.yaml`).
 
 ### Voice
-Default is **edge-tts** (free, no hardware). For a high-quality local/custom voice, run [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) as a service and point the config at it (needs a GPU or Apple Silicon). Voice-cloning a real person's voice is your legal responsibility. `fun_asr`, `coqui_tts` and `silero_vad` also need PyTorch: `uv sync --extra torch`.
+Default is **edge-tts** (free, online). For a more natural voice that runs on your computer, install [GPT-SoVITS](https://github.com/RVC-Boss/GPT-SoVITS) with one click from the first-run setup or the voice settings (macOS on Apple Silicon, or 64-bit Windows; about 3.8 GB to download on macOS, 8.2 GB on Windows). It lives in `~/Library/Application Support/Tomoshibi/GPT-SoVITS` or `%LOCALAPPDATA%\Tomoshibi\GPT-SoVITS` — delete that folder to remove it. The default voice is the Tsukuyomi-chan Corpus (CV: Rei Yumesaki). Already run GPT-SoVITS yourself? See [the guide](docs/custom-voice-gpt-sovits.md). Voice-cloning a real person's voice is your legal responsibility. `fun_asr`, `coqui_tts` and `silero_vad` also need PyTorch: `uv sync --extra torch`.
 
 ---
 
@@ -273,7 +274,7 @@ Default is **edge-tts** (free, no hardware). For a high-quality local/custom voi
 Usually a settings or engine choice an older build couldn't recover from. Download the **latest release** — it opens even with an old setting. If you'd rather not update: open `conf.yaml` in the app folder, find `asr_model: 'faster_whisper'`, change it to `asr_model: 'sherpa_onnx_asr'`, save, and relaunch. (Don't restore `conf.yaml.backup` — it has the same setting.)
 
 **It replies in text but there's no voice.**
-Update to the latest release (it bundles the audio tools Windows needs) and run the launcher again so dependencies refresh. If you switched the voice (TTS) engine to GPT-SoVITS, that needs a separate service running — switch back to **Edge TTS** in Settings → Performance for the free built-in voice.
+Update to the latest release (it bundles the audio tools Windows needs) and run the launcher again so dependencies refresh. If you use GPT-SoVITS, give it up to a minute after launch to load (one you run yourself has to be running) — or switch back to **Edge TTS** in Settings → Performance for the free built-in voice.
 
 **On the first launch the browser says "this site can't be reached / connection refused."**
 The server is still starting — the first run downloads a ~1GB speech model, which takes a few minutes. Leave the black window open; once it prints that it's running, refresh `http://localhost:12393`. The latest release opens the browser only when it's ready.

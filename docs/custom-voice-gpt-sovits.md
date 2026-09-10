@@ -5,6 +5,11 @@ example a specific character's voice) instead of the default free **edge-tts** v
 Tomoshibi can do this through **GPT-SoVITS**, a separate voice-synthesis service that you
 run yourself.
 
+> **Easiest way:** on macOS (Apple Silicon) or 64-bit Windows, Tomoshibi installs GPT-SoVITS
+> for you — it's offered at first launch and in the voice settings. That sets up everything
+> below with a default voice, running on the CPU. Read on to run GPT-SoVITS yourself, use a
+> GPU, or load your own voice pack.
+
 ## Prerequisites
 
 - **A machine with a GPU or Apple Silicon.** GPT-SoVITS is a neural TTS engine; it needs
