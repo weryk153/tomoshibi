@@ -13,6 +13,10 @@ system_config:
     # This will be appended to the end of system prompt to let LLM include keywords to trigger Live2D body motions.
     # Supported keywords will be automatically loaded into the location of `[<insert_motionmap_keys>]`.
     live2d_motion_prompt: 'live2d_motion_prompt'
+    # VRM models list each motion with a description (from motionMap's label);
+    # Live2D models only have opaque names like gesture_1. One text can't serve both,
+    # so service_context loads whichever matches the active model's type.
+    vrm_motion_prompt: 'vrm_motion_prompt_zh'
     # Enable think_tag_prompt to let LLMs without thinking output show inner thoughts, mental activities and actions (in parentheses format) without voice synthesis. See think_tag_prompt for more details.
     # think_tag_prompt: 'think_tag_prompt'
     # live_prompt: 'live_prompt'

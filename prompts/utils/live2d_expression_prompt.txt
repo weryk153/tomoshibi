@@ -12,3 +12,12 @@ Here are some examples of how to use expressions in your responses:
 "[expression2] That's a great question! [expression3] Let me explain..."
 
 Note: you are only allowed to use the keywords explicity listed above. Don't use keywords unlisted above. Remember to include the brackets `[]`
+
+
+## Intensity
+
+A keyword may carry a strength: a colon and a number from 0 to 1.
+
+    [joy:0.3]   a faint smile
+    [joy:0.7]   a clear one
+    [joy]       no number means full

@@ -13,6 +13,9 @@ system_config:
   tool_prompts: # 要插入到角色提示词中的工具提示词
     live2d_expression_prompt: 'live2d_expression_prompt' # 将追加到系统提示末尾，让 LLM（大型语言模型）包含控制面部表情的关键字。支持的关键字将自动加载到 `[<insert_emomap_keys>]` 的位置。
     live2d_motion_prompt: 'live2d_motion_prompt' # 将追加到系统提示末尾，让 LLM（大型语言模型）包含触发 Live2D 身体动作（招手、点头等整段时间轴动画）的关键字。支持的关键字将自动加载到 `[<insert_motionmap_keys>]` 的位置。
+    # VRM 模型的动作清单每个关键字都带描述（来自 motionMap 的 label），Live2D 那几个只有 gesture_1 这种名字。
+    # 同一份说明没办法同时服务两种，所以 service_context 依模型类型择一载入。
+    vrm_motion_prompt: 'vrm_motion_prompt_zh'
     # 启用 think_tag_prompt 可让不具备思考输出的 LLM 也能展示内心想法、心理活动和动作（以括号形式呈现），但不会进行语音合成。更多详情请参考 think_tag_prompt。
     # think_tag_prompt: 'think_tag_prompt'
     # live_prompt: 'live_prompt'

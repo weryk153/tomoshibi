@@ -10,6 +10,14 @@ Motions are a separate system from expressions: an expression is a facial overla
 
 A motion takes real time to play out, so only use at most one motion keyword per sentence — stacking more than one in the same sentence doesn't make sense.
 
+## Intensity
+
+A motion keyword may also carry a strength: a colon and a number from 0 to 1, e.g.
+`[some_motion_keyword:0.4]` for a small, restrained version of the gesture, or the
+bare keyword for the full-size one. A restrained nod and an emphatic one are the
+same clip at different strengths — use the number rather than reaching for a
+different keyword.
+
 ## Examples
 Here are some examples of how to use motions in your responses. `[some_motion_keyword]` below is a stand-in — always substitute a keyword from the list above.
 

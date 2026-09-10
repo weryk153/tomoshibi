@@ -844,8 +844,19 @@ class ServiceContext:
             ):
                 continue
 
+            # 動作 prompt 分兩份，依模型類型擇一。兩者的動作清單形狀不同：
+            # VRM 的每個關鍵字後面帶一句描述（來自 motionMap 的 label），
+            # Live2D 那幾個模型只有 gesture_1／motion_2 這種沒有語意的名字。
+            # 同一份說明沒辦法同時服務兩種——教 VRM「照描述挑」對 Live2D 是在
+            # 講一個不存在的東西，教 Live2D「別猜泛用名稱」對 VRM 是廢話。
+            if prompt_name in ("live2d_motion_prompt", "vrm_motion_prompt"):
+                is_vrm = self.live2d_model.type == "vrm"
+                wanted = "vrm_motion_prompt" if is_vrm else "live2d_motion_prompt"
+                if prompt_name != wanted:
+                    continue
+
             if (
-                prompt_name == "live2d_motion_prompt"
+                prompt_name in ("live2d_motion_prompt", "vrm_motion_prompt")
                 and not self.live2d_model.motion_str
             ):
                 # An empty motion_str means this model's motionMap has no
@@ -878,7 +889,7 @@ class ServiceContext:
                     "[<insert_emomap_keys>]", self.live2d_model.emo_str
                 )
 
-            if prompt_name == "live2d_motion_prompt":
+            if prompt_name in ("live2d_motion_prompt", "vrm_motion_prompt"):
                 prompt_content = prompt_content.replace(
                     "[<insert_motionmap_keys>]", self.live2d_model.motion_str
                 )
