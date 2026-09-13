@@ -1,5 +1,7 @@
 # Tomoshibi
 
+*Tomoshibi*（灯）是日语的「灯火」，一盏陪着你的小灯。
+
 和喜欢的动漫角色聊天、互动的 app。免费、开源，macOS 和 Windows 都能用。
 
 **语言：** [English](./README.md) | [繁體中文](./README.TW.md) | [日本語](./README.JP.md) | [한국어](./README.KR.md) | 简体中文

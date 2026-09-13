@@ -1,5 +1,7 @@
 # Tomoshibi
 
+名前の *Tomoshibi* は「灯（ともしび）」から。そばで灯っている、小さなあかりです。
+
 好きなアニメキャラクターとおしゃべりしたり触れ合ったりできるアプリです。無料・オープンソースで、macOS と Windows で使えます。
 
 **言語：** [English](./README.md) | [繁體中文](./README.TW.md) | 日本語 | [한국어](./README.KR.md) | [简体中文](./README.CN.md)

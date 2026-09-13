@@ -1,5 +1,7 @@
 # Tomoshibi
 
+*Tomoshibi* (灯) is Japanese for a lamplight: a small light that keeps you company.
+
 Chat and hang out with your favorite anime characters. Free and open source, for macOS and Windows.
 
 **Language:** English | [繁體中文](./README.TW.md) | [日本語](./README.JP.md) | [한국어](./README.KR.md) | [简体中文](./README.CN.md)

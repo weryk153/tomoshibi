@@ -1,5 +1,7 @@
 # Tomoshibi
 
+*Tomoshibi*(灯)는 일본어로 '등불'이라는 뜻이에요. 곁을 밝혀 주는 작은 불빛이죠.
+
 좋아하는 애니메이션 캐릭터와 대화하고 교감하는 앱이에요. 무료 오픈소스이고, macOS와 Windows에서 쓸 수 있어요.
 
 **언어:** [English](./README.md) | [繁體中文](./README.TW.md) | [日本語](./README.JP.md) | 한국어 | [简体中文](./README.CN.md)
