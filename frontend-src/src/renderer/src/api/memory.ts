@@ -30,6 +30,10 @@ export interface MemoryState {
   // 權威，帶著走。
   cap_min: number
   cap_max: number
+  // 她自己的記憶：角色層、所有對話共用、直播時也帶著。上限由後端固定。
+  self_content: string
+  self_char_count: number
+  self_cap: number
 }
 
 // GET /api/memory 的原始回應形狀（欄位比 MemoryState 多，且後端命名是
@@ -45,6 +49,9 @@ interface MemoryGetResponse {
   cap_max: number
   consolidation_interval: number
   consolidation_interval_choices: number[]
+  self_content: string
+  self_char_count: number
+  self_cap: number
 }
 
 // cap 是數字輸入框；使用者清空輸入框時 value 會是 NaN，直接送給後端會被
@@ -60,6 +67,23 @@ export function isValidConsolidation(value: number): boolean {
   return CONSOLIDATION_CHOICES.has(value)
 }
 
+// 從 GET 的原始形狀映射成 MemoryState。抽成純函式是為了測得到——欄位漏抄
+// 在 UI 上只會顯示成空白，不會報錯。
+export function mapMemoryResponse(d: MemoryGetResponse): MemoryState {
+  return {
+    enabled: d.enabled,
+    content: d.content,
+    char_count: d.char_count,
+    cap: d.cap,
+    consolidation_interval: d.consolidation_interval,
+    cap_min: d.cap_min,
+    cap_max: d.cap_max,
+    self_content: d.self_content,
+    self_char_count: d.self_char_count,
+    self_cap: d.self_cap,
+  }
+}
+
 export const fetchMemory = async (
   baseUrl: string,
   confUid: string,
@@ -69,18 +93,9 @@ export const fetchMemory = async (
     `/api/memory?conf_uid=${encodeURIComponent(confUid)}`,
   )
   if (!res.ok) return res
-  const d = res.data
   return {
     ok: true,
-    data: {
-      enabled: d.enabled,
-      content: d.content,
-      char_count: d.char_count,
-      cap: d.cap,
-      consolidation_interval: d.consolidation_interval,
-      cap_min: d.cap_min,
-      cap_max: d.cap_max,
-    },
+    data: mapMemoryResponse(res.data),
   }
 }
 
@@ -139,4 +154,16 @@ export const setMemoryConsolidation = (
 // 破壞性：把 core memory 清空（不刪檔、不動對話紀錄）。
 export const clearMemory = (baseUrl: string, confUid: string): Promise<ApiResult<unknown>> =>
   apiPost<unknown>(baseUrl, '/api/memory/clear', { conf_uid: confUid })
+
+// POST /api/memory/self：整份取代她自己的記憶（角色層，不需要連線）。
+export const saveSelfMemoryContent = (
+  baseUrl: string,
+  confUid: string,
+  content: string,
+): Promise<ApiResult<unknown>> =>
+  apiPost<unknown>(baseUrl, '/api/memory/self', { conf_uid: confUid, content })
+
+// 破壞性：清空她自己的記憶。
+export const clearSelfMemory = (baseUrl: string, confUid: string): Promise<ApiResult<unknown>> =>
+  apiPost<unknown>(baseUrl, '/api/memory/self/clear', { conf_uid: confUid })
 

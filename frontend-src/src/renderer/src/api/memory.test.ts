@@ -21,3 +21,27 @@ test('consolidation 只接受後端允許的 1 / 3 / 5', () => {
   assert.equal(isValidConsolidation(2), false)
   assert.equal(isValidConsolidation(0), false)
 })
+
+import { mapMemoryResponse } from './memory.ts'
+
+test('GET 回應裡的 self 欄位會被帶進 MemoryState', () => {
+  const state = mapMemoryResponse({
+    conf_uid: 'aoi',
+    enabled: true,
+    content: '對方叫小明。',
+    exists: true,
+    char_count: 6,
+    cap: 1500,
+    cap_min: 500,
+    cap_max: 8000,
+    consolidation_interval: 1,
+    consolidation_interval_choices: [1, 3, 5],
+    self_content: '她喜歡咖啡。',
+    self_char_count: 6,
+    self_cap: 800,
+  })
+  assert.equal(state.self_content, '她喜歡咖啡。')
+  assert.equal(state.self_char_count, 6)
+  assert.equal(state.self_cap, 800)
+  assert.equal(state.content, '對方叫小明。')
+})
