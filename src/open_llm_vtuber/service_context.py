@@ -925,7 +925,7 @@ class ServiceContext:
             persona_prompt += prompt_content
 
         # 注入兩份長期記憶：她自己的（角色層，所有對話共用）在前、對方的（屬於這一段
-        # 對話，不跨對話累積）在後。見 docs/superpowers/specs/2026-09-15-self-memory-design.md
+        # 對話，不跨對話累積）在後。見 MEMORY_SYSTEM_DESIGN.md。
         # 長期記憶關閉時（long_term_memory_enabled=False）兩份都不注入。
         if getattr(target_character, "long_term_memory_enabled", True):
             from .memory_core import load_core_memory, load_self_memory

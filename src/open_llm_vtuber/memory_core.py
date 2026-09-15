@@ -18,7 +18,7 @@
   分類出來的 self 行不會整份覆寫檔案，而是用 merge_self_memory 合併進既有內容：
   9B 模型收到「現有記憶」後，輸出「更新後的完整記憶」時會把舊條目丟掉、只吐這一
   輪的內容（連舊提示詞都一樣），整份覆寫的話她自己的記憶永遠只剩最後一輪。
-  見 docs/superpowers/specs/2026-09-15-self-memory-design.md。
+  見 MEMORY_SYSTEM_DESIGN.md 的「The character's own memory」一節。
 
 行為契約由 tests/test_memory_store_behavior.py 釘住。
 """

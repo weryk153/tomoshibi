@@ -1,6 +1,6 @@
 """角色層的 self_memory.md：她自己的記憶，所有對話共用。
 
-規格：docs/superpowers/specs/2026-09-15-self-memory-design.md。
+規格：MEMORY_SYSTEM_DESIGN.md 的「The character's own memory」一節。
 路徑是 chat_history/<conf_uid>/self_memory.md——不在任何一段對話底下，所以刪對話
 不會動到它。conf_uid 是請求可控的，要過 safe_join。
 """

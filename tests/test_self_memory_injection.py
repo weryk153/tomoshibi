@@ -50,6 +50,13 @@ def test_system_prompt_injection_loads_both_under_the_enabled_gate():
 
 
 def test_mid_turn_refresh_compares_both_files():
+    """中途重讀要拿「兩份一起」跟上一次注入的比，不是只比對話那份。
+
+    斷言的是實際比較用的那個 tuple 本身（fresh_mem = (fresh_self, fresh_core)），
+    不是鬆散的「_core_mem_injected 這個詞有出現」——後者在只重讀 core、self 沒
+    納入比較時一樣會通過。
+    """
     src = inspect.getsource(single_conversation.process_single_conversation)
     assert "load_self_memory(context.character_config.conf_uid)" in src
-    assert "_core_mem_injected" in src
+    assert "fresh_mem = (fresh_self, fresh_core)" in src
+    assert "context._core_mem_injected = fresh_mem" in src

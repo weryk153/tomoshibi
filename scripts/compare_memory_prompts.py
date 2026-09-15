@@ -40,6 +40,7 @@ import importlib.util
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -49,8 +50,6 @@ from src.open_llm_vtuber.config_manager.utils import read_yaml, validate_config 
 from src.open_llm_vtuber.conversation_quality import (  # noqa: E402
     normalize_output_language_variant,
 )
-
-_OLD_TMP = Path(".superpowers-old-memory-core.py")
 
 
 def _character_reply_language_and_protected_names(
@@ -112,9 +111,15 @@ def _load_old_module(ref: str):
     src = subprocess.check_output(
         ["git", "show", f"{ref}:src/open_llm_vtuber/memory_core.py"], text=True
     )
-    _OLD_TMP.write_text(src, encoding="utf-8")
+    # 暫存檔寫到系統暫存區，不寫進專案目錄：這支腳本會中途 SystemExit（找不到
+    # 完整的一輪就 raise），留在 repo 裡的檔案會被當成未追蹤的垃圾跟著人走。
+    with tempfile.NamedTemporaryFile(
+        "w", suffix=".py", delete=False, encoding="utf-8"
+    ) as fh:
+        fh.write(src)
+        tmp_path = Path(fh.name)
     try:
-        spec = importlib.util.spec_from_file_location("old_memory_core", _OLD_TMP)
+        spec = importlib.util.spec_from_file_location("old_memory_core", tmp_path)
         mod = importlib.util.module_from_spec(spec)
         # 舊檔用相對 import（.utils.path_safety）；用套件名載入才解得開
         mod.__package__ = "src.open_llm_vtuber"
@@ -136,7 +141,7 @@ def _load_old_module(ref: str):
         shim.build_consolidation_prompt = ns["build_consolidation_prompt"]
         return shim
     finally:
-        _OLD_TMP.unlink(missing_ok=True)
+        tmp_path.unlink(missing_ok=True)
 
 
 def _last_turn(messages: list) -> tuple[str, str]:
