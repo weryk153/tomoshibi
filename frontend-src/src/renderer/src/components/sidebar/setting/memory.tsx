@@ -37,6 +37,8 @@ import {
   setMemoryEnabled,
   setMemoryCap,
   clearMemory,
+  saveSelfMemoryContent,
+  clearSelfMemory,
   clampCap,
   type MemoryState,
 } from '@/api/memory.ts';
@@ -86,6 +88,15 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
   const [saveError, setSaveError] = useState<string | null>(null);
   const [pendingSaveContent, setPendingSaveContent] = useState(false);
 
+  // 她自己的記憶：角色層、所有對話共用。跟 contentDraft 同一套保護——POST 是整份
+  // 取代，載入前不准存。
+  const [selfDraft, setSelfDraft] = useState('');
+  const [savingSelf, setSavingSelf] = useState(false);
+  const [saveSelfError, setSaveSelfError] = useState<string | null>(null);
+  const [pendingSaveSelf, setPendingSaveSelf] = useState(false);
+  const [pendingClearSelf, setPendingClearSelf] = useState(false);
+  const [clearingSelf, setClearingSelf] = useState(false);
+
   const [capDraft, setCapDraft] = useState('');
   const [savingCap, setSavingCap] = useState(false);
 
@@ -99,8 +110,8 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
   // 載入現值。confUid 改變（切換角色）或 refreshTick 遞增（破壞性操作完成後
   // 想確認結果）都要重新拉一次，不用整頁重載。
   //
-  // 同時在這裡重置三個「待確認」旗標（pendingSaveContent／pendingClear／
-  // ）。Memory 分頁在切換角色時不會 unmount——setting-ui.tsx 的
+  // 同時在這裡重置「待確認」旗標（pendingSaveContent／pendingClear／
+  // pendingSaveSelf／pendingClearSelf）。Memory 分頁在切換角色時不會 unmount——setting-ui.tsx 的
   // Tabs.Root 沒設 lazyMount／unmountOnExit，General 分頁切換角色是直接打
   // WebSocket（見 use-general-settings.ts），不會重新掛載這個元件——state 會
   // 整份留著。若使用者對角色 A 開了「清除記憶」或「重建索引」的確認框，再切去
@@ -115,12 +126,15 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
     setContentLoaded(false);
     setPendingSaveContent(false);
     setPendingClear(false);
+    setPendingSaveSelf(false);
+    setPendingClearSelf(false);
     (async () => {
       const result = await fetchMemory(baseUrl, confUid);
       if (cancelled) return;
       if (result.ok) {
         setMemory(result.data);
         setContentDraft(result.data.content);
+        setSelfDraft(result.data.self_content);
         setContentLoaded(true);
         setCapDraft(String(result.data.cap));
       } else {
@@ -279,6 +293,46 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
     }
   }, [baseUrl, confUid, t]);
 
+  const handleSelfSave = useCallback(async () => {
+    if (!contentLoaded) return;
+    setSavingSelf(true);
+    setSaveSelfError(null);
+    const result = await saveSelfMemoryContent(baseUrl, confUid, selfDraft);
+    setSavingSelf(false);
+    setPendingSaveSelf(false);
+    if (result.ok) {
+      setMemory((m) => (m
+        ? { ...m, self_content: selfDraft, self_char_count: selfDraft.length }
+        : m));
+      toaster.create({
+        title: t('settings.memory.saved'),
+        description: t('settings.memory.restartHint'),
+        type: 'success',
+        duration: 4000,
+      });
+    } else {
+      setSaveSelfError(result.error || t('settings.memory.saveContentFailed'));
+    }
+  }, [baseUrl, confUid, selfDraft, contentLoaded, t]);
+
+  const handleSelfClear = useCallback(async () => {
+    setClearingSelf(true);
+    const result = await clearSelfMemory(baseUrl, confUid);
+    setClearingSelf(false);
+    setPendingClearSelf(false);
+    if (result.ok) {
+      setSelfDraft('');
+      setMemory((m) => (m ? { ...m, self_content: '', self_char_count: 0 } : m));
+      toaster.create({ title: t('settings.memory.selfCleared'), type: 'success', duration: 2500 });
+    } else {
+      toaster.create({
+        title: result.error || t('settings.memory.clearFailed'),
+        type: 'error',
+        duration: 3000,
+      });
+    }
+  }, [baseUrl, confUid, t]);
+
 
   if (loadError) {
     return (
@@ -339,9 +393,64 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
         </Collapsible.Trigger>
         <Collapsible.Content>
           <Stack gap={6} mt={4}>
-            {/* 手動編輯核心記憶 */}
+            {/* 她自己的記憶：角色層、所有對話共用，排在前面 */}
             <Stack gap={2}>
-              <Heading size="sm">{t('settings.memory.viewLabel')}</Heading>
+              <Heading size="sm">{t('settings.memory.selfLabel')}</Heading>
+              <Text fontSize="xs" color="whiteAlpha.600">{t('settings.memory.selfHelp')}</Text>
+              <Textarea
+                rows={5}
+                value={selfDraft}
+                onChange={(e) => setSelfDraft(e.target.value)}
+                placeholder={t('settings.memory.empty')}
+                disabled={!contentLoaded}
+              />
+              <Text fontSize="xs" color="whiteAlpha.600">
+                {t('settings.memory.selfCharCount', { count: selfDraft.length, cap: memory.self_cap })}
+              </Text>
+              {saveSelfError && (
+                <Text fontSize="xs" color="red.300">{saveSelfError}</Text>
+              )}
+              {!pendingSaveSelf ? (
+                <HStack>
+                  <Button size="xs" tone="blue" disabled={!contentLoaded} onClick={() => setPendingSaveSelf(true)}>
+                    {t('settings.memory.selfSave')}
+                  </Button>
+                  <Button size="xs" tone="red" variant="outline" onClick={() => setPendingClearSelf(true)}>
+                    {t('settings.memory.selfClear')}
+                  </Button>
+                </HStack>
+              ) : (
+                <Box p={2} borderWidth="1px" borderColor="orange.700" borderRadius="sm">
+                  <Text fontSize="xs">{t('settings.memory.selfSaveConfirm')}</Text>
+                  <HStack mt={2}>
+                    <Button size="xs" tone="blue" onClick={handleSelfSave} loading={savingSelf}>
+                      {t('settings.characters.confirm')}
+                    </Button>
+                    <Button size="xs" variant="ghost" onClick={() => setPendingSaveSelf(false)} disabled={savingSelf}>
+                      {t('common.cancel')}
+                    </Button>
+                  </HStack>
+                </Box>
+              )}
+              {pendingClearSelf && (
+                <Box p={2} borderWidth="1px" borderColor="red.700" borderRadius="sm">
+                  <Text fontSize="xs">{t('settings.memory.selfClearConfirm')}</Text>
+                  <HStack mt={2}>
+                    <Button size="xs" tone="red" onClick={handleSelfClear} loading={clearingSelf}>
+                      {t('settings.characters.confirm')}
+                    </Button>
+                    <Button size="xs" variant="ghost" onClick={() => setPendingClearSelf(false)} disabled={clearingSelf}>
+                      {t('common.cancel')}
+                    </Button>
+                  </HStack>
+                </Box>
+              )}
+            </Stack>
+
+            {/* 這段對話的記憶 */}
+            <Stack gap={2}>
+              <Heading size="sm">{t('settings.memory.conversationLabel')}</Heading>
+              <Text fontSize="xs" color="whiteAlpha.600">{t('settings.memory.conversationHelp')}</Text>
               <Textarea
                 rows={8}
                 value={contentDraft}
