@@ -99,6 +99,19 @@ def test_oversized_self_section_is_rejected_but_conversation_still_lands(monkeyp
     assert load_self_memory(CONF) == ""
 
 
+def test_placeholder_echoed_by_llm_does_not_write_self_memory(monkeypatch, tmp_path):
+    """Round-1 fix regression: the model echoing the '現有' placeholder back must
+    not land in self_memory.md (finding A)."""
+    _run(
+        "conv-1",
+        f"{SECTION_CONVERSATION}\n對方叫小明。\n{LABEL}\n（目前還沒有任何關於自己的記憶）",
+        monkeypatch,
+    )
+    assert load_core_memory(CONF, "conv-1") == "對方叫小明。"
+    assert load_self_memory(CONF) == ""
+    assert not (tmp_path / "chat_history" / CONF / "self_memory.md").exists()
+
+
 def test_self_memory_is_shared_across_conversations(monkeypatch):
     _run(
         "conv-a",

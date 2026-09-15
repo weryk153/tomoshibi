@@ -20,6 +20,7 @@
 """
 
 import asyncio
+import re
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any
@@ -241,6 +242,7 @@ def clear_self_memory(conf_uid: str) -> bool:
 
 SECTION_CONVERSATION = "【對話記憶】"
 _SELF_FORBIDDEN = ("對方", "你")
+_PARENTHETICAL_ONLY = re.compile(r"^（[^）]*）$")
 
 
 def self_section_label(character_name: str) -> str:
@@ -256,6 +258,10 @@ def split_consolidation_output(
 
     猜錯的後果是把對話記憶整份寫進 self_memory.md，那是這個設計唯一不能犯的錯。
     兩段順序不限。標記前後的空白與反引號容忍。
+
+    整段是全形括號的行（如「（目前還沒有任何關於自己的記憶）」）一律跳過、不算內容：
+    模型會把提示詞裡「現有記憶」那句佔位文字原樣或近乎原樣地回顯進輸出，真正的記憶
+    條目不可能整條只是一句括號註記。
     """
     raw = (text or "").strip().strip("`").strip()
     self_label = self_section_label(character_name)
@@ -271,7 +277,7 @@ def split_consolidation_output(
             current = self_label
             sections.setdefault(current, [])
             continue
-        if current is not None and stripped:
+        if current is not None and stripped and not _PARENTHETICAL_ONLY.match(stripped):
             sections[current].append(stripped)
     if SECTION_CONVERSATION not in sections or self_label not in sections:
         return None
@@ -348,6 +354,17 @@ def build_consolidation_prompt(
     新對話沒有私事，但她仍是同一個人。分類規則比「看主詞」更嚴：只要牽涉到對方，
     就算主詞是她，也歸對話記憶。實際檔案裡「AI 確認與對方共事的女僕咖啡廳經歷」
     這種主詞是她、內容是共同回憶的條目，正是這條規則要擋的。
+
+    Round-1（5×5 人讀對照第一輪）：0/25 次新提示詞輸出裡自己段有任何一條事實——
+    「牧瀨紅莉栖：認為時間是相對的概念」這類明明獨自成立的句子，全部被放進對話記憶，
+    自己段全是空的。同時 25/25 次自己段把提示詞裡「現有的……記憶」那句佔位文字
+    （「（目前還沒有任何關於自己的記憶）」及其變體）原樣或近乎原樣回顯進輸出——這條
+    連同對話段的「（目前還沒有任何記憶）」，經 `_acceptable_rewrite` 判定為合法內容，
+    差點被寫進 self_memory.md、注入系統提示當成「她對自己的認知」。修法分兩處：
+    分類規則加上「單獨拿出來看是否成立」的判斷法與正反例，並要求主詞是她的每一條
+    都先問一次「跟對方有關嗎」；另外明講「沒有內容就留空，不要寫佔位文字」。程式面
+    另加一道防線——`split_consolidation_output` 直接丟掉整行只有全形括號的內容
+    （見該函式 docstring），佔位文字就算被回顯也進不了任何一段。
     """
     who = character_name.strip() or "角色"
     self_label = self_section_label(character_name)
@@ -360,9 +377,13 @@ def build_consolidation_prompt(
         "  1. 關於對方的：身分／職業／正在做的事、偏好與習慣、希望被怎麼稱呼、\n"
         "     他明確講過的重要事件。\n"
         f"  2. {who}與對方之間的：答應過對方的事、跟對方一起做過的事、對方告訴{who}的事。\n"
-        f"- {who}自己的記憶只記{who}獨自成立的事：喜好、看法、來歷、自己的計畫。\n"
+        f"- {who}自己的記憶記{who}獨自成立的事：她的喜好、看法、來歷、自己的計畫。\n"
+        f"  判斷方法：把那一條單獨拿出來看，不需要知道對方是誰也能成立的，就是{who}自己的。\n"
+        f"  例如「{who}：認為時間是相對的概念」是{who}自己的；「{who}：覺得對方等太久」是對話記憶。\n"
         f"  只要牽涉到對方，就算主詞是{who}，也一律歸進對話記憶，不可以放進{who}自己的記憶。\n"
         f"  {who}自己的記憶裡不可以出現「對方」或「你」這兩個詞。\n"
+        f"- 主詞是{who}的每一條都要先問一次「這條跟對方有關嗎」：無關就放進{who}自己的記憶，\n"
+        "  不要把全部都塞進對話記憶。\n"
         f"- 每一條都必須以「對方」或「{who}」開頭，寫明這件事是誰的。省略主詞不行。\n"
         f"- {who}講的話絕對不可以寫成對方的事實。分不清楚是誰的就整條不要記。\n"
         "- 絕不記：一次性閒聊、寒暄、問候、沒有新資訊的對話。\n"
@@ -375,6 +396,7 @@ def build_consolidation_prompt(
         "- 絕不記測試、確認聲音有沒有傳到、連線通不通這種操作性的對話。\n"
         "- 用簡短條列，每條一行，繁體中文，台灣用語。\n"
         "- 如果這輪對話沒有任何值得記的新資訊，就原封不動輸出現有的兩份記憶，一個字都不要改。\n"
+        "- 某一段沒有內容時，那個標記下方留空就好，不要寫「目前還沒有」之類的佔位文字。\n"
         f"- 對話記憶總長度控制在 {cap} 字元內、{who}自己的記憶控制在 {self_cap} 字元內；\n"
         "  若超過，合併或提煉舊條目（保留最關鍵、刪掉過時細節）。\n\n"
         f"現有的對話記憶：\n{current or '（目前還沒有任何記憶）'}\n\n"

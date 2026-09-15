@@ -80,6 +80,57 @@ def test_tolerates_backticks_and_whitespace_around_markers():
     assert self_ == "紅莉栖喜歡咖啡。"
 
 
+def test_self_section_with_only_placeholder_is_empty():
+    text = (
+        f"{SECTION_CONVERSATION}\n對方叫小明。\n"
+        f"{self_section_label(NAME)}\n（目前還沒有任何關於自己的記憶）\n"
+    )
+    conv, self_ = split_consolidation_output(text, NAME)
+    assert conv == "對方叫小明。"
+    assert self_ == ""
+
+
+def test_self_section_placeholder_variants_are_dropped():
+    for placeholder in (
+        "（目前沒有任何關於自己的記憶）",
+        "（目前沒有關於自己的記憶）",
+    ):
+        text = (
+            f"{SECTION_CONVERSATION}\n對方叫小明。\n"
+            f"{self_section_label(NAME)}\n{placeholder}\n"
+        )
+        _, self_ = split_consolidation_output(text, NAME)
+        assert self_ == ""
+
+
+def test_conversation_section_with_only_placeholder_is_empty():
+    text = (
+        f"{SECTION_CONVERSATION}\n（目前還沒有任何記憶）\n"
+        f"{self_section_label(NAME)}\n紅莉栖喜歡咖啡。\n"
+    )
+    conv, self_ = split_consolidation_output(text, NAME)
+    assert conv == ""
+    assert self_ == "紅莉栖喜歡咖啡。"
+
+
+def test_parenthetical_only_line_dropped_among_real_lines():
+    text = (
+        f"{SECTION_CONVERSATION}\n對方叫小明。\n（沒有更多了）\n對方喜歡貓。\n"
+        f"{self_section_label(NAME)}\n紅莉栖喜歡咖啡。\n"
+    )
+    conv, self_ = split_consolidation_output(text, NAME)
+    assert conv == "對方叫小明。\n對方喜歡貓。"
+
+
+def test_line_merely_containing_parentheses_is_kept():
+    text = (
+        f"{SECTION_CONVERSATION}\n紅莉栖喜歡咖啡（黑的）。\n"
+        f"{self_section_label(NAME)}\n"
+    )
+    conv, self_ = split_consolidation_output(text, NAME)
+    assert conv == "紅莉栖喜歡咖啡（黑的）。"
+
+
 def test_filter_drops_lines_mentioning_the_other_party():
     text = "紅莉栖喜歡咖啡。\n紅莉栖和對方去過秋葉原。\n紅莉栖答應你下次帶書來。\n紅莉栖討厭夏天。"
     assert filter_self_lines(text) == "紅莉栖喜歡咖啡。\n紅莉栖討厭夏天。"
@@ -141,3 +192,13 @@ def test_prompt_keeps_the_old_subject_rules():
 def test_prompt_placeholder_for_empty_self_memory():
     p = _prompt(current_self="")
     assert "（目前還沒有任何關於自己的記憶）" in p
+
+
+def test_prompt_gives_a_standalone_test_for_self_classification():
+    p = _prompt()
+    assert "判斷方法" in p
+
+
+def test_prompt_forbids_placeholder_text_when_a_section_is_empty():
+    p = _prompt()
+    assert "不要寫「目前還沒有」" in p
