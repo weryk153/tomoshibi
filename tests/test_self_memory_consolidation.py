@@ -85,10 +85,13 @@ def test_unchanged_self_section_does_not_rewrite_self_file(monkeypatch, tmp_path
 def test_oversized_self_section_is_merged_but_capped_and_conversation_still_lands(
     monkeypatch,
 ):
+    """單行本身就超過 cap、又沒有既有 self 記憶可丟：merge_self_memory 的
+    fallback 讓 self 記憶維持原樣（這裡是空字串），不是截斷過的殘留內容。
+    conv 記憶完全不受影響，照常落地。"""
     huge = "紅莉栖喜歡" + "咖" * (int(SELF_CAP_CHARS * 1.5) + 10)
     _run("conv-1", f"對方叫小明。\n{huge}", monkeypatch)
     assert load_core_memory(CONF, "conv-1") == "對方叫小明。"
-    assert len(load_self_memory(CONF)) <= SELF_CAP_CHARS
+    assert load_self_memory(CONF) == ""
 
 
 def test_two_rounds_of_consolidation_keep_both_self_entries(monkeypatch):

@@ -314,8 +314,18 @@ def merge_self_memory(existing: str, incoming: str, cap: int = SELF_CAP_CHARS) -
     - 相近的行（用 difflib.SequenceMatcher ratio、去掉開頭的「名字／代稱：」
       再比對，避免主詞前綴影響相似度判斷）視為同一條，留新的那行、放在舊的
       位置——這樣「喜歡咖啡」換成「很喜歡喝咖啡，尤其黑咖啡」不會變成兩條。
+      一條新行同時貼近兩條以上舊行時（同一件事的兩份舊紀錄），只有 ratio 最高
+      的那條被取代、留在它原本的位置，其餘一樣貼近的舊行整條刪掉，不留下不會
+      自癒的重複舊行。
     - 完全相同的行落在同一個分支（ratio 1.0），不會重複。
-    - 合併後超過 cap 時，從最舊的行開始丟，直到不超過——新內容比舊內容重要。
+    - 合併後超過 cap 時，只從「這輪沒被取代也不是新增」的舊行裡挑最舊（最前面）
+      的丟，直到不超過——這輪新增或更新的內容不可以被擠掉。如果丟光了這種舊行
+      還是超過 cap（例如這輪新行本身就比 cap 長），代表這輪的內容放不進去，
+      整份维持現有記憶不變、这輪的異動全部捨棄，並記一筆 warning。
+
+    去掉開頭「名字／代稱：」的正規化不認得主詞是誰——呼叫端要先把不同主詞的行
+    分開（classify_memory_lines 已經這樣做，只把「她自己的」那一半的行交進來），
+    不然「對方喜歡咖啡」跟「紅莉栖喜歡咖啡」單看去掉前綴後的內文會被判成相似。
     """
     if not (incoming or "").strip():
         return existing
@@ -323,28 +333,66 @@ def merge_self_memory(existing: str, incoming: str, cap: int = SELF_CAP_CHARS) -
     existing_lines = [ln.strip() for ln in (existing or "").splitlines() if ln.strip()]
     incoming_lines = [ln.strip() for ln in incoming.splitlines() if ln.strip()]
 
-    merged = list(existing_lines)
-    matched_incoming: set[int] = set()
-    for i, ex_line in enumerate(merged):
-        best_j, best_ratio = None, 0.0
-        for j, inc_line in enumerate(incoming_lines):
-            if j in matched_incoming:
-                continue
+    # 每條新行找它最像的舊行（ratio 最高、>= 門檻）來取代；同一條新行若同時貼近
+    # 多條舊行，其餘的舊行視為同一件事的重複記錄，直接刪掉——不然會留下一條
+    # 沒被取代、也不會再被下一輪比對修正的殘留重複行。
+    replace_at: dict[int, str] = {}
+    remove_existing_idx: set[int] = set()
+    used_incoming: set[int] = set()
+    for inc_idx, inc_line in enumerate(incoming_lines):
+        candidates: list[tuple[float, int]] = []
+        for ex_idx, ex_line in enumerate(existing_lines):
+            if ex_idx in replace_at or ex_idx in remove_existing_idx:
+                continue  # 已經被這輪更早的新行取代／標記刪除，不再爭搶
             ratio = _lines_are_similar(ex_line, inc_line)
-            if ratio >= _SIMILARITY_THRESHOLD and ratio > best_ratio:
-                best_j, best_ratio = j, ratio
-        if best_j is not None:
-            merged[i] = incoming_lines[best_j]
-            matched_incoming.add(best_j)
+            if ratio >= _SIMILARITY_THRESHOLD:
+                candidates.append((ratio, ex_idx))
+        if not candidates:
+            continue
+        candidates.sort(key=lambda c: (-c[0], c[1]))
+        _, best_idx = candidates[0]
+        replace_at[best_idx] = inc_line
+        used_incoming.add(inc_idx)
+        for _, dup_idx in candidates[1:]:
+            remove_existing_idx.add(dup_idx)
 
-    for j, inc_line in enumerate(incoming_lines):
-        if j not in matched_incoming:
+    # is_new 標出「這輪動過」的行（取代或新增）：cap 超出時這些行不能被擠掉。
+    merged: list[str] = []
+    is_new: list[bool] = []
+    for ex_idx, ex_line in enumerate(existing_lines):
+        if ex_idx in remove_existing_idx:
+            continue
+        if ex_idx in replace_at:
+            merged.append(replace_at[ex_idx])
+            is_new.append(True)
+        else:
+            merged.append(ex_line)
+            is_new.append(False)
+    for inc_idx, inc_line in enumerate(incoming_lines):
+        if inc_idx not in used_incoming:
             merged.append(inc_line)
+            is_new.append(True)
 
-    while merged and len("\n".join(merged)) > cap:
-        merged.pop(0)
+    def _joined() -> str:
+        return "\n".join(merged)
 
-    return "\n".join(merged)
+    if len(_joined()) > cap:
+        while len(_joined()) > cap:
+            evictable = [i for i, new in enumerate(is_new) if not new]
+            if not evictable:
+                break
+            idx = evictable[0]
+            merged.pop(idx)
+            is_new.pop(idx)
+        if len(_joined()) > cap:
+            logger.warning(
+                "[self_memory] merged content still exceeds cap "
+                f"({cap} chars) after evicting every untouched existing line; "
+                "discarding this round's self-memory changes"
+            )
+            return existing
+
+    return _joined()
 
 
 # --- 整理（consolidation）----------------------------------------------------
