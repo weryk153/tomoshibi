@@ -232,6 +232,71 @@ def clear_self_memory(conf_uid: str) -> bool:
         return False
 
 
+# --- 整理輸出的兩段解析 ---------------------------------------------------------
+
+SECTION_CONVERSATION = "【對話記憶】"
+_SELF_FORBIDDEN = ("對方", "你")
+
+
+def self_section_label(character_name: str) -> str:
+    """self 段的標題用角色名，跟「主詞用角色名」的做法一致。"""
+    who = (character_name or "").strip() or "角色"
+    return f"【{who}自己】"
+
+
+def split_consolidation_output(
+    text: str, character_name: str
+) -> tuple[str, str] | None:
+    """把 LLM 輸出切成 (對話記憶, 她自己)。缺任一段標記回 None——不猜。
+
+    猜錯的後果是把對話記憶整份寫進 self_memory.md，那是這個設計唯一不能犯的錯。
+    兩段順序不限。標記前後的空白與反引號容忍。
+    """
+    raw = (text or "").strip().strip("`").strip()
+    self_label = self_section_label(character_name)
+    sections: dict[str, list[str]] = {}
+    current: str | None = None
+    for line in raw.splitlines():
+        stripped = line.strip()
+        if stripped == SECTION_CONVERSATION:
+            current = SECTION_CONVERSATION
+            sections.setdefault(current, [])
+            continue
+        if stripped == self_label:
+            current = self_label
+            sections.setdefault(current, [])
+            continue
+        if current is not None and stripped:
+            sections[current].append(stripped)
+    if SECTION_CONVERSATION not in sections or self_label not in sections:
+        return None
+    return (
+        "\n".join(sections[SECTION_CONVERSATION]),
+        "\n".join(sections[self_label]),
+    )
+
+
+def filter_self_lines(text: str) -> str:
+    """self 段寫入前的程式防線：含「對方」或「你」的行整行丟掉。
+
+    提示詞不能當唯一防線（歷次教訓：禁令寫了，模型照樣違反）。這道擋得住代名詞，
+    擋不住名字——「紅莉栖和岡部去過秋葉原」會過關，那靠提示詞與設定頁的檢視。
+    寧可少記一條她自己的事，也不要把共同回憶放進直播讀得到的地方。
+    """
+    kept = []
+    for line in (text or "").splitlines():
+        s = line.strip()
+        if not s:
+            continue
+        if any(tok in s for tok in _SELF_FORBIDDEN):
+            logger.info(
+                f"[self_memory] dropped line mentioning the other party: {s[:40]}"
+            )
+            continue
+        kept.append(s)
+    return "\n".join(kept)
+
+
 # --- 整理（consolidation）----------------------------------------------------
 
 
