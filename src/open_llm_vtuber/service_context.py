@@ -38,6 +38,21 @@ from .config_manager import (
 )
 
 
+def build_memory_blocks(self_mem: str, core_mem: str) -> str:
+    """把兩份記憶組成系統提示的兩塊。她自己的在前、對方的在後；空的不出。"""
+    out = ""
+    if self_mem:
+        out += (
+            "\n\n## 你對自己的認知（所有對話共用，自然運用、不要生硬複述）\n" + self_mem
+        )
+    if core_mem:
+        out += (
+            "\n\n## 你對對方的長期記憶（之前對話累積下來的，自然運用、不要生硬複述）\n"
+            + core_mem
+        )
+    return out
+
+
 class ServiceContext:
     """Initializes, stores, and updates the asr, tts, and llm instances and other
     configurations for a connected client."""
@@ -909,18 +924,15 @@ class ServiceContext:
 
             persona_prompt += prompt_content
 
-        # 注入核心記憶（關於使用者的長期記憶，屬於這一段對話，不跨對話累積。
-        # 見 MEMORY_SYSTEM_DESIGN.md）
-        # 長期記憶關閉時（long_term_memory_enabled=False）完全不注入。
+        # 注入兩份長期記憶：她自己的（角色層，所有對話共用）在前、對方的（屬於這一段
+        # 對話，不跨對話累積）在後。見 docs/superpowers/specs/2026-09-15-self-memory-design.md
+        # 長期記憶關閉時（long_term_memory_enabled=False）兩份都不注入。
         if getattr(target_character, "long_term_memory_enabled", True):
-            from .memory_core import load_core_memory
+            from .memory_core import load_core_memory, load_self_memory
 
+            self_mem = load_self_memory(target_character.conf_uid)
             core_mem = load_core_memory(target_character.conf_uid, self.history_uid)
-            if core_mem:
-                persona_prompt += (
-                    "\n\n## 你對對方的長期記憶（之前對話累積下來的，自然運用、不要生硬複述）\n"
-                    + core_mem
-                )
+            persona_prompt += build_memory_blocks(self_mem, core_mem)
 
         # Generic conversation quality belongs to the capability layer, not to any
         # character's personality.

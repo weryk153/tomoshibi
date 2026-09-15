@@ -243,16 +243,18 @@ async def process_single_conversation(
         # 長期記憶關閉時跳過 phase-1.5 重注入（construct_system_prompt 本身也已 gate，
         # 這裡短路避免無謂重建 prompt）。
         try:
-            from ..memory_core import load_core_memory
+            from ..memory_core import load_core_memory, load_self_memory
 
             _mem_on = getattr(
                 context.character_config, "long_term_memory_enabled", True
             )
             agent = context.agent_engine
             if _mem_on and hasattr(agent, "set_system"):
-                fresh_mem = load_core_memory(
+                fresh_core = load_core_memory(
                     context.character_config.conf_uid, context.history_uid
                 )
+                fresh_self = load_self_memory(context.character_config.conf_uid)
+                fresh_mem = (fresh_self, fresh_core)
                 if fresh_mem != getattr(context, "_core_mem_injected", None):
                     refreshed_prompt = await context.construct_system_prompt(
                         context.character_config.persona_prompt
