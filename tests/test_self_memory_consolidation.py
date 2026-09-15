@@ -101,9 +101,11 @@ def test_two_rounds_of_consolidation_keep_both_self_entries(monkeypatch):
 
 
 def test_second_round_similar_wording_replaces_first_round_line(monkeypatch):
-    _run("conv-1", "對方叫小明。\n紅莉栖：喜歡咖啡。", monkeypatch)
+    # 兩邊剝掉角色名前綴後都要有 6 字以上；短句判不出相似度，一律留成兩條
+    # （見 tests/test_self_memory_merge.py 的 test_short_lines_are_never_...）。
     _run("conv-1", "對方叫小明。\n紅莉栖：喜歡喝咖啡。", monkeypatch)
-    assert load_self_memory(CONF) == "紅莉栖：喜歡喝咖啡。"
+    _run("conv-1", "對方叫小明。\n紅莉栖：很喜歡喝咖啡。", monkeypatch)
+    assert load_self_memory(CONF) == "紅莉栖：很喜歡喝咖啡。"
 
 
 def test_placeholder_reply_does_not_write_self_memory(monkeypatch, tmp_path):
@@ -267,3 +269,36 @@ def test_different_characters_do_not_wait_for_each_other(monkeypatch):
 
     asyncio.run(_both())
     assert peak == 2
+
+
+# --- final fix wave F4: 被 _acceptable_rewrite 丟掉時要留下痕跡 ----------------
+
+
+def _info_lines(monkeypatch):
+    """攔下這次整理記的 info，回傳訊息清單。"""
+    seen = []
+    monkeypatch.setattr(
+        memory_core.logger, "info", lambda msg, *a, **k: seen.append(str(msg))
+    )
+    return seen
+
+
+def test_empty_conversation_half_is_logged(monkeypatch):
+    seen = _info_lines(monkeypatch)
+    _run("conv-1", "紅莉栖喜歡咖啡。", monkeypatch)  # 分類後對話那半是空的
+    assert any("empty" in m for m in seen), seen
+
+
+def test_unchanged_conversation_half_is_logged(monkeypatch):
+    save_core_memory(CONF, "conv-1", "對方叫小明。")
+    seen = _info_lines(monkeypatch)
+    _run("conv-1", "對方叫小明。", monkeypatch)
+    assert any("unchanged" in m for m in seen), seen
+
+
+def test_oversized_conversation_half_is_logged(monkeypatch):
+    seen = _info_lines(monkeypatch)
+    huge = "對方說了" + "話" * 3000
+    _run("conv-1", huge, monkeypatch)
+    assert load_core_memory(CONF, "conv-1") == ""
+    assert any("cap" in m for m in seen), seen

@@ -216,7 +216,12 @@ def _write_self_memory(conf_uid: str, text: str) -> None:
 
 
 def save_self_memory(conf_uid: str, content: str) -> bool:
-    """整份覆寫（設定頁手動編輯用）。超過上限照存並警告，下次整理會提煉。"""
+    """整份覆寫（設定頁手動編輯用）。超過上限照存並警告。
+
+    超長的內容不會被「提煉」回上限內：self 記憶的維護是程式端合併
+    （merge_self_memory），不是讓模型重寫，所以下次合併只會從最舊的行往下淘汰
+    到裝得下為止。
+    """
     try:
         text = (content or "").strip()
         if len(text) > SELF_CAP_CHARS:
@@ -246,33 +251,47 @@ def clear_self_memory(conf_uid: str) -> bool:
 
 # --- 整理輸出的分類（程式端做，不靠模型）---------------------------------------
 
-_SELF_FORBIDDEN = ("對方", "你")
+# 第二人稱一律代表「這行在講對方」。「妳」是女性寫法、「您」是敬語，模型對
+# 不同使用者會整份換一種寫法——只擋「你」的話，「紅莉栖答應妳下次帶書來。」
+# 會被判成她自己的事實，跟對方有關的承諾寫進所有對話共用的角色層檔案。
+# 刻意不含「他」「她」：她講第三者、或用第三人稱講自己（「紅莉栖說她小時候
+# 住在美國」）時會誤殺整行。
+_SELF_FORBIDDEN = ("對方", "你", "妳", "您")
 _PARENTHETICAL_ONLY = re.compile(r"^（[^）]*）$")
-_LIST_PREFIXES = ("- ", "• ", "・ ")
+_LIST_PREFIXES = ("- ", "• ", "・ ", "* ")
+# 模型也會自己編號。沒剝掉的話整行不以角色名開頭，全部掉進對話記憶。
+_NUMBERED_PREFIX = re.compile(r"^\d+[.、)] ?")
+
+
+def _strip_list_prefix(line: str) -> str:
+    for prefix in _LIST_PREFIXES:
+        if line.startswith(prefix):
+            return line[len(prefix) :].strip()
+    return _NUMBERED_PREFIX.sub("", line, count=1).strip()
 
 
 def classify_memory_lines(text: str, character_name: str) -> tuple[str, str]:
     """把整理 LLM 輸出的單一清單逐行分成 (對話記憶, 她自己的)。
 
     分類由程式做、不靠模型：9B 模型在三輪實測裡做不到穩定的兩段輸出。
-    規則（每行先 strip、去掉開頭的 "- " 或 "• " 或 "・ "）：
+    規則（每行先 strip、去掉開頭的條列符號或數字編號）：
     - 純括號行（^（[^）]*）$）丟掉——模型會把提示詞裡的說明文字照抄回來。
-    - 以角色名開頭、且整行不含「對方」「你」→ 她自己的。
+    - 以角色名開頭、且整行不含「對方」「你」「妳」「您」→ 她自己的。
     - 其餘（以「對方」開頭、主詞不明、或提到對方）→ 對話記憶。分不清的一律留在
       對話記憶——那一邊是私人的，放錯不會外洩。
-    角色名為空時，沒有任何行會被判成她自己的。
+    角色名為空時，沒有任何行會被判成她自己的（並記一筆 warning：那等於整個 self
+    分類失效，是設定錯誤，不可以無聲發生）。
     """
     who = (character_name or "").strip()
+    if not who:
+        logger.warning(
+            "[self_memory] classify called without a character_name; "
+            "every line will stay in the conversation memory"
+        )
     conv_lines: list[str] = []
     self_lines: list[str] = []
     for raw_line in (text or "").splitlines():
-        line = raw_line.strip()
-        if not line:
-            continue
-        for prefix in _LIST_PREFIXES:
-            if line.startswith(prefix):
-                line = line[len(prefix) :].strip()
-                break
+        line = _strip_list_prefix(raw_line.strip())
         if not line or _PARENTHETICAL_ONLY.match(line):
             continue
         if (
@@ -286,44 +305,77 @@ def classify_memory_lines(text: str, character_name: str) -> tuple[str, str]:
     return "\n".join(conv_lines), "\n".join(self_lines)
 
 
-_SIMILARITY_THRESHOLD = 0.75
+# 0.85，不是 0.75：短句差一個字的 ratio 本來就高（n 字差一字 = (n-1)/n），
+# 「喜歡貓。」vs「喜歡狗。」在舊門檻下 0.857 就足以讓貓被狗蓋掉。
+_SIMILARITY_THRESHOLD = 0.85
+# 剝掉前綴後短於這個長度的行不比相似度：一兩個字的差異在短句裡就是完全不同的
+# 事實（貓／狗、咖啡／紅茶），ratio 判不出來。完全相同的行另外走等值捷徑。
+_MIN_COMPARABLE_LEN = 6
 # 開頭的角色名／代稱 + 分隔符去掉再比對，避免「紅莉栖：喜歡咖啡」跟「喜歡咖啡」
-# 因為多了主詞前綴而被誤判成不像。名字本身不重要（這裡沒有角色名可用——
-# merge_self_memory 是純函式，不吃 character_name），只要是「開頭一小段非標點
-# 文字 + 冒號或空白」這個形狀就去掉；12 字元夠涵蓋常見稱呼，不會誤砍句子中段。
+# 因為多了主詞前綴而被誤判成不像。有角色名時優先剝角色名（模型常寫成
+# 「紅莉栖喜歡貓。」，中間沒有任何分隔符，這個形狀下面那條正規式抓不到，
+# 名字就整段留在被比較的文字裡灌水）；沒有角色名時退回「開頭一小段非標點
+# 文字 + 冒號或空白」這個形狀，12 字元夠涵蓋常見稱呼，不會誤砍句子中段。
 _LEADING_LABEL = re.compile(r"^[^：: ]{1,12}[：: ]")
+_LEADING_SEPARATOR = re.compile(r"^[：: ]+")
 
 
-def _normalize_for_similarity(line: str) -> str:
+def _normalize_for_similarity(line: str, character_name: str = "") -> str:
+    who = (character_name or "").strip()
+    if who and line.startswith(who):
+        return _LEADING_SEPARATOR.sub("", line[len(who) :]).strip()
     return _LEADING_LABEL.sub("", line)
 
 
-def _lines_are_similar(a: str, b: str) -> float:
-    return difflib.SequenceMatcher(
-        None, _normalize_for_similarity(a), _normalize_for_similarity(b)
-    ).ratio()
+def _lines_are_similar(a: str, b: str, character_name: str = "") -> float:
+    na = _normalize_for_similarity(a, character_name)
+    nb = _normalize_for_similarity(b, character_name)
+    if na == nb:
+        return 1.0
+    if len(na) < _MIN_COMPARABLE_LEN or len(nb) < _MIN_COMPARABLE_LEN:
+        return 0.0
+    return difflib.SequenceMatcher(None, na, nb).ratio()
 
 
-def merge_self_memory(existing: str, incoming: str, cap: int = SELF_CAP_CHARS) -> str:
+def _dedupe_incoming(lines: list[str], character_name: str) -> list[str]:
+    """同一輪裡兩條講同一件事的行只留後者（後者是模型最後的說法）。"""
+    kept: list[str] = []
+    for idx, line in enumerate(lines):
+        if any(
+            _lines_are_similar(line, later, character_name) >= _SIMILARITY_THRESHOLD
+            for later in lines[idx + 1 :]
+        ):
+            continue
+        kept.append(line)
+    return kept
+
+
+def merge_self_memory(
+    existing: str,
+    incoming: str,
+    cap: int = SELF_CAP_CHARS,
+    character_name: str = "",
+) -> str:
     """把這輪分類出來的 self 行合併進既有的 self 記憶（程式端做，不靠模型）。
 
     9B 模型被要求輸出「更新後的完整記憶」時，只要現有記憶不是空的，就會把舊
     條目丟掉、只吐這一輪的內容——換掉提示詞也一樣（見 fix-round-5-brief.md 的
     離線重跑）。所以她自己的記憶不能讓模型整份覆寫，改成程式端合併：
     - 既有的行全部保留、順序不變；新行接在後面。
-    - 相近的行（用 difflib.SequenceMatcher ratio、去掉開頭的「名字／代稱：」
-      再比對，避免主詞前綴影響相似度判斷）視為同一條，留新的那行、放在舊的
-      位置——這樣「喜歡咖啡」換成「很喜歡喝咖啡，尤其黑咖啡」不會變成兩條。
+    - 相近的行（用 difflib.SequenceMatcher ratio、去掉開頭的角色名／代稱再比對，
+      避免主詞前綴影響相似度判斷）視為同一條，留新的那行、放在舊的位置——
+      這樣「喜歡喝咖啡」換成「很喜歡喝咖啡，尤其黑咖啡」不會變成兩條。
       一條新行同時貼近兩條以上舊行時（同一件事的兩份舊紀錄），只有 ratio 最高
       的那條被取代、留在它原本的位置，其餘一樣貼近的舊行整條刪掉，不留下不會
-      自癒的重複舊行。
+      自癒的重複舊行。同一輪的新行之間也互相去重，只留後者。
     - 完全相同的行落在同一個分支（ratio 1.0），不會重複。
-    - 合併後超過 cap 時，只從「這輪沒被取代也不是新增」的舊行裡挑最舊（最前面）
-      的丟，直到不超過——這輪新增或更新的內容不可以被擠掉。如果丟光了這種舊行
-      還是超過 cap（例如這輪新行本身就比 cap 長），代表這輪的內容放不進去，
-      整份维持現有記憶不變、这輪的異動全部捨棄，並記一筆 warning。
+    - 合併後超過 cap 時：先從這輪的新行由前往後丟（最早的新行先丟）直到新行
+      本身裝得下——單一新行就比 cap 長時那行必然被丟掉，記一筆 warning；再從
+      「這輪沒被取代也不是新增」的舊行裡挑最舊（最前面）的丟，直到總長不超過。
+      先修新行、後淘汰舊行是刻意的：反過來做的話，一條放不進去的巨大新行會先
+      把舊記憶整份淘汰掉，最後那行自己還是被丟掉，等於白白清空了檔案。
 
-    去掉開頭「名字／代稱：」的正規化不認得主詞是誰——呼叫端要先把不同主詞的行
+    去掉開頭角色名／代稱的正規化不認得主詞是誰——呼叫端要先把不同主詞的行
     分開（classify_memory_lines 已經這樣做，只把「她自己的」那一半的行交進來），
     不然「對方喜歡咖啡」跟「紅莉栖喜歡咖啡」單看去掉前綴後的內文會被判成相似。
     """
@@ -331,7 +383,20 @@ def merge_self_memory(existing: str, incoming: str, cap: int = SELF_CAP_CHARS) -
         return existing
 
     existing_lines = [ln.strip() for ln in (existing or "").splitlines() if ln.strip()]
-    incoming_lines = [ln.strip() for ln in incoming.splitlines() if ln.strip()]
+    incoming_lines = _dedupe_incoming(
+        [ln.strip() for ln in incoming.splitlines() if ln.strip()], character_name
+    )
+
+    # 這輪的新行本身就超過 cap 時，從最早的新行開始丟——舊記憶還沒動到，丟完
+    # 之後剩下的舊行仍有機會留在檔案裡。
+    while incoming_lines and len("\n".join(incoming_lines)) > cap:
+        dropped = incoming_lines.pop(0)
+        logger.warning(
+            f"[self_memory] this round's self lines exceed cap ({cap} chars); "
+            f"dropping the oldest one ({len(dropped)} chars)"
+        )
+    if not incoming_lines:
+        return existing
 
     # 每條新行找它最像的舊行（ratio 最高、>= 門檻）來取代；同一條新行若同時貼近
     # 多條舊行，其餘的舊行視為同一件事的重複記錄，直接刪掉——不然會留下一條
@@ -344,7 +409,7 @@ def merge_self_memory(existing: str, incoming: str, cap: int = SELF_CAP_CHARS) -
         for ex_idx, ex_line in enumerate(existing_lines):
             if ex_idx in replace_at or ex_idx in remove_existing_idx:
                 continue  # 已經被這輪更早的新行取代／標記刪除，不再爭搶
-            ratio = _lines_are_similar(ex_line, inc_line)
+            ratio = _lines_are_similar(ex_line, inc_line, character_name)
             if ratio >= _SIMILARITY_THRESHOLD:
                 candidates.append((ratio, ex_idx))
         if not candidates:
@@ -376,21 +441,13 @@ def merge_self_memory(existing: str, incoming: str, cap: int = SELF_CAP_CHARS) -
     def _joined() -> str:
         return "\n".join(merged)
 
-    if len(_joined()) > cap:
-        while len(_joined()) > cap:
-            evictable = [i for i, new in enumerate(is_new) if not new]
-            if not evictable:
-                break
-            idx = evictable[0]
-            merged.pop(idx)
-            is_new.pop(idx)
-        if len(_joined()) > cap:
-            logger.warning(
-                "[self_memory] merged content still exceeds cap "
-                f"({cap} chars) after evicting every untouched existing line; "
-                "discarding this round's self-memory changes"
-            )
-            return existing
+    while len(_joined()) > cap:
+        evictable = [i for i, new in enumerate(is_new) if not new]
+        if not evictable:
+            break  # 只剩這輪動過的行，而它們前面已經修到裝得下了
+        idx = evictable[0]
+        merged.pop(idx)
+        is_new.pop(idx)
 
     return _joined()
 
@@ -472,23 +529,40 @@ def build_consolidation_prompt(
         "- 絕不記測試、確認聲音有沒有傳到、連線通不通這種操作性的對話。\n"
         "- 用簡短條列，每條一行，繁體中文，台灣用語。\n"
         "- 如果這輪對話沒有任何值得記的新資訊，就原封不動輸出現有記憶，一個字都不要改。\n"
-        f"- 總長度控制在 {cap + self_cap} 字元內；若超過，合併或提煉舊條目\n"
-        "  （保留最關鍵、刪掉過時細節）。\n\n"
+        f"- 關於對方與你們之間的條目合計控制在 {cap} 字元內、"
+        f"{who}自己的條目合計控制在 {self_cap} 字元內；\n"
+        "  若超過，合併或提煉舊條目（保留最關鍵、刪掉過時細節）。\n\n"
         f"現有記憶：\n{existing}\n\n"
         f"這輪對話：\n對方說：{user_input}\n{who}回：{ai_response}\n\n"
         "請輸出「更新後的完整記憶內容」本身，不要任何解釋、前言或標題。"
     )
 
 
-def _acceptable_rewrite(candidate: str, current: str, cap: int) -> bool:
-    """整理 LLM 的輸出能不能落地。
+def _rewrite_rejection_reason(candidate: str, current: str, cap: int) -> str | None:
+    """整理 LLM 的輸出不能落地的理由；能落地時回 None。
 
     - 空的：模型判斷這輪沒東西可記（或整個失敗），不動檔案。
     - 跟現有一模一樣：寫了也是白寫。
     - 超過 cap 的 1.5 倍：模型沒守住長度指示，寧可丟掉這輪也不要讓檔案
       失控膨脹——注入是每輪都付的成本。
+
+    回「理由」而不是布林，是因為丟掉一輪整理是靜默的：提示詞跟這個門檻曾經
+    互相矛盾（提示詞允許 cap + self_cap、這裡用 int(cap * 1.5) 拒收），而丟掉
+    的那些輪沒有留下任何一行 log，只能靠人事後推敲為什麼記憶沒更新。
     """
-    return bool(candidate) and candidate != current and len(candidate) < int(cap * 1.5)
+    if not candidate:
+        return "empty candidate"
+    if candidate == current:
+        return "unchanged from the stored memory"
+    limit = int(cap * 1.5)
+    if len(candidate) >= limit:
+        return f"{len(candidate)} chars exceeds the 1.5x cap ({limit})"
+    return None
+
+
+def _acceptable_rewrite(candidate: str, current: str, cap: int) -> bool:
+    """能不能落地。理由見 _rewrite_rejection_reason。"""
+    return _rewrite_rejection_reason(candidate, current, cap) is None
 
 
 async def _request_rewrite(
@@ -622,14 +696,23 @@ async def consolidate_core_memory(
                 raw, reply_language, protected_names
             )
             conv_candidate, self_candidate = classify_memory_lines(raw, character_name)
-            if _acceptable_rewrite(conv_candidate, current, limit):
+            rejected = _rewrite_rejection_reason(conv_candidate, current, limit)
+            if rejected is None:
                 _write_memory(conf_uid, history_uid, conv_candidate)
                 logger.info(
                     f"[core_memory] updated for {conf_uid}/{history_uid} "
                     f"({len(conv_candidate)} chars)"
                 )
+            else:
+                logger.info(
+                    f"[core_memory] conversation half not written for "
+                    f"{conf_uid}/{history_uid}: {rejected}"
+                )
             merged_self = merge_self_memory(
-                current_self, self_candidate, SELF_CAP_CHARS
+                current_self,
+                self_candidate,
+                SELF_CAP_CHARS,
+                character_name=character_name,
             )
             if merged_self != current_self:
                 _write_self_memory(conf_uid, merged_self)

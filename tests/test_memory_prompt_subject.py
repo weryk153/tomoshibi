@@ -50,8 +50,12 @@ def test_carries_the_turn_and_the_existing_memory():
     assert "使用者叫小明。" in prompt
     assert "今天好累" in prompt
     assert "辛苦了。" in prompt
-    # 長度上限現在是對話記憶與 self 記憶合計（見 fix-round-3），不是單一的 cap。
-    assert str(800 + SELF_CAP_CHARS) in prompt
+    # 兩個上限分開講（見 test_self_memory_classify 的同名測試）：合計上限會讓
+    # 模型以為對話記憶那半能寫到 cap + self_cap，而 _acceptable_rewrite 對那一半
+    # 是用 int(cap * 1.5) 拒收，模型照著寫出來的東西反而被丟掉。
+    assert str(800) in prompt
+    assert str(SELF_CAP_CHARS) in prompt
+    assert str(800 + SELF_CAP_CHARS) not in prompt
 
 
 def test_says_the_character_statements_must_not_become_user_facts():

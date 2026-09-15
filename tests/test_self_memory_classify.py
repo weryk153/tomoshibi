@@ -32,6 +32,31 @@ def test_name_prefixed_line_containing_ni_is_conversation():
     assert self_ == ""
 
 
+def test_name_prefixed_line_containing_female_ni_is_conversation():
+    """「妳」跟「你」是同一個字的女性寫法，模型對女性使用者會整份改用它。
+
+    漏掉它的話「紅莉栖答應妳下次帶書來。」會被判成她自己的事實，跟對方有關的
+    承諾就寫進所有對話共用的角色層檔案。
+    """
+    conv, self_ = classify_memory_lines("紅莉栖答應妳下次帶書來。", NAME)
+    assert conv == "紅莉栖答應妳下次帶書來。"
+    assert self_ == ""
+
+
+def test_name_prefixed_line_containing_polite_ni_is_conversation():
+    """「您」同理——敬語版的第二人稱一樣是在講對方。"""
+    conv, self_ = classify_memory_lines("紅莉栖稱呼您為老師。", NAME)
+    assert conv == "紅莉栖稱呼您為老師。"
+    assert self_ == ""
+
+
+def test_third_person_pronouns_are_not_forbidden_tokens():
+    """「他」「她」刻意不在禁用詞裡：她講第三者、或用第三人稱講自己時會誤殺。"""
+    conv, self_ = classify_memory_lines("紅莉栖說她小時候住在美國。", NAME)
+    assert self_ == "紅莉栖說她小時候住在美國。"
+    assert conv == ""
+
+
 def test_line_starting_with_the_other_party_is_conversation():
     conv, self_ = classify_memory_lines("對方叫小明。", NAME)
     assert conv == "對方叫小明。"
@@ -45,10 +70,40 @@ def test_line_without_a_clear_subject_is_conversation():
 
 
 def test_list_prefixes_are_stripped_before_classifying():
-    for prefix in ("- ", "• ", "・ "):
+    for prefix in ("- ", "• ", "・ ", "* "):
         conv, self_ = classify_memory_lines(f"{prefix}紅莉栖喜歡咖啡。", NAME)
         assert self_ == "紅莉栖喜歡咖啡。", prefix
         assert conv == ""
+
+
+def test_numbered_list_prefixes_are_stripped_before_classifying():
+    """模型也會自己編號。沒剝掉的話整行不以角色名開頭，全部掉進對話記憶。"""
+    for prefix in ("1. ", "2.", "3、", "4) ", "10. "):
+        conv, self_ = classify_memory_lines(f"{prefix}紅莉栖喜歡咖啡。", NAME)
+        assert self_ == "紅莉栖喜歡咖啡。", prefix
+        assert conv == ""
+
+
+def test_name_separated_by_a_space_is_still_self():
+    """「紅莉栖 喜歡咖啡。」「紅莉栖：喜歡咖啡。」都以角色名開頭，都算她自己的。"""
+    for line in ("紅莉栖 喜歡咖啡。", "紅莉栖：喜歡咖啡。", "紅莉栖:喜歡咖啡。"):
+        conv, self_ = classify_memory_lines(line, NAME)
+        assert self_ == line, line
+        assert conv == ""
+
+
+def test_empty_character_name_logs_a_warning():
+    """角色名空掉等於整個 self 分類失效，是設定錯誤，不可以無聲發生。"""
+    from src.open_llm_vtuber import memory_core as mc
+
+    seen = []
+    original = mc.logger.warning
+    mc.logger.warning = lambda msg, *a, **k: seen.append(str(msg))
+    try:
+        classify_memory_lines("紅莉栖喜歡咖啡。", "")
+    finally:
+        mc.logger.warning = original
+    assert any("character_name" in m for m in seen), seen
 
 
 def test_pure_parenthetical_lines_are_dropped_from_both():
@@ -111,9 +166,17 @@ def test_current_self_lines_precede_current_lines():
     assert p.index("紅莉栖喜歡咖啡。") < p.index("對方叫小明。")
 
 
-def test_prompt_states_the_combined_cap():
+def test_prompt_states_the_two_caps_separately():
+    """預算句要跟 _acceptable_rewrite 的拒收門檻講同一件事。
+
+    合計上限（cap + self_cap）會讓模型以為對話記憶那半可以寫到 2300 字，而
+    _acceptable_rewrite 對那一半是用 int(cap * 1.5) 拒收——模型照著提示詞寫，
+    寫出來的東西被丟掉。所以兩個上限分開講，各自釘住自己的數字。
+    """
     p = _prompt(cap=1500)
-    assert str(1500 + SELF_CAP_CHARS) in p
+    assert str(1500) in p
+    assert str(SELF_CAP_CHARS) in p
+    assert str(1500 + SELF_CAP_CHARS) not in p
 
 
 def test_prompt_keeps_the_old_subject_rules():
