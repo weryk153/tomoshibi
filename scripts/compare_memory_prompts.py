@@ -62,21 +62,29 @@ def _character_reply_language_and_protected_names(
 
     檔案不存在或讀壞：fail-soft 回退回值／None，不讓對照腳本因為某段對話的
     角色檔壞掉而整支中斷。
+
+    刻意不用 validate_config：那是對整份 Config（含 agent_config／asr_config／
+    tts_config 等全部必填欄位）的驗證，characters/<conf_uid>.yaml 通常只覆寫這個
+    角色自己的欄位，其餘留給 conf.yaml 補（真正載入角色時走的是深度合併，不是單檔
+    各自獨立驗證）。單檔拿去 validate_config 會因為缺 agent_config 等欄位直接丟
+    ValidationError，被下面的 except 吞掉、fail-soft 回 None——實測發生過：
+    kurisu.yaml 明明有 protected_names，卻因為這樣被吃成沒有表。只讀原始 dict、
+    直接照 key 取值，不需要角色檔本身是一份完整可獨立驗證的 Config。
     """
     path = Path("characters") / f"{conf_uid}.yaml"
     if not path.is_file():
         return fallback_reply_language, None
     try:
-        char_conf = validate_config(read_yaml(str(path)))
+        data = read_yaml(str(path)) or {}
+        cc = data.get("character_config") or {}
     except Exception as e:
         print(
             f"[warn] 讀不到 characters/{conf_uid}.yaml 的專有名詞表（{e}），當成沒有表",
             file=sys.stderr,
         )
         return fallback_reply_language, None
-    cc = char_conf.character_config
-    reply_language = getattr(cc, "reply_language", "") or fallback_reply_language
-    protected_names = getattr(cc, "protected_names", None) or None
+    reply_language = cc.get("reply_language") or fallback_reply_language
+    protected_names = cc.get("protected_names") or None
     return reply_language, protected_names
 
 
