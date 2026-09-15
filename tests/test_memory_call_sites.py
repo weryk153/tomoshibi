@@ -40,3 +40,34 @@ def test_consolidation_passes_the_conversation_first():
         "                            input_text,\n"
         "                            full_response,\n"
     ) in src, "背景整理呼叫的 history_uid 沒有緊接在 conf_uid 之後"
+
+
+def test_consolidation_passes_reply_language_and_protected_names():
+    """整理呼叫要帶上這個角色的語言與專有名詞表，否則整理出來的記憶不會套
+    normalize_output_language_variant，錯字（如「杜拉比」）會原樣寫進檔案。
+    """
+    src = inspect.getsource(single_conversation.process_single_conversation)
+    assert "consolidate_core_memory(" in src
+    assert "reply_language=_effective_output_language(context)" in src
+    assert "protected_names=" in src
+
+
+def test_every_normalize_call_passes_the_protected_names_table():
+    """process_single_conversation 與 _speak 裡，每一個
+    normalize_output_language_variant( 呼叫都要帶 _protected(context)，
+    不然一般回覆的顯示/TTS 文字不會套這個角色的專有名詞表。
+    """
+    for func in (
+        single_conversation._speak,
+        single_conversation.process_single_conversation,
+    ):
+        src = inspect.getsource(func)
+        total = src.count("normalize_output_language_variant(")
+        protected = src.count("_protected(context)")
+        assert total > 0, (
+            f"{func.__name__} 裡沒有 normalize_output_language_variant( 呼叫"
+        )
+        assert total == protected, (
+            f"{func.__name__} 裡有 {total} 個 normalize_output_language_variant( 呼叫，"
+            f"但只有 {protected} 個帶了 _protected(context)"
+        )

@@ -86,6 +86,11 @@ def _effective_output_language(context: ServiceContext) -> str:
     )
 
 
+def _protected(context: ServiceContext):
+    """這個角色的專有名詞表；沒設就是 None，normalize 會當成沒有表。"""
+    return getattr(context.character_config, "protected_names", None)
+
+
 async def _speak(
     output_item,
     *,
@@ -106,10 +111,10 @@ async def _speak(
     if isinstance(output_item, SentenceOutput):
         output_language = _effective_output_language(context)
         output_item.display_text.text = normalize_output_language_variant(
-            output_item.display_text.text, output_language
+            output_item.display_text.text, output_language, _protected(context)
         )
         output_item.tts_text = normalize_output_language_variant(
-            output_item.tts_text, output_language
+            output_item.tts_text, output_language, _protected(context)
         )
     response_part = await process_agent_output(
         output=output_item,
@@ -289,11 +294,13 @@ async def process_single_conversation(
                             normalize_output_language_variant(
                                 output_item.display_text.text,
                                 output_language,
+                                _protected(context),
                             )
                         )
                         output_item.tts_text = normalize_output_language_variant(
                             output_item.tts_text,
                             output_language,
+                            _protected(context),
                         )
 
                     if isinstance(
@@ -451,11 +458,13 @@ async def process_single_conversation(
                             normalize_output_language_variant(
                                 output_item.display_text.text,
                                 output_language,
+                                _protected(context),
                             )
                         )
                         output_item.tts_text = normalize_output_language_variant(
                             output_item.tts_text,
                             output_language,
+                            _protected(context),
                         )
                         if is_generic_assistant_boilerplate(
                             output_item.display_text.text
@@ -610,6 +619,10 @@ async def process_single_conversation(
                             # 抽取器需要知道角色叫什麼（見 build_consolidation_prompt）。
                             character_name=getattr(
                                 context.character_config, "character_name", ""
+                            ),
+                            reply_language=_effective_output_language(context),
+                            protected_names=getattr(
+                                context.character_config, "protected_names", None
                             ),
                         )
                     )

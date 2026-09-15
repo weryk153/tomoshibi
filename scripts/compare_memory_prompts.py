@@ -21,6 +21,14 @@ load_self_memory 都是讀函式，這支腳本從不呼叫任何寫入或整理
 的新提示詞欄位下方會多印一塊「→ 程式分類」，把 classify_memory_lines 的結果
 （對話記憶／她自己的）列出來，讓人讀時直接看到最後會落地成什麼。
 
+分類之前先套這個角色的專有名詞保護：讀 characters/<conf_uid>.yaml 的
+character_config.protected_names 與 reply_language（沒有檔案或沒有該欄位，
+reply_language 退回 conf.yaml 的 system_config.player_language、protected_names
+當 None），呼叫 normalize_output_language_variant 折字——跟 production
+（memory_core.consolidate_core_memory）走同一條路。只影響「→ 程式分類」那一塊，
+「新提示詞」欄位本身顯示模型的原始輸出，不折字，讓人讀時看得出模型實際寫了
+什麼、折字改了什麼。
+
 輸出一頁 HTML：每段對話一區，區內 5 列，每列左舊右新，全文不截斷。
 """
 
@@ -38,8 +46,38 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from src.open_llm_vtuber import memory_core  # noqa: E402
 from src.open_llm_vtuber.config_manager.utils import read_yaml, validate_config  # noqa: E402
+from src.open_llm_vtuber.conversation_quality import (  # noqa: E402
+    normalize_output_language_variant,
+)
 
 _OLD_TMP = Path(".superpowers-old-memory-core.py")
+
+
+def _character_reply_language_and_protected_names(
+    conf_uid: str, fallback_reply_language: str
+) -> tuple[str, dict | None]:
+    """讀 characters/<conf_uid>.yaml，取這個角色自己的 reply_language 與
+    protected_names——跟 production 的 _effective_output_language／_protected
+    走同一條規則：角色沒設就退回呼叫端傳入的預設語言，表沒設就是 None。
+
+    檔案不存在或讀壞：fail-soft 回退回值／None，不讓對照腳本因為某段對話的
+    角色檔壞掉而整支中斷。
+    """
+    path = Path("characters") / f"{conf_uid}.yaml"
+    if not path.is_file():
+        return fallback_reply_language, None
+    try:
+        char_conf = validate_config(read_yaml(str(path)))
+    except Exception as e:
+        print(
+            f"[warn] 讀不到 characters/{conf_uid}.yaml 的專有名詞表（{e}），當成沒有表",
+            file=sys.stderr,
+        )
+        return fallback_reply_language, None
+    cc = char_conf.character_config
+    reply_language = getattr(cc, "reply_language", "") or fallback_reply_language
+    protected_names = getattr(cc, "protected_names", None) or None
+    return reply_language, protected_names
 
 
 def _extract_function_source(src: str, func_name: str) -> str:
@@ -130,6 +168,11 @@ async def _main(args):
         conf.character_config
     )
     cap = getattr(conf.character_config, "core_memory_max_chars", 1500)
+    # 角色沒自己設 reply_language 時的退回值，跟 production
+    # （single_conversation._effective_output_language）用的是同一層退回。
+    default_reply_language = str(
+        getattr(getattr(conf, "system_config", None), "player_language", "") or ""
+    )
 
     sections = []
     self_hits = 0
@@ -146,6 +189,9 @@ async def _main(args):
         if args.fresh:
             current = ""
             current_self = ""
+        reply_language, protected_names = _character_reply_language_and_protected_names(
+            conf_uid, default_reply_language
+        )
 
         old_prompt = old.build_consolidation_prompt(
             current, user_input, ai_response, cap, character_name=name
@@ -162,7 +208,12 @@ async def _main(args):
         for i in range(args.runs):
             o = await _safe_request(base_url, model, old_prompt, api_key, extra_body)
             n = await _safe_request(base_url, model, new_prompt, api_key, extra_body)
-            conv, self_ = memory_core.classify_memory_lines(n, name)
+            # 折字後才分類——跟 production（memory_core.consolidate_core_memory）
+            # 走同一條路。n 本身（顯示欄位）保留模型原始輸出，不折字。
+            folded = normalize_output_language_variant(
+                n, reply_language, protected_names
+            )
+            conv, self_ = memory_core.classify_memory_lines(folded, name)
             rows.append((o, n, conv, self_))
             self_total += 1
             if self_:

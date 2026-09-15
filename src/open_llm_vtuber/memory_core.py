@@ -23,6 +23,7 @@
 import asyncio
 import re
 from collections import OrderedDict
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -463,10 +464,21 @@ async def consolidate_core_memory(
     api_key: str = "",
     extra_body: dict | None = None,
     character_name: str = "",
+    reply_language: str = "",
+    protected_names: "Mapping[str, Sequence[str]] | None" = None,
 ) -> None:
     """一輪對話結束後背景執行：值得記的才更新 core_memory.md。
 
     fire-and-forget——任何失敗只記 warning，絕不影響對話本身。
+
+    ``reply_language``／``protected_names``：整理用的 LLM 跟一般回覆用同一顆模型，
+    會犯同一種錯——把專有名詞寫成同音字（「橋田至」寫成「杜拉比」）。一般回覆的
+    正規化只套在顯示／TTS 這一次性輸出上；記憶不套的話，錯字會原樣寫進
+    core_memory.md／self_memory.md，之後每一輪注入回系統提示，模型再學回去、
+    越滾越錯。所以在丟給 classify_memory_lines **之前**先套一次
+    normalize_output_language_variant——分類是逐行字串比對（角色名開頭），錯字
+    沒折回來的話「杜拉比」那一行永遠對不上角色名開頭，會被誤判進對話記憶。
+    兩個參數留空／None 時 normalize 本來就直接回傳原文，行為與不傳時一致。
     """
     try:
         if not history_uid:
@@ -489,6 +501,13 @@ async def consolidate_core_memory(
                 self_cap=SELF_CAP_CHARS,
             )
             raw = await _request_rewrite(base_url, model, prompt, api_key, extra_body)
+            # local import：conversation_quality 目前不匯入 memory_core，沒有循環
+            # 匯入風險，但兩邊都用 local import 是既有慣例（見 service_context.py）。
+            from .conversation_quality import normalize_output_language_variant
+
+            raw = normalize_output_language_variant(
+                raw, reply_language, protected_names
+            )
             conv_candidate, self_candidate = classify_memory_lines(raw, character_name)
             if _acceptable_rewrite(conv_candidate, current, limit):
                 _write_memory(conf_uid, history_uid, conv_candidate)

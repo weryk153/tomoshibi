@@ -28,7 +28,14 @@ def _isolated(tmp_path, monkeypatch):
     memory_core._consolidation_locks.clear()
 
 
-def _run(history_uid, reply, monkeypatch, character_name=NAME):
+def _run(
+    history_uid,
+    reply,
+    monkeypatch,
+    character_name=NAME,
+    reply_language="",
+    protected_names=None,
+):
     async def fake_rewrite(base_url, model, prompt, api_key, extra_body):
         return reply
 
@@ -42,6 +49,8 @@ def _run(history_uid, reply, monkeypatch, character_name=NAME):
             base_url="http://stub",
             model="stub",
             character_name=character_name,
+            reply_language=reply_language,
+            protected_names=protected_names,
         )
     )
 
@@ -177,6 +186,42 @@ def test_two_conversations_of_one_character_queue_and_keep_both_self_entries(
     stored = load_self_memory(CONF)
     assert "紅莉栖喜歡咖啡。" in stored
     assert "紅莉栖討厭夏天。" in stored
+
+
+def test_protected_names_fold_misspelling_before_classification(monkeypatch):
+    """整理輸出裡的錯字先被 normalize 折回正式寫法，才逐行分類。
+
+    表裡帶了「紅莉栖」自己這條（跟 characters/kurisu.yaml 實際的寫法一致）：
+    s2twp 會把「栖」當一般詞彙轉成「棲」，先跑過 OpenCC 才做 protected_names
+    折字，角色名不折回來的話，這行就不再以角色名開頭，會被誤判進對話記憶
+    而不是她自己的——這正是 fold 必須在分類「之前」跑的原因。
+    """
+    _run(
+        "conv-1",
+        "紅莉栖：記得杜拉比和椎名。",
+        monkeypatch,
+        reply_language="Traditional Chinese (Taiwan)",
+        protected_names={"橋田至": ["杜拉比"], "紅莉栖": ["紅莉棲"]},
+    )
+    assert load_self_memory(CONF) == "紅莉栖：記得橋田至和椎名。"
+
+
+def test_protected_names_not_folded_for_non_taiwan_language(monkeypatch):
+    """語言不是台灣繁中時 normalize 本來就直接回傳原文，錯字原樣保留。"""
+    _run(
+        "conv-1",
+        "紅莉栖：記得杜拉比和椎名。",
+        monkeypatch,
+        reply_language="Japanese",
+        protected_names={"橋田至": ["杜拉比"]},
+    )
+    assert load_self_memory(CONF) == "紅莉栖：記得杜拉比和椎名。"
+
+
+def test_without_the_new_kwargs_behavior_is_unchanged(monkeypatch):
+    """不傳 reply_language／protected_names 時行為與現在一致：不折字。"""
+    _run("conv-1", "紅莉栖：記得杜拉比和椎名。", monkeypatch)
+    assert load_self_memory(CONF) == "紅莉栖：記得杜拉比和椎名。"
 
 
 def test_different_characters_do_not_wait_for_each_other(monkeypatch):
