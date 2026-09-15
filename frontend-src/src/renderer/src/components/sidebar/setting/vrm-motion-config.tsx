@@ -39,6 +39,7 @@ import {
   saveVrmModelConfig,
   buildVrmPayload,
   emotionPresets,
+  emotionKeywordsExcept,
   EMOTION_EXCLUDED_PRESETS,
   type VrmModelConfig,
   type VrmClipMapping,
@@ -193,19 +194,17 @@ function VrmMotionConfig(): JSX.Element {
     return result === 'empty' ? null : result;
   }, [rows, allKeywordsExcept]);
 
-  const allEmotionKeywordsExcept = useCallback((excludeName: string): string[] => {
-    const list: string[] = [];
-    Object.entries(expressionRows).forEach(([name, keyword]) => {
-      if (name === excludeName) return;
-      const trimmed = keyword.trim();
-      if (trimmed) list.push(trimmed);
-    });
-    Object.entries(extraEmotionKeywords).forEach(([name, keywords]) => {
-      if (name === excludeName) return;
-      keywords.forEach((k) => list.push(k));
-    });
-    return list;
-  }, [expressionRows, extraEmotionKeywords]);
+  // re-review of cfa0138 殘留 1：重複檢查的清單一定要包含 hiddenEmotionKeywords
+  // （被 emotionPresets 濾掉、畫面看不到的既有關鍵字，例如 neutral→neutral）。
+  // 漏了它，使用者在可見列打「neutral」不會被判重複，存檔時兩個來源會撞同一個
+  // key（見 api/vrm-config.ts 的 emotionKeywordsExcept 說明）。邏輯本體已經抽成
+  // 純函式方便單獨測試（vrm-config.test.ts），這裡只是把元件的 state 餵進去。
+  const allEmotionKeywordsExcept = useCallback(
+    (excludeName: string): string[] => emotionKeywordsExcept(
+      excludeName, expressionRows, extraEmotionKeywords, hiddenEmotionKeywords,
+    ),
+    [expressionRows, extraEmotionKeywords, hiddenEmotionKeywords],
+  );
 
   const expressionRowError = useCallback((name: string): 'duplicate' | 'invalidChars' | null => {
     const keyword = expressionRows[name];
@@ -238,14 +237,16 @@ function VrmMotionConfig(): JSX.Element {
       // 從 model_dict.json 移除了——畫面上的清單要跟著清空。
       setOrphans([]);
       // review a0c0ce7 fix 2(d)：角色載入當下只預先讀了 motionMap 裡「當時」有
-      // 的 clip（見 vrm-avatar.tsx）。這次存檔可能新增了指到某個 clip 的關鍵字
-      // ——不背景預先載入的話，LLM 接下來寫出那個關鍵字時 playOnce 會找不到
-      // action，直到使用者自己按過一次試播或重新整理。不 await，不擋存檔完成
-      // 的回饋；ensureMotionLoaded 內部已經處理失敗（回 false，不 throw）。
+      // 的 clip（見 vrm-avatar.tsx）。這裡對存檔後 motionMap 裡「每一個」clip
+      // 都呼叫 ensureMotionLoaded（不只挑新增的）——ensureLoaded 內部用
+      // hasClip 短路，已經載入過的一律立刻 resolve(true) 不重拉，逐一呼叫全部
+      // 比自己再算一次「哪些是新的」便宜、也不會算漏。不 await，不擋存檔完成
+      // 的回饋；用 Promise.allSettled 收集而不是各自裸接，讓「這裡不會 throw」
+      // 是結構上保證的，不是依賴 ensureMotionLoaded 目前剛好每條路徑都不拋
+      // （re-review of cfa0138 殘留 3）。
       const renderer = getActiveRenderer();
-      new Set(Object.values(motionMap).map((target) => target.clip)).forEach((clip) => {
-        void renderer?.ensureMotionLoaded?.(clip);
-      });
+      const clipsToPreload = [...new Set(Object.values(motionMap).map((target) => target.clip))];
+      void Promise.allSettled(clipsToPreload.map((clip) => renderer?.ensureMotionLoaded?.(clip)));
       toaster.create({
         title: t('settings.live2d.motionConfigSaved'),
         type: 'success',

@@ -22,6 +22,14 @@ export class MotionPlayer {
   // clip（見 vrm-avatar.tsx）。存檔後新增的關鍵字，或還沒被試播過的 clip，都要
   // 能用這個 base URL 現拉，不用整個角色重新載入。
   private readonly motionsBaseUrl: string;
+  // re-review of cfa0138 殘留 2：試播鍵可能在同一個 clip 上被連點，或存檔後
+  // ensureMotionLoaded 對同一批 clip 觸發、使用者又立刻按了試播——這些都是對
+  // 「同一個 clip」的並發 ensureLoaded。沒有這個 map 的話每次呼叫都各自起一個
+  // GLTFLoader 請求，同一個檔案被拉好幾份。key 是 clip 名稱，value 是那次
+  // load() 呼叫本身的 promise；settle（無論成功失敗）就從這裡刪掉，所以「失敗」
+  // 不會被快取住——下一次呼叫會重新嘗試，跟 hasClip 為 true 時的「成功有快取」
+  // 是不同語意（成功的快取活在 this.actions，不在這個 map）。
+  private pendingLoads = new Map<string, Promise<boolean>>();
 
   // 明確欄位指派而不是 constructor parameter property：vrm-renderer.ts 對這個檔案
   // 是值匯入（IDLE_CLIP），node --test 載入 vrm-renderer.test.ts 時會連帶解析整份
@@ -69,10 +77,19 @@ export class MotionPlayer {
   /**
    * 確保某個 clip 已經載入，已經有就直接回 true 不重拉。給試播（可能點到一個
    * 剛存檔、角色載入當下還不知道要拉的 clip）與存檔後的背景預先載入用。
+   *
+   * 對同一個 name 的並發呼叫會共用同一次 load()（見 pendingLoads 欄位的說明），
+   * 不會各自起一份請求；那次請求 settle 後就從 pendingLoads 移除，所以失敗
+   * 不會被快取，下一次呼叫會重新嘗試。
    */
   async ensureLoaded(name: string): Promise<boolean> {
     if (this.hasClip(name)) return true;
-    return this.load(name, `${this.motionsBaseUrl}/${name}.vrma`);
+    const pending = this.pendingLoads.get(name);
+    if (pending) return pending;
+    const promise = this.load(name, `${this.motionsBaseUrl}/${name}.vrma`);
+    this.pendingLoads.set(name, promise);
+    promise.finally(() => this.pendingLoads.delete(name));
+    return promise;
   }
 
   private crossfadeTo(next: THREE.AnimationAction, weight = 1): void {

@@ -4,6 +4,7 @@ import {
   EMOTION_EXCLUDED_PRESETS,
   emotionPresets,
   buildVrmPayload,
+  emotionKeywordsExcept,
   type VrmModelConfig,
   type VrmClipEntry,
   type VrmExpressionEntry,
@@ -160,4 +161,41 @@ test('buildVrmPayload：hiddenEmotionKeywords 省略時不影響既有行為（�
   const expressionRows: Record<string, string> = { happy: 'joy' }
   const { emotionMap } = buildVrmPayload([], {}, {}, expressions, expressionRows, {})
   assert.deepEqual(emotionMap, { joy: 'happy' })
+})
+
+// re-review of cfa0138 residual 1：allEmotionKeywordsExcept（元件裡 validateKeyword
+// 用的重複清單）原本沒有把 hiddenEmotionKeywords 算進去——使用者在可見的表情列打
+// 「neutral」不會被判定重複，存檔會被 buildVrmPayload 的 hiddenEmotionKeywords
+// 合併悄悄蓋掉（後者在 emotionMap 組裝順序上在後面），或者兩邊都送出同一個
+// keyword 給後端、被大小寫不敏感的重複檢查拒絕、體驗是一個看不懂的 400。把這段
+// 邏輯抽成純函式讓它可以脫離元件單獨測試。
+test('emotionKeywordsExcept：包含 hiddenEmotionKeywords 裡的關鍵字，讓可見列輸入 neutral 會被判重複', () => {
+  const list = emotionKeywordsExcept('happy', { happy: 'joy' }, {}, { neutral: ['neutral'] })
+  assert.deepEqual(list, ['neutral'])
+})
+
+test('emotionKeywordsExcept：大小寫不同的重複交給 validateKeyword 判斷，這裡只負責把清單湊齊', () => {
+  const list = emotionKeywordsExcept('happy', { happy: 'joy' }, {}, { neutral: ['Neutral'] })
+  assert.deepEqual(list, ['Neutral'])
+})
+
+test('emotionKeywordsExcept：hiddenEmotionKeywords 不受 excludeName 篩選——它們沒有對應的可見列', () => {
+  // excludeName 只用來跳過「自己正在編輯的那一列」，hidden 的 preset 名稱
+  // （這裡是 neutral）從來不會等於某個可見 expression 的名字時被跳過的邏輯是
+  // 給 expressionRows／extraEmotionKeywords 用的；hidden 的部分整份都要算進去。
+  const list = emotionKeywordsExcept('neutral', {}, {}, { neutral: ['neutral'] })
+  assert.deepEqual(list, ['neutral'])
+})
+
+test('emotionKeywordsExcept：合併可見列、extras、hidden 三個來源，排除自己那一列', () => {
+  const expressionRows = { happy: 'joy', sad: 'blue' }
+  const extraEmotionKeywords = { happy: ['glad'] }
+  const hiddenEmotionKeywords = { neutral: ['neutral'], blink: ['wink'] }
+  const list = emotionKeywordsExcept('happy', expressionRows, extraEmotionKeywords, hiddenEmotionKeywords)
+  assert.deepEqual([...list].sort(), ['blue', 'neutral', 'wink'].sort())
+})
+
+test('emotionKeywordsExcept：空白的可見列關鍵字跳過，不算進清單', () => {
+  const list = emotionKeywordsExcept('sad', { happy: '   ', sad: 'blue' }, {}, {})
+  assert.deepEqual(list, [])
 })

@@ -61,6 +61,44 @@ export function emotionPresets(config: VrmModelConfig): VrmExpressionEntry[] {
   return config.expressions.filter((expression) => !EMOTION_EXCLUDED_PRESETS.has(expression.name))
 }
 
+// re-review of cfa0138 殘留 1：畫面上情緒關鍵字的重複檢查（validateKeyword 的
+// existing 清單）原本只看得到可見列 expressionRows／extraEmotionKeywords，沒有
+// hiddenEmotionKeywords（被 emotionPresets 濾掉的 preset，例如 neutral，的既有
+// 關鍵字）。漏了它的後果：使用者在可見的表情列打「neutral」不會被標成重複，
+// 存檔時 buildVrmPayload 用 hiddenEmotionKeywords 覆寫同一個 key（兩邊都想要
+// "neutral" 這個字，後寫的那個贏），或者後端 _validate_emotion_map 的大小寫
+// 不敏感重複檢查直接拒絕整次存檔、UI 只看到一個看不懂的 400。
+//
+// 抽成純函式（跟 vrm-motion-config.tsx 元件內同名的 useCallback 邏輯完全一致，
+// 只是多吃一個 hiddenEmotionKeywords 參數）方便脫離 React 單獨測試——元件裡的
+// allEmotionKeywordsExcept 就是呼叫這個函式，state 從外面傳進來。
+//
+// excludeName 只排除「自己正在編輯的那一列」，只對 expressionRows／
+// extraEmotionKeywords 有意義；hiddenEmotionKeywords 沒有對應的可見列（它的
+// key 是被排除的 preset 名稱，不可能等於使用者正在打字的那個可見 expression
+// 名稱），所以整份都算進去，不做排除。
+export function emotionKeywordsExcept(
+  excludeName: string,
+  expressionRows: Record<string, string>,
+  extraEmotionKeywords: Record<string, string[]>,
+  hiddenEmotionKeywords: Record<string, string[]>,
+): string[] {
+  const list: string[] = []
+  Object.entries(expressionRows).forEach(([name, keyword]) => {
+    if (name === excludeName) return
+    const trimmed = keyword.trim()
+    if (trimmed) list.push(trimmed)
+  })
+  Object.entries(extraEmotionKeywords).forEach(([name, keywords]) => {
+    if (name === excludeName) return
+    keywords.forEach((k) => list.push(k))
+  })
+  Object.values(hiddenEmotionKeywords).forEach((keywords) => {
+    keywords.forEach((k) => list.push(k))
+  })
+  return list
+}
+
 // motionMap 裡一個 keyword 指向的目標。VRM 的動作只有 clip 檔名可以定位，沒有
 // Live2D 的 (group, index)——見 api/live2d-config.ts 的 MotionMapTarget。
 export interface VrmMotionMapTarget {
