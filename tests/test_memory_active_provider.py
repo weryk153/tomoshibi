@@ -63,7 +63,15 @@ def test_consolidation_payload_carries_extra_body(monkeypatch, tmp_path):
 
     class _Resp:
         def json(self):
-            return {"choices": [{"message": {"content": "- 使用者在做 Live2D"}}]}
+            return {
+                "choices": [
+                    {
+                        "message": {
+                            "content": "【對話記憶】\n- 使用者在做 Live2D\n【角色自己】\n"
+                        }
+                    }
+                ]
+            }
 
     class _Client:
         def __init__(self, *a, **k):
@@ -82,6 +90,9 @@ def test_consolidation_payload_carries_extra_body(monkeypatch, tmp_path):
     monkeypatch.setattr(mc.httpx, "AsyncClient", _Client)
     monkeypatch.setattr(
         mc, "_memory_file", lambda conf_uid, history_uid: tmp_path / "core_memory.md"
+    )
+    monkeypatch.setattr(
+        mc, "_self_memory_file", lambda conf_uid: tmp_path / "self_memory.md"
     )
 
     asyncio.run(

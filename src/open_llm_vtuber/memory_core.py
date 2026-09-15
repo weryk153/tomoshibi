@@ -430,14 +430,14 @@ async def _request_rewrite(
     return str(text).strip().strip("`").strip()
 
 
-# --- 併發（同一段對話一次只整理一份）--------------------------------------
+# --- 併發（同一個角色一次只整理一份）--------------------------------------
 
-_consolidation_locks: "OrderedDict[tuple[str, str], asyncio.Lock]" = OrderedDict()
+_consolidation_locks: "OrderedDict[str, asyncio.Lock]" = OrderedDict()
 _MAX_LOCKS = 64
 
 
-def _consolidation_lock(conf_uid: str, history_uid: str) -> asyncio.Lock:
-    """同一段對話的整理必須排隊。
+def _consolidation_lock(conf_uid: str) -> asyncio.Lock:
+    """同一個角色的整理必須排隊。
 
     整理是「讀出整份記憶 → 丟給 LLM 重寫 → 整份覆寫」，中間那步要花到 60 秒。
     沒有鎖的話，第 N 輪還在等 LLM、第 N+1 輪就開始了：兩邊各自讀到同一份舊記憶
@@ -447,10 +447,11 @@ def _consolidation_lock(conf_uid: str, history_uid: str) -> asyncio.Lock:
 
     鎖要含蓋「讀」才有用：只鎖寫入的話兩邊依然是從同一份底稿長出來的。
 
-    鎖以 (conf_uid, history_uid) 為單位——不同對話之間本來就互不相干，
-    沒有理由讓它們互相等。
+    鎖以 conf_uid 為單位，不是 (conf_uid, history_uid)：self_memory.md 是同角色所有
+    對話共用的，兩段對話同時整理會各自讀到同一份舊的 self 記憶當底稿、整份寫回，
+    後寫的蓋掉先寫的新條目。代價是同角色開兩段對話時整理會排隊，可接受。
     """
-    key = (str(conf_uid), str(history_uid))
+    key = str(conf_uid)
     lock = _consolidation_locks.get(key)
     if lock is None:
         lock = asyncio.Lock()
@@ -491,23 +492,39 @@ async def consolidate_core_memory(
 
         limit = _clamp_cap(cap)
         # 讀→重寫→寫回，整段持鎖。見 _consolidation_lock。
-        async with _consolidation_lock(conf_uid, history_uid):
+        async with _consolidation_lock(conf_uid):
             current = load_core_memory(conf_uid, history_uid)
+            current_self = load_self_memory(conf_uid)
             prompt = build_consolidation_prompt(
                 current=current,
                 user_input=user_input,
                 ai_response=ai_response,
                 cap=limit,
                 character_name=character_name,
+                current_self=current_self,
+                self_cap=SELF_CAP_CHARS,
             )
-            candidate = await _request_rewrite(
-                base_url, model, prompt, api_key, extra_body
-            )
-            if _acceptable_rewrite(candidate, current, limit):
-                _write_memory(conf_uid, history_uid, candidate)
+            raw = await _request_rewrite(base_url, model, prompt, api_key, extra_body)
+            parts = split_consolidation_output(raw, character_name)
+            if parts is None:
+                # 不猜。猜錯會把對話記憶整份寫進 self_memory.md。
+                logger.warning(
+                    f"[core_memory] consolidation output for {conf_uid}/{history_uid} "
+                    "lacks a section marker; nothing written"
+                )
+                return
+            conv_candidate, self_candidate = parts
+            if _acceptable_rewrite(conv_candidate, current, limit):
+                _write_memory(conf_uid, history_uid, conv_candidate)
                 logger.info(
                     f"[core_memory] updated for {conf_uid}/{history_uid} "
-                    f"({len(candidate)} chars)"
+                    f"({len(conv_candidate)} chars)"
+                )
+            self_filtered = filter_self_lines(self_candidate)
+            if _acceptable_rewrite(self_filtered, current_self, SELF_CAP_CHARS):
+                _write_self_memory(conf_uid, self_filtered)
+                logger.info(
+                    f"[self_memory] updated for {conf_uid} ({len(self_filtered)} chars)"
                 )
     except Exception as e:
         logger.warning(
