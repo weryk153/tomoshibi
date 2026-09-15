@@ -40,11 +40,15 @@ def test_falls_back_to_a_generic_label_without_a_name():
 
 
 def test_carries_the_turn_and_the_existing_memory():
+    # cap 刻意不用 800：SELF_CAP_CHARS 剛好也是 800，兩個數字撞在一起時，
+    # 就算 build_consolidation_prompt 把 self_cap 錯寫成 cap 出現的位置，
+    # 斷言照樣通過——退化成沒在測東西。cap=900 讓兩個數字分得開，才驗得到
+    # 「對話記憶上限」跟「self 上限」真的是各自獨立寫進提示詞的兩個數字。
     prompt = build_consolidation_prompt(
         current="使用者叫小明。",
         user_input="今天好累",
         ai_response="辛苦了。",
-        cap=800,
+        cap=900,
         character_name="芙莉蓮",
     )
     assert "使用者叫小明。" in prompt
@@ -53,9 +57,9 @@ def test_carries_the_turn_and_the_existing_memory():
     # 兩個上限分開講（見 test_self_memory_classify 的同名測試）：合計上限會讓
     # 模型以為對話記憶那半能寫到 cap + self_cap，而 _acceptable_rewrite 對那一半
     # 是用 int(cap * 1.5) 拒收，模型照著寫出來的東西反而被丟掉。
-    assert str(800) in prompt
+    assert str(900) in prompt
     assert str(SELF_CAP_CHARS) in prompt
-    assert str(800 + SELF_CAP_CHARS) not in prompt
+    assert str(900 + SELF_CAP_CHARS) not in prompt
 
 
 def test_says_the_character_statements_must_not_become_user_facts():

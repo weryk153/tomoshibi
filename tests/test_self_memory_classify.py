@@ -77,11 +77,30 @@ def test_list_prefixes_are_stripped_before_classifying():
 
 
 def test_numbered_list_prefixes_are_stripped_before_classifying():
-    """模型也會自己編號。沒剝掉的話整行不以角色名開頭，全部掉進對話記憶。"""
-    for prefix in ("1. ", "2.", "3、", "4) ", "10. "):
+    """模型也會自己編號。沒剝掉的話整行不以角色名開頭，全部掉進對話記憶。
+
+    編號後面一定要接空白才算列表前綴（見下面 test_numbered_list_prefix_does_not_
+    eat_a_leading_year）：「2." 這種沒有空白的形狀不再視為編號。
+    """
+    for prefix in ("1. ", "2. ", "3、 ", "4) ", "10. "):
         conv, self_ = classify_memory_lines(f"{prefix}紅莉栖喜歡咖啡。", NAME)
         assert self_ == "紅莉栖喜歡咖啡。", prefix
         assert conv == ""
+
+
+def test_numbered_list_prefix_does_not_eat_a_leading_year():
+    """`_NUMBERED_PREFIX` 曾經把「2024.11 開始學畫。」的「2024.」當成編號前綴
+    吃掉，剩下「11 開始學畫。」。編號限最多三位數、後面一定要接空白，年份
+    （四位數，句點後面接的是數字不是空白）就不會再中招。"""
+    conv, self_ = classify_memory_lines("2024.11 開始學畫。", NAME)
+    assert conv == "2024.11 開始學畫。"
+    assert self_ == ""
+
+
+def test_short_numbered_prefix_with_space_is_still_stripped():
+    conv, self_ = classify_memory_lines("1. 紅莉栖喜歡貓。", NAME)
+    assert self_ == "紅莉栖喜歡貓。"
+    assert conv == ""
 
 
 def test_name_separated_by_a_space_is_still_self():

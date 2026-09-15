@@ -36,6 +36,13 @@ export interface MemoryState {
   self_cap: number
 }
 
+// 四個記憶寫入端點都可能等整理鎖（memory_route.py 的 _hold_consolidation_lock，
+// 最長等 10 秒才回 503），apiPost 的預設逾時（DEFAULT_TIMEOUT_MS，15 秒）不夠：
+// 等到鎖那端的 10 秒 + 實際寫入時間，可能就撞上前端自己先斷線——這時後端其實
+// 已經正常回應了（成功或 503），畫面卻報「請求逾時」，使用者以為沒存到。拉到
+// 20 秒留出餘裕。
+const MEMORY_WRITE_TIMEOUT_MS = 20000
+
 // GET /api/memory 的原始回應形狀（欄位比 MemoryState 多，且後端命名是
 // 因為這就是 memory_route.py 實際回傳的鍵）。
 interface MemoryGetResponse {
@@ -105,7 +112,12 @@ export const saveMemoryContent = (
   confUid: string,
   content: string,
 ): Promise<ApiResult<unknown>> =>
-  apiPost<unknown>(baseUrl, '/api/memory', { conf_uid: confUid, content })
+  apiPost<unknown>(
+    baseUrl,
+    '/api/memory',
+    { conf_uid: confUid, content },
+    MEMORY_WRITE_TIMEOUT_MS,
+  )
 
 export const setMemoryEnabled = (
   baseUrl: string,
@@ -153,7 +165,12 @@ export const setMemoryConsolidation = (
 
 // 破壞性：把 core memory 清空（不刪檔、不動對話紀錄）。
 export const clearMemory = (baseUrl: string, confUid: string): Promise<ApiResult<unknown>> =>
-  apiPost<unknown>(baseUrl, '/api/memory/clear', { conf_uid: confUid })
+  apiPost<unknown>(
+    baseUrl,
+    '/api/memory/clear',
+    { conf_uid: confUid },
+    MEMORY_WRITE_TIMEOUT_MS,
+  )
 
 // POST /api/memory/self：整份取代她自己的記憶（角色層，不需要連線）。
 export const saveSelfMemoryContent = (
@@ -161,9 +178,19 @@ export const saveSelfMemoryContent = (
   confUid: string,
   content: string,
 ): Promise<ApiResult<unknown>> =>
-  apiPost<unknown>(baseUrl, '/api/memory/self', { conf_uid: confUid, content })
+  apiPost<unknown>(
+    baseUrl,
+    '/api/memory/self',
+    { conf_uid: confUid, content },
+    MEMORY_WRITE_TIMEOUT_MS,
+  )
 
 // 破壞性：清空她自己的記憶。
 export const clearSelfMemory = (baseUrl: string, confUid: string): Promise<ApiResult<unknown>> =>
-  apiPost<unknown>(baseUrl, '/api/memory/self/clear', { conf_uid: confUid })
+  apiPost<unknown>(
+    baseUrl,
+    '/api/memory/self/clear',
+    { conf_uid: confUid },
+    MEMORY_WRITE_TIMEOUT_MS,
+  )
 

@@ -260,7 +260,10 @@ _SELF_FORBIDDEN = ("對方", "你", "妳", "您")
 _PARENTHETICAL_ONLY = re.compile(r"^（[^）]*）$")
 _LIST_PREFIXES = ("- ", "• ", "・ ", "* ")
 # 模型也會自己編號。沒剝掉的話整行不以角色名開頭，全部掉進對話記憶。
-_NUMBERED_PREFIX = re.compile(r"^\d+[.、)] ?")
+# 最多三位數、後面一定要接空白——「2024.11 開始學畫。」曾經被當成「2024.」
+# 這個編號前綴吃掉，剩下「11 開始學畫。」；年份後面接的是數字不是空白，
+# 加上這兩條限制就不會再中招（真的編號列表模型也一律會接空白）。
+_NUMBERED_PREFIX = re.compile(r"^\d{1,3}[.、)] ")
 
 
 def _strip_list_prefix(line: str) -> str:
@@ -338,13 +341,29 @@ def _lines_are_similar(a: str, b: str, character_name: str = "") -> float:
 
 
 def _dedupe_incoming(lines: list[str], character_name: str) -> list[str]:
-    """同一輪裡兩條講同一件事的行只留後者（後者是模型最後的說法）。"""
+    """同一輪裡兩條講同一件事的行只留後者（後者是模型最後的說法）。
+
+    比對只看「這行後面」的行、逐一比對到門檻就丟，不是遞移的——A 像 B、
+    B 像 C，不代表 A 像 C（ratio 是連續值，不是等價關係），這裡刻意不做
+    遞移閉包，演算法本身不變。這裡只是把原本靜默丟棄的行記下來：丟掉的行
+    以前完全沒有痕跡，事後沒辦法追查某條記憶為什麼沒進最終結果。
+    """
     kept: list[str] = []
     for idx, line in enumerate(lines):
-        if any(
-            _lines_are_similar(line, later, character_name) >= _SIMILARITY_THRESHOLD
-            for later in lines[idx + 1 :]
-        ):
+        superseded_by = next(
+            (
+                later
+                for later in lines[idx + 1 :]
+                if _lines_are_similar(line, later, character_name)
+                >= _SIMILARITY_THRESHOLD
+            ),
+            None,
+        )
+        if superseded_by is not None:
+            logger.info(
+                f"[self_memory] dedupe dropped incoming line {line!r}; "
+                f"superseded by later line {superseded_by!r} this round"
+            )
             continue
         kept.append(line)
     return kept

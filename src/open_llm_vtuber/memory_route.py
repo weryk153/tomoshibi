@@ -24,6 +24,7 @@ conf_uid 前端知道（從 WebSocket 的 set-model-and-conf 來），沒帶就�
 
 import os
 import asyncio
+from contextlib import asynccontextmanager
 from typing import Any, Optional
 
 from fastapi import APIRouter, Request
@@ -277,6 +278,35 @@ async def _write_or_error(fn, *args, what: str):
         return _error(500, "Could not write config file.")
 
 
+# 整理持鎖跨整個 LLM 呼叫（最長 60 秒），前端 apiPost 的逾時只有 15～20 秒。記憶
+# 寫入端點如果進鎖後沒有等待上限，HTTP 請求會撐到前端自己斷線——畫面報「請求
+# 逾時」，但寫入其實已經在背後完成，使用者以為沒存到。等待有上限、逾時就
+# 明確回 503 讓使用者稍後重試，好過讓請求卡到前端先放棄。
+_LOCK_WAIT_SECONDS = 10
+
+
+class _LockBusy(Exception):
+    """等整理鎖等過了 _LOCK_WAIT_SECONDS；呼叫端接住、轉成 503。"""
+
+
+@asynccontextmanager
+async def _hold_consolidation_lock(conf_uid: str):
+    """等整理鎖最多 _LOCK_WAIT_SECONDS 秒；等不到就丟 _LockBusy。
+
+    拿到鎖後才進入 with 區塊，寫入＋讀回都在鎖內做完才離開——不會有拿不到鎖
+    卻已經寫了一半檔案的狀態。
+    """
+    lock = memory_core._consolidation_lock(conf_uid)
+    try:
+        await asyncio.wait_for(lock.acquire(), _LOCK_WAIT_SECONDS)
+    except asyncio.TimeoutError:
+        raise _LockBusy() from None
+    try:
+        yield
+    finally:
+        lock.release()
+
+
 # --------------------------------------------------------------------------- #
 # Route factory
 # --------------------------------------------------------------------------- #
@@ -366,13 +396,17 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
             return _error(400, "'content' must be a string.")
 
         cap = _cap_from_conf()
-        if not await asyncio.to_thread(
-            memory_core.save_core_memory, conf_uid, history_uid, content, cap
-        ):
-            return _error(500, "Could not save core memory.")
-
-        # 讀回真正存下去的內容，讓 UI 的字數是誠實的。
-        stored = memory_core.load_core_memory(conf_uid, history_uid)
+        # 跟整理排同一把鎖：整理跑到一半時寫檔，會被它 60 秒後的整份覆寫蓋掉。
+        try:
+            async with _hold_consolidation_lock(conf_uid):
+                if not await asyncio.to_thread(
+                    memory_core.save_core_memory, conf_uid, history_uid, content, cap
+                ):
+                    return _error(500, "Could not save core memory.")
+                # 讀回真正存下去的內容，讓 UI 的字數是誠實的。
+                stored = memory_core.load_core_memory(conf_uid, history_uid)
+        except _LockBusy:
+            return _error(503, "記憶正在整理中，請幾秒後再試。")
         logger.info(f"[memory] manually saved (conf_uid={conf_uid})")
         return JSONResponse(
             {
@@ -431,10 +465,15 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         if bad:
             return bad
 
-        if not await asyncio.to_thread(
-            memory_core.clear_core_memory, conf_uid, history_uid
-        ):
-            return _error(500, "Could not clear core memory.")
+        # 跟整理排同一把鎖（見 save_memory 的說明）。
+        try:
+            async with _hold_consolidation_lock(conf_uid):
+                if not await asyncio.to_thread(
+                    memory_core.clear_core_memory, conf_uid, history_uid
+                ):
+                    return _error(500, "Could not clear core memory.")
+        except _LockBusy:
+            return _error(503, "記憶正在整理中，請幾秒後再試。")
 
         logger.info(f"[memory] cleared (conf_uid={conf_uid})")
         return JSONResponse({"ok": True, "conf_uid": conf_uid, "cleared": True})
@@ -459,13 +498,17 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         content = body.get("content")
         if not isinstance(content, str):
             return _error(400, "'content' must be a string.")
-        # 跟整理排同一把鎖（見下面 clear 的說明）。
-        async with memory_core._consolidation_lock(conf_uid):
-            if not await asyncio.to_thread(
-                memory_core.save_self_memory, conf_uid, content
-            ):
-                return _error(500, "Could not save self memory.")
-            stored = memory_core.load_self_memory(conf_uid)
+        # 跟整理排同一把鎖（見下面 clear 的說明），但等待有上限——見
+        # _hold_consolidation_lock 的說明。
+        try:
+            async with _hold_consolidation_lock(conf_uid):
+                if not await asyncio.to_thread(
+                    memory_core.save_self_memory, conf_uid, content
+                ):
+                    return _error(500, "Could not save self memory.")
+                stored = memory_core.load_self_memory(conf_uid)
+        except _LockBusy:
+            return _error(503, "記憶正在整理中，請幾秒後再試。")
         logger.info(f"[memory] self memory manually saved (conf_uid={conf_uid})")
         return JSONResponse(
             {
@@ -491,10 +534,14 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         # 清空的話，整理若已經讀到舊的 self，60 秒後 merge 會把使用者剛刪掉的行
         # 原樣寫回去——而設定頁刪除正是規格對「分類誤判」這個已知漏洞唯一的
         # 緩解手段，復活等於把那個手段拿掉。self 記憶在角色層，鎖也以 conf_uid
-        # 為單位（見 memory_core._consolidation_lock），兩邊對得上。
-        async with memory_core._consolidation_lock(conf_uid):
-            if not await asyncio.to_thread(memory_core.clear_self_memory, conf_uid):
-                return _error(500, "Could not clear self memory.")
+        # 為單位（見 memory_core._consolidation_lock），兩邊對得上。等待有上限，
+        # 見 _hold_consolidation_lock 的說明。
+        try:
+            async with _hold_consolidation_lock(conf_uid):
+                if not await asyncio.to_thread(memory_core.clear_self_memory, conf_uid):
+                    return _error(500, "Could not clear self memory.")
+        except _LockBusy:
+            return _error(503, "記憶正在整理中，請幾秒後再試。")
         logger.info(f"[memory] self memory cleared (conf_uid={conf_uid})")
         return JSONResponse({"ok": True, "conf_uid": conf_uid, "cleared": True})
 

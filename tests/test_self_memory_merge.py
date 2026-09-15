@@ -225,3 +225,39 @@ def test_incoming_dedup_keeps_distinct_lines():
     incoming = f"{NAME}：喜歡喝咖啡。\n{NAME}：討厭夏天。"
     merged = merge_self_memory("", incoming, character_name=NAME)
     assert merged == incoming
+
+
+# --- final fix wave 2 G3: 被去重丟掉的行不能靜默消失 -------------------------- #
+
+
+def test_dedupe_incoming_logs_the_dropped_line():
+    """一輪裡兩條講同一件事的行，前者被丟掉時要記 logger.info，列出是被哪一行
+    吃掉的——原本完全靜默，事後沒辦法追查某條記憶為什麼沒進最終結果。"""
+    from src.open_llm_vtuber import memory_core as mc
+
+    seen = []
+    original = mc.logger.info
+    mc.logger.info = lambda msg, *a, **k: seen.append(str(msg))
+    try:
+        kept = mc._dedupe_incoming(
+            [f"{NAME}：喜歡喝咖啡。", f"{NAME}：很喜歡喝咖啡。"], NAME
+        )
+    finally:
+        mc.logger.info = original
+    assert kept == [f"{NAME}：很喜歡喝咖啡。"]
+    assert len(seen) == 1
+    assert f"{NAME}：喜歡喝咖啡。" in seen[0]
+    assert f"{NAME}：很喜歡喝咖啡。" in seen[0]
+
+
+def test_dedupe_incoming_does_not_log_when_nothing_is_dropped():
+    from src.open_llm_vtuber import memory_core as mc
+
+    seen = []
+    original = mc.logger.info
+    mc.logger.info = lambda msg, *a, **k: seen.append(str(msg))
+    try:
+        mc._dedupe_incoming([f"{NAME}：喜歡喝咖啡。", f"{NAME}：討厭夏天。"], NAME)
+    finally:
+        mc.logger.info = original
+    assert seen == []
