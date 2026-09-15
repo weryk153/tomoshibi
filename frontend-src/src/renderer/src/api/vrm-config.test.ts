@@ -129,3 +129,35 @@ test('buildVrmPayload：motionMap 與 emotionMap 互不干擾，各自從各自�
   assert.deepEqual(motionMap, { yes: { clip: 'nod', label: null } })
   assert.deepEqual(emotionMap, { joy: 'happy' })
 })
+
+// review a0c0ce7 fix 1（critical）：emotionPresets 濾掉的 preset（嘴型／眨眼／視線／
+// neutral）從來不會出現在 `expressions` 這個參數裡——UI 沒有畫面可以編輯它們。
+// 存檔前必須把它們的既有關鍵字原樣帶回 hiddenEmotionKeywords，否則每次存檔都會
+// 把 neutral→neutral 這種每個 VRM 模型出廠就有的對應洗掉（kurisu_3d* 系列甚至
+// 整份 emotionMap 都是被排除的 preset，可見列表是空的，不帶回等於整份清空）。
+test('buildVrmPayload：指向被排除 preset 的關鍵字存檔後原樣保留', () => {
+  const expressions: VrmExpressionEntry[] = [{ name: 'happy', keywords: [] }]
+  const expressionRows: Record<string, string> = { happy: 'joy' }
+  const hiddenEmotionKeywords: Record<string, string[]> = { neutral: ['neutral'] }
+  const { emotionMap } = buildVrmPayload(
+    [], {}, {}, expressions, expressionRows, {}, hiddenEmotionKeywords,
+  )
+  assert.deepEqual(emotionMap, { joy: 'happy', neutral: 'neutral' })
+})
+
+test('buildVrmPayload：可見清單全空時（kurisu_3d 形狀），存檔後的 map 等於載入時的 map', () => {
+  // kurisu_3d 系列：expressionManager 裡只有 neutral 這個 preset，emotionPresets
+  // 過濾完是空陣列——畫面上完全沒有表情列可編輯，但 hiddenEmotionKeywords 仍要把
+  // 載入時讀到的 neutral→neutral 原樣帶回去。
+  const hiddenEmotionKeywords: Record<string, string[]> = { neutral: ['neutral'] }
+  const { motionMap, emotionMap } = buildVrmPayload([], {}, {}, [], {}, {}, hiddenEmotionKeywords)
+  assert.deepEqual(motionMap, {})
+  assert.deepEqual(emotionMap, { neutral: 'neutral' })
+})
+
+test('buildVrmPayload：hiddenEmotionKeywords 省略時不影響既有行為（向下相容）', () => {
+  const expressions: VrmExpressionEntry[] = [{ name: 'happy', keywords: [] }]
+  const expressionRows: Record<string, string> = { happy: 'joy' }
+  const { emotionMap } = buildVrmPayload([], {}, {}, expressions, expressionRows, {})
+  assert.deepEqual(emotionMap, { joy: 'happy' })
+})

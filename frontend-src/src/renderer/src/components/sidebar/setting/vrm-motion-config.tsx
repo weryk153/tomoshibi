@@ -5,15 +5,23 @@
 // 差異：
 // - 沒有 (group, index)／HitArea／tapMotions，VRM 的動作只有 clip 檔名可以定位，
 //   點擊區域指派這個區塊完全不存在。
-// - idle 是保留字：待機流程直接用檔名 "idle" 找 .vrma（見後端
-//   build_vrm_model_config），不像 Live2D 用 reserved 旗標標記任意 (group,
-//   index)——這裡永遠鎖住 clip.clip === 'idle' 那一列的輸入框。
+// - idle 是保留字，待機流程直接用檔名 "idle" 找 .vrma（見後端
+//   build_vrm_model_config），但後端 list_vrm_clips（vrm_models.py）掃描時就
+//   把它排除了——這份清單永遠不會出現 idle，不需要 Live2D 版 reserved 旗標那套
+//   鎖輸入框的邏輯（review a0c0ce7 fix 4）。buildVrmPayload 仍然留著
+//   `clip.clip === 'idle'` 的防呆（見該函式），是防手改 model_dict.json 塞進去
+//   的極端情況，不是這個 UI 平常會走到的路。
 // - 表情只列「情緒」：嘴型／眨眼／視線／neutral 從清單裡濾掉
-//   （api/vrm-config.ts 的 emotionPresets），理由見那個檔案的註解。
+//   （api/vrm-config.ts 的 emotionPresets），理由見那個檔案的註解。存檔時這些
+//   被濾掉的 preset 原樣帶回（hiddenEmotionKeywords，見下面 state 宣告），不是
+//   直接丟棄——這是 review a0c0ce7 fix 1（critical）：這裡是每個 VRM 模型出廠
+//   就有的 neutral→neutral 的唯一防線，漏了就會在第一次存檔時被整份洗掉。
 // - 試播不是呼叫 LAppAdapter，是 getActiveRenderer()——VRM 的 renderer 是
 //   VRMRenderer，跟 Live2D 走的是 character-renderer.ts 這個共用介面
 //   （previewExpression／previewMotion 是可選方法，任何沒實作的 renderer 就是
-//   不支援試播，見該介面的註解）。
+//   不支援試播，見該介面的註解）。previewMotion 是非同步的：VRM 角色載入時只
+//   預先讀 motionMap 裡當時有的 clip，剛存檔、還沒試播過的 clip 要現拉，見
+//   VRMRenderer.previewMotion 的說明（review a0c0ce7 fix 2）。
 import {
   useState, useEffect, useMemo, useCallback,
 } from 'react';
@@ -31,6 +39,7 @@ import {
   saveVrmModelConfig,
   buildVrmPayload,
   emotionPresets,
+  EMOTION_EXCLUDED_PRESETS,
   type VrmModelConfig,
   type VrmClipMapping,
   type VrmMotionRowEdit,
@@ -55,6 +64,13 @@ function VrmMotionConfig(): JSX.Element {
   // 表情（情緒 preset）：key 是 preset 名稱。
   const [expressionRows, setExpressionRows] = useState<Record<string, string>>({});
   const [extraEmotionKeywords, setExtraEmotionKeywords] = useState<Record<string, string[]>>({});
+  // review a0c0ce7 fix 1（critical）：emotionPresets 濾掉的 preset（嘴型／眨眼／
+  // 視線／neutral）完全沒有畫面可以編輯，但幾乎每個 VRM 模型出廠就有
+  // neutral→neutral（kurisu_3d 系列甚至整份 emotionMap 都指向被排除的
+  // preset）。載入時把這些關鍵字整份存起來，存檔時原樣帶回 buildVrmPayload，
+  // 不然第一次存檔就會把它們全部洗掉。key 是 preset 名稱，value 是這個
+  // preset 當時讀到的完整關鍵字清單。
+  const [hiddenEmotionKeywords, setHiddenEmotionKeywords] = useState<Record<string, string[]>>({});
 
   const [saving, setSaving] = useState(false);
 
@@ -114,6 +130,16 @@ function VrmMotionConfig(): JSX.Element {
         });
         setExpressionRows(nextExpressionRows);
         setExtraEmotionKeywords(nextExtraEmotion);
+
+        // 被 emotionPresets 濾掉的 preset：整份關鍵字清單原樣存起來，畫面沒有
+        // 欄位可以編輯它們，存檔時要整份帶回（見上面 state 宣告的說明）。
+        const nextHiddenEmotion: Record<string, string[]> = {};
+        result.data.expressions.forEach((expression) => {
+          if (EMOTION_EXCLUDED_PRESETS.has(expression.name) && expression.keywords.length) {
+            nextHiddenEmotion[expression.name] = expression.keywords;
+          }
+        });
+        setHiddenEmotionKeywords(nextHiddenEmotion);
       } else {
         setLoadError(result.error || t('settings.live2d.motionConfigLoadError'));
       }
@@ -124,9 +150,19 @@ function VrmMotionConfig(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseUrl, modelName]);
 
-  const handleMotionPreview = useCallback((clip: string) => {
-    getActiveRenderer()?.previewMotion?.(clip);
-  }, []);
+  // previewMotion 可能要現拉還沒載入過的 .vrma（見 VRMRenderer.previewMotion 的
+  // 說明），所以是非同步。false 代表角色根本沒有這個 clip 檔案——不是靜靜地
+  // 什麼都不做，要讓使用者知道。
+  const handleMotionPreview = useCallback(async (clip: string) => {
+    const played = await getActiveRenderer()?.previewMotion?.(clip);
+    if (played === false) {
+      toaster.create({
+        title: t('settings.live2d.vrmPreviewClipMissing'),
+        type: 'error',
+        duration: 4000,
+      });
+    }
+  }, [t]);
 
   const handleExpressionPreview = useCallback((name: string) => {
     getActiveRenderer()?.previewExpression?.(name);
@@ -193,6 +229,7 @@ function VrmMotionConfig(): JSX.Element {
     setSaving(true);
     const { motionMap, emotionMap } = buildVrmPayload(
       config.clips, rows, extraMappings, presets, expressionRows, extraEmotionKeywords,
+      hiddenEmotionKeywords,
     );
     const result = await saveVrmModelConfig(baseUrl, modelName, motionMap, emotionMap);
     setSaving(false);
@@ -200,6 +237,15 @@ function VrmMotionConfig(): JSX.Element {
       // orphan_keywords 從來不會被 buildVrmPayload 包進去，這次存檔已經把它們
       // 從 model_dict.json 移除了——畫面上的清單要跟著清空。
       setOrphans([]);
+      // review a0c0ce7 fix 2(d)：角色載入當下只預先讀了 motionMap 裡「當時」有
+      // 的 clip（見 vrm-avatar.tsx）。這次存檔可能新增了指到某個 clip 的關鍵字
+      // ——不背景預先載入的話，LLM 接下來寫出那個關鍵字時 playOnce 會找不到
+      // action，直到使用者自己按過一次試播或重新整理。不 await，不擋存檔完成
+      // 的回饋；ensureMotionLoaded 內部已經處理失敗（回 false，不 throw）。
+      const renderer = getActiveRenderer();
+      new Set(Object.values(motionMap).map((target) => target.clip)).forEach((clip) => {
+        void renderer?.ensureMotionLoaded?.(clip);
+      });
       toaster.create({
         title: t('settings.live2d.motionConfigSaved'),
         type: 'success',
@@ -214,7 +260,7 @@ function VrmMotionConfig(): JSX.Element {
     }
   }, [
     config, modelName, hasAnyError, rows, extraMappings, presets,
-    expressionRows, extraEmotionKeywords, baseUrl, t,
+    expressionRows, extraEmotionKeywords, hiddenEmotionKeywords, baseUrl, t,
   ]);
 
   return (
@@ -249,7 +295,10 @@ function VrmMotionConfig(): JSX.Element {
           <Stack gap={1} mt={1}>
             {orphans.map((orphan) => (
               <Text key={`${orphan.keyword}-${orphan.clip ?? ''}`} fontSize="xs" color="whiteAlpha.700">
-                {`「${orphan.keyword}」→ ${orphan.clip ?? t('settings.live2d.groupUnnamed')}`}
+                {t('settings.live2d.vrmOrphanWarningItem', {
+                  keyword: orphan.keyword,
+                  clip: orphan.clip ?? t('settings.live2d.vrmOrphanUnknownClip'),
+                })}
               </Text>
             ))}
           </Stack>
@@ -266,26 +315,18 @@ function VrmMotionConfig(): JSX.Element {
         </Box>
       )}
 
+      {/* review a0c0ce7 fix 4：list_vrm_clips（vrm_models.py）排除 idle——它是待機
+          迴圈專用的檔名，從來不會出現在這份清單裡，所以這裡不需要（也不該有）
+          Live2D 版 reserved／isIdle 那一整套鎖輸入框的邏輯。 */}
       {config && config.clips.map((clip) => {
         const row = rows[clip.clip] ?? { keyword: '', label: '' };
         const error = rowError(clip.clip);
-        const isIdle = clip.clip === 'idle';
         return (
           <Box key={clip.clip} p={2} borderWidth="1px" borderColor="whiteAlpha.200" borderRadius="md">
-            <HStack justify="space-between">
-              <Text fontSize="sm" fontWeight="semibold">{clip.clip}</Text>
-              {isIdle && (
-                <Text fontSize="xs" color="orange.300">{t('settings.live2d.reservedBadge')}</Text>
-              )}
-            </HStack>
+            <Text fontSize="sm" fontWeight="semibold">{clip.clip}</Text>
             <Text fontSize="xs" color="whiteAlpha.500">
-              {t('settings.live2d.vrmClipFileLabel')}
-              ：
-              {clip.file}
+              {t('settings.live2d.vrmClipFileLabel', { file: clip.file })}
             </Text>
-            {isIdle && (
-              <Text fontSize="xs" color="whiteAlpha.500">{t('settings.live2d.reservedHelp')}</Text>
-            )}
 
             <HStack mt={1} gap={2}>
               <Button
@@ -309,7 +350,6 @@ function VrmMotionConfig(): JSX.Element {
                 [clip.clip]: { keyword: value, label: prev[clip.clip]?.label ?? '' },
               }))}
               placeholder={t('settings.live2d.keywordFieldPlaceholder')}
-              disabled={isIdle}
             />
             {error && (
               <Text fontSize="xs" color="red.300">
@@ -327,7 +367,6 @@ function VrmMotionConfig(): JSX.Element {
                 [clip.clip]: { keyword: prev[clip.clip]?.keyword ?? '', label: value },
               }))}
               placeholder={t('settings.live2d.labelFieldPlaceholder')}
-              disabled={isIdle}
             />
           </Box>
         );
@@ -370,9 +409,7 @@ function VrmMotionConfig(): JSX.Element {
                   >
                     <HStack justify="space-between">
                       <Text fontSize="sm" fontWeight="semibold">
-                        {t('settings.live2d.vrmExpressionPresetLabel')}
-                        ：
-                        {expression.name}
+                        {t('settings.live2d.vrmExpressionPresetLabel', { name: expression.name })}
                       </Text>
                       <Button
                         size="xs"

@@ -230,10 +230,13 @@ export function VRMAvatar(): JSX.Element {
         if (vrm.lookAt) vrm.lookAt.target = lookTarget;
         scene.add(vrm.scene);
 
-        motions = new MotionPlayer(vrm);
         const base = url.slice(0, url.lastIndexOf("/"));
+        // review a0c0ce7 fix 2：motionsBaseUrl 讓 MotionPlayer 之後能自己用
+        // ensureLoaded 現拉沒有預先載入的 clip（設定頁試播、存檔後背景預載），
+        // 不用整個角色重新載入。
+        motions = new MotionPlayer(vrm, `${base}/motions`);
         const names = [IDLE_CLIP, ...(JSON.parse(clipsKey) as string[])];
-        await Promise.all(names.map((n) => motions!.load(n, `${base}/motions/${n}.vrma`)));
+        await Promise.all(names.map((n) => motions!.ensureLoaded(n)));
         if (disposed) return;
         motions.playIdle();
 

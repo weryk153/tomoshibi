@@ -48,9 +48,21 @@ export class VRMRenderer implements CharacterRenderer {
     this.expressions.setEmotion(name, 1);
   }
 
-  /** 設定頁試播：播一次動作，強度固定拉滿。 */
-  previewMotion(clip: string): void {
-    this.motions.playOnce(clip, 1);
+  /**
+   * 設定頁試播：播一次動作，強度固定拉滿。先 ensureLoaded 現拉一次——角色載入
+   * 當下只預先讀了 motionMap 裡當時有的 clip（見 vrm-avatar.tsx），剛存檔、還
+   * 沒試播過的 clip 這裡才會真的去要那個檔案。ensureLoaded 失敗（角色根本沒有
+   * 這個 .vrma）就不播，回 false 讓 UI 顯示「這個角色沒有這個動作」。
+   */
+  async previewMotion(clip: string): Promise<boolean> {
+    const loaded = await this.motions.ensureLoaded(clip);
+    if (!loaded) return false;
+    return this.motions.playOnce(clip, 1);
+  }
+
+  /** 存檔後背景預先載入，不播放——見 CharacterRenderer.ensureMotionLoaded 的說明。 */
+  async ensureMotionLoaded(clip: string): Promise<boolean> {
+    return this.motions.ensureLoaded(clip);
   }
 
   /** 每幀。lookTarget 為 null 時不動視線。 */

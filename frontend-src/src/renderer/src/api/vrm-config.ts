@@ -119,6 +119,15 @@ export async function saveVrmModelConfig(
 //   motion-config.tsx 兩種不同的既有慣例：動作的 extras 原樣帶回（來源是後端
 //   已驗證過的資料，不需要再 trim／檢查空字串）；情緒關鍵字的 extras 有 trim
 //   與空字串檢查（跟 motion-config.tsx 的 buildEmotionMap 同一種寫法）。
+// - hiddenEmotionKeywords：review a0c0ce7 fix 1（critical）。emotionPresets 濾掉
+//   的 preset（嘴型／眨眼／視線／neutral）從來不會出現在 `expressions` 參數裡，
+//   UI 根本沒有畫面可以編輯它們——但每個 VRM 模型出廠時的 emotionMap 幾乎都有
+//   neutral→neutral，kurisu_3d 系列甚至整份 emotionMap 都指向被排除的 preset。
+//   不把這些原樣帶回去的話，第一次存檔就會把它們全部洗掉。key 是 preset 名稱，
+//   value 是載入當下讀到的完整關鍵字清單（不像 extraEmotionKeywords 只存「第一筆
+//   以外」的——這裡整份都是「畫面沒有欄位」，所以整份都要原樣帶回，沒有
+//   trim／空字串檢查，因為來源是後端已經驗證過的既有資料）。省略＝視為空物件，
+//   向下相容舊呼叫端。
 export function buildVrmPayload(
   clips: VrmClipEntry[],
   rows: Record<string, VrmMotionRowEdit>,
@@ -126,6 +135,7 @@ export function buildVrmPayload(
   expressions: VrmExpressionEntry[],
   expressionRows: Record<string, string>,
   extraEmotionKeywords: Record<string, string[]>,
+  hiddenEmotionKeywords: Record<string, string[]> = {},
 ): { motionMap: Record<string, VrmMotionMapTarget>; emotionMap: Record<string, string> } {
   const motionMap: Record<string, VrmMotionMapTarget> = {}
   clips.forEach((clip) => {
@@ -147,6 +157,11 @@ export function buildVrmPayload(
     ;(extraEmotionKeywords[expression.name] ?? []).forEach((keyword) => {
       const trimmed = keyword.trim()
       if (trimmed) emotionMap[trimmed] = expression.name
+    })
+  })
+  Object.entries(hiddenEmotionKeywords).forEach(([presetName, keywords]) => {
+    keywords.forEach((keyword) => {
+      emotionMap[keyword] = presetName
     })
   })
 

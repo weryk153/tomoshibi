@@ -18,13 +18,18 @@ export class MotionPlayer {
   private current: THREE.AnimationAction | null = null;
   private loader = new GLTFLoader();
   private readonly vrm: VRM;
+  // review a0c0ce7 fix 2：VRMAvatar 只在角色載入時預先讀 motionMap 裡當下有的
+  // clip（見 vrm-avatar.tsx）。存檔後新增的關鍵字，或還沒被試播過的 clip，都要
+  // 能用這個 base URL 現拉，不用整個角色重新載入。
+  private readonly motionsBaseUrl: string;
 
   // 明確欄位指派而不是 constructor parameter property：vrm-renderer.ts 對這個檔案
   // 是值匯入（IDLE_CLIP），node --test 載入 vrm-renderer.test.ts 時會連帶解析整份
   // 這個檔案，parameter property 語法會讓 node --experimental-strip-types 直接
   // SyntaxError（見 frontend-node-test-constraints）。行為不變。
-  constructor(vrm: VRM) {
+  constructor(vrm: VRM, motionsBaseUrl: string) {
     this.vrm = vrm;
+    this.motionsBaseUrl = motionsBaseUrl;
     this.mixer = new THREE.AnimationMixer(vrm.scene);
     this.loader.register((parser) => new VRMAnimationLoaderPlugin(parser));
     this.mixer.addEventListener("finished", () => {
@@ -59,6 +64,15 @@ export class MotionPlayer {
 
   hasClip(name: string): boolean {
     return this.actions.has(name);
+  }
+
+  /**
+   * 確保某個 clip 已經載入，已經有就直接回 true 不重拉。給試播（可能點到一個
+   * 剛存檔、角色載入當下還不知道要拉的 clip）與存檔後的背景預先載入用。
+   */
+  async ensureLoaded(name: string): Promise<boolean> {
+    if (this.hasClip(name)) return true;
+    return this.load(name, `${this.motionsBaseUrl}/${name}.vrma`);
   }
 
   private crossfadeTo(next: THREE.AnimationAction, weight = 1): void {
