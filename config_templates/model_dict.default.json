@@ -138,6 +138,7 @@
       "joy": "happy",
       "anger": "angry",
       "sadness": "sad",
+      "surprise": "surprised",
       "relaxed": "relaxed"
     },
     "tapMotions": {},
