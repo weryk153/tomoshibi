@@ -11,6 +11,11 @@
 整理用的提示詞（build_consolidation_prompt）是這個模組的靈魂——它決定記憶會
 被記成什麼樣子，歷次修正的教訓都寫在它的 docstring 裡。
 
+- **她自己的記憶**：chat_history/<conf_uid>/self_memory.md，角色層、所有對話共用、
+  上限固定 800 字。整理時同一次 LLM 呼叫輸出兩段，解析後分別落地；self 段寫入前
+  逐行丟掉含「對方」「你」的行。只要牽涉到對方，就算主詞是她，也歸對話記憶。
+  見 docs/superpowers/specs/2026-09-15-self-memory-design.md。
+
 行為契約由 tests/test_memory_store_behavior.py 釘住。
 """
 
