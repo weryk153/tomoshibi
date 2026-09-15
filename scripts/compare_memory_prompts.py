@@ -10,6 +10,10 @@ core_memory.md 當「現有記憶」，self_memory.md 當「現有的自己的�
 個參數，只餵 core）。LLM 走 conf.yaml 裡對話用的那一顆（resolve_consolidation_llm），
 temperature 照 _request_rewrite 的 0.3。
 
+加 --fresh 時，忽略每段對話實際的 core_memory.md／self_memory.md，兩者都當成空
+字串餵給提示詞——用來單獨測「這輪台詞裡的自我陳述會不會被分進自己的記憶」，
+不受既有記憶裡已經分類錯誤的舊條目干擾。<h2> 標題會加上「（fresh）」標記。
+
 只讀 chat_history/ 底下的對話與記憶檔，絕不寫入 —— load_core_memory /
 load_self_memory 都是讀函式，這支腳本從不呼叫任何寫入或整理落地的函式。
 
@@ -144,6 +148,9 @@ async def _main(args):
         name = _character_name(messages)
         current = memory_core.load_core_memory(conf_uid, history_uid)
         current_self = memory_core.load_self_memory(conf_uid)
+        if args.fresh:
+            current = ""
+            current_self = ""
 
         old_prompt = old.build_consolidation_prompt(
             current, user_input, ai_response, cap, character_name=name
@@ -181,7 +188,8 @@ async def _main(args):
         ".ctx{background:#f6f6f6}</style>"
     ]
     for fname, name, current, current_self, ui, ai, rows in sections:
-        out.append(f"<h2>{html.escape(fname)}（{html.escape(name)}）</h2>")
+        fresh_tag = "（fresh）" if args.fresh else ""
+        out.append(f"<h2>{html.escape(fname)}（{html.escape(name)}）{fresh_tag}</h2>")
         out.append("<details><summary>這輪對話與現有記憶</summary>")
         out.append(
             f"<pre class=ctx>對方說：{html.escape(ui)}\n\n{html.escape(name)}回：{html.escape(ai)}</pre>"
@@ -209,5 +217,10 @@ if __name__ == "__main__":
     ap.add_argument("old_ref")
     ap.add_argument("conversations", nargs="+")
     ap.add_argument("--runs", type=int, default=5)
+    ap.add_argument(
+        "--fresh",
+        action="store_true",
+        help="忽略每段對話既有的 core_memory.md／self_memory.md，強制當成空白對話跑",
+    )
     ap.add_argument("--out", required=True)
     asyncio.run(_main(ap.parse_args()))

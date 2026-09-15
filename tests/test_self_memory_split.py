@@ -202,3 +202,15 @@ def test_prompt_gives_a_standalone_test_for_self_classification():
 def test_prompt_forbids_placeholder_text_when_a_section_is_empty():
     p = _prompt()
     assert "不要寫「目前還沒有」" in p
+
+
+def test_prompt_asks_to_migrate_misclassified_existing_entries():
+    # round 2 修法：現有對話記憶裡其實是她自己的條目，要求搬過去，不留副本。
+    p = _prompt()
+    assert "搬到" in p
+
+
+def test_prompt_hints_to_scan_the_turn_for_self_statements_first():
+    # round 2 修法：先從這輪找角色自己的事，再處理其餘，避免整段照抄漏分類。
+    p = _prompt()
+    assert "先從這輪找出" in p
