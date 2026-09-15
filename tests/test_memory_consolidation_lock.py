@@ -43,15 +43,14 @@ def _consolidate(user_input, ai_response):
 def test_overlapping_consolidations_do_not_clobber_each_other(monkeypatch):
     """第二輪必須讀到第一輪寫下的記憶，而不是兩邊都從空白長出來。"""
     seen_current = []
-    tail = "\n【角色自己】\n"
 
     async def fake_rewrite(base_url, model, prompt, api_key, extra_body):
         # 提示詞裡帶著「現有記憶」，用它反推這一輪讀到的底稿是什麼。
         seen_current.append("第一輪的事實" in prompt)
         await asyncio.sleep(0.05)  # 模擬 LLM 的往返
         if "第一輪的事實" in prompt:
-            return "【對話記憶】\n第一輪的事實\n第二輪的事實" + tail
-        return "【對話記憶】\n第一輪的事實" + tail
+            return "第一輪的事實\n第二輪的事實"
+        return "第一輪的事實"
 
     monkeypatch.setattr(memory_core, "_request_rewrite", fake_rewrite)
 

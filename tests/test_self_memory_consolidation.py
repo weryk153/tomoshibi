@@ -1,7 +1,6 @@
-"""整理一次呼叫，兩份記憶分別落地。
+"""整理一次呼叫，兩份記憶分別落地——分類由程式做（classify_memory_lines）。
 
-- 兩段都有才落地；缺任一段標記兩份都不寫。
-- self 段先過 filter_self_lines 再寫。
+- 模型只回一份清單；程式逐行分類成對話記憶／她自己的，各自落地。
 - 每一份各自套 _acceptable_rewrite（空／沒變／超過 1.5 倍上限 → 那一份不動）。
 - 鎖以 conf_uid 為單位：同角色兩段對話同時整理，兩邊的新條目都要保留。
 """
@@ -12,18 +11,15 @@ import pytest
 
 from src.open_llm_vtuber import memory_core
 from src.open_llm_vtuber.memory_core import (
-    SECTION_CONVERSATION,
     SELF_CAP_CHARS,
     load_core_memory,
     load_self_memory,
     save_core_memory,
     save_self_memory,
-    self_section_label,
 )
 
 CONF = "consol-test"
 NAME = "紅莉栖"
-LABEL = self_section_label(NAME)
 
 
 @pytest.fixture(autouse=True)
@@ -32,7 +28,7 @@ def _isolated(tmp_path, monkeypatch):
     memory_core._consolidation_locks.clear()
 
 
-def _run(history_uid, reply, monkeypatch):
+def _run(history_uid, reply, monkeypatch, character_name=NAME):
     async def fake_rewrite(base_url, model, prompt, api_key, extra_body):
         return reply
 
@@ -45,46 +41,33 @@ def _run(history_uid, reply, monkeypatch):
             "回了些話",
             base_url="http://stub",
             model="stub",
-            character_name=NAME,
+            character_name=character_name,
         )
     )
 
 
 def test_writes_both_sections_to_their_own_files(monkeypatch):
-    _run(
-        "conv-1",
-        f"{SECTION_CONVERSATION}\n對方叫小明。\n{LABEL}\n紅莉栖喜歡咖啡。",
-        monkeypatch,
-    )
+    _run("conv-1", "對方叫小明。\n紅莉栖喜歡咖啡。", monkeypatch)
     assert load_core_memory(CONF, "conv-1") == "對方叫小明。"
     assert load_self_memory(CONF) == "紅莉栖喜歡咖啡。"
 
 
-def test_missing_marker_writes_nothing(monkeypatch):
-    save_core_memory(CONF, "conv-1", "原本的")
-    save_self_memory(CONF, "原本她的")
-    _run("conv-1", "對方叫小明。\n紅莉栖喜歡咖啡。", monkeypatch)
-    assert load_core_memory(CONF, "conv-1") == "原本的"
-    assert load_self_memory(CONF) == "原本她的"
-
-
-def test_self_lines_mentioning_the_other_party_are_dropped(monkeypatch):
+def test_self_lines_mentioning_the_other_party_land_in_conversation_not_self(
+    monkeypatch,
+):
     _run(
         "conv-1",
-        f"{SECTION_CONVERSATION}\n對方叫小明。\n{LABEL}\n紅莉栖喜歡咖啡。\n紅莉栖和對方去過秋葉原。",
+        "對方叫小明。\n紅莉栖喜歡咖啡。\n紅莉栖和對方去過秋葉原。",
         monkeypatch,
     )
+    assert load_core_memory(CONF, "conv-1") == "對方叫小明。\n紅莉栖和對方去過秋葉原。"
     assert load_self_memory(CONF) == "紅莉栖喜歡咖啡。"
 
 
 def test_unchanged_self_section_does_not_rewrite_self_file(monkeypatch, tmp_path):
     save_self_memory(CONF, "紅莉栖喜歡咖啡。")
     before = (tmp_path / "chat_history" / CONF / "self_memory.md").stat().st_mtime_ns
-    _run(
-        "conv-1",
-        f"{SECTION_CONVERSATION}\n對方叫小明。\n{LABEL}\n紅莉栖喜歡咖啡。",
-        monkeypatch,
-    )
+    _run("conv-1", "對方叫小明。\n紅莉栖喜歡咖啡。", monkeypatch)
     after = (tmp_path / "chat_history" / CONF / "self_memory.md").stat().st_mtime_ns
     assert before == after
     assert load_core_memory(CONF, "conv-1") == "對方叫小明。"
@@ -92,40 +75,39 @@ def test_unchanged_self_section_does_not_rewrite_self_file(monkeypatch, tmp_path
 
 def test_oversized_self_section_is_rejected_but_conversation_still_lands(monkeypatch):
     huge = "紅莉栖喜歡" + "咖" * (int(SELF_CAP_CHARS * 1.5) + 10)
-    _run(
-        "conv-1", f"{SECTION_CONVERSATION}\n對方叫小明。\n{LABEL}\n{huge}", monkeypatch
-    )
+    _run("conv-1", f"對方叫小明。\n{huge}", monkeypatch)
     assert load_core_memory(CONF, "conv-1") == "對方叫小明。"
     assert load_self_memory(CONF) == ""
 
 
-def test_placeholder_echoed_by_llm_does_not_write_self_memory(monkeypatch, tmp_path):
-    """Round-1 fix regression: the model echoing the '現有' placeholder back must
-    not land in self_memory.md (finding A)."""
-    _run(
-        "conv-1",
-        f"{SECTION_CONVERSATION}\n對方叫小明。\n{LABEL}\n（目前還沒有任何關於自己的記憶）",
-        monkeypatch,
-    )
+def test_placeholder_reply_does_not_write_self_memory(monkeypatch, tmp_path):
+    """模型回傳佔位文字（純括號行）不該落地成她自己的記憶。"""
+    _run("conv-1", "對方叫小明。\n（目前還沒有任何關於自己的記憶）", monkeypatch)
     assert load_core_memory(CONF, "conv-1") == "對方叫小明。"
     assert load_self_memory(CONF) == ""
     assert not (tmp_path / "chat_history" / CONF / "self_memory.md").exists()
 
 
 def test_self_memory_is_shared_across_conversations(monkeypatch):
-    _run(
-        "conv-a",
-        f"{SECTION_CONVERSATION}\n對方叫小明。\n{LABEL}\n紅莉栖喜歡咖啡。",
-        monkeypatch,
-    )
+    _run("conv-a", "對方叫小明。\n紅莉栖喜歡咖啡。", monkeypatch)
     _run(
         "conv-b",
-        f"{SECTION_CONVERSATION}\n對方叫小華。\n{LABEL}\n紅莉栖喜歡咖啡。\n紅莉栖討厭夏天。",
+        "對方叫小華。\n紅莉栖喜歡咖啡。\n紅莉栖討厭夏天。",
         monkeypatch,
     )
     assert load_core_memory(CONF, "conv-a") == "對方叫小明。"
     assert load_core_memory(CONF, "conv-b") == "對方叫小華。"
     assert load_self_memory(CONF) == "紅莉栖喜歡咖啡。\n紅莉栖討厭夏天。"
+
+
+def test_existing_conversation_entry_that_is_actually_self_gets_migrated(monkeypatch):
+    """模型把現有對話記憶裡其實是她自己的條目原樣回傳時，程式分類會把它搬到
+    self，對話記憶不再含它——不需要模型自己判斷該搬去哪裡。
+    """
+    save_core_memory(CONF, "conv-1", "紅莉栖：認為時間是相對的概念")
+    _run("conv-1", "對方叫小明。\n紅莉栖：認為時間是相對的概念", monkeypatch)
+    assert load_core_memory(CONF, "conv-1") == "對方叫小明。"
+    assert load_self_memory(CONF) == "紅莉栖：認為時間是相對的概念"
 
 
 def test_prompt_receives_the_existing_self_memory(monkeypatch):
@@ -165,7 +147,7 @@ def test_two_conversations_of_one_character_queue_and_keep_both_self_entries(
             if not existing_has_a
             else ["紅莉栖喜歡咖啡。", "紅莉栖討厭夏天。"]
         )
-        return f"{SECTION_CONVERSATION}\n{conv}\n{LABEL}\n" + "\n".join(self_lines)
+        return "\n".join([conv, *self_lines])
 
     monkeypatch.setattr(memory_core, "_request_rewrite", fake_rewrite)
 
@@ -207,7 +189,7 @@ def test_different_characters_do_not_wait_for_each_other(monkeypatch):
         peak = max(peak, in_flight)
         await asyncio.sleep(0.05)
         in_flight -= 1
-        return f"{SECTION_CONVERSATION}\n對方x\n{self_section_label('')}\n角色y"
+        return "對方x\n角色y"
 
     monkeypatch.setattr(memory_core, "_request_rewrite", fake_rewrite)
 

@@ -17,6 +17,10 @@ temperature 照 _request_rewrite 的 0.3。
 只讀 chat_history/ 底下的對話與記憶檔，絕不寫入 —— load_core_memory /
 load_self_memory 都是讀函式，這支腳本從不呼叫任何寫入或整理落地的函式。
 
+新提示詞的輸出不再分兩段：分類交給程式端的 classify_memory_lines 做。每一列
+的新提示詞欄位下方會多印一塊「→ 程式分類」，把 classify_memory_lines 的結果
+（對話記憶／她自己的）列出來，讓人讀時直接看到最後會落地成什麼。
+
 輸出一頁 HTML：每段對話一區，區內 5 列，每列左舊右新，全文不截斷。
 """
 
@@ -26,7 +30,6 @@ import asyncio
 import html
 import importlib.util
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -110,14 +113,6 @@ def _character_name(messages: list) -> str:
     return ""
 
 
-_MARKER_CONVERSATION = "【對話記憶】"
-_SELF_MARKER_RE = re.compile(r"【.+自己】")
-
-
-def _has_both_markers(text: str) -> bool:
-    return _MARKER_CONVERSATION in text and bool(_SELF_MARKER_RE.search(text))
-
-
 async def _safe_request(base_url, model, prompt, api_key, extra_body) -> str:
     """單次呼叫失敗不能讓整支腳本停下——把例外文字當成這格的輸出，繼續跑下一格。"""
     try:
@@ -137,8 +132,8 @@ async def _main(args):
     cap = getattr(conf.character_config, "core_memory_max_chars", 1500)
 
     sections = []
-    new_marker_hits = 0
-    new_marker_total = 0
+    self_hits = 0
+    self_total = 0
     for path in args.conversations:
         p = Path(path)
         conf_uid = p.parent.name
@@ -167,17 +162,18 @@ async def _main(args):
         for i in range(args.runs):
             o = await _safe_request(base_url, model, old_prompt, api_key, extra_body)
             n = await _safe_request(base_url, model, new_prompt, api_key, extra_body)
-            rows.append((o, n))
-            new_marker_total += 1
-            if _has_both_markers(n):
-                new_marker_hits += 1
+            conv, self_ = memory_core.classify_memory_lines(n, name)
+            rows.append((o, n, conv, self_))
+            self_total += 1
+            if self_:
+                self_hits += 1
             print(f"{p.name} run {i + 1}/{args.runs} done", file=sys.stderr)
         sections.append(
             (p.name, name, current, current_self, user_input, ai_response, rows)
         )
 
     print(
-        f"[marker] 新提示詞輸出同時含兩個標記：{new_marker_hits}/{new_marker_total}",
+        f"[classify] self 非空：{self_hits}/{self_total}",
         file=sys.stderr,
     )
 
@@ -201,10 +197,16 @@ async def _main(args):
             f"<pre class=ctx>現有她自己的記憶：\n{html.escape(current_self) or '（空）'}</pre></details>"
         )
         out.append("<table><tr><th>舊提示詞</th><th>新提示詞</th></tr>")
-        for i, (o, n) in enumerate(rows, 1):
+        for i, (o, n, conv, self_) in enumerate(rows, 1):
+            classified = (
+                "→ 程式分類\n"
+                f"對話記憶：\n{conv or '（空）'}\n\n"
+                f"她自己的：\n{self_ or '（空）'}"
+            )
             out.append(
                 f"<tr><td><b>run {i}</b><pre>{html.escape(o)}</pre></td>"
-                f"<td><b>run {i}</b><pre>{html.escape(n)}</pre></td></tr>"
+                f"<td><b>run {i}</b><pre>{html.escape(n)}</pre>"
+                f"<pre class=ctx>{html.escape(classified)}</pre></td></tr>"
             )
         out.append("</table>")
     Path(args.out).parent.mkdir(parents=True, exist_ok=True)

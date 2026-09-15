@@ -1,149 +1,85 @@
-"""整理 LLM 的輸出分成兩段，缺一段就整輪作廢；self 段寫入前逐行過濾。
+"""整理 LLM 輸出的單一清單，逐行分類成 (對話記憶, 她自己的)。
 
-猜錯的後果是把對話記憶整份寫進 self_memory.md——那是唯一不能犯的錯，所以缺
-標記時不猜。過濾擋得住代名詞（對方／你），擋不住名字；後者靠提示詞與設定頁。
+分類由程式做，不靠模型：9B 模型在三輪 5×5 實測裡做不到穩定的兩段輸出
+（0/25 → 0/25 → 11/25，且第三輪出現幻覺自我事實）。分不清的一律留在對話
+記憶——那一邊是私人的，放錯不會外洩。
 """
 
 from src.open_llm_vtuber.memory_core import (
     SELF_CAP_CHARS,
-    SECTION_CONVERSATION,
     build_consolidation_prompt,
-    filter_self_lines,
-    self_section_label,
-    split_consolidation_output,
+    classify_memory_lines,
 )
 
 NAME = "紅莉栖"
 
 
-def test_self_label_uses_the_character_name():
-    assert self_section_label(NAME) == "【紅莉栖自己】"
-
-
-def test_self_label_falls_back_without_a_name():
-    assert self_section_label("") == "【角色自己】"
-    assert self_section_label("   ") == "【角色自己】"
-
-
-def test_splits_both_sections():
-    text = (
-        f"{SECTION_CONVERSATION}\n對方叫小明。\n對方喜歡貓。\n"
-        f"{self_section_label(NAME)}\n紅莉栖最近迷上手沖咖啡。\n"
-    )
-    conv, self_ = split_consolidation_output(text, NAME)
-    assert conv == "對方叫小明。\n對方喜歡貓。"
-    assert self_ == "紅莉栖最近迷上手沖咖啡。"
-
-
-def test_sections_may_come_in_either_order():
-    text = (
-        f"{self_section_label(NAME)}\n紅莉栖喜歡咖啡。\n"
-        f"{SECTION_CONVERSATION}\n對方叫小明。\n"
-    )
-    conv, self_ = split_consolidation_output(text, NAME)
-    assert conv == "對方叫小明。"
-    assert self_ == "紅莉栖喜歡咖啡。"
-
-
-def test_empty_section_is_empty_string_not_none():
-    text = f"{SECTION_CONVERSATION}\n對方叫小明。\n{self_section_label(NAME)}\n"
-    conv, self_ = split_consolidation_output(text, NAME)
-    assert conv == "對方叫小明。"
-    assert self_ == ""
-
-
-def test_missing_self_marker_returns_none():
-    assert (
-        split_consolidation_output(f"{SECTION_CONVERSATION}\n對方叫小明。", NAME)
-        is None
-    )
-
-
-def test_missing_conversation_marker_returns_none():
-    assert (
-        split_consolidation_output(f"{self_section_label(NAME)}\n她喜歡咖啡。", NAME)
-        is None
-    )
-
-
-def test_no_markers_at_all_returns_none():
-    assert split_consolidation_output("對方叫小明。\n她喜歡咖啡。", NAME) is None
-
-
-def test_tolerates_backticks_and_whitespace_around_markers():
-    text = (
-        f"```\n  {SECTION_CONVERSATION}  \n對方叫小明。\n\n"
-        f"  {self_section_label(NAME)}\n紅莉栖喜歡咖啡。\n```"
-    )
-    conv, self_ = split_consolidation_output(text, NAME)
-    assert conv == "對方叫小明。"
-    assert self_ == "紅莉栖喜歡咖啡。"
-
-
-def test_self_section_with_only_placeholder_is_empty():
-    text = (
-        f"{SECTION_CONVERSATION}\n對方叫小明。\n"
-        f"{self_section_label(NAME)}\n（目前還沒有任何關於自己的記憶）\n"
-    )
-    conv, self_ = split_consolidation_output(text, NAME)
-    assert conv == "對方叫小明。"
-    assert self_ == ""
-
-
-def test_self_section_placeholder_variants_are_dropped():
-    for placeholder in (
-        "（目前沒有任何關於自己的記憶）",
-        "（目前沒有關於自己的記憶）",
-    ):
-        text = (
-            f"{SECTION_CONVERSATION}\n對方叫小明。\n"
-            f"{self_section_label(NAME)}\n{placeholder}\n"
-        )
-        _, self_ = split_consolidation_output(text, NAME)
-        assert self_ == ""
-
-
-def test_conversation_section_with_only_placeholder_is_empty():
-    text = (
-        f"{SECTION_CONVERSATION}\n（目前還沒有任何記憶）\n"
-        f"{self_section_label(NAME)}\n紅莉栖喜歡咖啡。\n"
-    )
-    conv, self_ = split_consolidation_output(text, NAME)
+def test_name_prefixed_line_without_the_other_party_is_self():
+    conv, self_ = classify_memory_lines("紅莉栖喜歡咖啡。", NAME)
     assert conv == ""
     assert self_ == "紅莉栖喜歡咖啡。"
 
 
-def test_parenthetical_only_line_dropped_among_real_lines():
-    text = (
-        f"{SECTION_CONVERSATION}\n對方叫小明。\n（沒有更多了）\n對方喜歡貓。\n"
-        f"{self_section_label(NAME)}\n紅莉栖喜歡咖啡。\n"
-    )
-    conv, self_ = split_consolidation_output(text, NAME)
-    assert conv == "對方叫小明。\n對方喜歡貓。"
+def test_name_prefixed_line_mentioning_the_other_party_is_conversation():
+    conv, self_ = classify_memory_lines("紅莉栖和對方去過秋葉原。", NAME)
+    assert conv == "紅莉栖和對方去過秋葉原。"
+    assert self_ == ""
+
+
+def test_name_prefixed_line_containing_ni_is_conversation():
+    conv, self_ = classify_memory_lines("紅莉栖答應你下次帶書來。", NAME)
+    assert conv == "紅莉栖答應你下次帶書來。"
+    assert self_ == ""
+
+
+def test_line_starting_with_the_other_party_is_conversation():
+    conv, self_ = classify_memory_lines("對方叫小明。", NAME)
+    assert conv == "對方叫小明。"
+    assert self_ == ""
+
+
+def test_line_without_a_clear_subject_is_conversation():
+    conv, self_ = classify_memory_lines("喜歡安靜的氛圍。", NAME)
+    assert conv == "喜歡安靜的氛圍。"
+    assert self_ == ""
+
+
+def test_list_prefixes_are_stripped_before_classifying():
+    for prefix in ("- ", "• ", "・ "):
+        conv, self_ = classify_memory_lines(f"{prefix}紅莉栖喜歡咖啡。", NAME)
+        assert self_ == "紅莉栖喜歡咖啡。", prefix
+        assert conv == ""
+
+
+def test_pure_parenthetical_lines_are_dropped_from_both():
+    for line in ("（目前還沒有任何記憶）", "（空）"):
+        conv, self_ = classify_memory_lines(line, NAME)
+        assert conv == ""
+        assert self_ == ""
 
 
 def test_line_merely_containing_parentheses_is_kept():
-    text = (
-        f"{SECTION_CONVERSATION}\n紅莉栖喜歡咖啡（黑的）。\n"
-        f"{self_section_label(NAME)}\n"
-    )
-    conv, self_ = split_consolidation_output(text, NAME)
-    assert conv == "紅莉栖喜歡咖啡（黑的）。"
+    conv, self_ = classify_memory_lines("紅莉栖喜歡咖啡（黑的）。", NAME)
+    assert self_ == "紅莉栖喜歡咖啡（黑的）。"
+    assert conv == ""
 
 
-def test_filter_drops_lines_mentioning_the_other_party():
-    text = "紅莉栖喜歡咖啡。\n紅莉栖和對方去過秋葉原。\n紅莉栖答應你下次帶書來。\n紅莉栖討厭夏天。"
-    assert filter_self_lines(text) == "紅莉栖喜歡咖啡。\n紅莉栖討厭夏天。"
+def test_empty_string_yields_two_empty_strings():
+    assert classify_memory_lines("", NAME) == ("", "")
 
 
-def test_filter_keeps_everything_when_clean():
-    text = "紅莉栖喜歡咖啡。\n紅莉栖討厭夏天。"
-    assert filter_self_lines(text) == text
+def test_empty_character_name_sends_everything_to_conversation():
+    text = "紅莉栖喜歡咖啡。\n對方叫小明。"
+    conv, self_ = classify_memory_lines(text, "")
+    assert conv == text
+    assert self_ == ""
 
 
-def test_filter_on_empty_is_empty():
-    assert filter_self_lines("") == ""
-    assert filter_self_lines("\n\n") == ""
+def test_mixed_input_preserves_order_within_each_bucket():
+    text = "紅莉栖喜歡咖啡。\n對方叫小明。\n紅莉栖討厭夏天。\n對方喜歡貓。"
+    conv, self_ = classify_memory_lines(text, NAME)
+    assert conv == "對方叫小明。\n對方喜歡貓。"
+    assert self_ == "紅莉栖喜歡咖啡。\n紅莉栖討厭夏天。"
 
 
 def _prompt(**kw):
@@ -159,58 +95,33 @@ def _prompt(**kw):
     return build_consolidation_prompt(**base)
 
 
-def test_prompt_asks_for_both_section_markers():
-    p = _prompt()
-    assert SECTION_CONVERSATION in p
-    assert self_section_label(NAME) in p
+def test_prompt_has_no_two_section_markers():
+    # 兩段格式的殘留（【對話記憶】／【<name>自己】）不該再出現。
+    assert "【" not in _prompt()
 
 
-def test_prompt_carries_both_existing_memories():
-    p = _prompt()
-    assert "對方叫小明。" in p
-    assert "紅莉栖喜歡咖啡。" in p
+def test_prompt_has_no_placeholder_text_for_empty_memories():
+    p = _prompt(current="", current_self="")
+    assert "（目前還沒有任何記憶）" not in p
+    assert "（目前還沒有任何關於自己的記憶）" not in p
 
 
-def test_prompt_states_the_self_cap():
-    assert str(SELF_CAP_CHARS) in _prompt()
+def test_current_self_lines_precede_current_lines():
+    p = _prompt(current="對方叫小明。", current_self="紅莉栖喜歡咖啡。")
+    assert p.index("紅莉栖喜歡咖啡。") < p.index("對方叫小明。")
 
 
-def test_prompt_says_anything_involving_the_other_party_goes_to_conversation():
-    # 這條是分類規則的核心：主詞是她但牽涉對方 → 對話記憶。用穩定關鍵詞釘住。
-    p = _prompt()
-    assert "牽涉到對方" in p
+def test_prompt_states_the_combined_cap():
+    p = _prompt(cap=1500)
+    assert str(1500 + SELF_CAP_CHARS) in p
 
 
 def test_prompt_keeps_the_old_subject_rules():
-    # 既有測試 tests/test_memory_uses_in_world_subject.py 釘住這些字串，不能掉。
+    # 既有測試（test_memory_uses_in_world_subject.py 等）釘住這些字串，不能掉。
     p = _prompt()
     assert "「對方」或「紅莉栖」開頭" in p
     assert "使用者" not in p
-    assert "拒絕" in p and "聽不" in p and "測試" in p
-
-
-def test_prompt_placeholder_for_empty_self_memory():
-    p = _prompt(current_self="")
-    assert "（目前還沒有任何關於自己的記憶）" in p
-
-
-def test_prompt_gives_a_standalone_test_for_self_classification():
-    p = _prompt()
-    assert "判斷方法" in p
-
-
-def test_prompt_forbids_placeholder_text_when_a_section_is_empty():
-    p = _prompt()
-    assert "不要寫「目前還沒有」" in p
-
-
-def test_prompt_asks_to_migrate_misclassified_existing_entries():
-    # round 2 修法：現有對話記憶裡其實是她自己的條目，要求搬過去，不留副本。
-    p = _prompt()
-    assert "搬到" in p
-
-
-def test_prompt_hints_to_scan_the_turn_for_self_statements_first():
-    # round 2 修法：先從這輪找角色自己的事，再處理其餘，避免整段照抄漏分類。
-    p = _prompt()
-    assert "先從這輪找出" in p
+    assert "拒絕" in p
+    assert "聽不" in p
+    assert "測試" in p
+    assert "主詞" in p

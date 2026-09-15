@@ -12,8 +12,9 @@
 被記成什麼樣子，歷次修正的教訓都寫在它的 docstring 裡。
 
 - **她自己的記憶**：chat_history/<conf_uid>/self_memory.md，角色層、所有對話共用、
-  上限固定 800 字。整理時同一次 LLM 呼叫輸出兩段，解析後分別落地；self 段寫入前
-  逐行丟掉含「對方」「你」的行。只要牽涉到對方，就算主詞是她，也歸對話記憶。
+  上限固定 800 字。整理只讓 LLM 輸出一份清單，分類由程式逐行做
+  （classify_memory_lines）：以角色名開頭、不含「對方」「你」的歸她自己的，其餘
+  留在對話記憶。9B 模型在三輪 5×5 實測裡做不到穩定的兩段輸出，才改成這樣。
   見 docs/superpowers/specs/2026-09-15-self-memory-design.md。
 
 行為契約由 tests/test_memory_store_behavior.py 釘住。
@@ -238,74 +239,46 @@ def clear_self_memory(conf_uid: str) -> bool:
         return False
 
 
-# --- 整理輸出的兩段解析 ---------------------------------------------------------
+# --- 整理輸出的分類（程式端做，不靠模型）---------------------------------------
 
-SECTION_CONVERSATION = "【對話記憶】"
 _SELF_FORBIDDEN = ("對方", "你")
 _PARENTHETICAL_ONLY = re.compile(r"^（[^）]*）$")
+_LIST_PREFIXES = ("- ", "• ", "・ ")
 
 
-def self_section_label(character_name: str) -> str:
-    """self 段的標題用角色名，跟「主詞用角色名」的做法一致。"""
-    who = (character_name or "").strip() or "角色"
-    return f"【{who}自己】"
+def classify_memory_lines(text: str, character_name: str) -> tuple[str, str]:
+    """把整理 LLM 輸出的單一清單逐行分成 (對話記憶, 她自己的)。
 
-
-def split_consolidation_output(
-    text: str, character_name: str
-) -> tuple[str, str] | None:
-    """把 LLM 輸出切成 (對話記憶, 她自己)。缺任一段標記回 None——不猜。
-
-    猜錯的後果是把對話記憶整份寫進 self_memory.md，那是這個設計唯一不能犯的錯。
-    兩段順序不限。標記前後的空白與反引號容忍。
-
-    整段是全形括號的行（如「（目前還沒有任何關於自己的記憶）」）一律跳過、不算內容：
-    模型會把提示詞裡「現有記憶」那句佔位文字原樣或近乎原樣地回顯進輸出，真正的記憶
-    條目不可能整條只是一句括號註記。
+    分類由程式做、不靠模型：9B 模型在三輪實測裡做不到穩定的兩段輸出。
+    規則（每行先 strip、去掉開頭的 "- " 或 "• " 或 "・ "）：
+    - 純括號行（^（[^）]*）$）丟掉——模型會把提示詞裡的說明文字照抄回來。
+    - 以角色名開頭、且整行不含「對方」「你」→ 她自己的。
+    - 其餘（以「對方」開頭、主詞不明、或提到對方）→ 對話記憶。分不清的一律留在
+      對話記憶——那一邊是私人的，放錯不會外洩。
+    角色名為空時，沒有任何行會被判成她自己的。
     """
-    raw = (text or "").strip().strip("`").strip()
-    self_label = self_section_label(character_name)
-    sections: dict[str, list[str]] = {}
-    current: str | None = None
-    for line in raw.splitlines():
-        stripped = line.strip()
-        if stripped == SECTION_CONVERSATION:
-            current = SECTION_CONVERSATION
-            sections.setdefault(current, [])
+    who = (character_name or "").strip()
+    conv_lines: list[str] = []
+    self_lines: list[str] = []
+    for raw_line in (text or "").splitlines():
+        line = raw_line.strip()
+        if not line:
             continue
-        if stripped == self_label:
-            current = self_label
-            sections.setdefault(current, [])
+        for prefix in _LIST_PREFIXES:
+            if line.startswith(prefix):
+                line = line[len(prefix) :].strip()
+                break
+        if not line or _PARENTHETICAL_ONLY.match(line):
             continue
-        if current is not None and stripped and not _PARENTHETICAL_ONLY.match(stripped):
-            sections[current].append(stripped)
-    if SECTION_CONVERSATION not in sections or self_label not in sections:
-        return None
-    return (
-        "\n".join(sections[SECTION_CONVERSATION]),
-        "\n".join(sections[self_label]),
-    )
-
-
-def filter_self_lines(text: str) -> str:
-    """self 段寫入前的程式防線：含「對方」或「你」的行整行丟掉。
-
-    提示詞不能當唯一防線（歷次教訓：禁令寫了，模型照樣違反）。這道擋得住代名詞，
-    擋不住名字——「紅莉栖和岡部去過秋葉原」會過關，那靠提示詞與設定頁的檢視。
-    寧可少記一條她自己的事，也不要把共同回憶放進直播讀得到的地方。
-    """
-    kept = []
-    for line in (text or "").splitlines():
-        s = line.strip()
-        if not s:
-            continue
-        if any(tok in s for tok in _SELF_FORBIDDEN):
-            logger.info(
-                f"[self_memory] dropped line mentioning the other party: {s[:40]}"
-            )
-            continue
-        kept.append(s)
-    return "\n".join(kept)
+        if (
+            who
+            and line.startswith(who)
+            and not any(tok in line for tok in _SELF_FORBIDDEN)
+        ):
+            self_lines.append(line)
+        else:
+            conv_lines.append(line)
+    return "\n".join(conv_lines), "\n".join(self_lines)
 
 
 # --- 整理（consolidation）----------------------------------------------------
@@ -349,51 +322,30 @@ def build_consolidation_prompt(
     不能改用「你」：系統提示是寫給角色看的，那裡的「你」指角色自己，主詞會整個
     混掉。
 
-    第四輪修正（2026-09-15）：輸出改成兩段。「關於角色自己的」從對話記憶分出來，
-    存到角色層的 self_memory.md，所有對話共用——這是 YouTube 直播的前置：直播開
-    新對話沒有私事，但她仍是同一個人。分類規則比「看主詞」更嚴：只要牽涉到對方，
-    就算主詞是她，也歸對話記憶。實際檔案裡「AI 確認與對方共事的女僕咖啡廳經歷」
-    這種主詞是她、內容是共同回憶的條目，正是這條規則要擋的。
+    第四輪修正（2026-09-15，回退）：曾經改成讓模型自己輸出兩段——「關於角色自己
+    的」與「對話記憶」各佔一段，分別存到 self_memory.md 與 core_memory.md。但這個
+    設計在 9B 模型（qwen/qwen3.5-9b）上三輪 5×5 人讀對照全部失敗：自己段抽取率
+    0/25 → 0/25 → 11/25，第三輪還出現幻覺自我事實（模型編出從未在對話裡出現過的
+    設定）。於是退回單一清單輸出，分類改由程式逐行做（見 classify_memory_lines）：
+    以角色名開頭、整行不含「對方」「你」的判為她自己的，其餘留在對話記憶，分不清
+    的一律留在對話記憶——那一邊是私人的，放錯不會外洩。
 
-    Round-1（5×5 人讀對照第一輪）：0/25 次新提示詞輸出裡自己段有任何一條事實——
-    「牧瀨紅莉栖：認為時間是相對的概念」這類明明獨自成立的句子，全部被放進對話記憶，
-    自己段全是空的。同時 25/25 次自己段把提示詞裡「現有的……記憶」那句佔位文字
-    （「（目前還沒有任何關於自己的記憶）」及其變體）原樣或近乎原樣回顯進輸出——這條
-    連同對話段的「（目前還沒有任何記憶）」，經 `_acceptable_rewrite` 判定為合法內容，
-    差點被寫進 self_memory.md、注入系統提示當成「她對自己的認知」。修法分兩處：
-    分類規則加上「單獨拿出來看是否成立」的判斷法與正反例，並要求主詞是她的每一條
-    都先問一次「跟對方有關嗎」；另外明講「沒有內容就留空，不要寫佔位文字」。程式面
-    另加一道防線——`split_consolidation_output` 直接丟掉整行只有全形括號的內容
-    （見該函式 docstring），佔位文字就算被回顯也進不了任何一段。
-
-    Round-2：Finding A 修好後，round-1 的 5×5 對照重跑仍是 0/25——模型把現有對話
-    記憶整段照抄回去，從不回頭重分類（「認為時間是相對的概念」這種本該屬於自己的
-    舊條目留在對話記憶不動），連這輪新出現的自我陳述也沒有被分進自己的記憶。修法：
-    把「{who}自己的記憶」規則區塊搬到「對話記憶」規則之前（順序本身是弱提示）、
-    加一條明講「現有對話記憶裡若其實是她自己的，這次要搬過去」、在這輪對話後加一句
-    「先從這輪找出她自己的事」引導模型先掃自我陳述再處理其餘、輸出格式也把自己段
-    換到對話段前面，跟規則順序一致。
+    同一輪也拿掉了「現有記憶：」欄位空的時候墊底的佔位文字（如「（目前還沒有任何
+    記憶）」）：三輪實測裡這段文字多次被模型原樣或近乎原樣回顯進輸出，而照抄回來
+    的字串會被 `_acceptable_rewrite` 當成合法內容寫進檔案。改成欄位空的時候直接
+    留空；程式端「整行只有全形括號的內容一律丟掉」（見 classify_memory_lines）
+    保留當第二層保險，佔位文字就算被回顯也進不了任何一份記憶。
     """
     who = character_name.strip() or "角色"
-    self_label = self_section_label(character_name)
+    existing = "\n".join(part for part in (current_self, current) if part)
     return (
         f"你是這個 AI 角色的記憶管理員。角色的名字是「{who}」。\n"
-        "根據下面這輪對話，維護兩份記憶：「這段關係的對話記憶」與「"
-        f"{who}自己的記憶」。\n\n"
+        "根據下面這輪對話，維護一份「這段關係的長期記憶」。\n\n"
         "規則（嚴格遵守）：\n"
-        f"- {who}自己的記憶記{who}獨自成立的事：她的喜好、看法、來歷、自己的計畫。\n"
-        f"  判斷方法：把那一條單獨拿出來看，不需要知道對方是誰也能成立的，就是{who}自己的。\n"
-        f"  例如「{who}：認為時間是相對的概念」是{who}自己的；「{who}：覺得對方等太久」是對話記憶。\n"
-        f"  只要牽涉到對方，就算主詞是{who}，也一律歸進對話記憶，不可以放進{who}自己的記憶。\n"
-        f"  {who}自己的記憶裡不可以出現「對方」或「你」這兩個詞。\n"
-        f"- 主詞是{who}的每一條都要先問一次「這條跟對方有關嗎」：無關就放進{who}自己的記憶，\n"
-        "  不要把全部都塞進對話記憶。\n"
-        f"- 現有的對話記憶裡，若有條目照上面的判斷方法其實是{who}自己的，這次就把它搬到{who}自己的記憶，\n"
-        "  對話記憶裡不要再保留同一條。\n"
-        "- 對話記憶記兩類事情：\n"
+        "- 記兩類事情，兩類都要記：\n"
         "  1. 關於對方的：身分／職業／正在做的事、偏好與習慣、希望被怎麼稱呼、\n"
         "     他明確講過的重要事件。\n"
-        f"  2. {who}與對方之間的：答應過對方的事、跟對方一起做過的事、對方告訴{who}的事。\n"
+        f"  2. 關於{who}自己的：說過的計畫、答應過的事、講過的關於自己的來歷或喜好。\n"
         f"- 每一條都必須以「對方」或「{who}」開頭，寫明這件事是誰的。省略主詞不行。\n"
         f"- {who}講的話絕對不可以寫成對方的事實。分不清楚是誰的就整條不要記。\n"
         "- 絕不記：一次性閒聊、寒暄、問候、沒有新資訊的對話。\n"
@@ -405,18 +357,12 @@ def build_consolidation_prompt(
         "  不是關於任何人的事實。\n"
         "- 絕不記測試、確認聲音有沒有傳到、連線通不通這種操作性的對話。\n"
         "- 用簡短條列，每條一行，繁體中文，台灣用語。\n"
-        "- 如果這輪對話沒有任何值得記的新資訊，就原封不動輸出現有的兩份記憶，一個字都不要改。\n"
-        "- 某一段沒有內容時，那個標記下方留空就好，不要寫「目前還沒有」之類的佔位文字。\n"
-        f"- 對話記憶總長度控制在 {cap} 字元內、{who}自己的記憶控制在 {self_cap} 字元內；\n"
-        "  若超過，合併或提煉舊條目（保留最關鍵、刪掉過時細節）。\n\n"
-        f"現有的對話記憶：\n{current or '（目前還沒有任何記憶）'}\n\n"
-        f"現有的{who}自己的記憶：\n{current_self or '（目前還沒有任何關於自己的記憶）'}\n\n"
+        "- 如果這輪對話沒有任何值得記的新資訊，就原封不動輸出現有記憶，一個字都不要改。\n"
+        f"- 總長度控制在 {cap + self_cap} 字元內；若超過，合併或提煉舊條目\n"
+        "  （保留最關鍵、刪掉過時細節）。\n\n"
+        f"現有記憶：\n{existing}\n\n"
         f"這輪對話：\n對方說：{user_input}\n{who}回：{ai_response}\n\n"
-        f"先從這輪找出{who}講到自己的事（喜好、看法、來歷、計畫），寫進{who}自己的記憶；再處理其餘。\n\n"
-        "請輸出「更新後的完整記憶內容」，格式嚴格如下，兩個標記都必須出現、各佔一行，"
-        "不要任何解釋、前言或其他標題：\n"
-        f"{self_label}\n（{who}自己的記憶的每一條）\n"
-        f"{SECTION_CONVERSATION}\n（對話記憶的每一條）"
+        "請輸出「更新後的完整記憶內容」本身，不要任何解釋、前言或標題。"
     )
 
 
@@ -543,26 +489,17 @@ async def consolidate_core_memory(
                 self_cap=SELF_CAP_CHARS,
             )
             raw = await _request_rewrite(base_url, model, prompt, api_key, extra_body)
-            parts = split_consolidation_output(raw, character_name)
-            if parts is None:
-                # 不猜。猜錯會把對話記憶整份寫進 self_memory.md。
-                logger.warning(
-                    f"[core_memory] consolidation output for {conf_uid}/{history_uid} "
-                    "lacks a section marker; nothing written"
-                )
-                return
-            conv_candidate, self_candidate = parts
+            conv_candidate, self_candidate = classify_memory_lines(raw, character_name)
             if _acceptable_rewrite(conv_candidate, current, limit):
                 _write_memory(conf_uid, history_uid, conv_candidate)
                 logger.info(
                     f"[core_memory] updated for {conf_uid}/{history_uid} "
                     f"({len(conv_candidate)} chars)"
                 )
-            self_filtered = filter_self_lines(self_candidate)
-            if _acceptable_rewrite(self_filtered, current_self, SELF_CAP_CHARS):
-                _write_self_memory(conf_uid, self_filtered)
+            if _acceptable_rewrite(self_candidate, current_self, SELF_CAP_CHARS):
+                _write_self_memory(conf_uid, self_candidate)
                 logger.info(
-                    f"[self_memory] updated for {conf_uid} ({len(self_filtered)} chars)"
+                    f"[self_memory] updated for {conf_uid} ({len(self_candidate)} chars)"
                 )
     except Exception as e:
         logger.warning(

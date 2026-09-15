@@ -63,15 +63,7 @@ def test_consolidation_payload_carries_extra_body(monkeypatch, tmp_path):
 
     class _Resp:
         def json(self):
-            return {
-                "choices": [
-                    {
-                        "message": {
-                            "content": "【對話記憶】\n- 使用者在做 Live2D\n【角色自己】\n"
-                        }
-                    }
-                ]
-            }
+            return {"choices": [{"message": {"content": "- 使用者在做 Live2D"}}]}
 
     class _Client:
         def __init__(self, *a, **k):
@@ -110,7 +102,7 @@ def test_consolidation_payload_carries_extra_body(monkeypatch, tmp_path):
     assert captured.get("reasoning_effort") == "none"
     assert (tmp_path / "core_memory.md").read_text(
         encoding="utf-8"
-    ) == "- 使用者在做 Live2D"
+    ) == "使用者在做 Live2D"
 
 
 def test_memory_consolidation_rejects_non_compatible_provider():

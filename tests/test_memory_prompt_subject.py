@@ -15,7 +15,7 @@ AI。更根本的是整份記憶被框成「關於使用者的長期記憶」，
 所以修法不是再加一條禁令，而是把框架改成兩類、並要求每條寫明主詞。
 """
 
-from src.open_llm_vtuber.memory_core import build_consolidation_prompt
+from src.open_llm_vtuber.memory_core import SELF_CAP_CHARS, build_consolidation_prompt
 
 
 def test_uses_the_character_name_as_the_subject_label():
@@ -50,7 +50,8 @@ def test_carries_the_turn_and_the_existing_memory():
     assert "使用者叫小明。" in prompt
     assert "今天好累" in prompt
     assert "辛苦了。" in prompt
-    assert "800" in prompt
+    # 長度上限現在是對話記憶與 self 記憶合計（見 fix-round-3），不是單一的 cap。
+    assert str(800 + SELF_CAP_CHARS) in prompt
 
 
 def test_says_the_character_statements_must_not_become_user_facts():
@@ -66,9 +67,9 @@ def test_says_the_character_statements_must_not_become_user_facts():
     assert "主詞" in prompt
 
 
-def test_empty_existing_memory_is_labelled_not_blank():
-    # 空字串直接插進提示詞會變成一段沒有內容的「現有記憶：」，模型容易把下一段
-    # 誤讀成記憶內容。
+def test_empty_existing_memory_has_no_placeholder_text():
+    # 佔位文字「（目前還沒有任何記憶）」拿掉了：它是模型照抄回輸出的來源，三輪
+    # 實測裡多次被原樣或近乎原樣回顯進整理結果。空的時候標籤下方直接留空。
     prompt = build_consolidation_prompt(
         current="",
         user_input="嗨",
@@ -76,4 +77,4 @@ def test_empty_existing_memory_is_labelled_not_blank():
         cap=1500,
         character_name="芙莉蓮",
     )
-    assert "（目前還沒有任何記憶）" in prompt
+    assert "（目前還沒有任何記憶）" not in prompt
