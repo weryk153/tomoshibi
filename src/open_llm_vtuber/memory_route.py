@@ -291,6 +291,8 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
     - POST /api/memory/clear            清空記憶
     - POST /api/memory/cap              設定字數上限
     - POST /api/memory/consolidation    設定整理頻率
+    - POST /api/memory/self         整份覆寫她自己的記憶（角色層，所有對話共用；不需要連線）
+    - POST /api/memory/self/clear   清空她自己的記憶
 
     每個寫入端點的回應都帶 restart_required：agent 的 system prompt 在 init 時就
     烤好了，已經注入的記憶要等重選角色或重啟才會完全反映。存檔本身是即時的，
@@ -312,6 +314,7 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
             return bad
 
         content = memory_core.load_core_memory(conf_uid, history_uid)
+        self_content = memory_core.load_self_memory(conf_uid)
         return JSONResponse(
             {
                 "conf_uid": conf_uid,
@@ -321,6 +324,10 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
                     memory_core.core_memory_path(conf_uid, history_uid)
                 ),
                 "char_count": len(content),
+                # 她自己的記憶：角色層，所有對話共用。上限固定，不開放設定。
+                "self_content": self_content,
+                "self_char_count": len(self_content),
+                "self_cap": memory_core.SELF_CAP_CHARS,
                 # 界限一律從後端送，UI 不要自己寫死一份——後端調整了那份副本不會
                 # 跟著動，畫面會強制一個伺服器早就不用的範圍，而且不會報錯。
                 "cap": _cap_from_conf(),
@@ -430,6 +437,53 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
             return _error(500, "Could not clear core memory.")
 
         logger.info(f"[memory] cleared (conf_uid={conf_uid})")
+        return JSONResponse({"ok": True, "conf_uid": conf_uid, "cleared": True})
+
+    @router.post("/api/memory/self")
+    async def save_self_memory(request: Request):
+        """整份覆寫她自己的記憶。
+
+        只以 conf_uid 為鍵——self_memory.md 在角色層，不屬於任何一段對話，所以不需要
+        連線、不走 _resolved_history_uid 的 409。
+        """
+        if not _is_local_request(request):
+            return _forbidden()
+        body, bad = await _parse_body(request)
+        if bad:
+            return bad
+        conf_uid, bad = _resolved_uid(body)
+        if bad:
+            return bad
+        content = body.get("content")
+        if not isinstance(content, str):
+            return _error(400, "'content' must be a string.")
+        if not await asyncio.to_thread(memory_core.save_self_memory, conf_uid, content):
+            return _error(500, "Could not save self memory.")
+        stored = memory_core.load_self_memory(conf_uid)
+        logger.info(f"[memory] self memory manually saved (conf_uid={conf_uid})")
+        return JSONResponse(
+            {
+                "ok": True,
+                "conf_uid": conf_uid,
+                "char_count": len(stored),
+                "cap": memory_core.SELF_CAP_CHARS,
+                "restart_required": True,
+            }
+        )
+
+    @router.post("/api/memory/self/clear")
+    async def clear_self_memory(request: Request):
+        if not _is_local_request(request):
+            return _forbidden()
+        body, bad = await _parse_body(request)
+        if bad:
+            return bad
+        conf_uid, bad = _resolved_uid(body)
+        if bad:
+            return bad
+        if not await asyncio.to_thread(memory_core.clear_self_memory, conf_uid):
+            return _error(500, "Could not clear self memory.")
+        logger.info(f"[memory] self memory cleared (conf_uid={conf_uid})")
         return JSONResponse({"ok": True, "conf_uid": conf_uid, "cleared": True})
 
     @router.post("/api/memory/cap")
