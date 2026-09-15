@@ -5,7 +5,9 @@
 """
 
 from src.open_llm_vtuber.memory_core import (
+    SELF_CAP_CHARS,
     SECTION_CONVERSATION,
+    build_consolidation_prompt,
     filter_self_lines,
     self_section_label,
     split_consolidation_output,
@@ -91,3 +93,51 @@ def test_filter_keeps_everything_when_clean():
 def test_filter_on_empty_is_empty():
     assert filter_self_lines("") == ""
     assert filter_self_lines("\n\n") == ""
+
+
+def _prompt(**kw):
+    base = dict(
+        current="對方叫小明。",
+        user_input="今天好累",
+        ai_response="辛苦了。",
+        cap=1500,
+        character_name=NAME,
+        current_self="紅莉栖喜歡咖啡。",
+    )
+    base.update(kw)
+    return build_consolidation_prompt(**base)
+
+
+def test_prompt_asks_for_both_section_markers():
+    p = _prompt()
+    assert SECTION_CONVERSATION in p
+    assert self_section_label(NAME) in p
+
+
+def test_prompt_carries_both_existing_memories():
+    p = _prompt()
+    assert "對方叫小明。" in p
+    assert "紅莉栖喜歡咖啡。" in p
+
+
+def test_prompt_states_the_self_cap():
+    assert str(SELF_CAP_CHARS) in _prompt()
+
+
+def test_prompt_says_anything_involving_the_other_party_goes_to_conversation():
+    # 這條是分類規則的核心：主詞是她但牽涉對方 → 對話記憶。用穩定關鍵詞釘住。
+    p = _prompt()
+    assert "牽涉到對方" in p
+
+
+def test_prompt_keeps_the_old_subject_rules():
+    # 既有測試 tests/test_memory_uses_in_world_subject.py 釘住這些字串，不能掉。
+    p = _prompt()
+    assert "「對方」或「紅莉栖」開頭" in p
+    assert "使用者" not in p
+    assert "拒絕" in p and "聽不" in p and "測試" in p
+
+
+def test_prompt_placeholder_for_empty_self_memory():
+    p = _prompt(current_self="")
+    assert "（目前還沒有任何關於自己的記憶）" in p
