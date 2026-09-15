@@ -415,7 +415,18 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
                   <Button size="xs" tone="blue" disabled={!contentLoaded} onClick={() => setPendingSaveSelf(true)}>
                     {t('settings.memory.selfSave')}
                   </Button>
-                  <Button size="xs" tone="red" variant="outline" onClick={() => setPendingClearSelf(true)}>
+                  {/* contentLoaded 同時是「畫面上這份內容真的屬於現在這個
+                      confUid」的旗標。切換角色時上面那個 effect 先把它設回
+                      false，重抓完成才設回 true——中間這段時間畫面還是 A 的
+                      內容、confUid 已經是 B，清除鍵按兩下就把 B 清掉了，而
+                      使用者以為自己在清 A。存檔鍵已經擋了，清除鍵一樣要擋。 */}
+                  <Button
+                    size="xs"
+                    tone="red"
+                    variant="outline"
+                    disabled={!contentLoaded}
+                    onClick={() => setPendingClearSelf(true)}
+                  >
                     {t('settings.memory.selfClear')}
                   </Button>
                 </HStack>
@@ -505,10 +516,12 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
             <Stack gap={2}>
               {!pendingClear ? (
                 <HStack>
+                  {/* 同上：載入完成前不准清除，避免清到剛切過去的那個角色。 */}
                   <Button
                     size="xs"
                     tone="red"
                     variant="outline"
+                    disabled={!contentLoaded}
                     onClick={() => setPendingClear(true)}
                   >
                     {t('settings.memory.clear')}
