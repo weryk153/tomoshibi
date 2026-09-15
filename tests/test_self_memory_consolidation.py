@@ -82,11 +82,25 @@ def test_unchanged_self_section_does_not_rewrite_self_file(monkeypatch, tmp_path
     assert load_core_memory(CONF, "conv-1") == "對方叫小明。"
 
 
-def test_oversized_self_section_is_rejected_but_conversation_still_lands(monkeypatch):
+def test_oversized_self_section_is_merged_but_capped_and_conversation_still_lands(
+    monkeypatch,
+):
     huge = "紅莉栖喜歡" + "咖" * (int(SELF_CAP_CHARS * 1.5) + 10)
     _run("conv-1", f"對方叫小明。\n{huge}", monkeypatch)
     assert load_core_memory(CONF, "conv-1") == "對方叫小明。"
-    assert load_self_memory(CONF) == ""
+    assert len(load_self_memory(CONF)) <= SELF_CAP_CHARS
+
+
+def test_two_rounds_of_consolidation_keep_both_self_entries(monkeypatch):
+    _run("conv-1", "對方叫小明。\n紅莉栖：喜歡咖啡。", monkeypatch)
+    _run("conv-1", "對方叫小明。\n紅莉栖：討厭夏天。", monkeypatch)
+    assert load_self_memory(CONF) == "紅莉栖：喜歡咖啡。\n紅莉栖：討厭夏天。"
+
+
+def test_second_round_similar_wording_replaces_first_round_line(monkeypatch):
+    _run("conv-1", "對方叫小明。\n紅莉栖：喜歡咖啡。", monkeypatch)
+    _run("conv-1", "對方叫小明。\n紅莉栖：喜歡喝咖啡。", monkeypatch)
+    assert load_self_memory(CONF) == "紅莉栖：喜歡喝咖啡。"
 
 
 def test_placeholder_reply_does_not_write_self_memory(monkeypatch, tmp_path):

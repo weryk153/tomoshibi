@@ -15,12 +15,16 @@
   上限固定 800 字。整理只讓 LLM 輸出一份清單，分類由程式逐行做
   （classify_memory_lines）：以角色名開頭、不含「對方」「你」的歸她自己的，其餘
   留在對話記憶。9B 模型在三輪 5×5 實測裡做不到穩定的兩段輸出，才改成這樣。
+  分類出來的 self 行不會整份覆寫檔案，而是用 merge_self_memory 合併進既有內容：
+  9B 模型收到「現有記憶」後，輸出「更新後的完整記憶」時會把舊條目丟掉、只吐這一
+  輪的內容（連舊提示詞都一樣），整份覆寫的話她自己的記憶永遠只剩最後一輪。
   見 docs/superpowers/specs/2026-09-15-self-memory-design.md。
 
 行為契約由 tests/test_memory_store_behavior.py 釘住。
 """
 
 import asyncio
+import difflib
 import re
 from collections import OrderedDict
 from collections.abc import Mapping, Sequence
@@ -282,6 +286,67 @@ def classify_memory_lines(text: str, character_name: str) -> tuple[str, str]:
     return "\n".join(conv_lines), "\n".join(self_lines)
 
 
+_SIMILARITY_THRESHOLD = 0.75
+# 開頭的角色名／代稱 + 分隔符去掉再比對，避免「紅莉栖：喜歡咖啡」跟「喜歡咖啡」
+# 因為多了主詞前綴而被誤判成不像。名字本身不重要（這裡沒有角色名可用——
+# merge_self_memory 是純函式，不吃 character_name），只要是「開頭一小段非標點
+# 文字 + 冒號或空白」這個形狀就去掉；12 字元夠涵蓋常見稱呼，不會誤砍句子中段。
+_LEADING_LABEL = re.compile(r"^[^：: ]{1,12}[：: ]")
+
+
+def _normalize_for_similarity(line: str) -> str:
+    return _LEADING_LABEL.sub("", line)
+
+
+def _lines_are_similar(a: str, b: str) -> float:
+    return difflib.SequenceMatcher(
+        None, _normalize_for_similarity(a), _normalize_for_similarity(b)
+    ).ratio()
+
+
+def merge_self_memory(existing: str, incoming: str, cap: int = SELF_CAP_CHARS) -> str:
+    """把這輪分類出來的 self 行合併進既有的 self 記憶（程式端做，不靠模型）。
+
+    9B 模型被要求輸出「更新後的完整記憶」時，只要現有記憶不是空的，就會把舊
+    條目丟掉、只吐這一輪的內容——換掉提示詞也一樣（見 fix-round-5-brief.md 的
+    離線重跑）。所以她自己的記憶不能讓模型整份覆寫，改成程式端合併：
+    - 既有的行全部保留、順序不變；新行接在後面。
+    - 相近的行（用 difflib.SequenceMatcher ratio、去掉開頭的「名字／代稱：」
+      再比對，避免主詞前綴影響相似度判斷）視為同一條，留新的那行、放在舊的
+      位置——這樣「喜歡咖啡」換成「很喜歡喝咖啡，尤其黑咖啡」不會變成兩條。
+    - 完全相同的行落在同一個分支（ratio 1.0），不會重複。
+    - 合併後超過 cap 時，從最舊的行開始丟，直到不超過——新內容比舊內容重要。
+    """
+    if not (incoming or "").strip():
+        return existing
+
+    existing_lines = [ln.strip() for ln in (existing or "").splitlines() if ln.strip()]
+    incoming_lines = [ln.strip() for ln in incoming.splitlines() if ln.strip()]
+
+    merged = list(existing_lines)
+    matched_incoming: set[int] = set()
+    for i, ex_line in enumerate(merged):
+        best_j, best_ratio = None, 0.0
+        for j, inc_line in enumerate(incoming_lines):
+            if j in matched_incoming:
+                continue
+            ratio = _lines_are_similar(ex_line, inc_line)
+            if ratio >= _SIMILARITY_THRESHOLD and ratio > best_ratio:
+                best_j, best_ratio = j, ratio
+        if best_j is not None:
+            merged[i] = incoming_lines[best_j]
+            matched_incoming.add(best_j)
+
+    for j, inc_line in enumerate(incoming_lines):
+        if j not in matched_incoming:
+            merged.append(inc_line)
+
+    while merged and len("\n".join(merged)) > cap:
+        merged.pop(0)
+
+    return "\n".join(merged)
+
+
 # --- 整理（consolidation）----------------------------------------------------
 
 
@@ -515,10 +580,13 @@ async def consolidate_core_memory(
                     f"[core_memory] updated for {conf_uid}/{history_uid} "
                     f"({len(conv_candidate)} chars)"
                 )
-            if _acceptable_rewrite(self_candidate, current_self, SELF_CAP_CHARS):
-                _write_self_memory(conf_uid, self_candidate)
+            merged_self = merge_self_memory(
+                current_self, self_candidate, SELF_CAP_CHARS
+            )
+            if merged_self != current_self:
+                _write_self_memory(conf_uid, merged_self)
                 logger.info(
-                    f"[self_memory] updated for {conf_uid} ({len(self_candidate)} chars)"
+                    f"[self_memory] merged for {conf_uid} ({len(merged_self)} chars)"
                 )
     except Exception as e:
         logger.warning(
