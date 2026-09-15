@@ -164,6 +164,74 @@ def save_core_memory(
         return False
 
 
+# --- 她自己的記憶（角色層，所有對話共用）--------------------------------------
+
+SELF_CAP_CHARS = 800  # 固定，不開放設定；她自己的事本來就比關於對方的少
+
+
+def _self_memory_file(conf_uid: str) -> Path:
+    """chat_history/<conf_uid>/self_memory.md。
+
+    放角色層、不在任何一段對話底下：刪對話不動它，開新對話也讀得到。
+    conf_uid 是請求可控的，過 safe_join。
+    """
+    return Path(safe_join("chat_history", conf_uid, "self_memory.md"))
+
+
+def self_memory_path(conf_uid: str) -> str:
+    """給 route 層用。路徑不安全時回空字串（跟 core_memory_path 一致）。"""
+    try:
+        return str(_self_memory_file(conf_uid))
+    except ValueError as e:
+        logger.warning(f"[self_memory] unsafe path for {conf_uid}: {e}")
+        return ""
+
+
+def load_self_memory(conf_uid: str) -> str:
+    """在注入路徑上，絕不丟例外。"""
+    try:
+        f = _self_memory_file(conf_uid)
+        return f.read_text(encoding="utf-8").strip() if f.is_file() else ""
+    except Exception as e:
+        logger.warning(f"[self_memory] load failed for {conf_uid}: {e}")
+        return ""
+
+
+def _write_self_memory(conf_uid: str, text: str) -> None:
+    f = _self_memory_file(conf_uid)
+    f.parent.mkdir(parents=True, exist_ok=True)
+    f.write_text(text, encoding="utf-8")
+
+
+def save_self_memory(conf_uid: str, content: str) -> bool:
+    """整份覆寫（設定頁手動編輯用）。超過上限照存並警告，下次整理會提煉。"""
+    try:
+        text = (content or "").strip()
+        if len(text) > SELF_CAP_CHARS:
+            logger.warning(
+                f"[self_memory] manual save for {conf_uid} exceeds cap "
+                f"({len(text)} > {SELF_CAP_CHARS} chars); stored as-is"
+            )
+        _write_self_memory(conf_uid, text)
+        logger.info(f"[self_memory] manually saved for {conf_uid} ({len(text)} chars)")
+        return True
+    except Exception as e:
+        logger.warning(f"[self_memory] save failed for {conf_uid}: {e}")
+        return False
+
+
+def clear_self_memory(conf_uid: str) -> bool:
+    """截斷成空檔而不是刪檔；檔案不存在等於已清空。"""
+    try:
+        if _self_memory_file(conf_uid).is_file():
+            _write_self_memory(conf_uid, "")
+            logger.info(f"[self_memory] cleared for {conf_uid}")
+        return True
+    except Exception as e:
+        logger.warning(f"[self_memory] clear failed for {conf_uid}: {e}")
+        return False
+
+
 # --- 整理（consolidation）----------------------------------------------------
 
 
