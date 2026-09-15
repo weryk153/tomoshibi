@@ -39,6 +39,10 @@ export interface CharacterRenderer {
   stop(): void;
   /** AI 回到 IDLE：清表情回素顏。 */
   resetExpression(): void;
+  /** 設定頁試播：套一個表情（VRM 是 preset／自訂名）。沒實作＝這個 renderer 不支援試播。 */
+  previewExpression?(name: string): void;
+  /** 設定頁試播：播一次動作。 */
+  previewMotion?(clip: string): void;
 }
 
 let active: CharacterRenderer | null = null;

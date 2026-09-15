@@ -8,15 +8,21 @@ import { LipSync } from "./lip-sync.ts";
 import { IDLE_CLIP, type MotionPlayer } from "./motion-player.ts";
 
 export class VRMRenderer implements CharacterRenderer {
+  private readonly vrm: VRM;
+  private readonly motions: MotionPlayer;
+  private readonly expressions: ExpressionController;
   private lip = new LipSync();
   private blink = new AutoBlink();
   private elapsed = 0;
 
-  constructor(
-    private readonly vrm: VRM,
-    private readonly motions: MotionPlayer,
-    private readonly expressions: ExpressionController,
-  ) {}
+  // 明確欄位指派而不是 constructor parameter property：node --experimental-strip-types
+  // 只剝型別、不轉譯這個語法（見 frontend-node-test-constraints），這個檔案要能被
+  // vrm-renderer.test.ts 用 node --test 載入就不能用那個寫法。行為不變。
+  constructor(vrm: VRM, motions: MotionPlayer, expressions: ExpressionController) {
+    this.vrm = vrm;
+    this.motions = motions;
+    this.expressions = expressions;
+  }
 
   beginSegment(audio: HTMLAudioElement, cues: SpeakCues): void {
     this.lip.begin(audio);
@@ -35,6 +41,16 @@ export class VRMRenderer implements CharacterRenderer {
 
   resetExpression(): void {
     this.expressions.clear();
+  }
+
+  /** 設定頁試播：套一個表情，強度固定拉滿——跟 handlePreview 一樣，試播不需要分層次。 */
+  previewExpression(name: string): void {
+    this.expressions.setEmotion(name, 1);
+  }
+
+  /** 設定頁試播：播一次動作，強度固定拉滿。 */
+  previewMotion(clip: string): void {
+    this.motions.playOnce(clip, 1);
   }
 
   /** 每幀。lookTarget 為 null 時不動視線。 */

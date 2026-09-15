@@ -17,8 +17,14 @@ export class MotionPlayer {
   private actions = new Map<string, THREE.AnimationAction>();
   private current: THREE.AnimationAction | null = null;
   private loader = new GLTFLoader();
+  private readonly vrm: VRM;
 
-  constructor(private readonly vrm: VRM) {
+  // 明確欄位指派而不是 constructor parameter property：vrm-renderer.ts 對這個檔案
+  // 是值匯入（IDLE_CLIP），node --test 載入 vrm-renderer.test.ts 時會連帶解析整份
+  // 這個檔案，parameter property 語法會讓 node --experimental-strip-types 直接
+  // SyntaxError（見 frontend-node-test-constraints）。行為不變。
+  constructor(vrm: VRM) {
+    this.vrm = vrm;
     this.mixer = new THREE.AnimationMixer(vrm.scene);
     this.loader.register((parser) => new VRMAnimationLoaderPlugin(parser));
     this.mixer.addEventListener("finished", () => {
