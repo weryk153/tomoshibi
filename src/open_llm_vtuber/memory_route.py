@@ -445,6 +445,8 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
 
         只以 conf_uid 為鍵——self_memory.md 在角色層，不屬於任何一段對話，所以不需要
         連線、不走 _resolved_history_uid 的 409。
+
+        寫入本身走整理的那把鎖：整理跑到一半時寫檔，會被它 60 秒後的 merge 蓋回去。
         """
         if not _is_local_request(request):
             return _forbidden()
@@ -457,9 +459,13 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         content = body.get("content")
         if not isinstance(content, str):
             return _error(400, "'content' must be a string.")
-        if not await asyncio.to_thread(memory_core.save_self_memory, conf_uid, content):
-            return _error(500, "Could not save self memory.")
-        stored = memory_core.load_self_memory(conf_uid)
+        # 跟整理排同一把鎖（見下面 clear 的說明）。
+        async with memory_core._consolidation_lock(conf_uid):
+            if not await asyncio.to_thread(
+                memory_core.save_self_memory, conf_uid, content
+            ):
+                return _error(500, "Could not save self memory.")
+            stored = memory_core.load_self_memory(conf_uid)
         logger.info(f"[memory] self memory manually saved (conf_uid={conf_uid})")
         return JSONResponse(
             {
@@ -481,8 +487,14 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         conf_uid, bad = _resolved_uid(body)
         if bad:
             return bad
-        if not await asyncio.to_thread(memory_core.clear_self_memory, conf_uid):
-            return _error(500, "Could not clear self memory.")
+        # 整理是「讀出兩份記憶 → 丟給 LLM（最久 60 秒）→ merge 寫回」。在鎖外
+        # 清空的話，整理若已經讀到舊的 self，60 秒後 merge 會把使用者剛刪掉的行
+        # 原樣寫回去——而設定頁刪除正是規格對「分類誤判」這個已知漏洞唯一的
+        # 緩解手段，復活等於把那個手段拿掉。self 記憶在角色層，鎖也以 conf_uid
+        # 為單位（見 memory_core._consolidation_lock），兩邊對得上。
+        async with memory_core._consolidation_lock(conf_uid):
+            if not await asyncio.to_thread(memory_core.clear_self_memory, conf_uid):
+                return _error(500, "Could not clear self memory.")
         logger.info(f"[memory] self memory cleared (conf_uid={conf_uid})")
         return JSONResponse({"ok": True, "conf_uid": conf_uid, "cleared": True})
 

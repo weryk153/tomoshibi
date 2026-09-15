@@ -4,6 +4,8 @@
 _existing_conf_uids）換成固定集合，檔案系統在 tmp_path。
 """
 
+import asyncio
+
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -90,3 +92,75 @@ def test_get_carries_self_fields_when_connected(client, monkeypatch):
     assert body["self_content"] == "她喜歡咖啡。"
     assert body["self_char_count"] == len("她喜歡咖啡。")
     assert body["self_cap"] == memory_core.SELF_CAP_CHARS
+
+
+# --- final fix wave F6: 手動儲存／清除要跟整理排同一把鎖 ----------------------
+#
+# 整理是「讀出兩份記憶 → 丟給 LLM（最久 60 秒）→ merge 寫回」。設定頁在鎖外寫檔
+# 的話，整理若已經讀到舊的 self、使用者這時刪掉一行、60 秒後 merge 把舊內容寫
+# 回去——被刪的行就復活了。而設定頁刪除正是規格對「分類誤判」這個已知漏洞唯一
+# 的緩解手段，復活等於把那個手段拿掉。
+#
+# 這裡直接拿 router 上的 endpoint 函式來跑（不經 TestClient）：TestClient 自己
+# 起一個事件迴圈跑請求，測試這一端拿不到那個迴圈，沒辦法在「整理持鎖中」這個
+# 時間點上斷言。endpoint 只用到 request.json()，假物件就夠。
+
+
+def _endpoint(router, path):
+    for route in router.routes:
+        if getattr(route, "path", None) == path:
+            return route.endpoint
+    raise AssertionError(f"找不到 {path}")
+
+
+class _FakeRequest:
+    def __init__(self, body):
+        self._body = body
+
+    async def json(self):
+        return self._body
+
+
+@pytest.fixture()
+def router(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(mr, "_existing_conf_uids", lambda: {CONF})
+    monkeypatch.setattr(mr, "_is_local_request", lambda _r: True)
+    memory_core._consolidation_locks.clear()
+    return mr.init_memory_route({})
+
+
+async def _while_consolidating(endpoint, body):
+    """整理持鎖期間呼叫 endpoint，回傳 (鎖還握著時的檔案內容, 鎖放掉之後的內容)。"""
+    lock = memory_core._consolidation_lock(CONF)
+    await lock.acquire()
+    task = asyncio.create_task(endpoint(_FakeRequest(body)))
+    for _ in range(5):
+        await asyncio.sleep(0.01)  # 給 endpoint 足夠的機會跑到寫入
+    during = memory_core.load_self_memory(CONF)
+    lock.release()
+    await task
+    return during, memory_core.load_self_memory(CONF)
+
+
+def test_self_save_waits_for_the_consolidation_lock(router):
+    memory_core.save_self_memory(CONF, "舊的。")
+    during, after = asyncio.run(
+        _while_consolidating(
+            _endpoint(router, "/api/memory/self"),
+            {"conf_uid": CONF, "content": "新的。"},
+        )
+    )
+    assert during == "舊的。", "整理還持著鎖，手動儲存不可以先寫進去"
+    assert after == "新的。"
+
+
+def test_self_clear_waits_for_the_consolidation_lock(router):
+    memory_core.save_self_memory(CONF, "舊的。")
+    during, after = asyncio.run(
+        _while_consolidating(
+            _endpoint(router, "/api/memory/self/clear"), {"conf_uid": CONF}
+        )
+    )
+    assert during == "舊的。", "整理還持著鎖，手動清除不可以先寫進去"
+    assert after == ""
