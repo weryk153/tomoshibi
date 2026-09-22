@@ -25,6 +25,14 @@ export interface SpeakCues {
   motion?: MotionRequest;
 }
 
+/**
+ * 試播的結果。以前是 boolean，但 false 同時代表兩件完全不同的事：「這個角色
+ * 沒有這個動作檔」（要告訴使用者）與「載入還沒回來就被下一次試播取代了」
+ * （不該告訴使用者，那是他自己點的）。合在一起會讓連點兩個動作時彈出
+ * 「這個角色沒有這個動作」的假錯誤，所以拆成三態。
+ */
+export type PreviewMotionResult = 'played' | 'missing' | 'superseded';
+
 export interface CharacterRenderer {
   /**
    * 一段音訊要開播。audio 已設好 src、已呼叫 play()。掛 lipsync、下表情、下動作。
@@ -39,6 +47,22 @@ export interface CharacterRenderer {
   stop(): void;
   /** AI 回到 IDLE：清表情回素顏。 */
   resetExpression(): void;
+  /** 設定頁試播：套一個表情（VRM 是 preset／自訂名）。沒實作＝這個 renderer 不支援試播。 */
+  previewExpression?(name: string): void;
+  /**
+   * 設定頁試播：播一次動作。VRM 可能要現拉還沒載入過的 .vrma（角色載入當下只
+   * 預先讀了 motionMap 裡當時有的 clip），所以是非同步；回傳值代表「這個動作
+   * 真的有播成功」——false 給 UI 顯示「這個角色沒有這個動作」，不是靜靜地
+   * 什麼都不做。
+   */
+  previewMotion?(clip: string): void | Promise<PreviewMotionResult>;
+  /**
+   * 存檔成功後，對每個新指到 motionMap 的 clip 呼叫，背景預先載入、不播放——
+   * 讓 LLM 接下來能立刻觸發剛存的關鍵字，不用等使用者自己先按一次試播。
+   * 沒實作＝這個 renderer 不需要預先載入（例如 Live2D 動作本來就都在
+   * model3.json 裡，載入模型時已經全部讀完）。
+   */
+  ensureMotionLoaded?(clip: string): Promise<boolean>;
 }
 
 let active: CharacterRenderer | null = null;

@@ -224,7 +224,7 @@ def test_build_vrm_model_config(tmp_path, monkeypatch):
             {"name": "aa", "keywords": []},
         ],
         "has_idle": True,
-        "orphan_keywords": [{"keyword": "gone", "clip": "nope"}],
+        "orphan_keywords": [{"keyword": "gone", "clip": "nope", "kind": "motion"}],
     }
 
 
@@ -329,3 +329,37 @@ def test_scan_warns_when_name_collides_with_live2d(tmp_path, monkeypatch, caplog
     entries = json.loads((tmp_path / "model_dict.json").read_text(encoding="utf-8"))
     assert entries == [{"name": "x"}]
     assert "x" in caplog.text and "shadow" in caplog.text.lower()
+
+
+def test_emotion_keyword_pointing_at_missing_preset_becomes_orphan(
+    tmp_path, monkeypatch
+):
+    """指向模型沒有的 preset 的 emotionMap 條目必須進 orphan_keywords。
+
+    以前這種條目既不進 expressions（`if name in by_expr` 濾掉）也不進
+    orphan_keywords（只有動作那個迴圈 append），前端完全看不到它，
+    buildVrmPayload 自然不會帶回去——使用者按一次儲存就永久消失，畫面上
+    沒有任何警告。這是換了新匯出的 .vrm、preset 改名之後的實際情境。
+    """
+    from src.open_llm_vtuber.vrm_models import build_vrm_model_config
+
+    monkeypatch.chdir(tmp_path)
+    _vrm_folder(tmp_path)
+    entry = {
+        "name": "kv",
+        "type": "vrm",
+        "url": "/vrm-models/kv/kv.vrm",
+        # happy 存在；joy 不存在（舊檔叫 happy，新檔改名）。
+        "emotionMap": {"開心": "happy", "喜": "joy"},
+        "motionMap": {"gone": {"clip": "nope"}},
+    }
+    result = build_vrm_model_config(entry)
+
+    orphans = {(o["keyword"], o["clip"], o["kind"]) for o in result["orphan_keywords"]}
+    assert orphans == {
+        ("gone", "nope", "motion"),
+        ("喜", "joy", "expression"),
+    }
+    # 存在的那筆不受影響。
+    happy = next(e for e in result["expressions"] if e["name"] == "happy")
+    assert happy["keywords"] == ["開心"]

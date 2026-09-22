@@ -28,7 +28,7 @@ import {
 } from '@/effects/stage-effect-music';
 import { toaster } from '@/components/ui/tw/toaster';
 import MotionConfig from './motion-config';
-import VrmConfigSummary from './vrm-config-summary';
+import VrmMotionConfig from './vrm-motion-config';
 
 function live2D(): JSX.Element {
   const { t } = useTranslation();
@@ -213,16 +213,19 @@ function live2D(): JSX.Element {
         </Box>
       </Box>
 
-      {/* 這一塊是唯一真正依模型分歧的：Live2D 有動作編輯器，VRM 目前唯讀。
-          上面兩塊（畫布互動、特效演出）兩種模型都吃，所以標了「共用」——
-          分頁名稱改成中性的「角色外觀」之後，這個區分靠這幾個標籤說清楚。 */}
+      {/* 這一塊是唯一真正依模型分歧的：Live2D 跟 VRM 的動作／表情編輯器版面
+          相同（都是關鍵字＋顯示名稱＋試播、即時存檔），但資料模型不同——
+          Live2D 是 (group, index)＋HitArea，VRM 只有 clip 檔名、沒有點擊區域，
+          所以是兩個各自獨立的元件，不共用同一份 UI 硬塞兩種形狀。上面兩塊
+          （畫布互動、特效演出）兩種模型都吃，所以標了「共用」——分頁名稱改成
+          中性的「角色外觀」之後，這個區分靠這幾個標籤說清楚。 */}
       <Stack gap={2}>
         <Heading size="sm">
           {modelInfo?.type === 'vrm'
             ? t('settings.live2d.vrmOnlySectionTitle')
             : t('settings.live2d.live2dOnlySectionTitle')}
         </Heading>
-        {modelInfo?.type === 'vrm' ? <VrmConfigSummary /> : <MotionConfig />}
+        {modelInfo?.type === 'vrm' ? <VrmMotionConfig /> : <MotionConfig />}
       </Stack>
     </Stack>
   );

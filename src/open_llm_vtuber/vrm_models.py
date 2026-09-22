@@ -218,14 +218,21 @@ def build_vrm_model_config(entry: dict) -> Optional[dict]:
         if clip in by_clip:
             by_clip[clip].append({"keyword": keyword, "label": target.get("label")})
         else:
-            orphans.append({"keyword": keyword, "clip": clip})
+            orphans.append({"keyword": keyword, "clip": clip, "kind": "motion"})
 
     expressions = read_vrm_expressions(vrm_path) or []
     emotion_map = entry.get("emotionMap", {}) or {}
     by_expr: dict = {e: [] for e in expressions}
+    # 指向模型沒有的 preset 的條目也要進 orphans。少了這個 else，那種 keyword
+    # 既不在 expressions 也不在 orphan_keywords，前端完全看不到它——而存檔時
+    # buildVrmPayload 只從畫面上的 preset 重建 emotionMap，所以使用者按一次
+    # 儲存就永久消失，全程沒有任何警告。換了新匯出的 .vrm、preset 改名之後
+    # 就是這個情境。動作那邊一直都有這個 else，表情這邊漏了。
     for keyword, name in emotion_map.items():
         if name in by_expr:
             by_expr[name].append(keyword)
+        else:
+            orphans.append({"keyword": keyword, "clip": name, "kind": "expression"})
 
     return {
         "name": entry["name"],
