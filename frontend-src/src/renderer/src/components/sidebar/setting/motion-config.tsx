@@ -3,7 +3,7 @@
 // （不是 model_dict.json 手寫出來的那份），播放確認長什麼樣子，再指定
 // 觸發用的關鍵字與顯示名稱。
 //
-// 這個區塊是後端狀態、即時存檔，刻意不接進 live2d.tsx 既有的
+// 這個區塊是後端狀態（寫 model_dict.json），刻意不接進 live2d.tsx 既有的
 // TabActions（Apply/Revert）——那一對按鈕governs的是 pointerInteractive／
 // scrollToResize 兩個畫布互動設定，走抽屜關閉時的還原機制；這裡寫的是
 // model_dict.json，語意完全不同。2e 子專案整批就是在消滅「一顆按鈕看起來
@@ -411,6 +411,10 @@ function MotionConfig(): JSX.Element {
             className="mt-2"
             onClick={handleSave}
             loading={saving}
+            // handleSave 的第一行就是 `if (... || hasAnyError) return`，不一起
+            // 停用的話這顆鍵看起來可按、按下去靜默什麼都不做，使用者完全不知道
+            // 是因為下面某一列有錯。跟最下面那顆主儲存鍵同一個條件。
+            disabled={hasAnyError}
           >
             {t('settings.live2d.orphanClearButton')}
           </Button>
