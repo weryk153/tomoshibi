@@ -3,9 +3,9 @@
 // 照 motion-config.tsx（Live2D 版）：多重對應只顯示第一筆、其餘原樣帶回，見該
 // 檔案檔頭的完整說明——這裡不重複，只記 VRM 特有的差異：
 // - **沒有自動存檔**。編輯只改本地 state，要按最下面那顆「儲存」才會 PUT。
-//   （這份檔頭原本沿用 Live2D 版寫著「每一列即時存檔」，畫面上的提示字也是
-//   同一句，但兩邊都沒有實作自動存檔——使用者改完關掉抽屜，改動就沒了。提示字
-//   已改成 vrmMotionConfigSaveNote，講實話。）
+//   Live2D 版也是一樣，兩邊共用 motionConfigSectionNote 這句提示——它原本寫著
+//   「每一筆修改都會自己立刻存檔」，但兩個面板都沒有實作自動存檔，使用者改完
+//   關掉抽屜改動就沒了。那句話已經改成實話。
 // - 沒有 (group, index)／HitArea／tapMotions，VRM 的動作只有 clip 檔名可以定位，
 //   點擊區域指派這個區塊完全不存在。
 // - idle 是保留字，待機流程直接用檔名 "idle" 找 .vrma（見後端
@@ -290,7 +290,7 @@ function VrmMotionConfig(): JSX.Element {
   return (
     <Stack gap={2}>
       <Heading size="sm">{t('settings.live2d.motionConfigSectionTitle')}</Heading>
-      <Text fontSize="xs" color="blue.300">{t('settings.live2d.vrmMotionConfigSaveNote')}</Text>
+      <Text fontSize="xs" color="blue.300">{t('settings.live2d.motionConfigSectionNote')}</Text>
       <Text fontSize="xs" color="whiteAlpha.600">{t('settings.live2d.vrmMotionSectionNote')}</Text>
 
       {!modelName && (
