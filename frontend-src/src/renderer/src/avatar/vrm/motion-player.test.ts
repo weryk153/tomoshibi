@@ -68,3 +68,35 @@ test("ensureLoaded：不快取失敗——settle 後從 pending map 移除，下
   assert.equal(second, true);
   assert.equal(calls.length, 2);
 });
+
+// 換角色時 vrm-avatar.tsx 的 cleanup 會呼叫 dispose()。GLTFLoader.loadAsync 不收
+// AbortSignal，所以飛在路上的請求一定會回來——沒有 disposed 旗標的話，它會在
+// 已經 stopAllAction 的 mixer 上 clipAction() 重建 action 並塞回 actions，讓
+// hasClip() 對一個死掉的 mixer 回 true。
+test("dispose：飛行中的 load 回來時不再回填 actions", async () => {
+  const player = makePlayer();
+  let resolveLoad: (v: unknown) => void = () => {};
+  // 蓋掉真的 GLTFLoader：回一個「有動畫」的 gltf，讓 load() 走到 disposed 檢查
+  // 那一行。若旗標沒擋住，下一行 createVRMAnimationClip 會拿假 VRM 去用。
+  (player as unknown as { loader: { loadAsync: () => Promise<unknown> } }).loader = {
+    loadAsync: () => new Promise((resolve) => { resolveLoad = resolve; }),
+  };
+
+  const pending = player.ensureLoaded("wave");
+  player.dispose();
+  resolveLoad({ userData: { vrmAnimations: [{}] } });
+
+  assert.equal(await pending, false);
+  assert.equal(player.hasClip("wave"), false);
+});
+
+test("dispose 之後 ensureLoaded 直接回 false，不再起新的請求", async () => {
+  const player = makePlayer();
+  const { calls } = stubLoad(player, async () => true);
+
+  player.dispose();
+  const result = await player.ensureLoaded("wave");
+
+  assert.equal(result, false);
+  assert.deepEqual(calls, []);
+});

@@ -30,6 +30,12 @@ export class MotionPlayer {
   // 不會被快取住——下一次呼叫會重新嘗試，跟 hasClip 為 true 時的「成功有快取」
   // 是不同語意（成功的快取活在 this.actions，不在這個 map）。
   private pendingLoads = new Map<string, Promise<boolean>>();
+  // dispose() 之後就不准再碰 mixer／actions。ensureLoaded 起的那次網路請求沒有
+  // abort 的辦法（GLTFLoader.loadAsync 不收 signal），所以換角色時飛在路上的
+  // load() 一定會回來——沒有這個旗標的話它會在已經 stopAllAction 的 mixer 上
+  // clipAction() 重建 action 並塞回 this.actions，讓 hasClip() 對一個死掉的
+  // mixer 回 true，整個舊 player 也被請求吊著無法回收。
+  private disposed = false;
 
   // 明確欄位指派而不是 constructor parameter property：vrm-renderer.ts 對這個檔案
   // 是值匯入（IDLE_CLIP），node --test 載入 vrm-renderer.test.ts 時會連帶解析整份
@@ -54,6 +60,8 @@ export class MotionPlayer {
         console.warn(`[VRM] ${url} has no VRM animation`);
         return false;
       }
+      // await 之後才檢查：請求飛行期間可能已經換角色並 dispose 過了。
+      if (this.disposed) return false;
       const clip = createVRMAnimationClip(anims[0], this.vrm);
       const action = this.mixer.clipAction(clip);
       if (name === IDLE_CLIP) {
@@ -83,6 +91,7 @@ export class MotionPlayer {
    * 不會被快取，下一次呼叫會重新嘗試。
    */
   async ensureLoaded(name: string): Promise<boolean> {
+    if (this.disposed) return false;
     if (this.hasClip(name)) return true;
     const pending = this.pendingLoads.get(name);
     if (pending) return pending;
@@ -141,6 +150,10 @@ export class MotionPlayer {
   }
 
   dispose(): void {
+    this.disposed = true;
+    // 飛在路上的 load() 會自己因為 disposed 而放棄（見該旗標的說明）；這裡清掉
+    // map 只是不要再把它們當成「可以共用的進行中請求」交給新的呼叫者。
+    this.pendingLoads.clear();
     this.mixer.stopAllAction();
     this.actions.clear();
     this.current = null;

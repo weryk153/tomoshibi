@@ -25,7 +25,10 @@ export interface VrmModelConfig {
   clips: VrmClipEntry[]
   expressions: VrmExpressionEntry[]
   has_idle: boolean
-  orphan_keywords: { keyword: string; clip: string | null }[]
+  // kind 區分這個失效關鍵字原本指的是動作還是表情——兩者訊息不同（見
+  // vrm-motion-config.tsx 的 orphan 清單）。後端一律會送，型別上留成可選是為了
+  // 相容還沒更新的後端，讀的地方預設當 'motion'。
+  orphan_keywords: { keyword: string; clip: string | null; kind?: 'motion' | 'expression' }[]
 }
 
 export const fetchVrmModelConfig = (

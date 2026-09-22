@@ -25,6 +25,14 @@ export interface SpeakCues {
   motion?: MotionRequest;
 }
 
+/**
+ * 試播的結果。以前是 boolean，但 false 同時代表兩件完全不同的事：「這個角色
+ * 沒有這個動作檔」（要告訴使用者）與「載入還沒回來就被下一次試播取代了」
+ * （不該告訴使用者，那是他自己點的）。合在一起會讓連點兩個動作時彈出
+ * 「這個角色沒有這個動作」的假錯誤，所以拆成三態。
+ */
+export type PreviewMotionResult = 'played' | 'missing' | 'superseded';
+
 export interface CharacterRenderer {
   /**
    * 一段音訊要開播。audio 已設好 src、已呼叫 play()。掛 lipsync、下表情、下動作。
@@ -47,7 +55,7 @@ export interface CharacterRenderer {
    * 真的有播成功」——false 給 UI 顯示「這個角色沒有這個動作」，不是靜靜地
    * 什麼都不做。
    */
-  previewMotion?(clip: string): void | Promise<boolean>;
+  previewMotion?(clip: string): void | Promise<PreviewMotionResult>;
   /**
    * 存檔成功後，對每個新指到 motionMap 的 clip 呼叫，背景預先載入、不播放——
    * 讓 LLM 接下來能立刻觸發剛存的關鍵字，不用等使用者自己先按一次試播。

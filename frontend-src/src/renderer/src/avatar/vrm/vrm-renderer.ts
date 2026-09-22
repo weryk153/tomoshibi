@@ -1,6 +1,6 @@
 // frontend-src/src/renderer/src/avatar/vrm/vrm-renderer.ts
 import type { VRM } from "@pixiv/three-vrm";
-import type { CharacterRenderer, SpeakCues } from "../character-renderer.ts";
+import type { CharacterRenderer, SpeakCues, PreviewMotionResult } from "../character-renderer.ts";
 import { isClipMotion } from "../character-renderer.ts";
 import { ExpressionController } from "./expression-controller.ts";
 import { AutoBlink } from "./auto-blink.ts";
@@ -14,6 +14,8 @@ export class VRMRenderer implements CharacterRenderer {
   private lip = new LipSync();
   private blink = new AutoBlink();
   private elapsed = 0;
+  // 試播的世代號，見 previewMotion。只在那一個方法裡讀寫。
+  private previewGeneration = 0;
 
   // 明確欄位指派而不是 constructor parameter property：node --experimental-strip-types
   // 只剝型別、不轉譯這個語法（見 frontend-node-test-constraints），這個檔案要能被
@@ -54,10 +56,17 @@ export class VRMRenderer implements CharacterRenderer {
    * 沒試播過的 clip 這裡才會真的去要那個檔案。ensureLoaded 失敗（角色根本沒有
    * 這個 .vrma）就不播，回 false 讓 UI 顯示「這個角色沒有這個動作」。
    */
-  async previewMotion(clip: string): Promise<boolean> {
+  async previewMotion(clip: string): Promise<PreviewMotionResult> {
+    // ensureLoaded 可能是一次真的 .vrma 網路請求（見 MotionPlayer）。沒有這個
+    // 世代號的話，先點的慢 clip 載完後會 playOnce 蓋掉後點的快 clip——使用者
+    // 看到的是自己最後點的動作沒播、播的是前一個。每次呼叫先領號，await 回來
+    // 如果號碼已經不是最新的就放棄，不播也不回報錯誤。
+    const generation = this.previewGeneration + 1;
+    this.previewGeneration = generation;
     const loaded = await this.motions.ensureLoaded(clip);
-    if (!loaded) return false;
-    return this.motions.playOnce(clip, 1);
+    if (generation !== this.previewGeneration) return 'superseded';
+    if (!loaded) return 'missing';
+    return this.motions.playOnce(clip, 1) ? 'played' : 'missing';
   }
 
   /** 存檔後背景預先載入，不播放——見 CharacterRenderer.ensureMotionLoaded 的說明。 */

@@ -1,8 +1,11 @@
 /* eslint-disable import/no-extraneous-dependencies */
-// VRM 版的動作／表情對應編輯器，取代原本唯讀的 vrm-config-summary.tsx。版面與
-// 存檔規則照 motion-config.tsx（Live2D 版）：每一列即時存檔、多重對應只顯示
-// 第一筆、其餘原樣帶回，見該檔案檔頭的完整說明——這裡不重複，只記 VRM 特有的
-// 差異：
+// VRM 版的動作／表情對應編輯器，取代原本唯讀的 vrm-config-summary.tsx。版面
+// 照 motion-config.tsx（Live2D 版）：多重對應只顯示第一筆、其餘原樣帶回，見該
+// 檔案檔頭的完整說明——這裡不重複，只記 VRM 特有的差異：
+// - **沒有自動存檔**。編輯只改本地 state，要按最下面那顆「儲存」才會 PUT。
+//   （這份檔頭原本沿用 Live2D 版寫著「每一列即時存檔」，畫面上的提示字也是
+//   同一句，但兩邊都沒有實作自動存檔——使用者改完關掉抽屜，改動就沒了。提示字
+//   已改成 vrmMotionConfigSaveNote，講實話。）
 // - 沒有 (group, index)／HitArea／tapMotions，VRM 的動作只有 clip 檔名可以定位，
 //   點擊區域指派這個區塊完全不存在。
 // - idle 是保留字，待機流程直接用檔名 "idle" 找 .vrma（見後端
@@ -23,7 +26,7 @@
 //   預先讀 motionMap 裡當時有的 clip，剛存檔、還沒試播過的 clip 要現拉，見
 //   VRMRenderer.previewMotion 的說明（review a0c0ce7 fix 2）。
 import {
-  useState, useEffect, useMemo, useCallback,
+  useState, useEffect, useMemo, useCallback, useRef,
 } from 'react';
 import { Stack, Box, Text, Heading, HStack } from '@chakra-ui/react';
 import { useTranslation } from 'react-i18next';
@@ -74,6 +77,15 @@ function VrmMotionConfig(): JSX.Element {
   const [hiddenEmotionKeywords, setHiddenEmotionKeywords] = useState<Record<string, string[]>>({});
 
   const [saving, setSaving] = useState(false);
+  // 存檔是非同步的（http.ts 的 timeout 是 15 秒），回來時使用者可能已經在角色
+  // 分頁換掉模型了。載入 effect 有 cancelled flag，存檔這邊原本什麼都沒有——
+  // A 的 PUT 回來會把 B 的失效關鍵字警告清掉（但 B 的檔案沒動），並拿 A 的
+  // clip 名去叫 B 的 ensureMotionLoaded 要不存在的 .vrma。用一個永遠指向
+  // 「畫面上現在是哪個模型」的 ref 當守衛。
+  const currentModelRef = useRef(modelName);
+  useEffect(() => {
+    currentModelRef.current = modelName;
+  }, [modelName]);
 
   // 試播／回到原樣是否可用：renderer 存在，且（試播另外要求）它有實作
   // previewExpression／previewMotion 這兩個可選方法。用輪詢而不是只在掛載時
@@ -155,8 +167,10 @@ function VrmMotionConfig(): JSX.Element {
   // 說明），所以是非同步。false 代表角色根本沒有這個 clip 檔案——不是靜靜地
   // 什麼都不做，要讓使用者知道。
   const handleMotionPreview = useCallback(async (clip: string) => {
-    const played = await getActiveRenderer()?.previewMotion?.(clip);
-    if (played === false) {
+    // 'superseded' 是「載入還沒回來就被下一次試播取代」，那是使用者自己又點了
+    // 別的動作，不是錯誤，不能彈「這個角色沒有這個動作」（見 PreviewMotionResult）。
+    const result = await getActiveRenderer()?.previewMotion?.(clip);
+    if (result === 'missing') {
       toaster.create({
         title: t('settings.live2d.vrmPreviewClipMissing'),
         type: 'error',
@@ -230,12 +244,17 @@ function VrmMotionConfig(): JSX.Element {
       config.clips, rows, extraMappings, presets, expressionRows, extraEmotionKeywords,
       hiddenEmotionKeywords,
     );
+    const savedModel = modelName;
     const result = await saveVrmModelConfig(baseUrl, modelName, motionMap, emotionMap);
     setSaving(false);
+    // 存檔本身成功與否照常回報（那是真的發生過的事），但只有在畫面還停在同一個
+    // 模型時才把結果套回 state／renderer。
+    const stillCurrent = currentModelRef.current === savedModel;
     if (result.ok) {
       // orphan_keywords 從來不會被 buildVrmPayload 包進去，這次存檔已經把它們
-      // 從 model_dict.json 移除了——畫面上的清單要跟著清空。
-      setOrphans([]);
+      // 從 model_dict.json 移除了——畫面上的清單要跟著清空。只清自己這次存的
+      // 那個模型的，別把已經換上來的另一個模型的警告一起抹掉。
+      if (stillCurrent) setOrphans([]);
       // review a0c0ce7 fix 2(d)：角色載入當下只預先讀了 motionMap 裡「當時」有
       // 的 clip（見 vrm-avatar.tsx）。這裡對存檔後 motionMap 裡「每一個」clip
       // 都呼叫 ensureMotionLoaded（不只挑新增的）——ensureLoaded 內部用
@@ -244,9 +263,13 @@ function VrmMotionConfig(): JSX.Element {
       // 的回饋；用 Promise.allSettled 收集而不是各自裸接，讓「這裡不會 throw」
       // 是結構上保證的，不是依賴 ensureMotionLoaded 目前剛好每條路徑都不拋
       // （re-review of cfa0138 殘留 3）。
-      const renderer = getActiveRenderer();
-      const clipsToPreload = [...new Set(Object.values(motionMap).map((target) => target.clip))];
-      void Promise.allSettled(clipsToPreload.map((clip) => renderer?.ensureMotionLoaded?.(clip)));
+      // 同理，getActiveRenderer() 是現拉的：模型換過就是另一顆 renderer，拿
+      // 這次存的 clip 名去叫它只會去要一批不存在的 .vrma。
+      if (stillCurrent) {
+        const renderer = getActiveRenderer();
+        const clipsToPreload = [...new Set(Object.values(motionMap).map((target) => target.clip))];
+        void Promise.allSettled(clipsToPreload.map((clip) => renderer?.ensureMotionLoaded?.(clip)));
+      }
       toaster.create({
         title: t('settings.live2d.motionConfigSaved'),
         type: 'success',
@@ -267,7 +290,7 @@ function VrmMotionConfig(): JSX.Element {
   return (
     <Stack gap={2}>
       <Heading size="sm">{t('settings.live2d.motionConfigSectionTitle')}</Heading>
-      <Text fontSize="xs" color="blue.300">{t('settings.live2d.motionConfigSectionNote')}</Text>
+      <Text fontSize="xs" color="blue.300">{t('settings.live2d.vrmMotionConfigSaveNote')}</Text>
       <Text fontSize="xs" color="whiteAlpha.600">{t('settings.live2d.vrmMotionSectionNote')}</Text>
 
       {!modelName && (
@@ -292,14 +315,19 @@ function VrmMotionConfig(): JSX.Element {
 
       {config && orphans.length > 0 && (
         <Box borderWidth="1px" borderColor="orange.700" borderRadius="md" p={2}>
-          <Text fontSize="sm" color="orange.300">{t('settings.live2d.orphanWarningTitle')}</Text>
+          <Text fontSize="sm" color="orange.300">{t('settings.live2d.vrmOrphanWarningTitle')}</Text>
           <Stack gap={1} mt={1}>
             {orphans.map((orphan) => (
-              <Text key={`${orphan.keyword}-${orphan.clip ?? ''}`} fontSize="xs" color="whiteAlpha.700">
-                {t('settings.live2d.vrmOrphanWarningItem', {
-                  keyword: orphan.keyword,
-                  clip: orphan.clip ?? t('settings.live2d.vrmOrphanUnknownClip'),
-                })}
+              <Text key={`${orphan.kind ?? 'motion'}-${orphan.keyword}-${orphan.clip ?? ''}`} fontSize="xs" color="whiteAlpha.700">
+                {orphan.kind === 'expression'
+                  ? t('settings.live2d.vrmOrphanExpressionItem', {
+                    keyword: orphan.keyword,
+                    name: orphan.clip ?? t('settings.live2d.vrmOrphanUnknownClip'),
+                  })
+                  : t('settings.live2d.vrmOrphanWarningItem', {
+                    keyword: orphan.keyword,
+                    clip: orphan.clip ?? t('settings.live2d.vrmOrphanUnknownClip'),
+                  })}
               </Text>
             ))}
           </Stack>
@@ -310,6 +338,10 @@ function VrmMotionConfig(): JSX.Element {
             className="mt-2"
             onClick={handleSave}
             loading={saving}
+            // handleSave 的第一行就是 `if (... || hasAnyError) return`，不一起
+            // 停用的話這顆鍵看起來可按、按下去靜默什麼都不做，使用者完全不知道
+            // 是因為下面某一列關鍵字重複。跟最下面那顆主儲存鍵同一個條件。
+            disabled={hasAnyError}
           >
             {t('settings.live2d.orphanClearButton')}
           </Button>

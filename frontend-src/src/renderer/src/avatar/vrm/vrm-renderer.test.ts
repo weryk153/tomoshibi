@@ -52,20 +52,42 @@ test("previewExpression 轉呼叫 ExpressionController.setEmotion，強度固定
 // review a0c0ce7 fix 2（important）：VRMAvatar 只預先載入 motionMap 裡目前有的
 // clip；試播一個剛存檔、還沒被預先載入的 clip 之前，previewMotion 必須先
 // ensureLoaded 現拉一次，不能悄悄什麼都不做。
-test("previewMotion 先 ensureLoaded 再 playOnce，回傳 playOnce 的結果", async () => {
+test("previewMotion 先 ensureLoaded 再 playOnce，播成功回 'played'", async () => {
   const { renderer, motionCalls, ensureCalls } = makeRenderer();
   const result = await renderer.previewMotion("wave");
   assert.deepEqual(ensureCalls, ["wave"]);
   assert.deepEqual(motionCalls, [["wave", 1]]);
-  assert.equal(result, true);
+  assert.equal(result, "played");
 });
 
-test("previewMotion 在 ensureLoaded 失敗（角色沒有這個 .vrma）時不播放，回傳 false", async () => {
+test("previewMotion 在 ensureLoaded 失敗（角色沒有這個 .vrma）時不播放，回 'missing'", async () => {
   const { renderer, motionCalls, ensureCalls } = makeRenderer({ ensureLoaded: async () => false });
   const result = await renderer.previewMotion("no-such-clip");
   assert.deepEqual(ensureCalls, ["no-such-clip"]);
   assert.deepEqual(motionCalls, []);
-  assert.equal(result, false);
+  assert.equal(result, "missing");
+});
+
+// 連點兩個動作：先點的 clip 載入比較慢。沒有世代號的話，它載完後會 playOnce
+// 蓋掉後點的那個——使用者看到的是自己最後點的動作沒播、播的是前一個。而且
+// 舊呼叫回 false 還會讓元件彈出「這個角色沒有這個動作」的假錯誤。
+test("previewMotion：慢的那次被後來的取代時不播放，回 'superseded'", async () => {
+  const gates: Record<string, () => void> = {};
+  const { renderer, motionCalls } = makeRenderer({
+    ensureLoaded: (clip: string) => new Promise<boolean>((resolve) => {
+      gates[clip] = (): void => resolve(true);
+    }),
+  });
+
+  const slow = renderer.previewMotion("slow");   // 先點，載入慢
+  const fast = renderer.previewMotion("fast");   // 後點，載入快
+  gates.fast();
+  assert.equal(await fast, "played");
+  gates.slow();                                   // 慢的這時才回來
+  assert.equal(await slow, "superseded");
+
+  // 關鍵：慢的那次不能播出去，否則畫面上放的是使用者已經放棄的那個動作。
+  assert.deepEqual(motionCalls, [["fast", 1]]);
 });
 
 test("previewExpression／previewMotion 互不影響對方的呼叫紀錄", async () => {
