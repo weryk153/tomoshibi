@@ -637,6 +637,9 @@ class ServiceContext:
                 tool_manager=self.tool_manager,
                 tool_executor=self.tool_executor,
                 mcp_prompt_string=self.mcp_prompt,
+                # character_engine_agent 的狀態存在 chat_history/<conf_uid>/engine/。
+                conf_uid=target_character.conf_uid,
+                character_name=target_character.character_name,
             )
 
             logger.debug(f"Agent choice: {agent_config.conversation_agent_choice}")

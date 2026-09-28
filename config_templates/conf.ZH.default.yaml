@@ -82,6 +82,23 @@ character_config:
         use_mcpp: False
         mcp_enabled_servers: ["time", "ddg-search"] # 启用的 MCP 服务器
 
+      character_engine_agent:
+        # 可选。基础 AI 代理加上 AI Character Engine：每轮对话之后，引擎在背景整理
+        # 她对你的感觉、接下来想做的事、注意到的事。要启用请把
+        # conversation_agent_choice 改成 'character_engine_agent'。需要 Python 3.11
+        # 以上和 ai-character-engine 包，见 docs/character-engine-agent.md。
+        # 对话本身沿用上面 basic_memory_agent 的设置。
+        # 每种背景工作每几轮跑一次；0 为停用。每一种都是一次额外的 LLM 调用，
+        # 机器慢的话把数字调大。
+        emotion_every: 1
+        memory_every: 2
+        summary_every: 0
+        reflection_every: 6
+        goal_every: 4
+        timeout_seconds: 60 # 每个背景工作的超时秒数
+        max_rebase_turns: 3 # 背景结果落后几轮以内仍然采用
+        goal_max_age_days: 7 # 超过几天没更新的目标不再写进提示
+
       hume_ai_agent:
         api_key: ''
         host: 'api.hume.ai' # 一般无需更改

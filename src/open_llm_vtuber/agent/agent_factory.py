@@ -38,7 +38,13 @@ class AgentFactory:
         """
         logger.info(f"Initializing agent: {conversation_agent_choice}")
 
-        if conversation_agent_choice == "basic_memory_agent":
+        if conversation_agent_choice in (
+            "basic_memory_agent",
+            "character_engine_agent",
+        ):
+            # character_engine_agent 是「BasicMemoryAgent 加上引擎的認知」，前景的
+            # 設定與它完全相同，所以共用 basic_memory_agent 這個設定區塊——設定頁、
+            # MCP、記憶整理、翻譯都讀那個區塊，另開一份的話它們全部要跟著改。
             # Get the LLM provider choice from agent settings
             basic_memory_settings: dict = agent_settings.get("basic_memory_agent", {})
             llm_provider: str = basic_memory_settings.get("llm_provider")
@@ -70,7 +76,7 @@ class AgentFactory:
             mcp_prompt_string: str = kwargs.get("mcp_prompt_string", "")
 
             # Create the agent with the LLM and live2d_model
-            return BasicMemoryAgent(
+            basic = dict(
                 llm=llm,
                 system=system_prompt,
                 live2d_model=live2d_model,
@@ -96,6 +102,33 @@ class AgentFactory:
                 # 只問得到、設定裡沒有（見 context_window 模組）。
                 llm_base_url=str(llm_config.get("base_url") or ""),
                 llm_model=str(llm_config.get("model") or ""),
+            )
+            if conversation_agent_choice == "basic_memory_agent":
+                return BasicMemoryAgent(**basic)
+
+            # 引擎是選用的（要 Python 3.11 以上），跟 hume_ai／letta 一樣延遲匯入。
+            from ..character_engine.factory import build_session, current_session
+            from .agents.character_engine_agent import CharacterEngineAgent
+
+            conf_uid = str(kwargs.get("conf_uid") or "").strip()
+            if not conf_uid:
+                raise ValueError(
+                    "character_engine_agent needs the character's conf_uid"
+                )
+            character_name = str(kwargs.get("character_name") or "")
+            session_key = build_session(
+                conf_uid=conf_uid,
+                character_name=character_name,
+                provider=llm_provider,
+                llm_config=llm_config,
+                settings=agent_settings.get("character_engine_agent") or {},
+            )
+            return CharacterEngineAgent(
+                # 給的是「怎麼查」而不是工作階段本身：設定變了工作階段會換一個，
+                # 而舊的 agent 還被別的連線拿著。
+                session=lambda: current_session(session_key),
+                character_name=character_name,
+                **basic,
             )
 
         elif conversation_agent_choice == "mem0_agent":

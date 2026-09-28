@@ -1,5 +1,9 @@
 # AI Character Engine：Tomoshibi 本機試接
 
+> 這份文件記錄的是最初的試接腳本。正式的接法是 `character_engine_agent`，
+> 見 [character-engine-agent.md](character-engine-agent.md)。腳本走的是引擎的前景
+> 路徑，正式的 agent 沒有採用，理由寫在規格文件裡。
+
 本分支驗證把 AI Character Engine 1.0.0 接進 Tomoshibi 的文字對話管線。
 現有主程式仍使用原本的 agent；試接入口是 `scripts/try_character_engine.py`。
 

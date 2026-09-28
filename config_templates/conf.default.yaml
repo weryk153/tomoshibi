@@ -88,6 +88,24 @@ character_config:
         use_mcpp: True
         mcp_enabled_servers: ["time", "ddg-search"] # Enabled MCP servers
 
+      character_engine_agent:
+        # Optional. The Basic AI Agent plus AI Character Engine: after each turn the
+        # engine works in the background on how she feels about you, what she wants
+        # to do next and what she noticed. To use it, set conversation_agent_choice to
+        # 'character_engine_agent'. It needs Python 3.11+ and the ai-character-engine
+        # package; see docs/character-engine-agent.md.
+        # The chat itself uses the basic_memory_agent settings above.
+        # Run each background job every N turns; 0 turns it off. Every job is an
+        # extra LLM call, so raise these numbers on a slow machine.
+        emotion_every: 1
+        memory_every: 2
+        summary_every: 0
+        reflection_every: 6
+        goal_every: 4
+        timeout_seconds: 60 # per background job
+        max_rebase_turns: 3 # a result this many turns late is still used
+        goal_max_age_days: 7 # goals untouched for this long leave the prompt
+
       letta_agent:
         host: 'localhost' # Host address
         port: 8283 # Port number

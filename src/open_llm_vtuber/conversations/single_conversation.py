@@ -546,6 +546,26 @@ async def process_single_conversation(
                     full_response,
                 )
 
+        # 把這一輪交給 agent 觀察（character_engine_agent 會交給引擎做背景認知）。
+        # 跟記憶整理是獨立的兩件事：那一段整理 core_memory.md，這一段不碰它。
+        #
+        # 放在 finalize 之前，理由跟上面的 store_message 一樣：回覆的文字這時已經
+        # 完整，而 finalize 會等語音播完。她講話的那十幾秒模型是閒著的，背景工作
+        # 要趁這段時間跑——等播完才交出去，背景一開始就碰上下一輪對話。
+        #
+        # 用 input_text 而不是 model_input_text：後者接了「最近說過的話」的提示，
+        # 那不是使用者講的。
+        from ..character_engine.turn_hook import notify_turn_finished
+
+        notify_turn_finished(
+            context.agent_engine,
+            conf_uid=context.character_config.conf_uid,
+            history_uid=context.history_uid,
+            user_text=input_text,
+            reply=full_response,
+            is_proactive=is_proactive,
+        )
+
         # 等待 TTS 收尾與送出 backend-synth-complete 都在 finalize_conversation_turn
         # 裡做了，這裡不要再做一次。先前這段會讓 backend-synth-complete 連送兩則，
         # 而前端收到第一則就開始倒數回報播放完成——那時後端還沒掛上等待者，回報
