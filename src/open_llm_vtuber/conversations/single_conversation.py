@@ -207,12 +207,20 @@ async def process_single_conversation(
                 context.character_config.conf_uid, context.history_uid, client_uid
             )
 
+        # 給 agent 的兩件它自己分不出來的事：這一輪屬於哪段對話（agent 是所有連線
+        # 共用的），以及使用者實際講的是哪一段（model_input_text 後面接了只給模型看
+        # 的提示）。character_engine_agent 靠這個讓引擎記得的是原話；其他 agent
+        # 不看這兩個欄位。
+        agent_metadata = {**(metadata or {}), "history_uid": context.history_uid}
+        if not is_proactive and isinstance(input_text, str):
+            agent_metadata["spoken_text"] = input_text
+
         # Create batch input
         batch_input = create_batch_input(
             input_text=model_input_text,
             images=images,
             from_name=context.character_config.human_name,
-            metadata=metadata,
+            metadata=agent_metadata,
         )
 
         # Store user message (check if we should skip storing to history)
@@ -404,7 +412,7 @@ async def process_single_conversation(
                 ),
                 images=images,
                 from_name=context.character_config.human_name,
-                metadata=metadata,
+                metadata=agent_metadata,
             )
             # 重生的輸出也要過同一道護欄，否則它可能再講一次剛被丟掉的內容——
             # 實測遇過。這裡先整批收完再決定：重生本來就是罕見路徑，多等這一下
@@ -445,7 +453,7 @@ async def process_single_conversation(
                 input_text=build_proactive_retry_prompt(input_text),
                 images=images,
                 from_name=context.character_config.human_name,
-                metadata=metadata,
+                metadata=agent_metadata,
             )
             try:
                 retry_stream = context.agent_engine.chat(retry_batch_input)
@@ -546,12 +554,12 @@ async def process_single_conversation(
                     full_response,
                 )
 
-        # 把這一輪交給 agent 觀察（character_engine_agent 會交給引擎做背景認知）。
-        # 跟記憶整理是獨立的兩件事：那一段整理 core_memory.md，這一段不碰它。
+        # 告訴 agent 這一輪使用者實際看到的是什麼。上面的護欄會丟掉重複的句子與
+        # 客套話，character_engine_agent 要讓引擎記得的是留下來的那一版。
         #
         # 放在 finalize 之前，理由跟上面的 store_message 一樣：回覆的文字這時已經
-        # 完整，而 finalize 會等語音播完。她講話的那十幾秒模型是閒著的，背景工作
-        # 要趁這段時間跑——等播完才交出去，背景一開始就碰上下一輪對話。
+        # 完整，而 finalize 會等語音播完——使用者在她講話中途又開口的話，下一輪
+        # 讀到的就還是沒修過的那一版。
         #
         # 用 input_text 而不是 model_input_text：後者接了「最近說過的話」的提示，
         # 那不是使用者講的。

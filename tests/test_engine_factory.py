@@ -1,46 +1,78 @@
-"""裝了引擎時，工廠真的建得出 character_engine_agent，而且狀態存在角色自己的資料夾。"""
+"""選了 character_engine_agent 時，工廠建得出一個由引擎驅動的 agent。
+
+引擎那一側（CharacterCompanion）每個角色同一時間只有一個，所有 agent 共用；
+agent 卻是每次儲存設定就重建一個。
+"""
 
 import asyncio
 
 import pytest
 
+from src.open_llm_vtuber.agent.agent_factory import AgentFactory
+from src.open_llm_vtuber.agent.input_types import BatchInput, TextData, TextSource
+
+
+from tests.engine_factory_arguments import factory_arguments  # noqa: E402
+
 pytest.importorskip("ai_character_engine")
 
-from src.open_llm_vtuber.agent.agent_factory import AgentFactory  # noqa: E402
-from src.open_llm_vtuber.agent.agents.character_engine_agent import (  # noqa: E402
-    CharacterEngineAgent,
-)
-from src.open_llm_vtuber.character_engine.factory import _worker_client  # noqa: E402
-from tests.test_engine_agent import factory_arguments  # noqa: E402
+from ai_character_engine.llm.models import LLMResponse, LLMStreamChunk  # noqa: E402
+
+from src.open_llm_vtuber.character_engine import factory  # noqa: E402
 
 
-def test_the_factory_builds_the_engine_agent_with_per_character_storage(
-    tmp_path, monkeypatch
-):
+class Offline:
+    """頂替引擎的模型 client，記下它是用什麼設定建的。"""
+
+    built = []
+
+    def __init__(self, **options):
+        self.options = options
+        self.request_options = options.get("request_options", {})
+        Offline.built.append(self)
+
+    async def generate(self, messages, *, tools=None):
+        return LLMResponse(text="{}", model="offline")
+
+    async def stream_generate(self, messages, *, tools=None):
+        yield LLMStreamChunk(text="嗯。")
+        yield LLMStreamChunk(
+            final=True, response=LLMResponse(text="嗯。", model="offline")
+        )
+
+
+@pytest.fixture(autouse=True)
+def offline(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(factory, "_LIVE", {})
+    monkeypatch.setattr(factory, "_engine_client", lambda **options: Offline(**options))
+    monkeypatch.setattr(factory, "detect_context_window", lambda *a, **k: None)
+    Offline.built = []
 
+
+async def say(agent, text):
+    batch = BatchInput(texts=[TextData(source=TextSource.INPUT, content=text)])
+    return [output async for output in agent.chat(batch)]
+
+
+def test_her_state_lives_next_to_that_characters_chat_history(tmp_path):
     async def scenario():
         created = AgentFactory.create_agent(**factory_arguments())
-        created.observe_turn("kurisu", "h1", "你好", "嗯，你好。")
+        await say(created, "你好")
         await created.close()
-        return created
 
-    created = asyncio.run(scenario())
+    asyncio.run(scenario())
 
-    assert isinstance(created, CharacterEngineAgent)
     assert (tmp_path / "chat_history" / "kurisu" / "engine" / "state.json").is_file()
 
 
-def test_engine_state_lives_next_to_that_characters_chat_history(tmp_path, monkeypatch):
-    """conf_uid 的清理方式要跟 chat_history_manager 一樣，不然同一個角色的歷史
-    在一個資料夾、引擎狀態在另一個。"""
-    monkeypatch.chdir(tmp_path)
+def test_the_folder_name_is_cleaned_like_the_chat_historys(tmp_path):
     arguments = factory_arguments()
     arguments["conf_uid"] = "../../outside"
 
     async def scenario():
         created = AgentFactory.create_agent(**arguments)
-        created.observe_turn("../../outside", "h1", "你好", "嗯。")
+        await say(created, "你好")
         await created.close()
 
     asyncio.run(scenario())
@@ -49,8 +81,7 @@ def test_engine_state_lives_next_to_that_characters_chat_history(tmp_path, monke
     assert not (tmp_path.parent / "outside").exists()
 
 
-def test_a_conf_uid_that_is_not_a_name_is_refused(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
+def test_a_conf_uid_that_is_not_a_name_is_refused(tmp_path):
     arguments = factory_arguments()
     arguments["conf_uid"] = ".."
 
@@ -60,65 +91,127 @@ def test_a_conf_uid_that_is_not_a_name_is_refused(tmp_path, monkeypatch):
     assert not (tmp_path / "chat_history").exists()
 
 
-def test_rebuilding_the_agent_with_the_same_settings_keeps_the_same_session(
-    tmp_path, monkeypatch
-):
-    monkeypatch.chdir(tmp_path)
+def test_she_is_the_persona_the_host_composed():
+    created = AgentFactory.create_agent(**factory_arguments())
+    character = created._companion().character
+
+    assert (character.id, character.name) == ("kurisu", "紅莉栖")
+    assert character.description.startswith("你是紅莉栖。")
+
+
+def test_rebuilding_the_agent_keeps_the_same_engine_side():
+    """每次儲存設定都會重建 agent；各建各的話，它們會寫同一個資料夾。"""
 
     async def scenario():
         first = AgentFactory.create_agent(**factory_arguments())
+        await say(first, "一")
         second = AgentFactory.create_agent(**factory_arguments())
-        first.observe_turn("kurisu", "h1", "一", "嗯。")
-        await first.close()
-        second.observe_turn("kurisu", "h1", "二", "嗯。")
-        await second.close()
-        return first, second
+        await say(second, "二")
+        return first._companion(), second._companion()
 
-    first, second = asyncio.run(scenario())
+    one, two = asyncio.run(scenario())
 
-    assert first._current_session() is second._current_session()
-    assert second._current_session().snapshot().trust == pytest.approx(50.6)
+    assert one is two
+    assert two.snapshot().trust == pytest.approx(50.6)
 
 
-def test_changing_the_model_moves_every_agent_to_the_new_session(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)
+def test_a_persona_edit_does_not_replace_the_engine_side():
+    """人設與記憶每輪都可能刷新；那是改她的描述，不是換一個她。"""
 
     async def scenario():
+        first = AgentFactory.create_agent(**factory_arguments())
+        await say(first, "一")
+        edited = factory_arguments()
+        edited["system_prompt"] = "你是鋼琴家。"
+        second = AgentFactory.create_agent(**edited)
+        await say(second, "二")
+        return first._companion(), second._companion()
+
+    one, two = asyncio.run(scenario())
+
+    assert one is two
+    assert two.character.description.startswith("你是鋼琴家。")
+
+
+def test_changing_the_model_moves_every_agent_to_a_new_engine_side():
+    async def scenario():
         before = AgentFactory.create_agent(**factory_arguments())
-        before.observe_turn("kurisu", "h1", "一", "嗯。")
-        await before.close()
-        old_session = before._current_session()
+        await say(before, "一")
+        old = before._companion()
         changed = factory_arguments()
         changed["llm_configs"]["lmstudio_llm"]["model"] = "another-model"
         after = AgentFactory.create_agent(**changed)
-        before.observe_turn("kurisu", "h1", "舊連線繼續聊", "嗯。")
-        await before.close()
-        return before, after, old_session
+        await say(before, "舊連線繼續聊")
+        return before, after, old
 
-    before, after, old_session = asyncio.run(scenario())
+    before, after, old = asyncio.run(scenario())
 
-    assert before._current_session() is after._current_session()
-    assert before._current_session() is not old_session
-    assert after._current_session().snapshot().trust == pytest.approx(50.6)
+    assert before._companion() is after._companion()
+    assert before._companion() is not old
+    assert old.usable_in_running_loop() is False
+    assert after._companion().snapshot().trust == pytest.approx(50.6)
 
 
-def test_background_workers_keep_only_the_reasoning_switches():
-    client = _worker_client(
-        "lmstudio_llm",
-        {
-            "base_url": "http://127.0.0.1:1/v1",
-            "model": "stub",
-            "extra_body": {
-                "reasoning_effort": "none",
-                "presence_penalty": 0.6,
-                "top_k": 20,
-            },
-        },
+def test_she_talks_with_the_hosts_settings_and_thinks_with_plain_ones():
+    """背景工作要的是穩定的 JSON：溫度壓低，只留「關掉思考模式」這類欄位——
+    presence_penalty 會懲罰 JSON 裡本來就該重複的鍵名。"""
+    AgentFactory.create_agent(**factory_arguments())
+    talking, thinking = Offline.built
+
+    assert talking.request_options == {
+        "temperature": 0.7,
+        "extra_body": {"reasoning_effort": "none", "presence_penalty": 0.6},
+    }
+    assert thinking.request_options["temperature"] == pytest.approx(0.1)
+    assert thinking.request_options["extra_body"] == {"reasoning_effort": "none"}
+    assert {client.options["model"] for client in Offline.built} == {"stub"}
+
+
+def test_the_cognition_settings_reach_the_engine():
+    arguments = factory_arguments()
+    arguments["agent_settings"]["character_engine_agent"] = {
+        "goal_every": 9,
+        "timeout_seconds": 45.0,
+        "max_rebase_turns": 5,
+    }
+
+    settings = AgentFactory.create_agent(**arguments)._companion().settings
+
+    assert (settings.goal_every, settings.call_timeout_seconds) == (9, 45.0)
+    assert settings.max_turns_late == 5
+    assert settings.emotion_every == 1
+
+
+def test_the_detected_context_window_becomes_her_budget(monkeypatch):
+    monkeypatch.setattr(factory, "detect_context_window", lambda *a, **k: 20992)
+
+    companion = AgentFactory.create_agent(**factory_arguments())._companion()
+
+    assert companion.runtime.context_builder.budget.context_window_tokens == 20992
+
+
+def test_she_can_see_through_the_same_model_without_its_reasoning(monkeypatch):
+    """本機模型預設會先思考再回答：描述一張圖要 23 秒；關掉是 3 秒。"""
+    built = []
+    monkeypatch.setattr(
+        factory, "_engine_eyes", lambda **options: built.append(options) or "eyes"
     )
 
-    assert client.request_options["extra_body"] == {"reasoning_effort": "none"}
+    companion = AgentFactory.create_agent(**factory_arguments())._companion()
+
+    (options,) = built
+    assert companion.sees
+    assert (options["model"], options["base_url"]) == ("stub", "http://127.0.0.1:1/v1")
+    assert options["request_options"]["extra_body"] == {"reasoning_effort": "none"}
+    assert options["request_options"]["max_tokens"] <= 200
 
 
-def test_a_provider_that_is_not_openai_compatible_turns_cognition_off():
-    assert _worker_client("claude_llm", {"model": "claude", "base_url": "x"}) is None
-    assert _worker_client("lmstudio_llm", {"model": "stub"}) is None
+def test_a_provider_the_engine_cannot_talk_to_is_refused_with_the_way_out():
+    arguments = factory_arguments()
+    arguments["agent_settings"]["basic_memory_agent"]["llm_provider"] = "claude_llm"
+    arguments["llm_configs"]["claude_llm"] = {"model": "claude", "base_url": "x"}
+
+    with pytest.raises(ValueError) as caught:
+        AgentFactory.create_agent(**arguments)
+
+    assert "basic_memory_agent" in str(caught.value)

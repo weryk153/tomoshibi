@@ -175,9 +175,10 @@ class LettaConfig(I18nMixin, BaseModel):
 class CharacterEngineAgentConfig(I18nMixin, BaseModel):
     """character_engine_agent 的認知節奏。
 
-    前景的設定（llm_provider、use_mcpp…）沿用 basic_memory_agent 區塊，這裡只放
-    引擎背景工作的部分。預設值來自實測，見 character_engine/session.py 的
-    CognitionSettings——兩邊的欄位必須一致，這份會原樣傳過去。
+    對話的設定（llm_provider、use_mcpp…）沿用 basic_memory_agent 區塊，這裡只放
+    引擎背景工作的部分。預設值跟引擎的 CompanionSettings 一致；character_engine/
+    factory.py 把這份傳過去（timeout_seconds、max_rebase_turns 在那裡換成引擎的
+    名字）。
     """
 
     emotion_every: int = Field(1, alias="emotion_every", ge=0)

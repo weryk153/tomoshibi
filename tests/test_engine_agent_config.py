@@ -63,12 +63,3 @@ def test_both_templates_accept_the_engine_agent_as_a_choice(template):
     chosen = config.character_config.agent_config
     assert chosen.conversation_agent_choice == "character_engine_agent"
     assert chosen.agent_settings.character_engine_agent.reflection_every == 6
-
-
-def test_settings_reach_the_engine_session_unchanged():
-    pytest.importorskip("ai_character_engine")
-    from src.open_llm_vtuber.character_engine.session import CognitionSettings
-
-    dumped = CharacterEngineAgentConfig(goal_every=4).model_dump()
-
-    assert CognitionSettings(**dumped).goal_every == 4

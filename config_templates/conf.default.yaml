@@ -89,12 +89,13 @@ character_config:
         mcp_enabled_servers: ["time", "ddg-search"] # Enabled MCP servers
 
       character_engine_agent:
-        # Optional. The Basic AI Agent plus AI Character Engine: after each turn the
-        # engine works in the background on how she feels about you, what she wants
-        # to do next and what she noticed. To use it, set conversation_agent_choice to
-        # 'character_engine_agent'. It needs Python 3.11+ and the ai-character-engine
-        # package; see docs/character-engine-agent.md.
-        # The chat itself uses the basic_memory_agent settings above.
+        # Optional. The whole conversation is driven by AI Character Engine:
+        # conversation, memory and tools live in the engine, and how she feels about
+        # you, what she wants to do next and what she noticed build up as you talk.
+        # To use it, set conversation_agent_choice to 'character_engine_agent'. It
+        # needs Python 3.11+, the ai-character-engine package and an
+        # OpenAI-compatible LLM endpoint; see docs/character-engine-agent.md.
+        # Model, MCP and sentence splitting use the basic_memory_agent settings above.
         # Run each background job every N turns; 0 turns it off. Every job is an
         # extra LLM call, so raise these numbers on a slow machine.
         emotion_every: 1

@@ -107,27 +107,29 @@ class AgentFactory:
                 return BasicMemoryAgent(**basic)
 
             # 引擎是選用的（要 Python 3.11 以上），跟 hume_ai／letta 一樣延遲匯入。
-            from ..character_engine.factory import build_session, current_session
-            from .agents.character_engine_agent import CharacterEngineAgent
+            # 先建引擎那一側：沒裝引擎的話，這裡會丟出寫明做法的錯誤。
+            from ..character_engine.factory import build_companion, current_companion
 
             conf_uid = str(kwargs.get("conf_uid") or "").strip()
             if not conf_uid:
                 raise ValueError(
                     "character_engine_agent needs the character's conf_uid"
                 )
-            character_name = str(kwargs.get("character_name") or "")
-            session_key = build_session(
+            key = build_companion(
                 conf_uid=conf_uid,
-                character_name=character_name,
+                character_name=str(kwargs.get("character_name") or ""),
+                system=system_prompt,
                 provider=llm_provider,
                 llm_config=llm_config,
                 settings=agent_settings.get("character_engine_agent") or {},
             )
+            from .agents.character_engine_agent import CharacterEngineAgent
+
             return CharacterEngineAgent(
-                # 給的是「怎麼查」而不是工作階段本身：設定變了工作階段會換一個，
+                # 給的是「怎麼查」而不是它本身：設定變了引擎那一側會換一個，
                 # 而舊的 agent 還被別的連線拿著。
-                session=lambda: current_session(session_key),
-                character_name=character_name,
+                companion=lambda: current_companion(key),
+                conf_uid=conf_uid,
                 **basic,
             )
 
