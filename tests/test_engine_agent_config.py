@@ -33,6 +33,7 @@ def test_defaults_match_what_was_measured_on_a_local_model():
         "max_rebase_turns": 3,
         "goal_max_age_days": 7,
         "foreground_patience_seconds": 120.0,
+        "max_history_messages": 80,
     }
 
 

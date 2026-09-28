@@ -405,18 +405,54 @@ def test_interrupted_she_remembers_only_what_was_heard(tmp_path):
     assert after == "嗯，我知道了。"
 
 
-def test_what_was_displayed_replaces_what_was_generated(tmp_path):
-    """主機會丟掉重複的句子、做繁簡正規化。她記得的要是使用者看到的那一版。"""
+def test_interrupted_the_way_the_host_really_does_it(tmp_path):
+    """conversation_handler 取消 task 之後馬上呼叫 handle_interrupt，不等它停下來。"""
 
     async def scenario():
-        llm = EngineLLM("嗯，我知道了。有什麼可以幫你的嗎？")
+        llm = EngineLLM("嗯，我知道了。", gate=asyncio.Event())
         engine = companion(tmp_path, llm)
         current = agent(engine)
-        await say(current, "你好", history_uid="h1")
-        current.observe_turn("kurisu", "h1", "你好", "嗯，我知道了。")
-        return [message.content for message in engine.runtime.history]
+        turn = asyncio.ensure_future(say(current, "你好"))
+        await llm.started.wait()
+        turn.cancel()
+        current.handle_interrupt("嗯")
+        with pytest.raises(asyncio.CancelledError):
+            await turn
+        llm.gate.set()
+        outputs = await say(current, "抱歉，你繼續")
+        return llm.said_by_both()[:2], spoken(outputs)
 
-    assert asyncio.run(scenario()) == ["你好", "嗯，我知道了。"]
+    history, after = asyncio.run(scenario())
+
+    assert history == ["你好", "嗯 [Interrupted by user]"]
+    assert after == "嗯，我知道了。"
+
+
+def test_interrupting_the_one_who_waits_does_not_cut_off_the_one_who_talks(tmp_path):
+    """agent 是共用的：A 的回覆還在生成，B 排在後面等。B 被打斷不能切掉 A。"""
+
+    async def scenario():
+        llm = EngineLLM("嗯，我知道了。", gate=asyncio.Event())
+        engine = companion(tmp_path, llm)
+        current = agent(engine)
+        first = asyncio.ensure_future(say(current, "我是第一個", history_uid="h1"))
+        await llm.started.wait()
+        second = asyncio.ensure_future(say(current, "我是第二個", history_uid="h2"))
+        for _ in range(20):
+            await asyncio.sleep(0)
+        second.cancel()
+        current.handle_interrupt("")
+        llm.gate.set()
+        outputs = await first
+        with pytest.raises(asyncio.CancelledError):
+            await second
+        await say(current, "繼續", history_uid="h1")
+        return spoken(outputs), llm.said_by_both()
+
+    said, conversation = asyncio.run(scenario())
+
+    assert said == "嗯，我知道了。"
+    assert conversation == ["我是第一個", "嗯，我知道了。", "繼續"]
 
 
 def test_each_turn_belongs_to_the_conversation_the_host_names(tmp_path):
@@ -424,15 +460,68 @@ def test_each_turn_belongs_to_the_conversation_the_host_names(tmp_path):
 
     async def scenario():
         llm = EngineLLM()
-        engine = companion(tmp_path, llm)
-        current = agent(engine)
+        current = agent(companion(tmp_path, llm))
         await say(current, "我在第一段", history_uid="h1")
         await say(current, "我在第二段", history_uid="h2")
-        current.observe_turn("kurisu", "h1", "我在第一段", "不是剛講完的那段")
         await say(current, "回到第一段", history_uid="h1")
         return llm.said_by_both()
 
     assert asyncio.run(scenario()) == ["我在第一段", "嗯，我知道了。", "回到第一段"]
+
+
+def test_two_connections_with_different_personas_do_not_trip_over_each_other(tmp_path):
+    """設定一存就有新的 agent，舊連線還拿著舊的；兩邊的人設可以不一樣。"""
+
+    async def scenario():
+        llm = EngineLLM("嗯，我知道了。", gate=asyncio.Event())
+        engine = companion(tmp_path, llm)
+        old, new = agent(engine), agent(engine)
+        new.set_system("你是鋼琴家。")
+        first = asyncio.ensure_future(say(old, "我是第一個", history_uid="h1"))
+        await llm.started.wait()
+        second = asyncio.ensure_future(say(new, "我是第二個", history_uid="h2"))
+        for _ in range(20):
+            await asyncio.sleep(0)
+        llm.gate.set()
+        results = await asyncio.gather(first, second)
+        return [spoken(r) for r in results], llm.sent(0)[0], llm.sent(1)[0]
+
+    said, first_system, second_system = asyncio.run(scenario())
+
+    assert said == ["嗯，我知道了。", "嗯，我知道了。"]
+    assert "你是紅莉栖。" in first_system
+    assert "你是鋼琴家。" in second_system
+
+
+def test_she_remembers_her_own_expressions(tmp_path):
+    """畫面上的字會把 [joy] 這類標籤拿掉；她記得的那一份要留著，不然幾輪之後
+    她讀到的自己從來不做表情，就真的不做了。"""
+
+    async def scenario():
+        llm = EngineLLM("[joy]太好了！你呢？")
+        engine = companion(tmp_path, llm)
+        current = agent(engine)
+        outputs = await say(current, "我考上了")
+        return spoken(outputs), engine.runtime.history[-1].content
+
+    shown, remembered = asyncio.run(scenario())
+
+    assert shown == "太好了！你呢？"
+    assert remembered == "[joy]太好了！你呢？"
+
+
+def test_she_remembers_what_she_said_in_the_players_script(tmp_path):
+    """模型某一輪漂到簡體時，畫面與紀錄會被轉成繁體；她記得的那一份沒轉的話，
+    下一輪她讀到自己講簡體，就更容易繼續漂。"""
+
+    async def scenario():
+        llm = EngineLLM("这样啊，我知道了。")
+        engine = companion(tmp_path, llm)
+        current = agent(engine, player_language="繁體中文")
+        await say(current, "我考上了")
+        return engine.runtime.history[-1].content
+
+    assert asyncio.run(scenario()) == "這樣啊，我知道了。"
 
 
 # --- 工具 -------------------------------------------------------------------------
@@ -528,6 +617,30 @@ def test_the_hosts_tools_run_and_report_their_progress(tmp_path):
     ]
     assert tool_result == "12:30"
     assert spoken(outputs) == "現在十二點半。"
+
+
+def test_two_connections_talking_at_once_each_get_their_own_tool_progress(tmp_path):
+    """agent 是所有連線共用的。引擎一次只跑一輪，但第二個連線在排隊的時候，
+    第一個連線的工具進度不能跑到它那裡去。"""
+
+    async def scenario():
+        current = agent(
+            companion(tmp_path, ToolUsingLLM()),
+            use_mcpp=True,
+            tool_manager=FakeToolManager(),
+            tool_executor=FakeToolExecutor(),
+        )
+        return await asyncio.gather(
+            say(current, "現在幾點", history_uid="h1"),
+            say(current, "現在幾點", history_uid="h2"),
+        )
+
+    for outputs in asyncio.run(scenario()):
+        assert [o["status"] for o in outputs if isinstance(o, dict)] == [
+            "running",
+            "completed",
+        ]
+        assert spoken(outputs) == "現在十二點半。"
 
 
 def test_a_rebuilt_agent_brings_its_own_tools(tmp_path):

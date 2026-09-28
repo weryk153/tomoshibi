@@ -192,8 +192,13 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
     foreground_patience_seconds: float = Field(
         120.0, alias="foreground_patience_seconds", gt=0
     )
+    max_history_messages: int = Field(80, alias="max_history_messages", ge=0)
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
+        "max_history_messages": Description(
+            en="How many messages of the conversation are kept for the model",
+            zh="對話最多留幾則給模型",
+        ),
         "emotion_every": Description(
             en="Analyse the user's emotion every N turns (0 disables)",
             zh="每幾輪分析一次對方的情緒（0 為停用）",

@@ -56,6 +56,26 @@ def test_her_memory_arrives_as_notes_and_the_persona_stays_the_same(tmp_path):
     assert "晨星" not in new_note
 
 
+def test_a_memory_the_user_corrected_or_deleted_is_no_longer_sent(tmp_path):
+    async def scenario():
+        llm = EngineLLM()
+        current = agent(companion(tmp_path, llm))
+        current.set_system(composed("", "對方：住在台北。"))
+        await say(current, "你好")
+        current.set_system(composed("", "對方：搬到台中了。"))
+        await say(current, "我搬家了")
+        corrected = "".join(llm.sent())
+        current.set_system(composed("", ""))
+        await say(current, "忘了吧")
+        return corrected, "".join(llm.sent())
+
+    corrected, cleared = asyncio.run(scenario())
+
+    assert "台北" not in corrected
+    assert "搬到台中了" in corrected
+    assert "台中" not in cleared
+
+
 def test_how_to_use_the_memory_is_still_said(tmp_path):
     async def scenario():
         llm = EngineLLM()
@@ -81,5 +101,6 @@ def test_she_knows_what_time_it_is(tmp_path):
 
     first, second = asyncio.run(scenario())
 
-    assert "- 現在時間：2026-09-29（週二）03:45" in first
-    assert "- 現在時間：2026-09-29（週二）03:47" in second
+    assert "For the next reply only: 現在時間：2026-09-29（週二）03:45" in first
+    assert "03:45" not in second
+    assert "For the next reply only: 現在時間：2026-09-29（週二）03:47" in second

@@ -182,6 +182,66 @@ def test_the_cognition_settings_reach_the_engine():
     assert settings.emotion_every == 1
 
 
+def test_a_window_that_is_detected_later_does_not_replace_her(monkeypatch):
+    """模型還沒載入的時候問不到 window；晚一點問到了，是同一個她、換一個預算。"""
+    first = AgentFactory.create_agent(**factory_arguments())._companion()
+    monkeypatch.setattr(factory, "detect_context_window", lambda *a, **k: 20992)
+
+    second = AgentFactory.create_agent(**factory_arguments())._companion()
+
+    assert second is first
+    assert second.runtime.context_builder.budget.context_window_tokens == 20992
+
+
+def test_saving_settings_while_she_talks_lets_her_finish(monkeypatch):
+    """設定一存，引擎那一側可能換一個。正在講的那句話要講完：主機那一輪沒有人
+    取消它，中途斷掉的話前端等不到這一輪的結束訊號。"""
+    gate = asyncio.Event()
+
+    class Slow(Offline):
+        async def stream_generate(self, messages, *, tools=None):
+            yield LLMStreamChunk(text="嗯，")
+            await gate.wait()
+            yield LLMStreamChunk(text="我知道了。")
+            yield LLMStreamChunk(
+                final=True, response=LLMResponse(text="嗯，我知道了。", model="offline")
+            )
+
+    monkeypatch.setattr(factory, "_engine_client", lambda **options: Slow(**options))
+
+    async def scenario():
+        talking = AgentFactory.create_agent(**factory_arguments())
+        turn = asyncio.ensure_future(say(talking, "你好"))
+        for _ in range(20):
+            await asyncio.sleep(0)
+        changed = factory_arguments()
+        changed["llm_configs"]["lmstudio_llm"]["model"] = "another-model"
+        AgentFactory.create_agent(**changed)
+        gate.set()
+        return await turn
+
+    outputs = asyncio.run(scenario())
+
+    assert "".join(o.display_text.text for o in outputs) == "嗯，我知道了。"
+
+
+def test_she_keeps_as_much_of_the_conversation_as_the_basic_agent():
+    """basic_memory_agent 留 20000 字、至少 24 則。引擎預設 40 則，語音對話一句
+    很短，會比原本更早忘記前面講過的。"""
+    default = AgentFactory.create_agent(**factory_arguments())._companion()
+    assert default.settings.max_history_messages == 80
+
+    arguments = factory_arguments()
+    arguments["conf_uid"] = "another"
+    arguments["agent_settings"]["character_engine_agent"] = {"max_history_messages": 30}
+    assert (
+        AgentFactory.create_agent(**arguments)
+        ._companion()
+        .settings.max_history_messages
+        == 30
+    )
+
+
 def test_the_detected_context_window_becomes_her_budget(monkeypatch):
     monkeypatch.setattr(factory, "detect_context_window", lambda *a, **k: 20992)
 

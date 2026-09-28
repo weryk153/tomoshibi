@@ -34,6 +34,9 @@ EYES_MAX_TOKENS = 160
 EYES_PROMPT = "用兩三句話說出畫面裡有什麼。只講看得到的，不要猜測，不要用條列或標記。"
 # 一輪可以包含工具呼叫（搜尋網頁要十幾秒）再加一段長回覆。
 TURN_TIMEOUT_SECONDS = 180.0
+# basic_memory_agent 留 20000 字、至少 24 則。語音對話一句很短，引擎預設的 40 則
+# 會比原本更早忘記前面講過的；真的太長的時候引擎會照 token 預算自己挑。
+HISTORY_MESSAGES = 80
 REPLY_TIMEOUT_SECONDS = 120.0
 
 UNAVAILABLE = (
@@ -173,6 +176,9 @@ def _let_go(companion: Any) -> None:
 
 async def _release(companion: Any) -> None:
     try:
+        # retire() 讓她把正在講的那句講完；close() 會切斷它。
+        while companion.busy:
+            await asyncio.sleep(0.2)
         await companion.close()
     except Exception as exc:
         # 它可能屬於另一個已經結束的 event loop；狀態在 retire() 時已經存好了。
@@ -225,14 +231,17 @@ def build_companion(
                     "extra_body",
                 )
             },
-            "window": window,
             "settings": dict(settings or {}),
         },
         sort_keys=True,
         default=str,
     )
+    budget = ContextBudget(context_window_tokens=window) if window else ContextBudget()
     live = _LIVE.get(key)
     if live and live.signature == signature and live.companion.usable_in_running_loop():
+        # 模型還沒載入的時候問不到 window，晚一點才問得到：同一個她，換預算就好。
+        if window:
+            live.companion.runtime.context_builder.budget = budget
         return key
 
     talking, thinking, eyes = _clients(provider, llm_config)
@@ -249,15 +258,14 @@ def build_companion(
             storage_dir=directory,
             settings=CompanionSettings(
                 **{
-                    _RENAMED_SETTINGS.get(name, name): value
-                    for name, value in dict(settings or {}).items()
+                    "max_history_messages": HISTORY_MESSAGES,
+                    **{
+                        _RENAMED_SETTINGS.get(name, name): value
+                        for name, value in dict(settings or {}).items()
+                    },
                 }
             ),
-            context_builder=ContextBuilder(
-                budget=ContextBudget(context_window_tokens=window)
-                if window
-                else ContextBudget()
-            ),
+            context_builder=ContextBuilder(budget=budget),
             vision=eyes,
             bridge_config=HostBridgeConfig(turn_timeout_seconds=TURN_TIMEOUT_SECONDS),
         ),

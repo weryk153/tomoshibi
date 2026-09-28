@@ -12,6 +12,7 @@
 """
 
 import asyncio
+import contextvars
 import json
 import weakref
 from dataclasses import replace
@@ -58,6 +59,12 @@ MEMORY_RULE = (
 PROACTIVE_REMARK = "你剛才主動開口說了這句話，對方現在是在回應它：{remark}"
 
 _DONE = object()
+# 這一輪的輸出要送去哪裡。agent 是所有連線共用的，不能記在 agent 身上：第二個
+# 連線排隊等引擎的時候，第一個連線的工具進度會跑到它那裡去。引擎那一輪是在
+# chat() 裡建的 task，會帶著建立當下的值。
+_OUTPUTS: "contextvars.ContextVar[Optional[asyncio.Queue]]" = contextvars.ContextVar(
+    "character_engine_outputs", default=None
+)
 WEEKDAYS = "一二三四五六日"
 MAX_PICTURES = 4
 MAX_PICTURE_BYTES = 8 * 1024 * 1024
@@ -101,9 +108,9 @@ class CharacterEngineAgent(AgentInterface):
         self._tools = self._tool_definitions(tool_manager) if use_mcpp else []
         self._tool_executor = tool_executor
         self._conversation: Optional[str] = None
-        self._spoke_in: Optional[str] = None
+        # 還沒結束的每一輪：(等著它的 task, 它屬於哪段對話)。
+        self._turns: list = []
         self._group_note = ""
-        self._outputs: Optional[asyncio.Queue] = None
         self.set_system(system)
 
         @tts_filter(tts_preprocessor_config)
@@ -182,30 +189,31 @@ class CharacterEngineAgent(AgentInterface):
         return "\n".join(lines) or None
 
     def handle_interrupt(self, heard_response: str) -> None:
+        """主機打斷的方式是取消等著回覆的那個 task，接著馬上呼叫這裡，不等它停。
+
+        agent 是共用的，這裡又沒有參數說是哪個連線：被打斷的是「等它的 task 剛被
+        取消」的那一輪。找不到（已經停下來了）就交給引擎，它記得最後沒講完的那輪。
+        """
+        cancelled = [
+            conversation for task, conversation in self._turns if task.cancelling()
+        ]
         try:
-            self._companion().interrupt(heard_response)
+            if cancelled:
+                self._companion().interrupt(
+                    heard_response, conversation_id=cancelled[-1]
+                )
+            else:
+                self._companion().interrupt(heard_response)
         except HostBridgeError as exc:
             logger.warning(f"[engine] interrupt not recorded ({exc})")
 
-    def observe_turn(
-        self, conf_uid: str, history_uid: str, user_text: str, reply: str
-    ) -> None:
-        """一輪講完後由主機呼叫，reply 是使用者實際看到的那一版。
-
-        主機會丟掉重複的句子與客套話、做繁簡正規化；她記得的要是那一版，
-        不然下一輪她讀到的自己跟使用者看到的不一樣。
-        """
-        shown = normalize_output_language_variant(
+    def _remembered(self, reply: str) -> str:
+        """她記得自己說了什麼。跟 BasicMemoryAgent._add_message 同一套：表情與動作
+        標籤留著（她得讀到自己會做表情），演出標籤拿掉，字形跟畫面一致。"""
+        return normalize_output_language_variant(
             deduplicate_response_text(strip_stage_performance_tag(reply)),
             self._player_language,
         )
-        if history_uid != self._spoke_in or not shown.strip():
-            # 兩個連線可以在不同的對話裡輪流講；不是剛講完的那段就不要動。
-            return
-        try:
-            self._companion().replace_reply(shown)
-        except HostBridgeError as exc:
-            logger.warning(f"[engine] displayed reply not kept ({exc})")
 
     async def close(self) -> None:
         """一個連線結束時由 ServiceContext.close() 呼叫。
@@ -249,10 +257,11 @@ class CharacterEngineAgent(AgentInterface):
         notes.append(self._group_note)
         # 以 "- " 開頭的是她知道的事：引擎在一段對話裡只講一次，之後只補新的。
         notes += self._memory
-        # 問她幾點，小模型有一半的機會不呼叫時間工具而是編一個。
+        # 問她幾點，小模型有一半的機會不呼叫時間工具而是編一個。這是這一輪的事，
+        # 不是「她知道的事」：每輪都不一樣，當成後者會每輪去改上一則備註。
         now = self._now()
         notes.append(
-            f"- 現在時間：{now:%Y-%m-%d}（週{WEEKDAYS[now.weekday()]}）{now:%H:%M}"
+            f"現在時間：{now:%Y-%m-%d}（週{WEEKDAYS[now.weekday()]}）{now:%H:%M}"
         )
         return text, [note.strip() for note in notes if note.strip()]
 
@@ -265,40 +274,52 @@ class CharacterEngineAgent(AgentInterface):
         if not text and not frames:
             logger.warning("No content generated for user message.")
             return
-        self._bring_up_to_date(companion)
         metadata = input_data.metadata or {}
         # agent 是共用的，「目前這段對話」是最後一個載入歷史的連線設的；
         # 主機有指明這一輪屬於哪一段的話以它為準。
-        self._spoke_in = metadata.get("history_uid") or self._conversation
-        self._hand_over(companion, self._spoke_in)
+        conversation = metadata.get("history_uid") or self._conversation
+        self._hand_over(companion, conversation)
 
         outputs: asyncio.Queue = asyncio.Queue()
-        self._outputs = outputs
+        _OUTPUTS.set(outputs)
         turn = asyncio.ensure_future(
             companion.reply(
                 text,
-                conversation_id=self._spoke_in,
+                conversation_id=conversation,
                 frames=frames,
                 on_text_delta=outputs.put_nowait,
                 skip_memory=bool(metadata.get("skip_memory")),
                 proactive=bool(metadata.get("proactive_speak")),
                 notes=notes,
+                # 在引擎那一輪裡面做：agent 是共用的，這一輪排隊的時候別的連線
+                # 可能正在講話，那時候不能換人設、換工具。
+                before_turn=lambda: self._bring_up_to_date(companion),
+                remember_as=self._remembered,
             )
         )
         turn.add_done_callback(lambda _: outputs.put_nowait(_DONE))
+        waiting = (asyncio.current_task(), conversation)
+        self._turns.append(waiting)
         try:
             while (output := await outputs.get()) is not _DONE:
                 yield output
             await turn
         except TurnInterrupted:
             return
+        except asyncio.CancelledError:
+            if asyncio.current_task().cancelling():
+                raise
+            # 被取消的是引擎那一輪（引擎正在關閉），不是主機這一輪。主機沒有取消
+            # 自己的話，這裡丟出取消會讓它那一輪收不了尾。
+            logger.warning("[engine] the reply was cut short; the engine is closing")
+            return
         finally:
+            self._turns.remove(waiting)
             # 主機打斷的方式是取消等著這個 generator 的 task。引擎那一輪得真的
             # 停下來，之後 handle_interrupt 才記得進去。
             if not turn.done():
                 turn.cancel()
                 await asyncio.gather(turn, return_exceptions=True)
-            self._outputs = None
 
     @staticmethod
     def _frames(input_data: BatchInput) -> tuple:
@@ -364,8 +385,8 @@ class CharacterEngineAgent(AgentInterface):
             async for update in self._tool_executor.execute_tools([request], "OpenAI"):
                 if update.get("type") == "final_tool_results":
                     results = update.get("results") or []
-                elif self._outputs is not None:
-                    self._outputs.put_nowait(update)
+                elif (outputs := _OUTPUTS.get()) is not None:
+                    outputs.put_nowait(update)
             return str(results[0].get("content", "")) if results else ""
 
         return call

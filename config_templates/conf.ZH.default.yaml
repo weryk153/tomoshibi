@@ -99,6 +99,7 @@ character_config:
         timeout_seconds: 60 # 每个背景工作的超时秒数
         max_rebase_turns: 3 # 背景结果落后几轮以内仍然采用
         goal_max_age_days: 7 # 超过几天没更新的目标不再写进提示
+        max_history_messages: 80 # 对话最多留几则给模型
 
       hume_ai_agent:
         api_key: ''
