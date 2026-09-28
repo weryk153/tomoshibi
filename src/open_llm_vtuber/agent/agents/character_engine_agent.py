@@ -21,7 +21,7 @@ from typing import Any, AsyncIterator, Callable, Dict, List, Optional, Union
 from uuid import uuid4
 
 from ai_character_engine.host import HostBridgeError, image_from_host
-from ai_character_engine.companion import TurnInterrupted
+from ai_character_engine.companion import CompanionClosed, TurnInterrupted
 from ai_character_engine.llm.models import Message
 from ai_character_engine.tools.models import ToolDefinition
 from ai_character_engine.vision.models import VisionFrame
@@ -108,8 +108,10 @@ class CharacterEngineAgent(AgentInterface):
         self._tools = self._tool_definitions(tool_manager) if use_mcpp else []
         self._tool_executor = tool_executor
         self._conversation: Optional[str] = None
-        # 還沒結束的每一輪：(等著它的 task, 它屬於哪段對話)。
+        # 還沒結束的每一輪：(等著它的 task, 它屬於哪段對話, 它的名字)。
         self._turns: list = []
+        # 最後結束的那一輪：使用者聽到的、會去打斷的，是它。
+        self._last_ended: Optional[tuple] = None
         self._group_note = ""
         self.set_system(system)
 
@@ -191,19 +193,24 @@ class CharacterEngineAgent(AgentInterface):
     def handle_interrupt(self, heard_response: str) -> None:
         """主機打斷的方式是取消等著回覆的那個 task，接著馬上呼叫這裡，不等它停。
 
-        agent 是共用的，這裡又沒有參數說是哪個連線：被打斷的是「等它的 task 剛被
-        取消」的那一輪。找不到（已經停下來了）就交給引擎，它記得最後沒講完的那輪。
+        agent 是共用的，這裡又沒有參數說是哪個連線：
+
+        - 有哪一輪「等它的 task 剛被取消」，被打斷的就是它。
+        - 沒有的話，她的回覆已經生成完、正在播（主機不會去取消一個結束的 task），
+          或是主機等它停了才來回報。兩種都是最後結束的那一輪。
+
+        每一輪都帶著名字交給引擎，所以這裡指的永遠是某一輪，不會是別的連線
+        正在生成的那一則。
         """
-        cancelled = [
-            conversation for task, conversation in self._turns if task.cancelling()
-        ]
+        cancelled = [turn for turn in self._turns if turn[0].cancelling()]
+        meant = cancelled[-1][1:] if cancelled else self._last_ended
         try:
-            if cancelled:
-                self._companion().interrupt(
-                    heard_response, conversation_id=cancelled[-1]
-                )
-            else:
+            if meant is None:
                 self._companion().interrupt(heard_response)
+            else:
+                self._companion().interrupt(
+                    heard_response, conversation_id=meant[0], turn_id=meant[1]
+                )
         except HostBridgeError as exc:
             logger.warning(f"[engine] interrupt not recorded ({exc})")
 
@@ -282,28 +289,46 @@ class CharacterEngineAgent(AgentInterface):
 
         outputs: asyncio.Queue = asyncio.Queue()
         _OUTPUTS.set(outputs)
-        turn = asyncio.ensure_future(
-            companion.reply(
-                text,
-                conversation_id=conversation,
-                frames=frames,
-                on_text_delta=outputs.put_nowait,
-                skip_memory=bool(metadata.get("skip_memory")),
-                proactive=bool(metadata.get("proactive_speak")),
-                notes=notes,
-                # 在引擎那一輪裡面做：agent 是共用的，這一輪排隊的時候別的連線
-                # 可能正在講話，那時候不能換人設、換工具。
-                before_turn=lambda: self._bring_up_to_date(companion),
-                remember_as=self._remembered,
+        name = uuid4().hex
+
+        def ask(companion):
+            turn = asyncio.ensure_future(
+                companion.reply(
+                    text,
+                    conversation_id=conversation,
+                    frames=frames,
+                    on_text_delta=outputs.put_nowait,
+                    skip_memory=bool(metadata.get("skip_memory")),
+                    proactive=bool(metadata.get("proactive_speak")),
+                    notes=notes,
+                    # 在引擎那一輪裡面做：agent 是共用的，這一輪排隊的時候別的
+                    # 連線可能正在講話，那時候不能換人設、換工具。
+                    before_turn=lambda: self._bring_up_to_date(companion),
+                    remember_as=self._remembered,
+                    turn_id=name,
+                )
             )
-        )
-        turn.add_done_callback(lambda _: outputs.put_nowait(_DONE))
-        waiting = (asyncio.current_task(), conversation)
+            turn.add_done_callback(lambda _: outputs.put_nowait(_DONE))
+            return turn
+
+        turn = ask(companion)
+        waiting = (asyncio.current_task(), conversation, name)
         self._turns.append(waiting)
         try:
-            while (output := await outputs.get()) is not _DONE:
-                yield output
-            await turn
+            while True:
+                while (output := await outputs.get()) is not _DONE:
+                    yield output
+                try:
+                    await turn
+                    return
+                except CompanionClosed:
+                    # 設定一存，引擎那一側換了一個，而這一輪還在排隊、沒開始。
+                    successor = self._companion()
+                    if successor is companion:
+                        raise
+                    companion = successor
+                    self._hand_over(companion, conversation)
+                    turn = ask(companion)
         except TurnInterrupted:
             return
         except asyncio.CancelledError:
@@ -315,6 +340,7 @@ class CharacterEngineAgent(AgentInterface):
             return
         finally:
             self._turns.remove(waiting)
+            self._last_ended = (conversation, name)
             # 主機打斷的方式是取消等著這個 generator 的 task。引擎那一輪得真的
             # 停下來，之後 handle_interrupt 才記得進去。
             if not turn.done():

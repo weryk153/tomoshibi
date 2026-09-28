@@ -455,6 +455,86 @@ def test_interrupting_the_one_who_waits_does_not_cut_off_the_one_who_talks(tmp_p
     assert conversation == ["我是第一個", "嗯，我知道了。", "繼續"]
 
 
+def test_interrupting_what_is_being_played_does_not_cut_off_another_connection(
+    tmp_path,
+):
+    """A 的回覆已經生成完、正在播；B 的回覆還在生成。A 那邊打斷的時候主機不會
+    取消任何 task（A 的已經結束了），只呼叫 handle_interrupt。"""
+
+    async def scenario():
+        llm = EngineLLM("嗯，我知道了。", gate=asyncio.Event())
+        llm.gate.set()
+        engine = companion(tmp_path, llm)
+        current = agent(engine)
+        await say(current, "我是A", history_uid="h1")
+        llm.gate.clear()
+        llm.started.clear()
+        talking = asyncio.ensure_future(say(current, "我是B", history_uid="h2"))
+        await llm.started.wait()
+        current.handle_interrupt("嗯")
+        llm.gate.set()
+        outputs = await talking
+        return spoken(outputs), [m.content for m in engine.runtime.history]
+
+    said, conversation = asyncio.run(scenario())
+
+    assert said == "嗯，我知道了。"
+    assert conversation == ["我是B", "嗯，我知道了。"]
+
+
+def test_the_same_conversation_in_two_windows(tmp_path):
+    """A 在生成、B 排在後面，兩個都在同一段對話。主機取消 A 並回報聽到哪裡：
+    被打斷的是 A，B 照常回答。"""
+
+    async def scenario():
+        llm = EngineLLM("嗯，我知道了。", gate=asyncio.Event())
+        engine = companion(tmp_path, llm)
+        current = agent(engine)
+        first = asyncio.ensure_future(say(current, "我是A", history_uid="h1"))
+        await llm.started.wait()
+        second = asyncio.ensure_future(say(current, "我是B", history_uid="h1"))
+        for _ in range(20):
+            await asyncio.sleep(0)
+        first.cancel()
+        current.handle_interrupt("嗯")
+        llm.gate.set()
+        with pytest.raises(asyncio.CancelledError):
+            await first
+        outputs = await second
+        return spoken(outputs), [m.content for m in engine.runtime.history]
+
+    said, conversation = asyncio.run(scenario())
+
+    assert said == "嗯，我知道了。"
+    assert conversation == [
+        "我是A",
+        "嗯 [Interrupted by user]",
+        "我是B",
+        "嗯，我知道了。",
+    ]
+
+
+def test_a_turn_that_waited_while_she_was_replaced_is_given_to_the_new_one(tmp_path):
+    """設定一存，引擎那一側換了一個。排隊等舊的那一輪還沒開始，交給新的。"""
+
+    async def scenario():
+        slow = EngineLLM("舊的。", gate=asyncio.Event())
+        old = companion(tmp_path / "old", slow)
+        live = {"now": old}
+        current = agent(lambda: live["now"])
+        talking = asyncio.ensure_future(say(current, "我是A", history_uid="h1"))
+        await slow.started.wait()
+        waiting = asyncio.ensure_future(say(current, "我是B", history_uid="h2"))
+        for _ in range(20):
+            await asyncio.sleep(0)
+        live["now"] = companion(tmp_path / "new", EngineLLM("新的。"))
+        old.retire()
+        slow.gate.set()
+        return spoken(await talking), spoken(await waiting)
+
+    assert asyncio.run(scenario()) == ("舊的。", "新的。")
+
+
 def test_each_turn_belongs_to_the_conversation_the_host_names(tmp_path):
     """agent 是共用的：兩個連線可以在不同的對話裡輪流講。"""
 

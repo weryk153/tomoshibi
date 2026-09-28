@@ -176,9 +176,12 @@ def _let_go(companion: Any) -> None:
 
 async def _release(companion: Any) -> None:
     try:
-        # retire() 讓她把正在講的那句講完；close() 會切斷它。
-        while companion.busy:
+        # retire() 讓她把正在講的那句講完；close() 會切斷它。一輪最久就是
+        # TURN_TIMEOUT_SECONDS，等超過的話那一輪是卡住了。
+        waited = 0.0
+        while companion.busy and waited < TURN_TIMEOUT_SECONDS:
             await asyncio.sleep(0.2)
+            waited += 0.2
         await companion.close()
     except Exception as exc:
         # 它可能屬於另一個已經結束的 event loop；狀態在 retire() 時已經存好了。
