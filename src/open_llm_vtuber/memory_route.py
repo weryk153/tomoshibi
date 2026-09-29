@@ -244,6 +244,22 @@ def _resolved_uid(body: dict):
     return conf_uid, None
 
 
+def _memory_keeper(client_contexts: dict, conf_uid: str):
+    """自己記得對方的 agent（character_engine_agent），沒有就回 None。
+
+    那種 agent 的記憶不在 core_memory.md 裡。記憶頁要讀寫的是它手上那一份，
+    不然使用者看到的、改的，跟她實際記得的是兩回事。
+    """
+    found = None
+    for ctx in client_contexts.values():
+        cfg = getattr(ctx, "character_config", None)
+        if getattr(cfg, "conf_uid", None) != conf_uid:
+            continue
+        agent = getattr(ctx, "agent_engine", None)
+        found = agent if hasattr(agent, "conversation_memory") else None
+    return found
+
+
 def _resolved_history_uid(client_contexts: dict, conf_uid: str):
     """取出目前連線正在用的 history_uid。回傳 (history_uid, 錯誤回應)。
 
@@ -343,16 +359,20 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         if bad:
             return bad
 
-        content = memory_core.load_core_memory(conf_uid, history_uid)
+        keeper = _memory_keeper(client_contexts, conf_uid)
+        if keeper is not None:
+            content = keeper.conversation_memory(history_uid)
+            exists = bool(content)
+        else:
+            content = memory_core.load_core_memory(conf_uid, history_uid)
+            exists = os.path.isfile(memory_core.core_memory_path(conf_uid, history_uid))
         self_content = memory_core.load_self_memory(conf_uid)
         return JSONResponse(
             {
                 "conf_uid": conf_uid,
                 "enabled": _memory_enabled_from_conf(),
                 "content": content,
-                "exists": os.path.isfile(
-                    memory_core.core_memory_path(conf_uid, history_uid)
-                ),
+                "exists": exists,
                 "char_count": len(content),
                 # 她自己的記憶：角色層，所有對話共用。上限固定，不開放設定。
                 "self_content": self_content,
@@ -397,14 +417,19 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
 
         cap = _cap_from_conf()
         # 跟整理排同一把鎖：整理跑到一半時寫檔，會被它 60 秒後的整份覆寫蓋掉。
+        keeper = _memory_keeper(client_contexts, conf_uid)
         try:
             async with _hold_consolidation_lock(conf_uid):
-                if not await asyncio.to_thread(
+                if keeper is not None:
+                    keeper.rewrite_conversation_memory(history_uid, content)
+                    stored = keeper.conversation_memory(history_uid)
+                elif not await asyncio.to_thread(
                     memory_core.save_core_memory, conf_uid, history_uid, content, cap
                 ):
                     return _error(500, "Could not save core memory.")
-                # 讀回真正存下去的內容，讓 UI 的字數是誠實的。
-                stored = memory_core.load_core_memory(conf_uid, history_uid)
+                else:
+                    # 讀回真正存下去的內容，讓 UI 的字數是誠實的。
+                    stored = memory_core.load_core_memory(conf_uid, history_uid)
         except _LockBusy:
             return _error(503, "記憶正在整理中，請幾秒後再試。")
         logger.info(f"[memory] manually saved (conf_uid={conf_uid})")
@@ -466,9 +491,12 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
             return bad
 
         # 跟整理排同一把鎖（見 save_memory 的說明）。
+        keeper = _memory_keeper(client_contexts, conf_uid)
         try:
             async with _hold_consolidation_lock(conf_uid):
-                if not await asyncio.to_thread(
+                if keeper is not None:
+                    keeper.rewrite_conversation_memory(history_uid, "")
+                elif not await asyncio.to_thread(
                     memory_core.clear_core_memory, conf_uid, history_uid
                 ):
                     return _error(500, "Could not clear core memory.")

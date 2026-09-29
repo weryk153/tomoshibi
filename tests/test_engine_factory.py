@@ -242,6 +242,17 @@ def test_she_keeps_as_much_of_the_conversation_as_the_basic_agent():
     )
 
 
+def test_she_thinks_in_the_language_she_answers_in():
+    """背景工作的指示是英文的，要模型自己從對話看出該用哪種語言。實機上一段
+    中文對話的五筆記憶有四筆寫成英文。主機知道語言，就直接講。"""
+    arguments = factory_arguments()
+    arguments["output_language"] = "繁體中文"
+
+    assert AgentFactory.create_agent(**arguments)._companion().settings.language == (
+        "繁體中文"
+    )
+
+
 def test_the_detected_context_window_becomes_her_budget(monkeypatch):
     monkeypatch.setattr(factory, "detect_context_window", lambda *a, **k: 20992)
 

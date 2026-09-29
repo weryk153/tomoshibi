@@ -672,8 +672,12 @@ async def consolidate_core_memory(
     character_name: str = "",
     reply_language: str = "",
     protected_names: "Mapping[str, Sequence[str]] | None" = None,
+    conversation_half: bool = True,
 ) -> None:
     """一輪對話結束後背景執行：值得記的才更新 core_memory.md。
+
+    ``conversation_half=False``：對方的那一半不寫。給自己記得對方的 agent 用
+    （character_engine_agent 的記憶在引擎裡）；她自己的那一半照舊合併。
 
     fire-and-forget——任何失敗只記 warning，絕不影響對話本身。
 
@@ -716,7 +720,9 @@ async def consolidate_core_memory(
             )
             conv_candidate, self_candidate = classify_memory_lines(raw, character_name)
             rejected = _rewrite_rejection_reason(conv_candidate, current, limit)
-            if rejected is None:
+            if not conversation_half:
+                pass
+            elif rejected is None:
                 _write_memory(conf_uid, history_uid, conv_candidate)
                 logger.info(
                     f"[core_memory] updated for {conf_uid}/{history_uid} "

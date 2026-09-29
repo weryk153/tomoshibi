@@ -632,6 +632,11 @@ async def process_single_conversation(
                             protected_names=getattr(
                                 context.character_config, "protected_names", None
                             ),
+                            # 自己記得對方的 agent（character_engine_agent）只要
+                            # 「她自己的記憶」那一半。
+                            conversation_half=not hasattr(
+                                context.agent_engine, "conversation_memory"
+                            ),
                         )
                     )
                     # 保存 reference 避免 fire-and-forget task 被 GC（Python asyncio 已知坑）

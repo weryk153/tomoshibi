@@ -27,6 +27,7 @@ from ai_character_engine.tools.models import ToolDefinition
 from ai_character_engine.vision.models import VisionFrame
 from loguru import logger
 
+from ... import memory_core
 from ...chat_history_manager import get_history
 from ...config_manager import TTSPreprocessorConfig
 from ...conversation_quality import (
@@ -49,13 +50,15 @@ from .agent_interface import AgentInterface
 INTERRUPT_RULE = (
     "If a reply of yours ends with `[Interrupted by user]`, you were interrupted there."
 )
-# 記憶不放在系統提示裡（見 split_memory_blocks），這句用法說明留著。
+# 她自己的記憶不放在系統提示裡（見 split_memory_blocks），這句用法說明留著。
+# 她記得對方什麼由引擎負責，主機那一份（core_memory.md）不送。
 ABOUT_HERSELF = "你對自己的認知"
-ABOUT_THE_USER = "你對對方的長期記憶"
 MEMORY_RULE = (
-    f"備註裡的「{ABOUT_HERSELF}」與「{ABOUT_THE_USER}」是之前對話累積下來的，"
+    f"備註裡的「{ABOUT_HERSELF}」與 memory 是之前對話累積下來的，"
     "自然運用、不要生硬複述。"
 )
+# core_memory.md 裡主詞是使用者的那幾行，開頭是這個。
+THE_USER = "對方："
 PROACTIVE_REMARK = "你剛才主動開口說了這句話，對方現在是在回應它：{remark}"
 
 _DONE = object()
@@ -108,6 +111,8 @@ class CharacterEngineAgent(AgentInterface):
         self._tools = self._tool_definitions(tool_manager) if use_mcpp else []
         self._tool_executor = tool_executor
         self._conversation: Optional[str] = None
+        # 這個 agent 已經確認過、不用再搬 core_memory.md 的對話。
+        self._brought: set = set()
         # 還沒結束的每一輪：(等著它的 task, 它屬於哪段對話, 它的名字)。
         self._turns: list = []
         # 最後結束的那一輪：使用者聽到的、會去打斷的，是它。
@@ -139,17 +144,51 @@ class CharacterEngineAgent(AgentInterface):
         """主機組好的系統提示。裡面的長期記憶拿出來，改由引擎寫進對話的備註。"""
         from ...service_context import split_memory_blocks
 
-        system, about_her, about_the_user = split_memory_blocks(system)
+        system, about_her, _about_the_user = split_memory_blocks(system)
         self._system = f"{system}\n\n{MEMORY_RULE}\n\n{INTERRUPT_RULE}"
         self._memory = [
-            f"- {label}：{line.strip()}"
-            for label, text in (
-                (ABOUT_HERSELF, about_her),
-                (ABOUT_THE_USER, about_the_user),
-            )
-            for line in text.splitlines()
+            f"- {ABOUT_HERSELF}：{line.strip()}"
+            for line in about_her.splitlines()
             if line.strip()
         ]
+
+    # --- 她記得對方什麼 -------------------------------------------------------
+    # 有這兩個方法，主機就知道這個 agent 自己記得對方：記憶頁讀寫的是這一份，
+    # 整理 core_memory.md 的那一半也不用做了。
+
+    def conversation_memory(self, history_uid: str) -> str:
+        return "\n".join(self._companion().memories(history_uid))
+
+    def rewrite_conversation_memory(self, history_uid: str, text: str) -> None:
+        self._companion().rewrite_memories(history_uid, text.splitlines())
+
+    def _bring_what_the_host_remembered(self, companion, history_uid: str) -> None:
+        """換成這個 agent 之前累積的 core_memory.md，搬一次。
+
+        搬過的對話記在檔案裡：使用者之後在記憶頁刪掉的，重開之後不能又跑回來。
+        """
+        from ...character_engine.factory import storage_dir
+
+        if history_uid in self._brought:
+            return
+        self._brought.add(history_uid)
+        done = storage_dir(self._conf_uid) / "brought-from-core-memory.txt"
+        if done.is_file() and history_uid in done.read_text("utf-8").splitlines():
+            return
+        remembered = [
+            line.strip()
+            for line in memory_core.load_core_memory(
+                self._conf_uid, history_uid
+            ).splitlines()
+            if line.strip().startswith(THE_USER)
+        ]
+        if remembered:
+            companion.rewrite_memories(
+                history_uid, [*companion.memories(history_uid), *remembered]
+            )
+        done.parent.mkdir(parents=True, exist_ok=True)
+        with done.open("a", encoding="utf-8") as file:
+            file.write(history_uid + "\n")
 
     def set_memory_from_history(self, conf_uid: str, history_uid: str) -> None:
         """之後的每一輪都屬於這段對話。引擎沒看過它的話，從主機的紀錄接著講。"""
@@ -160,6 +199,7 @@ class CharacterEngineAgent(AgentInterface):
     def _hand_over(self, companion, history_uid: Optional[str]) -> None:
         if not history_uid or not self._conf_uid:
             return
+        self._bring_what_the_host_remembered(companion, history_uid)
         if companion.has_conversation(history_uid):
             return
         messages = []

@@ -27,43 +27,40 @@ from tests.test_engine_agent import (  # noqa: E402
 from tests.test_memory_blocks_split import composed  # noqa: E402
 
 
-def test_her_memory_arrives_as_notes_and_the_persona_stays_the_same(tmp_path):
+def test_her_own_memory_arrives_as_notes_and_the_persona_stays_the_same(tmp_path):
     async def scenario():
         llm = EngineLLM()
         current = agent(companion(tmp_path, llm))
-        current.set_system(composed("紅莉栖：喜歡胡椒博士。", "對方：叫晨星。"))
+        current.set_system(composed("紅莉栖：喜歡胡椒博士。", ""))
         await say(current, "你好")
         # 每一輪之後記憶都會被整理一次，主機接著重組系統提示。
-        current.set_system(
-            composed("紅莉栖：喜歡胡椒博士。", "對方：叫晨星。\n對方：養了一隻貓。")
-        )
+        current.set_system(composed("紅莉栖：喜歡胡椒博士。\n紅莉栖：怕蟑螂。", ""))
         await say(current, "還記得我嗎")
         return llm.calls
 
     first, second = asyncio.run(scenario())
 
     assert first[0] == second[0]
-    assert "晨星" not in first[0].content
+    assert "胡椒博士" not in first[0].content
     assert CORE_CONVERSATION_PROMPT in first[0].content
     assert second[: len(first)] == first
 
     (first_note,) = [m.content for m in first if CONTEXT_MARK in m.content]
     assert "- 你對自己的認知：紅莉栖：喜歡胡椒博士。" in first_note
-    assert "- 你對對方的長期記憶：對方：叫晨星。" in first_note
 
     new_note = [m.content for m in second if CONTEXT_MARK in m.content][-1]
-    assert "- 你對對方的長期記憶：對方：養了一隻貓。" in new_note
-    assert "晨星" not in new_note
+    assert "- 你對自己的認知：紅莉栖：怕蟑螂。" in new_note
+    assert "胡椒博士" not in new_note
 
 
-def test_a_memory_the_user_corrected_or_deleted_is_no_longer_sent(tmp_path):
+def test_what_she_no_longer_knows_of_herself_is_no_longer_sent(tmp_path):
     async def scenario():
         llm = EngineLLM()
         current = agent(companion(tmp_path, llm))
-        current.set_system(composed("", "對方：住在台北。"))
+        current.set_system(composed("紅莉栖：住在秋葉原。", ""))
         await say(current, "你好")
-        current.set_system(composed("", "對方：搬到台中了。"))
-        await say(current, "我搬家了")
+        current.set_system(composed("紅莉栖：搬到池袋了。", ""))
+        await say(current, "你搬家了")
         corrected = "".join(llm.sent())
         current.set_system(composed("", ""))
         await say(current, "忘了吧")
@@ -71,16 +68,16 @@ def test_a_memory_the_user_corrected_or_deleted_is_no_longer_sent(tmp_path):
 
     corrected, cleared = asyncio.run(scenario())
 
-    assert "台北" not in corrected
-    assert "搬到台中了" in corrected
-    assert "台中" not in cleared
+    assert "秋葉原" not in corrected
+    assert "搬到池袋了" in corrected
+    assert "池袋" not in cleared
 
 
 def test_how_to_use_the_memory_is_still_said(tmp_path):
     async def scenario():
         llm = EngineLLM()
         current = agent(companion(tmp_path, llm))
-        current.set_system(composed("", "對方：叫晨星。"))
+        current.set_system(composed("紅莉栖：喜歡胡椒博士。", ""))
         await say(current, "你好")
         return llm.calls[0][0].content
 

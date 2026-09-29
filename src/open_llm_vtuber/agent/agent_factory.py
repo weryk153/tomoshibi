@@ -122,6 +122,7 @@ class AgentFactory:
                 provider=llm_provider,
                 llm_config=llm_config,
                 settings=agent_settings.get("character_engine_agent") or {},
+                language=basic["player_language"],
             )
             from .agents.character_engine_agent import CharacterEngineAgent
 

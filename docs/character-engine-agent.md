@@ -88,10 +88,16 @@ chat_history/<conf_uid>/engine/cognition.jsonl  體會
 對話紀錄仍然由 Tomoshibi 存在 `chat_history/<conf_uid>/<history_uid>.json`。引擎只在
 記憶體裡留最近幾段對話；沒看過的對話會從這份紀錄接著講。
 
-`core_memory.md` 與 `self_memory.md` 照舊整理、照舊可以在記憶頁編輯，跟引擎的記憶
-並存。差別在送給模型的位置：`basic_memory_agent` 把它們放在系統提示裡，這個 agent
-把它們拿出來、一行一行寫進對話的備註。改過或刪掉的那一行會從當初寫它的那則備註裡
-拿掉；推論端要從那一則開始重讀，所以改記憶的那一輪會慢一點。
+她記得對方什麼，由引擎負責，`core_memory.md` 不再使用：
+
+- 記憶頁「對這段對話的記憶」顯示的、編輯的，是引擎的記憶。刪掉或改掉的那一行會從
+  她讀到的內容裡拿掉。
+- 換成這個 agent 之前累積的 `core_memory.md`，每段對話第一次用到時搬一次，只搬
+  主詞是「對方」的那幾行。
+- 她會拿到這段對話的全部記憶（預設最多 40 筆），跟最新一句有關的排前面。
+- 每幾輪一次的記憶整理還在，但只留「她自己的記憶」（`self_memory.md`）那一半；
+  引擎沒有對應的東西。它仍然多佔一次模型呼叫，可以用 `memory_consolidation_interval`
+  調疏。
 
 ## 送給模型的長相
 
@@ -100,8 +106,12 @@ chat_history/<conf_uid>/engine/cognition.jsonl  體會
 提示都是上一輪的延伸，推論端的快取才用得上。系統提示只有人設與一段「備註怎麼讀」
 的說明，狀態怎麼變都不會動到它。
 
-主機的長期記憶每一輪都會被整理一次。放在系統提示裡的話，它一變，推論端就得把
-後半段系統提示連同整段對話重讀一遍；寫進備註就只多讀新增的那幾行。
+`basic_memory_agent` 把長期記憶放在系統提示的中段，而它每一輪都會被整理一次：它一
+變，推論端就得把後半段系統提示連同整段對話重讀一遍。寫進備註就只多讀新增的那幾行。
+
+備註的標籤（`emotion`、`memory`、`goal`、`the user seems`、`For the next reply only`）
+是引擎的，英文；那是給模型讀的，使用者看不到。記憶、目標、體會的內容用她回話的
+語言寫（`player_language`／角色的 `reply_language`）。
 
 量過的數字（M4 16GB、`qwen/qwen3.5-9b`、LM Studio、GPT-SoVITS，實際伺服器走
 WebSocket，第 2–5 輪）：

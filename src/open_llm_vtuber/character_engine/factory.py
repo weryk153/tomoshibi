@@ -196,8 +196,12 @@ def build_companion(
     provider: str,
     llm_config: Mapping[str, Any],
     settings: Optional[Mapping[str, Any]] = None,
+    language: str = "",
 ) -> str:
     """確保這個角色有一個符合目前設定的 companion，回傳用來查它的鍵。
+
+    language 是她回話用的語言。記憶、目標、體會也用它寫：不講的話模型得自己從
+    對話看出來，而它不一定看得出來。
 
     人設（system）不算在「設定」裡：它每輪都可能刷新，由 agent 直接改她的描述。
     """
@@ -235,6 +239,7 @@ def build_companion(
                 )
             },
             "settings": dict(settings or {}),
+            "language": language,
         },
         sort_keys=True,
         default=str,
@@ -262,6 +267,7 @@ def build_companion(
             settings=CompanionSettings(
                 **{
                     "max_history_messages": HISTORY_MESSAGES,
+                    "language": language,
                     **{
                         _RENAMED_SETTINGS.get(name, name): value
                         for name, value in dict(settings or {}).items()
