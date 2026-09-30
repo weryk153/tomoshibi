@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 // VRM 版的動作／表情對應編輯器，取代原本唯讀的 vrm-config-summary.tsx。版面
 // 照 motion-config.tsx（Live2D 版）：多重對應只顯示第一筆、其餘原樣帶回，見該
 // 檔案檔頭的完整說明——這裡不重複，只記 VRM 特有的差異：

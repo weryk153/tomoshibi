@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 // 角色管理分頁：清單 + 建立表單 + 編輯表單。跟 LLM／About 一樣是無 props 的
 // 分頁（見 setting-ui.tsx 的三處註冊）——存檔／建立是即時打 API，不需要外層
 // 抽屜的 Save/Cancel 去觸發，所以不接 onSave/onCancel。

@@ -44,3 +44,8 @@ jobs:
 
       - name: 單元測試
         run: pnpm test
+
+      - name: lint
+        # hook 放在提早 return 之後曾讓整個 app 白屏（React #310），typecheck、
+        # 單元測試、build 全過。rules-of-hooks 是擋這個的。
+        run: pnpm run lint

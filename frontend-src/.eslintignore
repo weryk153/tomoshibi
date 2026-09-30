@@ -1,3 +1,10 @@
-src/renderer/WebSDK/**/*.ts
+src/renderer/WebSDK/**
 src/renderer/MotionSync/**/*.js
-src/renderer/MotionSync/**/*.ts 
+src/renderer/MotionSync/**/*.ts
+# 第三方的壓縮檔
+src/renderer/public/libs/**
+# 建置產物
+out/**
+bundled/**
+release/**
+dist/**

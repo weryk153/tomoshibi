@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 // 一鍵安裝 GPT-SoVITS（本機語音）。首次啟動精靈的最後一步，也放在語音設定分頁。
 //
 // 預設的 Edge TTS 已經能講話，這一步是加分，所以精靈裡一定有「先不要」。沒得裝

@@ -100,7 +100,6 @@ export function createLive2DRenderer(): CharacterRenderer {
           const originalUpdate = model._wavFileHandler.update.bind(model._wavFileHandler);
           model._wavFileHandler.update = function (deltaTimeSeconds: number) {
             const result = originalUpdate(deltaTimeSeconds);
-            // @ts-ignore
             this._lastRms = Math.min(2.0, this._lastRms * lipSyncScale);
             return result;
           };

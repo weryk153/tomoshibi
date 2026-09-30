@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 // 共用的 LLM 設定表單：apikey／ollama／custom 三種模式共用一個 Test & Save。
 // Task 4 把這個元件掛進設定分頁，Task 5 把它包成首次精靈的全螢幕畫面——表單
 // 狀態、載入現值、送出與錯誤顯示都在這裡自己管，呼叫端只需要知道存檔成功了

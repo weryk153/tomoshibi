@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 // tts 分頁：曾經整個檔案是 `return <Box> </Box>;`，但已經註冊在分頁列
 // （setting-ui.tsx 用 <TTS />，無 props）——使用者點「合成」看到的是空白畫面，
 // 這是 UI 上看得見的破綻。這裡補上語音合成引擎選擇，跟 asr.tsx 剛解決的是

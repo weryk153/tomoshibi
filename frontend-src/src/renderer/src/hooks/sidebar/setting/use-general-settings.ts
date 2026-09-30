@@ -1,4 +1,3 @@
-/* eslint-disable import/order */
 /* eslint-disable no-use-before-define */
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { settingsDirty } from '@/utils/settings-dirty';

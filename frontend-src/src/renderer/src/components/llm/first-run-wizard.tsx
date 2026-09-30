@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 // 首次啟動精靈：<LlmForm> 的全螢幕包裝。跟設定分頁版（sidebar/setting/llm.tsx）
 // 共用同一個表單元件——差別只在「什麼時候出現」與「多一個跳過／關閉的殼」。
 //

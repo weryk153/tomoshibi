@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 // 「關於你」區塊：你的暱稱／頭像（純 localStorage，Step 1）、玩家語言與全域
 // 指示（寫 conf.yaml，經 api/player.ts，Step 2／3）、目前角色的發聲語言
 // （唯讀，衍生自 GET /api/characters 的 voice 欄位，Step 4）、用其他語言發聲＋
