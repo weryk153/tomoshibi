@@ -332,3 +332,11 @@ def test_text_without_parentheses_is_untouched():
         ).strip()
         == line
     )
+
+
+def test_escaped_asterisks_are_not_spoken():
+    """2026-10-01 的實際輸出：`\\*\\*動作*`。反斜線把星號隔開，動作被送去翻譯、唸了出來。"""
+    state = TTSFilterState()
+
+    assert filter_asterisks("\\*\\*輕輕嘆了口氣，眼神中帶著一絲無奈*", state) == ""
+    assert state.in_asterisk is False
