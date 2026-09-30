@@ -670,6 +670,8 @@ class ServiceContext:
                 # character_engine_agent 的狀態存在 chat_history/<conf_uid>/engine/。
                 conf_uid=target_character.conf_uid,
                 character_name=target_character.character_name,
+                # 記憶頁的開關：關掉時引擎也不再抽記憶、不再把記憶帶進對話。
+                long_term_memory_enabled=target_character.long_term_memory_enabled,
             )
 
             logger.debug(f"Agent choice: {agent_config.conversation_agent_choice}")

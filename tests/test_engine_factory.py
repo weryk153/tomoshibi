@@ -362,3 +362,25 @@ def test_a_provider_the_engine_cannot_talk_to_is_refused_with_the_way_out():
         AgentFactory.create_agent(**arguments)
 
     assert "basic_memory_agent" in str(caught.value)
+
+
+def test_turning_long_term_memory_off_stops_the_engine_remembering_too():
+    """記憶頁的開關說「關閉後她就不會再把新對話整理進記憶、也不會把舊記憶帶進
+    對話」。接引擎時關掉它只停了主機自己那一份，引擎照樣抽記憶、照樣帶進對話。"""
+    arguments = factory_arguments()
+    arguments["long_term_memory_enabled"] = False
+
+    settings = AgentFactory.create_agent(**arguments)._companion().settings
+
+    assert (settings.memory_every, settings.memories_recalled) == (0, 0)
+
+
+def test_long_term_memory_on_leaves_the_engine_settings_alone():
+    arguments = factory_arguments()
+    arguments["long_term_memory_enabled"] = True
+    arguments["agent_settings"]["character_engine_agent"] = {"memory_every": 3}
+
+    settings = AgentFactory.create_agent(**arguments)._companion().settings
+
+    assert settings.memory_every == 3
+    assert settings.memories_recalled > 0

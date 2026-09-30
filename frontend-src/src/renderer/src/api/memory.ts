@@ -34,6 +34,9 @@ export interface MemoryState {
   self_content: string
   self_char_count: number
   self_cap: number
+  // 這段對話的記憶在引擎手上（character_engine_agent）：不按字數限制，cap 對它
+  // 不起作用。
+  engine_managed: boolean
 }
 
 // 四個記憶寫入端點都可能等整理鎖（memory_route.py 的 _hold_consolidation_lock，
@@ -59,6 +62,7 @@ interface MemoryGetResponse {
   self_content: string
   self_char_count: number
   self_cap: number
+  engine_managed?: boolean
 }
 
 // cap 是數字輸入框；使用者清空輸入框時 value 會是 NaN，直接送給後端會被
@@ -88,6 +92,7 @@ export function mapMemoryResponse(d: MemoryGetResponse): MemoryState {
     self_content: d.self_content,
     self_char_count: d.self_char_count,
     self_cap: d.self_cap,
+    engine_managed: d.engine_managed === true,
   }
 }
 

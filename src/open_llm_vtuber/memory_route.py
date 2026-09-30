@@ -398,6 +398,8 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
             {
                 "conf_uid": conf_uid,
                 "enabled": _memory_enabled_from_conf(),
+                # 這段對話的記憶在引擎手上：不按字數限制，下面的上限對它不起作用。
+                "engine_managed": keeper is not None,
                 "content": content,
                 "exists": exists,
                 "char_count": len(content),

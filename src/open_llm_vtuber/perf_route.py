@@ -47,6 +47,7 @@ from .conf_editor import (
     read_conf_lines as _read_conf_lines,
     rewrite_int_leaf as _rewrite_int_leaf,
     rewrite_str_leaf as _rewrite_leaf,
+    upsert_leaf as _upsert_leaf,
     write_conf as _write_conf,
 )
 
@@ -94,6 +95,11 @@ PRESETS: dict[str, dict[str, Any]] = {
         "core_memory_max_chars": 1000,
         "memory_consolidation_interval": 3,
         "keep_alive": 300,
+        # 引擎的背景工作：每一項都是多一次模型呼叫。
+        "emotion_every": 2,
+        "memory_every": 3,
+        "goal_every": 8,
+        "reflection_every": 12,
     },
     # 標準：預設值（基本等於出廠的輕量預設）。
     "standard": {
@@ -102,6 +108,10 @@ PRESETS: dict[str, dict[str, Any]] = {
         "core_memory_max_chars": 1500,
         "memory_consolidation_interval": 1,
         "keep_alive": 1800,
+        "emotion_every": 1,
+        "memory_every": 2,
+        "goal_every": 4,
+        "reflection_every": 6,
     },
     # 高效能：強機。ASR 維持內建的 sherpa_onnx_asr（離線、零額外相依）——不換成
     # faster_whisper，因為它的相依沒打包進來、換了一重開就起不來。「高效能」差別在
@@ -112,6 +122,10 @@ PRESETS: dict[str, dict[str, Any]] = {
         "core_memory_max_chars": 3000,
         "memory_consolidation_interval": 1,
         "keep_alive": 3600,
+        "emotion_every": 1,
+        "memory_every": 1,
+        "goal_every": 3,
+        "reflection_every": 4,
     },
 }
 
@@ -363,12 +377,8 @@ def _write_consolidation_interval(interval: int) -> bool:
     """改寫記憶整理的頻率（每 N 輪一次）。"""
     lines = _read_conf_lines()
     start, end = character_config_extent(lines)
-    if not _rewrite_int_leaf(
-        lines, start, end, "memory_consolidation_interval", interval
-    ):
-        raise KeyError(
-            "memory_consolidation_interval leaf not found in character_config"
-        )
+    # 出廠的 conf.yaml 沒有這一行（程式端有預設值）：沒有就補上，不要報錯。
+    _upsert_leaf(lines, start, end, "memory_consolidation_interval", str(int(interval)))
     _write_conf(lines)
     return True
 
@@ -729,25 +739,12 @@ def _apply_preset_bundle(bundle: dict) -> bool:
         lines = f.readlines()
 
     # --- character_config direct-child leaves ---
+    # 出廠的 conf.yaml 沒有這兩行（程式端有預設值）：沒有就補上。之前是找不到就
+    # 丟 KeyError，整個效能模式在沒改過這兩項的設定檔上都套用不了。
     cc_start, cc_end = _character_config_extent(lines)
-    if "core_memory_max_chars" in bundle:
-        if not _rewrite_int_leaf(
-            lines,
-            cc_start,
-            cc_end,
-            "core_memory_max_chars",
-            int(bundle["core_memory_max_chars"]),
-        ):
-            raise KeyError("core_memory_max_chars leaf not found")
-    if "memory_consolidation_interval" in bundle:
-        if not _rewrite_int_leaf(
-            lines,
-            cc_start,
-            cc_end,
-            "memory_consolidation_interval",
-            int(bundle["memory_consolidation_interval"]),
-        ):
-            raise KeyError("memory_consolidation_interval leaf not found")
+    for leaf in ("core_memory_max_chars", "memory_consolidation_interval"):
+        if leaf in bundle:
+            cc_end = _upsert_leaf(lines, cc_start, cc_end, leaf, str(int(bundle[leaf])))
 
     # --- asr_model (re-find extent on the current lines; line count unchanged) ---
     if "asr_model" in bundle:
@@ -772,6 +769,11 @@ def _apply_preset_bundle(bundle: dict) -> bool:
             lines, start, end, "keep_alive", int(bundle["keep_alive"])
         ):
             raise KeyError("keep_alive leaf not found")
+
+    # --- 引擎背景工作的頻率（接 character_engine_agent 時真正影響速度的是這幾個）---
+    from .engine_config_route import EVERY_KEYS, apply_engine_settings
+
+    apply_engine_settings(lines, {k: bundle[k] for k in EVERY_KEYS if k in bundle})
 
     _write_conf(lines)
     return True
