@@ -32,7 +32,6 @@ import { ScreenCaptureProvider } from "./context/screen-capture-context";
 import { GroupProvider } from "./context/group-context";
 import { BrowserProvider } from "./context/browser-context";
 import FirstRunWizard from "./components/llm/first-run-wizard";
-// eslint-disable-next-line import/no-extraneous-dependencies, import/newline-after-import
 import "@chatscope/chat-ui-kit-styles/dist/default/styles.min.css";
 import Scene from "./components/canvas/scene";
 import WebSocketStatus from "./components/canvas/ws-status";

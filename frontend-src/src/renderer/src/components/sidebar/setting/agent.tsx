@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 import { useState, useEffect, useCallback } from 'react';
 import {
   Stack, Text, Heading, HStack, Box,

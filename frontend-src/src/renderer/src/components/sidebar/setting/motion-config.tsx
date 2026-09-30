@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 // 動作清單與試播（3a-2 Task 4）：讓使用者看到模型「真的有」的每一個動作
 // （不是 model_dict.json 手寫出來的那份），播放確認長什麼樣子，再指定
 // 觸發用的關鍵字與顯示名稱。

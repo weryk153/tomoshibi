@@ -135,4 +135,4 @@ The app uses React Context for state management with multiple specialized contex
 - Live2D models are loaded from URLs provided by the backend
 - Audio is streamed as base64-encoded data with volume arrays for lip sync
 - The app uses Chakra UI v3 for the component library
-- ESLint is configured with relaxed rules (many checks disabled in .eslintrc.js)
+- ESLint checks for bugs, not style: `eslint:recommended`, typescript-eslint, React and `react-hooks` (`rules-of-hooks` is what catches a hook after an early return, which once blanked the whole app). The airbnb preset it used to extend was never installed, so lint never ran before; its style rules were not brought back. `pnpm run lint` only checks; `lint:fix` rewrites files. CI runs lint in `frontend-checks.yml`.

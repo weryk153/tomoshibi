@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 import { Box, Button, Heading, HStack, Input, Stack, Text, Textarea } from '@chakra-ui/react';
 import { createListCollection } from '@ark-ui/react/collection';
 import {

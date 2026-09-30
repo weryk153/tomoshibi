@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 // memory 分頁：長期記憶管理。跟 Characters／LLM／About 一樣是無 props 的分頁
 // （見 setting-ui.tsx 的三處註冊）——存檔是即時打 API，不需要外層抽屜的
 // Save/Cancel 去觸發。

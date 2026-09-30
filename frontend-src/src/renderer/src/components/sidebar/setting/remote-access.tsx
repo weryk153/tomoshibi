@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 /* eslint-disable react/require-default-props */
 // remote-access 分頁：唯讀顯示「這台伺服器現在能被哪些其他裝置連到」。
 //

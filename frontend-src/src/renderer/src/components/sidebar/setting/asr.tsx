@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 /* eslint-disable react/require-default-props */
 // asr 分頁：這裡曾經只有前端的麥克風／VAD 設定（純 localStorage，不碰後端），
 // 後端的辨識引擎選擇被埋在 perf 分頁裡——perf_route.py 自己的 docstring 都在

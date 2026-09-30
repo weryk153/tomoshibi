@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useTranslation } from "react-i18next";
 // 遷移中：這個分頁的表單控制項已改用 Ark UI + Tailwind（common-tw），版面容器

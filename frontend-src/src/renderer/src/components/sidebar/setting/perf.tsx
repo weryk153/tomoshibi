@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 // perf 分頁：效能／硬體設定。跟 memory.tsx 一樣是無 props 的分頁（見
 // setting-ui.tsx 的三處註冊）——存檔是即時打 API，不需要外層抽屜的
 // Save/Cancel 去觸發。

@@ -1,4 +1,3 @@
-/* eslint-disable import/no-extraneous-dependencies */
 /* eslint-disable react-hooks/rules-of-hooks */
 // 這個分頁分成三塊，跟 asr.tsx 同一種「一部分走 Apply/Revert、其餘自己即時
 // 存檔」的模式（見 asr.tsx 檔頭說明）：
