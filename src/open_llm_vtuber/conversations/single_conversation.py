@@ -576,6 +576,14 @@ async def process_single_conversation(
                 full_response,
             )
             logger.info("Proactive response recorded in rolling anti-repeat context")
+            # 自己記對話的 agent（character_engine_agent）：她說出口的那句留在對話裡，
+            # 指示不留。不然她不記得自己主動說過什麼。
+            remember_remark = getattr(context.agent_engine, "remember_remark", None)
+            if remember_remark is not None:
+                try:
+                    await remember_remark(context.history_uid, full_response)
+                except Exception as error:
+                    logger.warning(f"Proactive remark not kept: {error}")
 
         # 對話一輪後背景整理核心記憶（fire-and-forget，不阻塞使用者）。見 MEMORY_SYSTEM_DESIGN.md
         # 長期記憶關閉時（long_term_memory_enabled=False）跳過整理，連背景 task 都不建。

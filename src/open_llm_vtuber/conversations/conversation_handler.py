@@ -15,6 +15,7 @@ from .conversation_utils import EMOJI_LIST
 from .types import GroupConversationState
 from prompts import prompt_loader
 from ..news_topics import compose_content as default_proactive_prompt
+from ..news_topics import proactive_material
 from ..conversation_quality import normalize_output_language_variant
 from ..proactive_context import (
     build_proactive_prompt,
@@ -285,6 +286,7 @@ async def handle_conversation_trigger(
         image_sources = [
             image.get("source") for image in raw_images or [] if isinstance(image, dict)
         ]
+        material: list[str] = []
         try:
             # Get proactive speak prompt from config
             prompt_name = "proactive_speak_prompt"
@@ -320,6 +322,9 @@ async def handle_conversation_trigger(
                     proactive_uid,
                     output_language,
                 )
+                material = proactive_material(user_input)
+                if verified_search_facts:
+                    material.append(f"【查到的資料】\n{verified_search_facts}")
                 user_input = build_proactive_prompt(
                     base_prompt=user_input,
                     conf_uid=context.character_config.conf_uid,
@@ -352,6 +357,8 @@ async def handle_conversation_trigger(
                 proactive_uid,
             ),
             "proactive_image_sources": image_sources,
+            # 由引擎決定講什麼的 agent 只要素材（話題、新聞、查到的資料）。
+            "proactive_material": material,
             # The anchor is quoted into the prompt, so a weak model can echo it
             # back verbatim instead of continuing from it. Comparing against it
             # is what catches that; normalize first, because the anchor comes

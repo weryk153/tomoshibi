@@ -141,3 +141,19 @@ def test_prompt_write_is_atomic(tmp_path, monkeypatch):
 
     assert target.read_text(encoding="utf-8") == "內容"
     assert not (tmp_path / "proactive_speak_prompt.txt.tmp").exists()
+
+
+def test_the_material_of_a_proactive_prompt_is_its_topic_and_news_sections():
+    from src.open_llm_vtuber.news_topics import compose_content, proactive_material
+
+    content = compose_content(
+        manual_topics=["天文", "動漫"],
+        news_blocks=["某某新聞標題"],
+        got_any=True,
+    )
+    material = proactive_material(content)
+
+    assert len(material) == 2
+    assert material[0].startswith("【你可以聊的主題") and "- 天文" in material[0]
+    assert material[1].startswith("【今天的新聞") and "某某新聞標題" in material[1]
+    assert proactive_material(compose_content()) == []

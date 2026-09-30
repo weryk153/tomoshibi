@@ -48,3 +48,12 @@ def test_the_agent_factory_is_told_whether_long_term_memory_is_on():
     assert (
         "long_term_memory_enabled=target_character.long_term_memory_enabled," in create
     )
+
+
+def test_a_proactive_turn_hands_the_agent_its_material():
+    from src.open_llm_vtuber.conversations import conversation_handler
+
+    src = inspect.getsource(conversation_handler)
+
+    assert "material = proactive_material(user_input)" in src
+    assert '"proactive_material": material,' in src

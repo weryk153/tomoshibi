@@ -354,6 +354,18 @@ def compose_content(manual_topics=None, news_blocks=None, got_any: bool = False)
     return "\n\n".join(parts) + "\n"
 
 
+def proactive_material(content: str) -> list[str]:
+    """主動開口提示裡的素材：「【…】」開頭的話題、新聞區塊，不含人設指示。
+
+    由引擎決定講什麼的 agent（character_engine_agent）只要素材；指示是引擎自己的。
+    """
+    return [
+        section.strip()
+        for section in str(content or "").split("\n\n")
+        if section.strip().startswith("【")
+    ]
+
+
 def write_prompt(content: str) -> None:
     """原子寫入 proactive_speak_prompt.txt（temp + os.replace）。
 

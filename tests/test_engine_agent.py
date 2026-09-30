@@ -211,21 +211,46 @@ def test_proactive_speech_leaves_no_trace_in_the_conversation(tmp_path):
     assert asyncio.run(scenario()) == ["你好", "嗯，我知道了。", "還在嗎"]
 
 
-def test_the_remark_she_made_on_her_own_is_supplied_once(tmp_path):
-    """主動發話不進對話；使用者回應它的那一輪，主機把那句話帶過來。"""
+def test_what_she_said_on_her_own_stays_in_the_conversation(tmp_path):
+    """主動開口的那一輪帶著一大段指示，不進對話；但她說出口的那句要留下，而且是她
+    自己說的話。之前只在使用者回應時以一次性的備註帶過去：她不記得自己主動說過
+    什麼（一直講同一件事），使用者回應時還把那句照唸一遍。"""
 
     async def scenario():
         llm = EngineLLM()
         current = agent(companion(tmp_path, llm))
-        await say(current, "真的嗎", previous_proactive_response="外面下雨了。")
-        first = llm.context()
-        await say(current, "好吧")
-        return first, llm.sent()
+        await say(current, "我在做時光機", history_uid="h1")
+        await say(
+            current,
+            "（主動開口的指示）",
+            history_uid="h1",
+            proactive_speak=True,
+            skip_memory=True,
+        )
+        await current.remember_remark("h1", "別讓 Amadeus 過熱了。")
+        await say(
+            current,
+            "好 確認下",
+            history_uid="h1",
+            previous_proactive_response="別讓 Amadeus 過熱了。",
+        )
+        return llm.calls[-1], llm.context()
 
-    context, afterwards = asyncio.run(scenario())
+    sent, context = asyncio.run(scenario())
+    lines = [(message.role, message.content) for message in sent]
+    assert ("assistant", "別讓 Amadeus 過熱了。") in lines
+    assert "別讓 Amadeus 過熱了。" not in context
+    assert not any("主動開口的指示" in content for _, content in lines)
 
-    assert "外面下雨了。" in context
-    assert [CONTEXT_MARK in c for c in afterwards if "外面下雨了。" in c] == [True]
+
+def test_the_conversation_keeps_what_she_said_on_her_own():
+    import inspect
+
+    from src.open_llm_vtuber.conversations import single_conversation
+
+    src = inspect.getsource(single_conversation.process_single_conversation)
+
+    assert 'getattr(context.agent_engine, "remember_remark", None)' in src
 
 
 # --- 影像 -------------------------------------------------------------------------
@@ -918,3 +943,33 @@ def test_the_retry_after_the_guard_tells_the_agent_to_redo():
     src = inspect.getsource(single_conversation.process_single_conversation)
 
     assert 'metadata={**agent_metadata, "redo": True},' in src
+
+
+def test_she_speaks_up_through_the_engine_with_the_hosts_material(tmp_path):
+    """主動開口改由引擎決定講什麼：主機那一大段指示不送，只送素材（話題、新聞、
+    查到的資料）。說出口的那句由主機過濾後再記（remember_remark），引擎不先記。"""
+
+    async def scenario():
+        llm = EngineLLM()
+        current = agent(companion(tmp_path, llm))
+        await say(current, "我在做時光機", history_uid="h1")
+        await say(
+            current,
+            "（主機的一大段主動開口指示）",
+            history_uid="h1",
+            proactive_speak=True,
+            skip_memory=True,
+            proactive_material=["【你可以聊的主題】\n- 天文"],
+        )
+        prompt = llm.calls[-1]
+        await say(current, "嗯", history_uid="h1")
+        return prompt, llm.calls[-1]
+
+    prompt, afterwards = asyncio.run(scenario())
+    everything = "\n".join(message.content for message in prompt)
+    assert "主機的一大段主動開口指示" not in everything
+    assert "Speak up on your own" in prompt[-1].content
+    assert "- 天文" in everything
+    later = "\n".join(message.content for message in afterwards)
+    assert "Speak up on your own" not in later
+    assert "- 天文" not in later

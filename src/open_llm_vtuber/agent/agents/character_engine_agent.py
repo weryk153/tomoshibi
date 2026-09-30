@@ -57,7 +57,6 @@ MEMORY_RULE = (
     f"備註裡的「{ABOUT_HERSELF}」與 memory 是之前對話累積下來的，"
     "自然運用、不要生硬複述。"
 )
-PROACTIVE_REMARK = "你剛才主動開口說了這句話，對方現在是在回應它：{remark}"
 
 _DONE = object()
 # 這一輪的輸出要送去哪裡。agent 是所有連線共用的，不能記在 agent 身上：第二個
@@ -310,6 +309,11 @@ class CharacterEngineAgent(AgentInterface):
                     raise
                 companion = successor
 
+    async def remember_remark(self, conversation, remark: str) -> None:
+        """她主動開口的那一輪帶著一大段指示，以 skip_memory 進行；說出口的那句另外
+        記進對話，像她自己說的話一樣。主機在那一輪播完之後呼叫。"""
+        await self._companion().remember_remark(conversation, self._remembered(remark))
+
     def _remembered(self, reply: str) -> str:
         """她記得自己說了什麼。跟 BasicMemoryAgent._add_message 同一套：表情與動作
         標籤留著（她得讀到自己會做表情），演出標籤拿掉，字形跟畫面一致。"""
@@ -354,9 +358,8 @@ class CharacterEngineAgent(AgentInterface):
         text = "\n".join(parts).strip()
 
         notes.append(build_turn_guidance(text, is_proactive=proactive))
-        remark = metadata.get("previous_proactive_response")
-        if isinstance(remark, str) and remark.strip():
-            notes.append(PROACTIVE_REMARK.format(remark=remark.strip()))
+        # 她主動說的話已經留在對話裡（remember_remark），不再以一次性的備註帶過去：
+        # 那樣她會把引號裡的話照唸一遍。
         notes.append(self._group_note)
         # 以 "- " 開頭的是她知道的事：引擎在一段對話裡只講一次，之後只補新的。
         notes += self._memory
@@ -389,25 +392,50 @@ class CharacterEngineAgent(AgentInterface):
         _OUTPUTS.set(outputs)
         name = uuid4().hex
 
+        proactive = bool(metadata.get("proactive_speak"))
+        material = [
+            str(item).strip()
+            for item in metadata.get("proactive_material") or ()
+            if str(item).strip()
+        ]
+        if metadata.get("proactive_forbid_question"):
+            material.append("你上一次主動開口已經問過問題了，這次不要再問，用陳述句。")
+
         def ask(companion):
-            turn = asyncio.ensure_future(
-                companion.reply(
+            # 在引擎那一輪裡面做：agent 是共用的，這一輪排隊的時候別的連線可能
+            # 正在講話，那時候不能換人設、換工具。
+            def before_turn():
+                self._bring_up_to_date(
+                    companion, take_back=conversation if redo else None
+                )
+
+            if proactive:
+                # 主動開口講什麼由引擎決定（她的目標、想法、還沒聊完的事），主機
+                # 那一大段指示不送，只送素材。說出口的那句主機過濾後才記
+                # （remember_remark），所以引擎不先記。
+                call = companion.speak_up(
+                    conversation,
+                    frames=frames,
+                    on_text_delta=outputs.put_nowait,
+                    notes=[*material, *notes],
+                    before_turn=before_turn,
+                    remember_as=self._remembered,
+                    turn_id=name,
+                    keep=False,
+                )
+            else:
+                call = companion.reply(
                     text,
                     conversation_id=conversation,
                     frames=frames,
                     on_text_delta=outputs.put_nowait,
                     skip_memory=bool(metadata.get("skip_memory")),
-                    proactive=bool(metadata.get("proactive_speak")),
                     notes=notes,
-                    # 在引擎那一輪裡面做：agent 是共用的，這一輪排隊的時候別的
-                    # 連線可能正在講話，那時候不能換人設、換工具。
-                    before_turn=lambda: self._bring_up_to_date(
-                        companion, take_back=conversation if redo else None
-                    ),
+                    before_turn=before_turn,
                     remember_as=self._remembered,
                     turn_id=name,
                 )
-            )
+            turn = asyncio.ensure_future(call)
             turn.add_done_callback(lambda _: outputs.put_nowait(_DONE))
             return turn
 
