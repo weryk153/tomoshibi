@@ -44,6 +44,8 @@ def test_reading_gives_the_choice_and_the_numbers():
         "memory_every": 2,
         "goal_every": 4,
         "reflection_every": 6,
+        "goals_shown": 3,
+        "thoughts_shown": 2,
     }
 
 
@@ -95,6 +97,8 @@ def test_a_conf_without_the_engine_block_gets_one(conf_file):
         "memory_every": 3,
         "goal_every": 4,
         "reflection_every": 6,
+        "goals_shown": 3,
+        "thoughts_shown": 2,
     }
 
 

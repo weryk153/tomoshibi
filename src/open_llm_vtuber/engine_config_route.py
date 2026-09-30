@@ -34,12 +34,21 @@ from .conf_editor import (
 ENGINE_CHOICE = "character_engine_agent"
 BASIC_CHOICE = "basic_memory_agent"
 # 畫面開得出來的幾個；其餘（timeout、goal_max_age_days…）留在 YAML。
-EVERY_KEYS = ("emotion_every", "memory_every", "goal_every", "reflection_every")
+EVERY_KEYS = (
+    "emotion_every",
+    "memory_every",
+    "goal_every",
+    "reflection_every",
+    "goals_shown",
+    "thoughts_shown",
+)
 EVERY_DEFAULTS = {
     "emotion_every": 1,
     "memory_every": 2,
     "goal_every": 4,
     "reflection_every": 6,
+    "goals_shown": 3,
+    "thoughts_shown": 2,
 }
 EVERY_MAX = 99
 

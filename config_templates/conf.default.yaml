@@ -106,6 +106,8 @@ character_config:
         timeout_seconds: 60 # per background job
         max_rebase_turns: 3 # a result this many turns late is still used
         goal_max_age_days: 7 # goals untouched for this long leave the prompt
+        goals_shown: 3 # how many goals (the most pressing) she keeps in mind
+        thoughts_shown: 2 # how many thoughts (the newest) she keeps in mind
         max_history_messages: 80 # how many messages of the conversation are kept for the model
 
       letta_agent:

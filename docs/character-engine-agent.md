@@ -70,6 +70,8 @@ agent_settings:
     timeout_seconds: 60
     max_rebase_turns: 3   # 背景結果落後幾輪以內仍然採用（記憶不受此限）
     goal_max_age_days: 7  # 超過幾天沒更新的目標不再寫進提示
+    goals_shown: 3  # 她同時放在心上的目標最多幾條（最急的優先）
+    thoughts_shown: 2  # 她同時放在心上的想法最多幾條（最新的優先）
     max_history_messages: 80  # 對話最多留幾則給模型
 ```
 

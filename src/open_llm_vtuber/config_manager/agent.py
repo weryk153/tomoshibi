@@ -189,6 +189,8 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
     timeout_seconds: float = Field(60.0, alias="timeout_seconds", gt=0)
     max_rebase_turns: int = Field(3, alias="max_rebase_turns", ge=0)
     goal_max_age_days: int = Field(7, alias="goal_max_age_days", ge=0)
+    goals_shown: int = Field(3, alias="goals_shown", ge=0)
+    thoughts_shown: int = Field(2, alias="thoughts_shown", ge=0)
     foreground_patience_seconds: float = Field(
         120.0, alias="foreground_patience_seconds", gt=0
     )
@@ -234,6 +236,14 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
         "goal_max_age_days": Description(
             en="Goals not updated for this many days leave the prompt",
             zh="超過幾天沒更新的目標不再寫進提示",
+        ),
+        "goals_shown": Description(
+            en="How many goals (the most pressing) she keeps in mind",
+            zh="她同時放在心上的目標最多幾條（最急的優先）",
+        ),
+        "thoughts_shown": Description(
+            en="How many thoughts (the newest) she keeps in mind",
+            zh="她同時放在心上的想法最多幾條（最新的優先）",
         ),
     }
 

@@ -182,6 +182,18 @@ def test_the_cognition_settings_reach_the_engine():
     assert settings.emotion_every == 1
 
 
+def test_how_much_she_keeps_in_mind_reaches_the_engine():
+    arguments = factory_arguments()
+    arguments["agent_settings"]["character_engine_agent"] = {
+        "goals_shown": 1,
+        "thoughts_shown": 0,
+    }
+
+    settings = AgentFactory.create_agent(**arguments)._companion().settings
+
+    assert (settings.goals_shown, settings.thoughts_shown) == (1, 0)
+
+
 def test_until_the_window_is_known_she_is_given_room_for_a_real_persona(monkeypatch):
     """實機：伺服器比模型早起來，問不到 window，引擎預設 8192 裝不下 Mao 的人設，
     主動發話那一輪直接失敗（Character context exceeds the configured context

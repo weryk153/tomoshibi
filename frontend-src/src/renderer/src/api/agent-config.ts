@@ -57,7 +57,9 @@ export async function setUseMcpp(
 // conf.yaml、要重啟），多了 available／reason：引擎裝不起來時開關是灰的，旁邊
 // 說明為什麼。
 
-export type EngineEvery = 'emotion_every' | 'memory_every' | 'goal_every' | 'reflection_every'
+export type EngineEvery =
+  | 'emotion_every' | 'memory_every' | 'goal_every' | 'reflection_every'
+  | 'goals_shown' | 'thoughts_shown'
 
 export interface EngineSettings {
   enabled: boolean
@@ -67,6 +69,8 @@ export interface EngineSettings {
   memory_every: number
   goal_every: number
   reflection_every: number
+  goals_shown: number
+  thoughts_shown: number
 }
 
 export type EngineSettingsChange = Partial<Pick<EngineSettings, 'enabled' | EngineEvery>>
