@@ -14,7 +14,7 @@ from typing import Any, Mapping, Optional
 
 from loguru import logger
 
-from ..context_window import detect_context_window
+from ..context_window import cooling_down, detect_context_window
 from ..utils.path_safety import safe_join
 
 # 背景工作要的是穩定的 JSON，不是有個性的對話。只帶「關掉思考模式」這類欄位：
@@ -163,6 +163,9 @@ def _fit_the_window(live: _Live) -> None:
     from ai_character_engine.context.budget import ContextBudget
 
     if live.window or live.probes >= WINDOW_PROBES:
+        return
+    if cooling_down(live.base_url):
+        # 問不到之後一分鐘內不會真的去問；那些呼叫不算一次。
         return
     live.probes += 1
     window = detect_context_window(live.base_url, live.model)

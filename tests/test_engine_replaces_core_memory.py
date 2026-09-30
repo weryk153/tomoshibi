@@ -83,6 +83,103 @@ def test_what_the_host_remembered_before_is_handed_to_the_engine_once(
     assert "紅莉栖：喜歡胡椒博士。" in memory_core.load_self_memory("kurisu")
 
 
+def test_her_lines_from_an_old_conversation_do_not_outrank_what_she_knows_now(
+    tmp_path, monkeypatch
+):
+    """舊 core_memory.md 裡她自己的那幾行比 self_memory.md 現在的內容舊。相近的
+    兩行要留現在的；裝不下的時候先丟舊檔案帶來的，不是現在的。"""
+    monkeypatch.chdir(tmp_path)
+    memory_core.save_self_memory(
+        "kurisu", "紅莉栖：每天早上都要先喝一杯紅茶才開始工作。\n紅莉栖：在學鋼琴。"
+    )
+    monkeypatch.setattr(
+        memory_core,
+        "load_core_memory",
+        lambda conf_uid,
+        history_uid: "紅莉栖：每天早上都要先喝一杯咖啡才開始工作。\n紅莉栖：喜歡胡椒博士。",
+    )
+
+    async def scenario():
+        current = agent(
+            companion(tmp_path, EngineLLM()), conf_uid="kurisu", character_name="紅莉栖"
+        )
+        await say(current, "你好", history_uid="h1")
+
+    asyncio.run(scenario())
+
+    own = memory_core.load_self_memory("kurisu").splitlines()
+    assert "紅莉栖：每天早上都要先喝一杯紅茶才開始工作。" in own
+    assert "紅莉栖：每天早上都要先喝一杯咖啡才開始工作。" not in own
+    assert "紅莉栖：在學鋼琴。" in own
+    assert "紅莉栖：喜歡胡椒博士。" in own
+
+
+def test_a_migration_that_could_not_save_her_lines_is_tried_again(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        memory_core,
+        "load_core_memory",
+        lambda conf_uid, history_uid: "對方：名字是晨星。\n紅莉栖：喜歡胡椒博士。",
+    )
+    saves = []
+
+    def failing_save(conf_uid, content):
+        saves.append(content)
+        return len(saves) > 1
+
+    monkeypatch.setattr(memory_core, "save_self_memory", failing_save)
+
+    async def scenario():
+        first = agent(
+            companion(tmp_path, EngineLLM()), conf_uid="kurisu", character_name="紅莉栖"
+        )
+        await say(first, "你好", history_uid="h1")
+        second = agent(
+            companion(tmp_path, EngineLLM()), conf_uid="kurisu", character_name="紅莉栖"
+        )
+        await say(second, "你好", history_uid="h1")
+
+    asyncio.run(scenario())
+
+    assert len(saves) == 2
+    assert all("紅莉栖：喜歡胡椒博士。" in content for content in saves)
+
+
+def test_an_unreadable_self_memory_is_not_overwritten_by_the_migration(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        memory_core,
+        "load_core_memory",
+        lambda conf_uid, history_uid: "紅莉栖：喜歡胡椒博士。",
+    )
+
+    def unreadable(conf_uid):
+        raise UnicodeDecodeError("utf-8", b"", 0, 1, "bad")
+
+    monkeypatch.setattr(memory_core, "read_self_memory", unreadable)
+    saves = []
+    monkeypatch.setattr(
+        memory_core, "save_self_memory", lambda conf_uid, content: saves.append(content)
+    )
+
+    async def scenario():
+        current = agent(
+            companion(tmp_path, EngineLLM()), conf_uid="kurisu", character_name="紅莉栖"
+        )
+        await say(current, "你好", history_uid="h1")
+
+    asyncio.run(scenario())
+
+    assert saves == []
+    assert not (
+        tmp_path / "chat_history" / "kurisu" / "engine" / "brought-from-core-memory.txt"
+    ).exists()
+
+
 def test_the_memory_page_shows_and_edits_what_the_engine_remembers(tmp_path):
     async def scenario():
         llm = EngineLLM()

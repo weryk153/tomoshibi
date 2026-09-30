@@ -199,11 +199,16 @@ def self_memory_path(conf_uid: str) -> str:
         return ""
 
 
+def read_self_memory(conf_uid: str) -> str:
+    """讀不到就丟例外。要拿它當合併起點的人得知道「空」是真的空還是讀不到。"""
+    f = _self_memory_file(conf_uid)
+    return f.read_text(encoding="utf-8").strip() if f.is_file() else ""
+
+
 def load_self_memory(conf_uid: str) -> str:
     """在注入路徑上，絕不丟例外。"""
     try:
-        f = _self_memory_file(conf_uid)
-        return f.read_text(encoding="utf-8").strip() if f.is_file() else ""
+        return read_self_memory(conf_uid)
     except Exception as e:
         logger.warning(f"[self_memory] load failed for {conf_uid}: {e}")
         return ""

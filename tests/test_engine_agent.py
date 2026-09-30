@@ -532,6 +532,53 @@ def test_an_interruption_is_delivered_once(tmp_path):
     assert asyncio.run(scenario()) == ["我是B", "我 [Interrupted by user]", "繼續"]
 
 
+def test_a_turn_told_of_its_interruption_is_not_told_again_while_it_stops(tmp_path):
+    """真的 HTTP 串流關掉要一點時間。A 被打斷、送過一次之後，它的 task 還在等
+    引擎停下來；這期間 B 打斷，不能又落到 A 頭上——A 聽到的會被 B 的覆寫。"""
+
+    class SlowToStop(EngineLLM):
+        async def stream_generate(self, messages, *, tools=None):
+            self.calls.append(list(messages))
+            yield LLMStreamChunk(text=self.reply[:1])
+            self.started.set()
+            try:
+                await self.gate.wait()
+            except asyncio.CancelledError:
+                for _ in range(20):
+                    await asyncio.sleep(0)
+                raise
+            yield LLMStreamChunk(text=self.reply[1:])
+            yield LLMStreamChunk(
+                final=True, response=LLMResponse(text=self.reply, model="fake")
+            )
+
+    async def scenario():
+        llm = SlowToStop("嗯，我知道了。", gate=asyncio.Event())
+        engine = companion(tmp_path, llm)
+        current = agent(engine)
+        a = asyncio.ensure_future(say(current, "我是A", history_uid="h1"))
+        await llm.started.wait()
+        b = asyncio.ensure_future(say(current, "我是B", history_uid="h2"))
+        for _ in range(5):
+            await asyncio.sleep(0)
+        a.cancel()
+        current.handle_interrupt("嗯")
+        for _ in range(5):
+            await asyncio.sleep(0)
+        assert not a.done()
+        b.cancel()
+        current.handle_interrupt("")
+        with pytest.raises(asyncio.CancelledError):
+            await a
+        with pytest.raises(asyncio.CancelledError):
+            await b
+        llm.gate.set()
+        await say(current, "繼續", history_uid="h1")
+        return llm.said_by_both()
+
+    assert asyncio.run(scenario()) == ["我是A", "嗯 [Interrupted by user]", "繼續"]
+
+
 def test_the_same_conversation_in_two_windows(tmp_path):
     """A 在生成、B 排在後面，兩個都在同一段對話。主機取消 A 並回報聽到哪裡：
     被打斷的是 A，B 照常回答。"""

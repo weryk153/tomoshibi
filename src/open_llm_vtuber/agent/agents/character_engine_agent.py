@@ -119,6 +119,8 @@ class CharacterEngineAgent(AgentInterface):
         self._playing: list = []
         # 最後結束的那一輪：主機等它停了才回報聽到哪裡時，指的是它。
         self._last_ended: Optional[tuple] = None
+        # 已經送過打斷的回合名字。它的 task 等引擎停下來的期間，別的連線也可能打斷。
+        self._told: set = set()
         self._group_note = ""
         self.set_system(system)
 
@@ -197,15 +199,25 @@ class CharacterEngineAgent(AgentInterface):
                 history_uid, [*companion.memories(history_uid), *remembered]
             )
         if her_own.strip():
-            current = memory_core.load_self_memory(self._conf_uid)
+            try:
+                current = memory_core.read_self_memory(self._conf_uid)
+            except Exception as exc:
+                # 讀不到不等於沒有：現在存會把整份蓋成舊檔案的那幾行。
+                logger.warning(
+                    f"[engine] self memory unreadable, kept for later ({exc})"
+                )
+                return
+            # 舊檔案的那幾行比她現在的記憶舊：相近的留現在的，裝不下先丟舊的。
             merged = memory_core.merge_self_memory(
-                current,
                 her_own,
+                current,
                 memory_core.SELF_CAP_CHARS,
                 character_name=self._character_name,
             )
-            if merged != current:
-                memory_core.save_self_memory(self._conf_uid, merged)
+            if merged != current and not memory_core.save_self_memory(
+                self._conf_uid, merged
+            ):
+                return
         # 搬完才記；搬到一半炸掉的話下一次還會再試。
         self._brought.add(history_uid)
         done.parent.mkdir(parents=True, exist_ok=True)
@@ -265,15 +277,15 @@ class CharacterEngineAgent(AgentInterface):
         正在生成的那一則。
         """
         self._playing = [entry for entry in self._playing if not entry[0].done()]
+        # 送過一次就不再是打斷的對象；它的 task 收尾期間別的連線也可能打斷。
         cancelled = [
-            entry for entry in (*self._turns, *self._playing) if entry[0].cancelling()
+            entry
+            for entry in (*self._turns, *self._playing)
+            if entry[0].cancelling() and entry[2] not in self._told
         ]
         meant = cancelled[-1][1:] if cancelled else self._last_ended
         if cancelled:
-            # 送過一次就不再是打斷的對象；它的 task 收尾期間別的連線也可能打斷。
-            self._playing = [
-                entry for entry in self._playing if entry is not cancelled[-1]
-            ]
+            self._told.add(cancelled[-1][2])
         try:
             if meant is None:
                 self._companion().interrupt(heard_response)
@@ -417,7 +429,8 @@ class CharacterEngineAgent(AgentInterface):
                 entry
                 for entry in self._playing
                 if not entry[0].done() and entry[0] is not waiting[0]
-            ] + [waiting]
+            ] + ([] if name in self._told else [waiting])
+            self._told &= {entry[2] for entry in (*self._turns, *self._playing)}
             # 主機打斷的方式是取消等著這個 generator 的 task。引擎那一輪得真的
             # 停下來，之後 handle_interrupt 才記得進去。
             if not turn.done():

@@ -212,6 +212,40 @@ def test_the_window_is_asked_for_a_few_times_not_on_every_turn_for_ever(monkeypa
     assert len(asked) <= factory.WINDOW_PROBES + 1
 
 
+def test_a_turn_inside_the_cooldown_does_not_use_up_a_probe(monkeypatch):
+    """問不到之後有一分鐘的冷卻，冷卻期內的呼叫沒有真的去問。LM Studio 是用到才
+    載模型：建 companion 時第一次必然問不到，接下來一分鐘內連線、第一輪、第二輪
+    各來問一次，額度就用光了，之後模型載好也永遠不會知道。"""
+    from src.open_llm_vtuber import context_window
+
+    now = [1000.0]
+    loaded = [None]
+    asked = []
+
+    def probe(base_url, model):
+        asked.append(1)
+        return loaded[0]
+
+    context_window.reset_cache()
+    monkeypatch.setattr(context_window, "_probe_lmstudio", probe)
+    monkeypatch.setattr(context_window.time, "monotonic", lambda: now[0])
+    monkeypatch.setattr(
+        factory, "detect_context_window", context_window.detect_context_window
+    )
+    created = AgentFactory.create_agent(**factory_arguments())
+    for _ in range(factory.WINDOW_PROBES + 2):
+        created._companion()
+    assert len(asked) == 1
+
+    now[0] += 120.0
+    loaded[0] = 8192
+    companion = created._companion()
+
+    assert len(asked) == 2
+    assert companion.runtime.context_builder.budget.context_window_tokens == 8192
+    context_window.reset_cache()
+
+
 def test_a_window_that_is_detected_later_does_not_replace_her(monkeypatch):
     """模型還沒載入的時候問不到 window；晚一點問到了，是同一個她、換一個預算。"""
     first = AgentFactory.create_agent(**factory_arguments())._companion()
