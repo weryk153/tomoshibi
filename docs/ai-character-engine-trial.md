@@ -21,9 +21,9 @@
 ## 執行試接
 
 Tomoshibi 支援 Python 3.10–3.12，引擎需要 3.11 以上；本次採獨立 Python 3.12
-環境，不覆寫原本 `.venv`。在新環境安裝 Tomoshibi 鎖定依賴與已驗證的
-`ai_character_engine-1.0.0`、`ai_character_engine_tomoshibi-1.0.0` wheels。
-這兩個 wheel 由引擎私人 repo 的交付包提供，不假設公開 PyPI 已上架。
+環境，不覆寫原本 `.venv`。在新環境安裝 Tomoshibi 鎖定依賴與引擎
+（`uv pip install ../ai-character-engine`，引擎沒有上架 PyPI）。
+試接用的是引擎中立的 `CharacterHostBridge`，不需要任何 Tomoshibi 專用套件。
 
 啟動本機 LM Studio，在 `127.0.0.1:1234` 提供相容 API，將已安裝模型載入為
 `tomoshibi-engine-trial`，再使用該 Python 3.12 環境執行：

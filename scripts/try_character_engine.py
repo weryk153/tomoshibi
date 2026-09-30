@@ -1,4 +1,4 @@
-"""Run the verified engine wheel through Tomoshibi's real text/output pipeline.
+"""Run the engine through Tomoshibi's real text/output pipeline.
 
 This local trial does not replace Tomoshibi's application agent or user history.
 Use --interactive for manual turns after the automated checks.
@@ -34,7 +34,7 @@ async def main(args):
     from ai_character_engine import CharacterProfile, CharacterRuntime, __version__
     from ai_character_engine.llm.local import OpenAICompatibleChatClient
     from ai_character_engine.llm.models import Message
-    from ai_character_engine_tomoshibi import TomoshibiBridge, TomoshibiIntegrationConfig
+    from ai_character_engine.host import CharacterHostBridge, HostBridgeConfig
     from src.open_llm_vtuber.agent.input_types import BatchInput, TextData, TextSource
     from src.open_llm_vtuber.agent.output_types import SentenceOutput
     from src.open_llm_vtuber.agent.transformers import (
@@ -61,9 +61,9 @@ async def main(args):
     )
     bridges = []
     def new_bridge():
-        bridge = TomoshibiBridge(
+        bridge = CharacterHostBridge(
             CharacterRuntime(character=profile, llm=client, max_history_messages=20),
-            config=TomoshibiIntegrationConfig(turn_timeout_seconds=100),
+            config=HostBridgeConfig(turn_timeout_seconds=100),
         )
         bridges.append(bridge)
         return bridge
