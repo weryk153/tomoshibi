@@ -45,3 +45,25 @@ test('GET 回應裡的 self 欄位會被帶進 MemoryState', () => {
   assert.equal(state.self_cap, 800)
   assert.equal(state.content, '對方叫小明。')
 })
+
+test('記憶在引擎手上時，頁面會知道（字數上限對它不起作用）', () => {
+  const base = {
+    conf_uid: 'kurisu',
+    enabled: true,
+    content: '',
+    exists: false,
+    char_count: 0,
+    cap: 1500,
+    cap_min: 500,
+    cap_max: 8000,
+    consolidation_interval: 1,
+    consolidation_interval_choices: [1, 3, 5],
+    self_content: '',
+    self_char_count: 0,
+    self_cap: 800,
+  }
+  assert.equal(mapMemoryResponse({ ...base, engine_managed: true }).engine_managed, true)
+  assert.equal(mapMemoryResponse({ ...base, engine_managed: false }).engine_managed, false)
+  // 舊後端沒有這個欄位：當成不是引擎。
+  assert.equal(mapMemoryResponse(base).engine_managed, false)
+})

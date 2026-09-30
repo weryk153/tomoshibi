@@ -366,6 +366,9 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
         help={t('settings.memory.toggleHelp')}
       />
 
+      {memory.engine_managed ? (
+        <Text fontSize="xs" color="whiteAlpha.600">{t('settings.memory.engineManaged')}</Text>
+      ) : (
       <Stack gap={2}>
         <NumberField
           label={t('settings.memory.capLabel', { min: capMin, max: capMax })}
@@ -382,9 +385,10 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
           </Button>
         </HStack>
       </Stack>
+      )}
 
-      {/* 進階：收在展開區，但功能齊全——手動編輯記憶、深度回想、重建索引都在
-          這裡，不是被移除，只是不該是打開分頁第一眼看到的東西。 */}
+      {/* 進階：收在展開區——手動編輯她自己的記憶與這段對話的記憶，不該是打開
+          分頁第一眼看到的東西。 */}
       <Collapsible.Root
         open={advancedOpen}
         onOpenChange={(details) => setAdvancedOpen(details.open)}
@@ -474,7 +478,9 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
                 disabled={!contentLoaded}
               />
               <Text fontSize="xs" color="whiteAlpha.600">
-                {t('settings.memory.charCount', { count: contentDraft.length, cap: memory.cap })}
+                {memory.engine_managed
+                  ? t('settings.memory.charCountNoCap', { count: contentDraft.length })
+                  : t('settings.memory.charCount', { count: contentDraft.length, cap: memory.cap })}
               </Text>
               <Text fontSize="xs" color="whiteAlpha.500">{t('settings.memory.editHint')}</Text>
               {saveError && (

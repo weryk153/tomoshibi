@@ -250,3 +250,30 @@ def test_a_hosts_call_waiting_when_the_engine_is_replaced_goes_to_the_new_one(tm
         return result, through
 
     assert asyncio.run(scenario()) == ("tidied", ["new"])
+
+
+def test_the_memory_page_is_told_when_the_engine_keeps_the_memory(
+    tmp_path, monkeypatch
+):
+    """引擎的記憶不按字數限制。頁面要知道，不然會顯示一個不起作用的上限。"""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(memory_route, "_is_local_request", lambda request: True)
+    monkeypatch.setattr(memory_route, "_resolve_conf_uid", lambda value: (value, None))
+    keeper = SimpleNamespace(
+        conversation_memory=lambda history_uid: "對方：名字是晨星。",
+        rewrite_conversation_memory=lambda history_uid, text, **_: None,
+    )
+    contexts = {"engine": _context("kurisu", "h1", keeper)}
+    app = FastAPI()
+    app.include_router(memory_route.init_memory_route(contexts))
+    client = TestClient(app)
+
+    engine = client.get("/api/memory", params={"conf_uid": "kurisu"}).json()
+    contexts["engine"] = _context("kurisu", "h1", SimpleNamespace())
+    basic = client.get("/api/memory", params={"conf_uid": "kurisu"}).json()
+
+    assert engine["engine_managed"] is True
+    assert basic["engine_managed"] is False

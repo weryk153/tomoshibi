@@ -86,6 +86,13 @@ def _clamp(value: Any, fallback: int) -> int:
 def write_engine_settings(changes: dict) -> None:
     """只寫送來的那幾個；沒送的不動。數字超出範圍就夾住，不是數字就略過。"""
     lines = read_conf_lines()
+    apply_engine_settings(lines, changes)
+    write_conf(lines)
+
+
+def apply_engine_settings(lines: list[str], changes: dict) -> None:
+    """同 write_engine_settings，改在已經讀進來的行上；給要一次寫入多項設定的人
+    （效能模式）用。"""
     agent_start, agent_end = block_extent(lines, "agent_config")
 
     if "enabled" in changes:
@@ -115,7 +122,6 @@ def write_engine_settings(changes: dict) -> None:
         if settings_start >= agent_end:
             raise KeyError("agent_settings: not found inside agent_config")
         upsert_nested_block(lines, settings_start, settings_end, ENGINE_CHOICE, numbers)
-    write_conf(lines)
 
 
 def _engine_importable() -> bool:

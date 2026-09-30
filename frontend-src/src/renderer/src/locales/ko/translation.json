@@ -665,7 +665,7 @@
     "memory": {
       "description": "기억 내용과 대화 기록은 캐릭터별로 분리되며 여기에는 현재 캐릭터의 기억이 표시돼요. 아래의 활성화, 용량, 심층 회상 설정은 모든 캐릭터에 공통으로 적용돼요.",
       "toggle": "장기 기억 사용",
-      "toggleHelp": "끄면 새 대화를 기억에 저장하지 않고, 지난 기억을 대화에 가져오지도 않아요. 기존 기억은 유지돼요(아래에서 지우지 않는 한).",
+      "toggleHelp": "끄면 새 대화를 기억으로 정리하지 않고, 예전 기억도 대화에 가져오지 않습니다 (AI Character Engine 사용 시 백엔드를 다시 시작한 뒤 적용). 저장된 기억은 아래에서 지우지 않는 한 유지됩니다.",
       "selfLabel": "그녀 자신에 대해",
       "selfHelp": "모든 대화에서 공유되며 방송 중에도 함께합니다. 취향, 생각, 내력, 그녀 자신의 계획이 여기에 들어갑니다. 당신과의 일은 들어오지 않습니다. 시청자가 이상한 걸 가르쳤다면 여기서 바로 지우세요.",
       "selfCharCount": "현재 {{count}}자 / 상한 {{cap}}자.",
@@ -695,12 +695,14 @@
       "loadError": "백엔드에서 기억 설정을 불러올 수 없어요.",
       "capLabel": "핵심 기억 상한({{min}}–{{max}}자)",
       "capHelp": "클수록 더 많이 기억하지만, 매 턴 더 많은 토큰을 쓰고 응답이 느려지며 통합 시 손실이 커져요. 범위 {{min}}–{{max}}, 약 1500 권장.",
-      "advancedToggle": "고급(수동 편집, 심층 회상, 색인 재구축)",
+      "advancedToggle": "고급 (직접 편집)",
       "saveConfirm": "현재 기억 내용을 통째로 교체해요(병합이 아니에요). 계속할까요?",
       "restartHintSetting": "저장했습니다. 이 설정이 현재 대화에 반영되려면 백엔드를 재시작하거나 캐릭터를 다시 선택해야 합니다.",
       "errors": {
         "invalidInterval": "정리 주기는 목록에 있는 값만 사용할 수 있습니다. 다시 선택해 주세요."
-      }
+      },
+      "engineManaged": "이 대화의 기억은 AI Character Engine이 관리합니다. 글자 수 제한이 없고, 매 턴 가장 관련 있는 기억을 최대 40개까지 떠올립니다.",
+      "charCountNoCap": "{{count}}자"
     },
     "perf": {
       "description": "사용하는 기기에 맞춰 성능을 조정하세요. 성능이 약하거나 공유하는 컴퓨터에서는 경량을, 강력한 GPU 장비에서는 고성능을 선택하세요. 엔진과 keep-alive 변경은 하드웨어 설정이라 재시작 후(또는 캐릭터를 한 번 전환한 뒤) 적용돼요.",
@@ -711,7 +713,7 @@
       "loading": "불러오는 중…",
       "presetSectionTitle": "원클릭 성능 모드",
       "presetLabel": "성능 모드",
-      "presetHelp": "엄선된 묶음을 한 번에 적용해요(음성 엔진, 기억 상한, 심층 회상, 통합 빈도, 모델 keep-alive). 적용 후에도 각 항목은 개별적으로 조정할 수 있어요.",
+      "presetHelp": "추천 설정을 한 번에 적용합니다 (음성 엔진, 기억 상한, 정리 빈도, 모델 유지 시간, AI Character Engine 백그라운드 작업 빈도). 적용 후에도 각 항목을 따로 조정할 수 있습니다.",
       "presetPlaceholder": "성능 모드 선택",
       "presetLight": "경량(성능이 약한 / 공유 기기)",
       "presetStandard": "표준(기본값)",
@@ -770,7 +772,7 @@
       "consolidationSectionTitle": "기억 통합 빈도",
       "consolidationLabel": "통합 주기",
       "consolidationPlaceholder": "빈도 선택",
-      "consolidationHelp": "핵심 기억을 얼마나 자주 통합하는지예요. 1 = 매 턴(기본값, 가장 정확하지만 로컬 모델에서는 더 느림); 3/5 = 통합에 쓰이는 LLM 호출을 절반 이상 줄여 성능이 약한 기기에 적합해요.",
+      "consolidationHelp": "장기 기억을 몇 턴마다 정리할지 (AI Character Engine 사용 시 그녀 자신의 기억만). 1=매 턴 (기본값, 가장 정확하지만 로컬 모델에서는 느림); 3/5=정리용 LLM 호출을 절반 이상 줄여 저사양 기기에 적합.",
       "consolidationEvery1": "매 턴(기본값)",
       "consolidationEvery3": "3턴마다",
       "consolidationEvery5": "5턴마다",

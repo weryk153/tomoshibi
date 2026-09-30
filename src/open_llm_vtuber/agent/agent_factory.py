@@ -14,6 +14,13 @@ from ..mcpp.tool_executor import ToolExecutor
 from typing import Optional
 
 
+def _engine_settings(settings: dict, *, long_term_memory: bool) -> dict:
+    """記憶頁關掉長期記憶時，引擎也不再抽記憶、不再把記憶帶進對話。"""
+    if long_term_memory:
+        return dict(settings)
+    return {**settings, "memory_every": 0, "memories_recalled": 0}
+
+
 class AgentFactory:
     @staticmethod
     def create_agent(
@@ -121,7 +128,10 @@ class AgentFactory:
                 system=system_prompt,
                 provider=llm_provider,
                 llm_config=llm_config,
-                settings=agent_settings.get("character_engine_agent") or {},
+                settings=_engine_settings(
+                    agent_settings.get("character_engine_agent") or {},
+                    long_term_memory=kwargs.get("long_term_memory_enabled", True),
+                ),
                 language=basic["player_language"],
             )
             from .agents.character_engine_agent import CharacterEngineAgent

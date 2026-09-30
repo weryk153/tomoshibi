@@ -39,3 +39,12 @@ def test_a_group_turn_names_the_conversation_of_the_member_who_speaks():
     assert '"history_uid": member_context.history_uid' in src or (
         '"history_uid": context.history_uid' in src
     )
+
+
+def test_the_agent_factory_is_told_whether_long_term_memory_is_on():
+    src = inspect.getsource(service_context.ServiceContext.init_agent)
+    create = src.split("AgentFactory.create_agent(", 1)[1]
+
+    assert (
+        "long_term_memory_enabled=target_character.long_term_memory_enabled," in create
+    )

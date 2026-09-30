@@ -665,7 +665,7 @@
     "memory": {
       "description": "记忆内容与聊天记录按角色分别保存，这里显示当前角色的记忆；下方的开关、字数上限和深度回忆选项是全局设置，会应用到所有角色。",
       "toggle": "开启长期记忆",
-      "toggleHelp": "关闭后她就不会再把新对话整理进记忆、也不会把旧记忆带进对话。已存的记忆内容会保留（除非你按下面的清除）。",
+      "toggleHelp": "关闭后她就不会再把新对话整理进记忆、也不会把旧记忆带进对话（使用 AI Character Engine 时需重新启动后端）。已存的记忆内容会保留（除非你按下面的清除）。",
       "selfLabel": "她自己",
       "selfHelp": "所有对话共用，直播时也会带着。她的喜好、看法、来历、自己的计划放这里；跟你之间的事不会进来。观众教了她什么奇怪的东西，直接在这里删掉。",
       "selfCharCount": "目前 {{count}} 字 / 上限 {{cap}} 字。",
@@ -695,12 +695,14 @@
       "loadError": "无法从后端加载记忆设置。",
       "capLabel": "核心记忆字数上限（{{min}}–{{max}}）",
       "capHelp": "越大她能记越多，但每轮消息会用更多 token、响应更慢、整理旧记忆时更容易遗漏。范围 {{min}}–{{max}}，建议 1500。",
-      "advancedToggle": "高级（手动编辑、深度回想、重建索引）",
+      "advancedToggle": "高级（手动编辑）",
       "saveConfirm": "这会整份替换目前的记忆内容，不是合并。确定要继续吗？",
       "restartHintSetting": "已保存。这个设置要重启后端（或重新切换一次角色）才会应用到当前对话。",
       "errors": {
         "invalidInterval": "整理频率只能是菜单上的值。请重新选一次。"
-      }
+      },
+      "engineManaged": "这段对话的记忆由 AI Character Engine 管理：没有字数上限，每轮最多想起最相关的 40 条。",
+      "charCountNoCap": "{{count}} 字"
     },
     "perf": {
       "description": "依你的机器调整性能：弱机/共用电脑选轻量，强显卡选高性能。换引擎或保留秒数等属硬件设置，需重启（或重新切换一次角色）才会生效。",
@@ -711,7 +713,7 @@
       "loading": "加载中…",
       "presetSectionTitle": "一键性能模式",
       "presetLabel": "性能模式",
-      "presetHelp": "一次应用一组建议设置（语音引擎、记忆上限、深度回忆、整理频率、模型保留时间）。应用后每一项仍可单独微调。",
+      "presetHelp": "一次套用一组建议设置（语音引擎、记忆上限、整理频率、模型保留时间，以及 AI Character Engine 后台工作的频率）。套用后每一项仍可单独微调。",
       "presetPlaceholder": "选一个性能模式",
       "presetLight": "轻量（弱机 / 共用电脑）",
       "presetStandard": "标准（默认）",
@@ -770,7 +772,7 @@
       "consolidationSectionTitle": "记忆整理频率",
       "consolidationLabel": "整理频率",
       "consolidationPlaceholder": "选整理频率",
-      "consolidationHelp": "每几轮整理一次核心记忆。1=每轮（默认，记得最准但本地模型较慢）；3/5=省一半以上整理用的 LLM 调用，适合弱机。",
+      "consolidationHelp": "每几轮整理一次长期记忆（使用 AI Character Engine 时只整理她自己的记忆）。1=每轮（默认，记得最准但本地模型较慢）；3/5=省一半以上整理用的 LLM 调用，适合弱机。",
       "consolidationEvery1": "每轮（默认）",
       "consolidationEvery3": "每 3 轮",
       "consolidationEvery5": "每 5 轮",
