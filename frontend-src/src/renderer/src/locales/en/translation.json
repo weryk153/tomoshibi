@@ -663,7 +663,7 @@
       "inheritsBase": "base voice"
     },
     "memory": {
-      "description": "Memory content and chat history are separate per character; this shows the active character's memory. The enable switch, size cap, and deep-recall options below are global and apply to every character.",
+      "description": "Memory content and chat history are separate per character; this shows the active character's memory. The switch below is global and applies to every character.",
       "toggle": "Enable long-term memory",
       "toggleHelp": "When off, she stops putting new conversation into memory and stops bringing old memories into the conversation (with AI Character Engine, after the backend restarts). Stored memories are kept unless you clear them below.",
       "selfLabel": "About herself",
@@ -718,10 +718,10 @@
       "presetLight": "Lightweight (weak / shared machine)",
       "presetStandard": "Standard (default)",
       "presetHigh": "High-performance (strong GPU)",
-      "presetLightDesc": "Local lightweight ASR + edge-tts + memory cap 1000 + deep recall off + consolidate every 3 turns + 5-min model unload.",
-      "presetStandardDesc": "Local lightweight ASR + edge-tts + memory cap 1500 + deep recall off + consolidate every turn + 30-min model unload. (Matches defaults except keep-alive — the default pins the model in RAM forever, not 30 minutes.)",
-      "presetHighDesc": "Local lightweight ASR (sherpa-onnx, same as Standard) + edge-tts + memory cap 3000 + deep recall on + consolidate every turn + keep model hot for 1 hour.",
-      "presetConfirm": "This overwrites six settings across ASR/TTS, memory, and keep-alive in one atomic write. This cannot be undone. Continue?",
+      "presetLightDesc": "Local lightweight ASR + edge-tts + memory cap 1000 + engine jobs less often (mood 2, memory 3, goals 8, reflection 12 turns) + consolidate every 3 turns + 5-min model unload.",
+      "presetStandardDesc": "Local lightweight ASR + edge-tts + memory cap 1500 + engine jobs at their defaults + consolidate every turn + 30-min model unload. (Matches defaults except keep-alive — the default pins the model in RAM forever, not 30 minutes.)",
+      "presetHighDesc": "Local lightweight ASR (sherpa-onnx, same as Standard) + edge-tts + memory cap 3000 + engine jobs more often (memory every turn, goals 3, reflection 4) + consolidate every turn + keep model hot for 1 hour.",
+      "presetConfirm": "This overwrites ASR/TTS, memory, keep-alive and AI Character Engine background-job settings in one atomic write. This cannot be undone. Continue?",
       "apply": "Apply",
       "applying": "Applying…",
       "applied": "Applied the “{{name}}” performance mode.",
