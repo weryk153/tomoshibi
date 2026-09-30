@@ -131,6 +131,7 @@ class AgentFactory:
                 # 而舊的 agent 還被別的連線拿著。
                 companion=lambda: current_companion(key),
                 conf_uid=conf_uid,
+                character_name=str(kwargs.get("character_name") or ""),
                 **basic,
             )
 

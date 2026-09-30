@@ -24,6 +24,7 @@ conf_uid 前端知道（從 WebSocket 的 set-model-and-conf 來），沒帶就�
 
 import os
 import asyncio
+from collections import OrderedDict
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
@@ -249,15 +250,39 @@ def _memory_keeper(client_contexts: dict, conf_uid: str):
 
     那種 agent 的記憶不在 core_memory.md 裡。記憶頁要讀寫的是它手上那一份，
     不然使用者看到的、改的，跟她實際記得的是兩回事。
+
+    看的是 _resolve_history_uid 選中的那個連線：正在初始化的連線（還沒有
+    history_uid、agent 也還沒好）不算，不然會退回去讀另一段對話的 core_memory.md。
     """
     found = None
     for ctx in client_contexts.values():
         cfg = getattr(ctx, "character_config", None)
         if getattr(cfg, "conf_uid", None) != conf_uid:
             continue
+        if not getattr(ctx, "history_uid", ""):
+            continue
         agent = getattr(ctx, "agent_engine", None)
         found = agent if hasattr(agent, "conversation_memory") else None
     return found
+
+
+# 記憶頁最後一次給使用者看的內容，(conf_uid, history_uid) → 內容。存檔時只把
+# 「看到、又被拿掉」的行算成刪掉：頁面開著的時候引擎新記下的不是使用者刪的。
+_SHOWN: "OrderedDict[tuple[str, str], str]" = OrderedDict()
+_SHOWN_KEPT = 64
+
+
+def _remember_what_was_shown(conf_uid: str, history_uid: str, content: str) -> None:
+    _SHOWN[(conf_uid, history_uid)] = content
+    _SHOWN.move_to_end((conf_uid, history_uid))
+    while len(_SHOWN) > _SHOWN_KEPT:
+        _SHOWN.popitem(last=False)
+
+
+def _save_through(keeper, conf_uid: str, history_uid: str, content: str) -> None:
+    keeper.rewrite_conversation_memory(
+        history_uid, content, edited_from=_SHOWN.get((conf_uid, history_uid))
+    )
 
 
 def _resolved_history_uid(client_contexts: dict, conf_uid: str):
@@ -305,13 +330,23 @@ class _LockBusy(Exception):
     """等整理鎖等過了 _LOCK_WAIT_SECONDS；呼叫端接住、轉成 503。"""
 
 
+def _needs_consolidation_lock(*, keeper) -> bool:
+    """整理鎖保護的是 core_memory.md 的讀→重寫→寫回。自己記得對方的 agent 的記憶
+    不在那個檔案裡，整理跑到一半（最長 60 秒）也不用等它，等了只會讓使用者按下
+    清除得到「記憶正在整理中」。"""
+    return keeper is None
+
+
 @asynccontextmanager
-async def _hold_consolidation_lock(conf_uid: str):
+async def _hold_consolidation_lock(conf_uid: str, *, needed: bool = True):
     """等整理鎖最多 _LOCK_WAIT_SECONDS 秒；等不到就丟 _LockBusy。
 
     拿到鎖後才進入 with 區塊，寫入＋讀回都在鎖內做完才離開——不會有拿不到鎖
     卻已經寫了一半檔案的狀態。
     """
+    if not needed:
+        yield
+        return
     lock = memory_core._consolidation_lock(conf_uid)
     try:
         await asyncio.wait_for(lock.acquire(), _LOCK_WAIT_SECONDS)
@@ -362,6 +397,7 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         keeper = _memory_keeper(client_contexts, conf_uid)
         if keeper is not None:
             content = keeper.conversation_memory(history_uid)
+            _remember_what_was_shown(conf_uid, history_uid, content)
             exists = bool(content)
         else:
             content = memory_core.load_core_memory(conf_uid, history_uid)
@@ -419,10 +455,13 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         # 跟整理排同一把鎖：整理跑到一半時寫檔，會被它 60 秒後的整份覆寫蓋掉。
         keeper = _memory_keeper(client_contexts, conf_uid)
         try:
-            async with _hold_consolidation_lock(conf_uid):
+            async with _hold_consolidation_lock(
+                conf_uid, needed=_needs_consolidation_lock(keeper=keeper)
+            ):
                 if keeper is not None:
-                    keeper.rewrite_conversation_memory(history_uid, content)
+                    _save_through(keeper, conf_uid, history_uid, content)
                     stored = keeper.conversation_memory(history_uid)
+                    _remember_what_was_shown(conf_uid, history_uid, stored)
                 elif not await asyncio.to_thread(
                     memory_core.save_core_memory, conf_uid, history_uid, content, cap
                 ):
@@ -493,7 +532,9 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         # 跟整理排同一把鎖（見 save_memory 的說明）。
         keeper = _memory_keeper(client_contexts, conf_uid)
         try:
-            async with _hold_consolidation_lock(conf_uid):
+            async with _hold_consolidation_lock(
+                conf_uid, needed=_needs_consolidation_lock(keeper=keeper)
+            ):
                 if keeper is not None:
                     keeper.rewrite_conversation_memory(history_uid, "")
                 elif not await asyncio.to_thread(

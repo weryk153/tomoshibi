@@ -32,6 +32,9 @@ WORKER_MAX_TOKENS = 600
 # 看圖是回覆之前多出來的一次模型呼叫，越短越好。
 EYES_MAX_TOKENS = 160
 EYES_PROMPT = "用兩三句話說出畫面裡有什麼。只講看得到的，不要猜測，不要用條列或標記。"
+# 問不到 window 時當它有這麼大。引擎預設的 8192 裝不下一份真的人設（Mao 的
+# 系統提示約 4500 token），主動發話那一輪會直接失敗。猜大了頂多推論端回錯。
+UNKNOWN_WINDOW_TOKENS = 16384
 # 一輪可以包含工具呼叫（搜尋網頁要十幾秒）再加一段長回覆。
 TURN_TIMEOUT_SECONDS = 180.0
 # basic_memory_agent 留 20000 字、至少 24 則。語音對話一句很短，引擎預設的 40 則
@@ -146,6 +149,21 @@ def storage_dir(conf_uid: str) -> Path:
 class _Live:
     signature: str
     companion: Any
+    base_url: str = ""
+    model: str = ""
+    window: Optional[int] = None
+
+
+def _fit_the_window(live: _Live) -> None:
+    """伺服器常比模型早起來，那時問不到 window。之後每一輪都來問，問到了就換預算。"""
+    from ai_character_engine.context.budget import ContextBudget
+
+    window = detect_context_window(live.base_url, live.model)
+    if window and window != live.window:
+        live.window = window
+        live.companion.runtime.context_builder.budget = ContextBudget(
+            context_window_tokens=window
+        )
 
 
 # 每個角色同一時間只有一個 companion，所有 agent 共用。
@@ -159,7 +177,10 @@ _CLOSING: set = set()
 
 def current_companion(key: str) -> Optional[Any]:
     live = _LIVE.get(key)
-    return live.companion if live else None
+    if live is None:
+        return None
+    _fit_the_window(live)
+    return live.companion
 
 
 def _let_go(companion: Any) -> None:
@@ -244,12 +265,10 @@ def build_companion(
         sort_keys=True,
         default=str,
     )
-    budget = ContextBudget(context_window_tokens=window) if window else ContextBudget()
+    budget = ContextBudget(context_window_tokens=window or UNKNOWN_WINDOW_TOKENS)
     live = _LIVE.get(key)
     if live and live.signature == signature and live.companion.usable_in_running_loop():
-        # 模型還沒載入的時候問不到 window，晚一點才問得到：同一個她，換預算就好。
-        if window:
-            live.companion.runtime.context_builder.budget = budget
+        _fit_the_window(live)
         return key
 
     talking, thinking, eyes = _clients(provider, llm_config)
@@ -278,6 +297,9 @@ def build_companion(
             vision=eyes,
             bridge_config=HostBridgeConfig(turn_timeout_seconds=TURN_TIMEOUT_SECONDS),
         ),
+        base_url=str(llm_config.get("base_url") or ""),
+        model=str(llm_config.get("model") or ""),
+        window=window,
     )
     logger.info(f"[engine] companion ready for {conf_uid} at {directory}")
     return key

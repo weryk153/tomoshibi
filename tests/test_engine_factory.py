@@ -182,6 +182,22 @@ def test_the_cognition_settings_reach_the_engine():
     assert settings.emotion_every == 1
 
 
+def test_until_the_window_is_known_she_is_given_room_for_a_real_persona(monkeypatch):
+    """實機：伺服器比模型早起來，問不到 window，引擎預設 8192 裝不下 Mao 的人設，
+    主動發話那一輪直接失敗（Character context exceeds the configured context
+    budget）。而且要等下一次儲存設定才會再問一次。"""
+    monkeypatch.setattr(factory, "detect_context_window", lambda *a, **k: None)
+    created = AgentFactory.create_agent(**factory_arguments())
+    before = created._companion().runtime.context_builder.budget.context_window_tokens
+    assert before >= 16384
+
+    monkeypatch.setattr(factory, "detect_context_window", lambda *a, **k: 20992)
+
+    # 每一輪都會來問「現在是哪一個」；模型載好之後不用重建 agent。
+    after = created._companion().runtime.context_builder.budget.context_window_tokens
+    assert after == 20992
+
+
 def test_a_window_that_is_detected_later_does_not_replace_her(monkeypatch):
     """模型還沒載入的時候問不到 window；晚一點問到了，是同一個她、換一個預算。"""
     first = AgentFactory.create_agent(**factory_arguments())._companion()

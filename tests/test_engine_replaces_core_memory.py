@@ -48,27 +48,36 @@ def test_what_the_host_remembered_before_is_handed_to_the_engine_once(
     她自己說過什麼不是引擎記憶要記的事。搬過一次就不再搬：使用者之後在記憶頁
     刪掉的，重開之後不能又跑回來。"""
     monkeypatch.chdir(tmp_path)
+    # 真實的 core_memory.md 不只一種寫法：審查在本機的檔案裡數過，30 行關於對方的
+    # 有 20 行不是「對方：」開頭。分法沿用主機自己的 classify_memory_lines。
     monkeypatch.setattr(
         memory_core,
         "load_core_memory",
         lambda conf_uid, history_uid: (
-            "對方：名字是晨星。\nMao：罵對方是笨蛋。\n對方：養了一隻貓叫饅頭。"
+            "對方：名字是晨星。\n紅莉栖：喜歡胡椒博士。\n- 對方對貓過敏。\n"
+            "對方 下週要去京都出差三天。\n1. 養了一隻貓叫饅頭。"
         ),
     )
 
     async def scenario():
-        first = agent(companion(tmp_path, EngineLLM()), conf_uid="kurisu")
+        first = agent(
+            companion(tmp_path, EngineLLM()), conf_uid="kurisu", character_name="紅莉栖"
+        )
         await say(first, "你好", history_uid="h1")
         imported = first.conversation_memory("h1")
         first.rewrite_conversation_memory("h1", "對方：名字是晨星。")
 
-        restarted = agent(companion(tmp_path, EngineLLM()), conf_uid="kurisu")
+        restarted = agent(
+            companion(tmp_path, EngineLLM()), conf_uid="kurisu", character_name="紅莉栖"
+        )
         await say(restarted, "你好", history_uid="h1")
         return imported, restarted.conversation_memory("h1")
 
     imported, after_restart = asyncio.run(scenario())
 
-    assert imported == "對方：名字是晨星。\n對方：養了一隻貓叫饅頭。"
+    assert imported == (
+        "對方：名字是晨星。\n對方對貓過敏。\n對方 下週要去京都出差三天。\n養了一隻貓叫饅頭。"
+    )
     assert after_restart == "對方：名字是晨星。"
 
 
@@ -90,3 +99,55 @@ def test_the_memory_page_shows_and_edits_what_the_engine_remembers(tmp_path):
     assert "對方住在台北。" in first
     assert "台北" not in corrected
     assert "對方搬到台中了。" in corrected
+
+
+def test_saving_the_page_keeps_what_arrived_while_it_was_open(tmp_path):
+    async def scenario():
+        engine = companion(tmp_path, EngineLLM())
+        current = agent(engine)
+        current.rewrite_conversation_memory("h1", "對方：住在台北。")
+        shown = current.conversation_memory("h1")
+        engine.rewrite_memories("h1", ["對方：住在台北。", "對方：養了一隻貓。"])
+        current.rewrite_conversation_memory(
+            "h1", "對方：住在台北。\n對方：喜歡烏龍茶。", edited_from=shown
+        )
+        return current.conversation_memory("h1")
+
+    assert (
+        asyncio.run(scenario())
+        == "對方：住在台北。\n對方：養了一隻貓。\n對方：喜歡烏龍茶。"
+    )
+
+
+def test_interrupting_a_reply_that_is_being_played_finds_its_own_conversation(tmp_path):
+    """A 的回覆已經生成完、正在播；B 接著講完一句。A 那邊打斷：主機取消 A 那一輪
+    的 task（播放期間它還活著），再呼叫 handle_interrupt。"""
+
+    async def scenario():
+        llm = EngineLLM("嗯，我知道了。")
+        engine = companion(tmp_path, llm)
+        current = agent(engine)
+        playing = asyncio.Event()
+
+        async def a_turn():
+            outputs = await say(current, "我是A", history_uid="h1")
+            await playing.wait()  # the host's turn lives on while audio plays
+            return outputs
+
+        a = asyncio.ensure_future(a_turn())
+        for _ in range(50):
+            await asyncio.sleep(0)
+        await say(current, "我是B", history_uid="h2")
+        a.cancel()
+        current.handle_interrupt("嗯")
+        with pytest.raises(asyncio.CancelledError):
+            await a
+        await say(current, "繼續", history_uid="h1")
+        in_a = llm.said_by_both()
+        await say(current, "繼續", history_uid="h2")
+        return in_a, llm.said_by_both()
+
+    in_a, in_b = asyncio.run(scenario())
+
+    assert in_a == ["我是A", "嗯 [Interrupted by user]", "繼續"]
+    assert in_b == ["我是B", "嗯，我知道了。", "繼續"]

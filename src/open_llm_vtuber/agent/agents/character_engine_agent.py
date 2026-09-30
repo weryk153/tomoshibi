@@ -57,8 +57,6 @@ MEMORY_RULE = (
     f"備註裡的「{ABOUT_HERSELF}」與 memory 是之前對話累積下來的，"
     "自然運用、不要生硬複述。"
 )
-# core_memory.md 裡主詞是使用者的那幾行，開頭是這個。
-THE_USER = "對方："
 PROACTIVE_REMARK = "你剛才主動開口說了這句話，對方現在是在回應它：{remark}"
 
 _DONE = object()
@@ -94,6 +92,7 @@ class CharacterEngineAgent(AgentInterface):
         tool_executor=None,
         player_language: str = "",
         conf_uid: str = "",
+        character_name: str = "",
         now: Callable[[], datetime] = datetime.now,
         **_basic_agent_only,
     ):
@@ -107,6 +106,7 @@ class CharacterEngineAgent(AgentInterface):
         self._companion_source = companion
         self._player_language = player_language
         self._conf_uid = conf_uid
+        self._character_name = character_name
         self._now = now
         self._tools = self._tool_definitions(tool_manager) if use_mcpp else []
         self._tool_executor = tool_executor
@@ -115,7 +115,9 @@ class CharacterEngineAgent(AgentInterface):
         self._brought: set = set()
         # 還沒結束的每一輪：(等著它的 task, 它屬於哪段對話, 它的名字)。
         self._turns: list = []
-        # 最後結束的那一輪：使用者聽到的、會去打斷的，是它。
+        # 已經講完、但主機那一輪還活著（語音還在播）的：打斷時被取消的是它們的 task。
+        self._playing: list = []
+        # 最後結束的那一輪：主機等它停了才回報聽到哪裡時，指的是它。
         self._last_ended: Optional[tuple] = None
         self._group_note = ""
         self.set_system(system)
@@ -159,8 +161,16 @@ class CharacterEngineAgent(AgentInterface):
     def conversation_memory(self, history_uid: str) -> str:
         return "\n".join(self._companion().memories(history_uid))
 
-    def rewrite_conversation_memory(self, history_uid: str, text: str) -> None:
-        self._companion().rewrite_memories(history_uid, text.splitlines())
+    def rewrite_conversation_memory(
+        self, history_uid: str, text: str, *, edited_from: Optional[str] = None
+    ) -> None:
+        """edited_from 是使用者看到的那一版：只有看到、又被拿掉的行才算刪掉，
+        頁面開著的時候引擎新記下的不受影響。"""
+        self._companion().rewrite_memories(
+            history_uid,
+            text.splitlines(),
+            edited_from=None if edited_from is None else edited_from.splitlines(),
+        )
 
     def _bring_what_the_host_remembered(self, companion, history_uid: str) -> None:
         """換成這個 agent 之前累積的 core_memory.md，搬一次。
@@ -171,21 +181,23 @@ class CharacterEngineAgent(AgentInterface):
 
         if history_uid in self._brought:
             return
-        self._brought.add(history_uid)
         done = storage_dir(self._conf_uid) / "brought-from-core-memory.txt"
         if done.is_file() and history_uid in done.read_text("utf-8").splitlines():
+            self._brought.add(history_uid)
             return
-        remembered = [
-            line.strip()
-            for line in memory_core.load_core_memory(
-                self._conf_uid, history_uid
-            ).splitlines()
-            if line.strip().startswith(THE_USER)
-        ]
+        # 真實的檔案不只「對方：」一種寫法；分法沿用主機自己的，她自己的那一半
+        # 留在 self_memory.md 那條路。
+        about_the_user, _her_own = memory_core.classify_memory_lines(
+            memory_core.load_core_memory(self._conf_uid, history_uid),
+            self._character_name,
+        )
+        remembered = [line for line in about_the_user.splitlines() if line.strip()]
         if remembered:
             companion.rewrite_memories(
                 history_uid, [*companion.memories(history_uid), *remembered]
             )
+        # 搬完才記；搬到一半炸掉的話下一次還會再試。
+        self._brought.add(history_uid)
         done.parent.mkdir(parents=True, exist_ok=True)
         with done.open("a", encoding="utf-8") as file:
             file.write(history_uid + "\n")
@@ -242,7 +254,10 @@ class CharacterEngineAgent(AgentInterface):
         每一輪都帶著名字交給引擎，所以這裡指的永遠是某一輪，不會是別的連線
         正在生成的那一則。
         """
-        cancelled = [turn for turn in self._turns if turn[0].cancelling()]
+        self._playing = [entry for entry in self._playing if not entry[0].done()]
+        cancelled = [
+            entry for entry in (*self._turns, *self._playing) if entry[0].cancelling()
+        ]
         meant = cancelled[-1][1:] if cancelled else self._last_ended
         try:
             if meant is None:
@@ -381,6 +396,8 @@ class CharacterEngineAgent(AgentInterface):
         finally:
             self._turns.remove(waiting)
             self._last_ended = (conversation, name)
+            # 主機那一輪還沒結束：她的字已經全出來了，語音還在播。
+            self._playing.append(waiting)
             # 主機打斷的方式是取消等著這個 generator 的 task。引擎那一輪得真的
             # 停下來，之後 handle_interrupt 才記得進去。
             if not turn.done():

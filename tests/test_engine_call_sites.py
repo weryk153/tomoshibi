@@ -28,3 +28,13 @@ def test_the_agent_factory_is_told_which_character_it_is_building_for():
 
     assert "conf_uid=target_character.conf_uid," in create
     assert "character_name=target_character.character_name," in create
+
+
+def test_a_group_turn_names_the_conversation_of_the_member_who_speaks():
+    from src.open_llm_vtuber.conversations import group_conversation
+
+    src = inspect.getsource(group_conversation.handle_group_member_turn)
+
+    assert '"history_uid": member_context.history_uid' in src or (
+        '"history_uid": context.history_uid' in src
+    )

@@ -261,7 +261,9 @@ async def handle_group_member_turn(
         input_text=new_context,
         images=images,
         from_name="Human",
-        metadata=metadata,
+        # 這一輪屬於這個成員的對話。agent 是所有連線共用的，不講的話它只能猜
+        # 是最後一個載入歷史的連線那一段（見 single_conversation 的 agent_metadata）。
+        metadata={**(metadata or {}), "history_uid": context.history_uid},
     )
 
     logger.info(
