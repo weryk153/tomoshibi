@@ -371,13 +371,15 @@ def proactive_instruction(content: str) -> str:
 def proactive_material(content: str) -> list[str]:
     """主動開口提示裡的素材：話題、新聞的內容，不含指示，也不含「【今天的新聞…】」
     這種標題——整塊交給模型時，小模型會把它當稿子念，連標題一起評論。"""
-    bodies = []
+    bodies: list[list[str]] = []
     for section in _sections(content):
         if section.startswith("【"):
             body = section.split("\n", 1)[1].strip() if "\n" in section else ""
-            if body:
-                bodies.append(body)
-    return bodies
+            bodies.append([body] if body else [])
+        elif bodies and section:
+            # 新聞一類一段，中間隔著空行：都屬於上面那個區塊。
+            bodies[-1].append(section)
+    return ["\n\n".join(parts) for parts in bodies if parts]
 
 
 def write_prompt(content: str) -> None:

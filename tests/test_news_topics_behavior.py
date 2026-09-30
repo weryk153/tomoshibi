@@ -172,3 +172,13 @@ def test_the_instruction_of_a_proactive_prompt_is_what_comes_before_the_material
     assert instruction.startswith(INSTRUCTION.strip()[:20])
     assert "想換題的話" in instruction
     assert "【" not in instruction and "天文" not in instruction
+
+
+def test_news_material_keeps_every_category_not_just_the_first():
+    from src.open_llm_vtuber.news_topics import compose_content, proactive_material
+
+    content = compose_content(
+        news_blocks=["國際：\n- 甲新聞", "台灣：\n- 乙新聞"], got_any=True
+    )
+
+    assert proactive_material(content) == ["國際：\n- 甲新聞\n\n台灣：\n- 乙新聞"]
