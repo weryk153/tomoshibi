@@ -417,11 +417,23 @@ class CharacterEngineAgent(AgentInterface):
                     conversation,
                     frames=frames,
                     on_text_delta=outputs.put_nowait,
-                    notes=[*material, *notes],
+                    # 一整則，不以 "- " 開頭：引擎把 "- " 開頭的備註當成「她知道的事」
+                    # 留在對話裡，素材只屬於這一句。
+                    notes=[
+                        *(
+                            ["可以聊的素材：\n" + "\n\n".join(material)]
+                            if material
+                            else []
+                        ),
+                        *notes,
+                    ],
                     before_turn=before_turn,
                     remember_as=self._remembered,
                     turn_id=name,
                     keep=False,
+                    # 主機自己的規矩（中文，實測出來的）；沒有就用引擎的。
+                    instruction=str(metadata.get("proactive_instruction") or "")
+                    or None,
                 )
             else:
                 call = companion.reply(

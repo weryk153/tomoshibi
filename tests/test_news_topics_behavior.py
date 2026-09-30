@@ -153,7 +153,22 @@ def test_the_material_of_a_proactive_prompt_is_its_topic_and_news_sections():
     )
     material = proactive_material(content)
 
-    assert len(material) == 2
-    assert material[0].startswith("【你可以聊的主題") and "- 天文" in material[0]
-    assert material[1].startswith("【今天的新聞") and "某某新聞標題" in material[1]
+    assert material == ["- 天文\n- 動漫", "某某新聞標題"]
     assert proactive_material(compose_content()) == []
+
+
+def test_the_instruction_of_a_proactive_prompt_is_what_comes_before_the_material():
+    from src.open_llm_vtuber.news_topics import (
+        INSTRUCTION,
+        compose_content,
+        proactive_instruction,
+    )
+
+    content = compose_content(
+        manual_topics=["天文"], news_blocks=["標題"], got_any=True
+    )
+    instruction = proactive_instruction(content)
+
+    assert instruction.startswith(INSTRUCTION.strip()[:20])
+    assert "想換題的話" in instruction
+    assert "【" not in instruction and "天文" not in instruction

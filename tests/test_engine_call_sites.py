@@ -57,3 +57,5 @@ def test_a_proactive_turn_hands_the_agent_its_material():
 
     assert "material = proactive_material(user_input)" in src
     assert '"proactive_material": material,' in src
+    assert "instruction = proactive_instruction(user_input)" in src
+    assert '"proactive_instruction": instruction,' in src

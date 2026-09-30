@@ -959,7 +959,8 @@ def test_she_speaks_up_through_the_engine_with_the_hosts_material(tmp_path):
             history_uid="h1",
             proactive_speak=True,
             skip_memory=True,
-            proactive_material=["【你可以聊的主題】\n- 天文"],
+            proactive_material=["- 天文"],
+            proactive_instruction="對方已經有一段時間沒講話了。請你自然地開口。",
         )
         prompt = llm.calls[-1]
         await say(current, "嗯", history_uid="h1")
@@ -968,8 +969,8 @@ def test_she_speaks_up_through_the_engine_with_the_hosts_material(tmp_path):
     prompt, afterwards = asyncio.run(scenario())
     everything = "\n".join(message.content for message in prompt)
     assert "主機的一大段主動開口指示" not in everything
-    assert "Speak up on your own" in prompt[-1].content
-    assert "- 天文" in everything
+    assert "請你自然地開口" in prompt[-1].content
+    assert "For the next reply only: 可以聊的素材：\n- 天文" in everything
     later = "\n".join(message.content for message in afterwards)
-    assert "Speak up on your own" not in later
+    assert "請你自然地開口" not in later
     assert "- 天文" not in later

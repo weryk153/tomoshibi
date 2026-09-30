@@ -354,16 +354,30 @@ def compose_content(manual_topics=None, news_blocks=None, got_any: bool = False)
     return "\n\n".join(parts) + "\n"
 
 
-def proactive_material(content: str) -> list[str]:
-    """主動開口提示裡的素材：「【…】」開頭的話題、新聞區塊，不含人設指示。
+def _sections(content: str) -> list[str]:
+    return [section.strip() for section in str(content or "").split("\n\n")]
 
-    由引擎決定講什麼的 agent（character_engine_agent）只要素材；指示是引擎自己的。
-    """
-    return [
-        section.strip()
-        for section in str(content or "").split("\n\n")
-        if section.strip().startswith("【")
-    ]
+
+def proactive_instruction(content: str) -> str:
+    """主動開口提示裡的指示：素材（「【…】」開頭的區塊）以前的部分。"""
+    kept = []
+    for section in _sections(content):
+        if section.startswith("【"):
+            break
+        kept.append(section)
+    return "\n\n".join(section for section in kept if section)
+
+
+def proactive_material(content: str) -> list[str]:
+    """主動開口提示裡的素材：話題、新聞的內容，不含指示，也不含「【今天的新聞…】」
+    這種標題——整塊交給模型時，小模型會把它當稿子念，連標題一起評論。"""
+    bodies = []
+    for section in _sections(content):
+        if section.startswith("【"):
+            body = section.split("\n", 1)[1].strip() if "\n" in section else ""
+            if body:
+                bodies.append(body)
+    return bodies
 
 
 def write_prompt(content: str) -> None:
