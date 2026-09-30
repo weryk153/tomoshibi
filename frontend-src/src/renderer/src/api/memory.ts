@@ -107,15 +107,19 @@ export const fetchMemory = async (
 }
 
 // POST /api/memory：整份取代 core memory 文字（不是部分更新）。
+// editedFrom 是這份編輯的起點（載入時放進 textarea 的那一版）。自己記得對方的
+// agent（character_engine_agent）用它判斷哪幾行是使用者刪掉的：頁面開著的時候
+// 引擎新記下的行不在起點裡，不算被刪。不送的話伺服器當成整份取代。
 export const saveMemoryContent = (
   baseUrl: string,
   confUid: string,
   content: string,
+  editedFrom?: string,
 ): Promise<ApiResult<unknown>> =>
   apiPost<unknown>(
     baseUrl,
     '/api/memory',
-    { conf_uid: confUid, content },
+    { conf_uid: confUid, content, edited_from: editedFrom },
     MEMORY_WRITE_TIMEOUT_MS,
   )
 

@@ -51,3 +51,45 @@ export async function setUseMcpp(
     data: { use_mcpp: res.data.use_mcpp, restart_required: res.data.restart_required },
   }
 }
+
+// 「由 AI Character Engine 驅動對話」：後端見 src/open_llm_vtuber/engine_config_route.py
+// 的 GET/POST /api/agent-config/character-engine。跟 use_mcpp 同一種存法（直接寫
+// conf.yaml、要重啟），多了 available／reason：引擎裝不起來時開關是灰的，旁邊
+// 說明為什麼。
+
+export type EngineEvery =
+  | 'emotion_every' | 'memory_every' | 'goal_every' | 'reflection_every'
+  | 'goals_shown' | 'thoughts_shown'
+
+export interface EngineSettings {
+  enabled: boolean
+  available: boolean
+  reason: string
+  emotion_every: number
+  memory_every: number
+  goal_every: number
+  reflection_every: number
+  goals_shown: number
+  thoughts_shown: number
+}
+
+export type EngineSettingsChange = Partial<Pick<EngineSettings, 'enabled' | EngineEvery>>
+
+interface EngineSaveResponse extends Omit<EngineSettings, 'available' | 'reason'> {
+  ok: true
+  restart_required: boolean
+}
+
+export async function fetchEngineSettings(baseUrl: string): Promise<ApiResult<EngineSettings>> {
+  return apiGet<EngineSettings>(baseUrl, '/api/agent-config/character-engine')
+}
+
+export async function saveEngineSettings(
+  baseUrl: string,
+  changes: EngineSettingsChange,
+): Promise<ApiResult<Omit<EngineSaveResponse, 'ok'>>> {
+  const res = await apiPost<EngineSaveResponse>(baseUrl, '/api/agent-config/character-engine', changes)
+  if (!res.ok) return res
+  const { ok: _ok, ...rest } = res.data
+  return { ok: true, data: rest }
+}

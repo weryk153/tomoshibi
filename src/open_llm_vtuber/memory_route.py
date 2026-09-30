@@ -244,6 +244,39 @@ def _resolved_uid(body: dict):
     return conf_uid, None
 
 
+def _memory_keeper(client_contexts: dict, conf_uid: str):
+    """自己記得對方的 agent（character_engine_agent），沒有就回 None。
+
+    那種 agent 的記憶不在 core_memory.md 裡。記憶頁要讀寫的是它手上那一份，
+    不然使用者看到的、改的，跟她實際記得的是兩回事。
+
+    看的是 _resolve_history_uid 選中的那個連線：正在初始化的連線（還沒有
+    history_uid、agent 也還沒好）不算，不然會退回去讀另一段對話的 core_memory.md。
+    """
+    found = None
+    for ctx in client_contexts.values():
+        cfg = getattr(ctx, "character_config", None)
+        if getattr(cfg, "conf_uid", None) != conf_uid:
+            continue
+        if not getattr(ctx, "history_uid", ""):
+            continue
+        agent = getattr(ctx, "agent_engine", None)
+        found = agent if hasattr(agent, "conversation_memory") else None
+    return found
+
+
+def _save_through(keeper, history_uid: str, content: str, edited_from) -> None:
+    """edited_from 是前端這次編輯的起點（載入時放進 textarea 的那一版）。只有起點
+    裡有、存回來時不見的行才算使用者刪掉的；頁面開著的時候引擎新記下的行不受
+    影響。伺服器自己記不住這件事——同一段對話可以開兩個頁面、切分頁回來也不會
+    重載文字框——所以由前端送。沒送就當整份取代。"""
+    keeper.rewrite_conversation_memory(
+        history_uid,
+        content,
+        edited_from=edited_from if isinstance(edited_from, str) else None,
+    )
+
+
 def _resolved_history_uid(client_contexts: dict, conf_uid: str):
     """取出目前連線正在用的 history_uid。回傳 (history_uid, 錯誤回應)。
 
@@ -289,13 +322,23 @@ class _LockBusy(Exception):
     """等整理鎖等過了 _LOCK_WAIT_SECONDS；呼叫端接住、轉成 503。"""
 
 
+def _needs_consolidation_lock(*, keeper) -> bool:
+    """整理鎖保護的是 core_memory.md 的讀→重寫→寫回。自己記得對方的 agent 的記憶
+    不在那個檔案裡，整理跑到一半（最長 60 秒）也不用等它，等了只會讓使用者按下
+    清除得到「記憶正在整理中」。"""
+    return keeper is None
+
+
 @asynccontextmanager
-async def _hold_consolidation_lock(conf_uid: str):
+async def _hold_consolidation_lock(conf_uid: str, *, needed: bool = True):
     """等整理鎖最多 _LOCK_WAIT_SECONDS 秒；等不到就丟 _LockBusy。
 
     拿到鎖後才進入 with 區塊，寫入＋讀回都在鎖內做完才離開——不會有拿不到鎖
     卻已經寫了一半檔案的狀態。
     """
+    if not needed:
+        yield
+        return
     lock = memory_core._consolidation_lock(conf_uid)
     try:
         await asyncio.wait_for(lock.acquire(), _LOCK_WAIT_SECONDS)
@@ -343,16 +386,20 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         if bad:
             return bad
 
-        content = memory_core.load_core_memory(conf_uid, history_uid)
+        keeper = _memory_keeper(client_contexts, conf_uid)
+        if keeper is not None:
+            content = keeper.conversation_memory(history_uid)
+            exists = bool(content)
+        else:
+            content = memory_core.load_core_memory(conf_uid, history_uid)
+            exists = os.path.isfile(memory_core.core_memory_path(conf_uid, history_uid))
         self_content = memory_core.load_self_memory(conf_uid)
         return JSONResponse(
             {
                 "conf_uid": conf_uid,
                 "enabled": _memory_enabled_from_conf(),
                 "content": content,
-                "exists": os.path.isfile(
-                    memory_core.core_memory_path(conf_uid, history_uid)
-                ),
+                "exists": exists,
                 "char_count": len(content),
                 # 她自己的記憶：角色層，所有對話共用。上限固定，不開放設定。
                 "self_content": self_content,
@@ -397,14 +444,21 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
 
         cap = _cap_from_conf()
         # 跟整理排同一把鎖：整理跑到一半時寫檔，會被它 60 秒後的整份覆寫蓋掉。
+        keeper = _memory_keeper(client_contexts, conf_uid)
         try:
-            async with _hold_consolidation_lock(conf_uid):
-                if not await asyncio.to_thread(
+            async with _hold_consolidation_lock(
+                conf_uid, needed=_needs_consolidation_lock(keeper=keeper)
+            ):
+                if keeper is not None:
+                    _save_through(keeper, history_uid, content, body.get("edited_from"))
+                    stored = keeper.conversation_memory(history_uid)
+                elif not await asyncio.to_thread(
                     memory_core.save_core_memory, conf_uid, history_uid, content, cap
                 ):
                     return _error(500, "Could not save core memory.")
-                # 讀回真正存下去的內容，讓 UI 的字數是誠實的。
-                stored = memory_core.load_core_memory(conf_uid, history_uid)
+                else:
+                    # 讀回真正存下去的內容，讓 UI 的字數是誠實的。
+                    stored = memory_core.load_core_memory(conf_uid, history_uid)
         except _LockBusy:
             return _error(503, "記憶正在整理中，請幾秒後再試。")
         logger.info(f"[memory] manually saved (conf_uid={conf_uid})")
@@ -466,9 +520,14 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
             return bad
 
         # 跟整理排同一把鎖（見 save_memory 的說明）。
+        keeper = _memory_keeper(client_contexts, conf_uid)
         try:
-            async with _hold_consolidation_lock(conf_uid):
-                if not await asyncio.to_thread(
+            async with _hold_consolidation_lock(
+                conf_uid, needed=_needs_consolidation_lock(keeper=keeper)
+            ):
+                if keeper is not None:
+                    keeper.rewrite_conversation_memory(history_uid, "")
+                elif not await asyncio.to_thread(
                     memory_core.clear_core_memory, conf_uid, history_uid
                 ):
                     return _error(500, "Could not clear core memory.")

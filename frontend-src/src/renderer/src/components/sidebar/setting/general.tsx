@@ -11,11 +11,14 @@ import { useBgUrl } from "@/context/bgurl-context";
 import { settingStyles } from "./setting-styles";
 import { useGeneralSettings } from "@/hooks/sidebar/setting/use-general-settings";
 import { useWebSocket } from "@/context/websocket-context";
-import { SelectField, SwitchField, InputField, SliderField, TabActions } from "./common";
+import { SelectField, SwitchField, InputField, SliderField, NumberField, TabActions } from "./common";
 import { Button } from "@/components/ui/tw/primitives";
 import { Field } from '@/components/ui/tw/primitives';
 import { toaster } from "@/components/ui/tw/toaster";
-import { fetchUseMcpp, setUseMcpp } from "@/api/agent-config.ts";
+import {
+  fetchUseMcpp, setUseMcpp, fetchEngineSettings, saveEngineSettings,
+  type EngineSettings, type EngineEvery,
+} from "@/api/agent-config.ts";
 import { uploadBackground, validateBackgroundFile } from "@/api/background.ts";
 import You from "./you";
 
@@ -133,6 +136,86 @@ function General({ onCancel }: GeneralProps): JSX.Element {
       setMcpError(result.error);
     }
   }, [baseUrl, mcpEnabled, t]);
+
+  // 引擎驅動對話：開關與「每幾輪跑一次」的幾個數字，同樣直接寫 conf.yaml、
+  // 存了要重啟。引擎裝不起來時開關是灰的，reason 說明為什麼。數字改了不是
+  // 每敲一個字就寫一次檔——停手半秒再送。
+  const [engine, setEngine] = useState<EngineSettings | null>(null);
+  const [engineError, setEngineError] = useState<string | null>(null);
+  const [engineSaving, setEngineSaving] = useState(false);
+  const [everyDrafts, setEveryDrafts] = useState<Record<EngineEvery, string> | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const result = await fetchEngineSettings(baseUrl);
+      if (cancelled) return;
+      if (result.ok) {
+        setEngine(result.data);
+        setEveryDrafts({
+          emotion_every: String(result.data.emotion_every),
+          memory_every: String(result.data.memory_every),
+          goal_every: String(result.data.goal_every),
+          reflection_every: String(result.data.reflection_every),
+          goals_shown: String(result.data.goals_shown),
+          thoughts_shown: String(result.data.thoughts_shown),
+        });
+      } else {
+        setEngineError(result.error);
+      }
+    })();
+    return (): void => {
+      cancelled = true;
+    };
+  }, [baseUrl]);
+
+  const handleEngineToggle = useCallback(async (checked: boolean) => {
+    if (!engine) return;
+    const previous = engine;
+    setEngine({ ...engine, enabled: checked });
+    setEngineSaving(true);
+    setEngineError(null);
+    const result = await saveEngineSettings(baseUrl, { enabled: checked });
+    setEngineSaving(false);
+    if (result.ok) {
+      setEngine((current) => (current ? { ...current, enabled: result.data.enabled } : current));
+      toaster.create({
+        title: t("settings.general.engineSaved"),
+        type: "success",
+        duration: 3000,
+      });
+    } else {
+      setEngine(previous);
+      setEngineError(result.error);
+    }
+  }, [baseUrl, engine, t]);
+
+  useEffect(() => {
+    if (!engine || !everyDrafts) return undefined;
+    const changes: Partial<Record<EngineEvery, number>> = {};
+    (Object.keys(everyDrafts) as EngineEvery[]).forEach((key) => {
+      const value = Number.parseInt(everyDrafts[key], 10);
+      if (Number.isFinite(value) && value !== engine[key]) changes[key] = value;
+    });
+    if (Object.keys(changes).length === 0) return undefined;
+    const timer = window.setTimeout(async () => {
+      setEngineSaving(true);
+      const result = await saveEngineSettings(baseUrl, changes);
+      setEngineSaving(false);
+      if (result.ok) {
+        setEngine((current) => (current ? { ...current, ...result.data } : current));
+        setEngineError(null);
+        toaster.create({
+          title: t("settings.general.engineSaved"),
+          type: "success",
+          duration: 3000,
+        });
+      } else {
+        setEngineError(result.error);
+      }
+    }, 500);
+    return (): void => window.clearTimeout(timer);
+  }, [baseUrl, engine, everyDrafts, t]);
 
   // 背景圖片上傳：POST /api/background 把檔案寫進磁碟，同樣是立刻生效、
   // 不可還原，不受下面的套用／還原影響。
@@ -376,6 +459,54 @@ function General({ onCancel }: GeneralProps): JSX.Element {
         </Text>
         {mcpError && (
           <Text fontSize="xs" color="red.300">{mcpError}</Text>
+        )}
+
+        <SwitchField
+          label={t("settings.general.enableEngine")}
+          checked={Boolean(engine?.enabled)}
+          onChange={handleEngineToggle}
+          disabled={!engine || !engine.available || engineSaving}
+        />
+        <Text fontSize="xs" color="whiteAlpha.600">
+          {t("settings.general.enableEngineHelp")}
+        </Text>
+        {engine && !engine.available && (
+          <Text fontSize="xs" color="orange.300">{engine.reason}</Text>
+        )}
+        {engine?.enabled && everyDrafts && (
+          <Stack gap={1} pl={2}>
+            <Text fontSize="xs" color="whiteAlpha.600">
+              {t("settings.general.engineEveryHelp")}
+            </Text>
+            {(["emotion_every", "memory_every", "goal_every", "reflection_every"] as EngineEvery[]).map((key) => (
+              <NumberField
+                key={key}
+                label={t(`settings.general.engine_${key}`)}
+                value={everyDrafts[key]}
+                min={0}
+                max={99}
+                step={1}
+                onChange={(value) => setEveryDrafts((current) => (current ? { ...current, [key]: value } : current))}
+              />
+            ))}
+            <Text fontSize="xs" color="whiteAlpha.600">
+              {t("settings.general.engineShownHelp")}
+            </Text>
+            {(["goals_shown", "thoughts_shown"] as EngineEvery[]).map((key) => (
+              <NumberField
+                key={key}
+                label={t(`settings.general.engine_${key}`)}
+                value={everyDrafts[key]}
+                min={0}
+                max={99}
+                step={1}
+                onChange={(value) => setEveryDrafts((current) => (current ? { ...current, [key]: value } : current))}
+              />
+            ))}
+          </Stack>
+        )}
+        {engineError && (
+          <Text fontSize="xs" color="red.300">{engineError}</Text>
         )}
 
         <Field

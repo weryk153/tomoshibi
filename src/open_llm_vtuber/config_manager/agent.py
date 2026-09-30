@@ -172,6 +172,82 @@ class LettaConfig(I18nMixin, BaseModel):
     }
 
 
+class CharacterEngineAgentConfig(I18nMixin, BaseModel):
+    """character_engine_agent 的認知節奏。
+
+    對話的設定（llm_provider、use_mcpp…）沿用 basic_memory_agent 區塊，這裡只放
+    引擎背景工作的部分。預設值跟引擎的 CompanionSettings 一致；character_engine/
+    factory.py 把這份傳過去（timeout_seconds、max_rebase_turns 在那裡換成引擎的
+    名字）。
+    """
+
+    emotion_every: int = Field(1, alias="emotion_every", ge=0)
+    memory_every: int = Field(2, alias="memory_every", ge=0)
+    summary_every: int = Field(0, alias="summary_every", ge=0)
+    reflection_every: int = Field(6, alias="reflection_every", ge=0)
+    goal_every: int = Field(4, alias="goal_every", ge=0)
+    timeout_seconds: float = Field(60.0, alias="timeout_seconds", gt=0)
+    max_rebase_turns: int = Field(3, alias="max_rebase_turns", ge=0)
+    goal_max_age_days: int = Field(7, alias="goal_max_age_days", ge=0)
+    goals_shown: int = Field(3, alias="goals_shown", ge=0)
+    thoughts_shown: int = Field(2, alias="thoughts_shown", ge=0)
+    foreground_patience_seconds: float = Field(
+        120.0, alias="foreground_patience_seconds", gt=0
+    )
+    max_history_messages: int = Field(80, alias="max_history_messages", ge=0)
+
+    DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
+        "max_history_messages": Description(
+            en="How many messages of the conversation are kept for the model",
+            zh="對話最多留幾則給模型",
+        ),
+        "emotion_every": Description(
+            en="Analyse the user's emotion every N turns (0 disables)",
+            zh="每幾輪分析一次對方的情緒（0 為停用）",
+        ),
+        "memory_every": Description(
+            en="Extract engine memories every N turns (0 disables)",
+            zh="每幾輪擷取一次引擎記憶（0 為停用）",
+        ),
+        "summary_every": Description(
+            en="Summarise the conversation every N turns (0 disables)",
+            zh="每幾輪摘要一次對話（0 為停用）",
+        ),
+        "reflection_every": Description(
+            en="Let the character reflect every N turns (0 disables)",
+            zh="每幾輪讓角色反思一次（0 為停用）",
+        ),
+        "goal_every": Description(
+            en="Let the character form goals every N turns (0 disables)",
+            zh="每幾輪讓角色產生一次目標（0 為停用）",
+        ),
+        "timeout_seconds": Description(
+            en="Timeout for each background worker call",
+            zh="每個背景工作的逾時秒數",
+        ),
+        "max_rebase_turns": Description(
+            en="A background result this many turns late is still used",
+            zh="背景結果落後幾輪以內仍然採用",
+        ),
+        "foreground_patience_seconds": Description(
+            en="Background work resumes after this long without an end-of-reply signal",
+            zh="對話沒回報講完時，背景工作等多久之後恢復",
+        ),
+        "goal_max_age_days": Description(
+            en="Goals not updated for this many days leave the prompt",
+            zh="超過幾天沒更新的目標不再寫進提示",
+        ),
+        "goals_shown": Description(
+            en="How many goals (the most pressing) she keeps in mind",
+            zh="她同時放在心上的目標最多幾條（最急的優先）",
+        ),
+        "thoughts_shown": Description(
+            en="How many thoughts (the newest) she keeps in mind",
+            zh="她同時放在心上的想法最多幾條（最新的優先）",
+        ),
+    }
+
+
 class AgentSettings(I18nMixin, BaseModel):
     """Settings for different types of agents."""
 
@@ -181,8 +257,15 @@ class AgentSettings(I18nMixin, BaseModel):
     mem0_agent: Optional[Mem0Config] = Field(None, alias="mem0_agent")
     hume_ai_agent: Optional[HumeAIConfig] = Field(None, alias="hume_ai_agent")
     letta_agent: Optional[LettaConfig] = Field(None, alias="letta_agent")
+    character_engine_agent: Optional[CharacterEngineAgentConfig] = Field(
+        None, alias="character_engine_agent"
+    )
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
+        "character_engine_agent": Description(
+            en="Cognition cadence for the AI Character Engine agent",
+            zh="AI Character Engine 代理的認知節奏",
+        ),
         "basic_memory_agent": Description(
             en="Configuration for basic memory agent", zh="基础记忆代理配置"
         ),
@@ -200,7 +283,11 @@ class AgentConfig(I18nMixin, BaseModel):
     """This class contains all of the configurations related to agent."""
 
     conversation_agent_choice: Literal[
-        "basic_memory_agent", "mem0_agent", "hume_ai_agent", "letta_agent"
+        "basic_memory_agent",
+        "mem0_agent",
+        "hume_ai_agent",
+        "letta_agent",
+        "character_engine_agent",
     ] = Field(..., alias="conversation_agent_choice")
     agent_settings: AgentSettings = Field(..., alias="agent_settings")
     llm_configs: StatelessLLMConfigs = Field(..., alias="llm_configs")

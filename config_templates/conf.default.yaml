@@ -88,6 +88,28 @@ character_config:
         use_mcpp: True
         mcp_enabled_servers: ["time", "ddg-search"] # Enabled MCP servers
 
+      character_engine_agent:
+        # Optional. The whole conversation is driven by AI Character Engine:
+        # conversation, memory and tools live in the engine, and how she feels about
+        # you, what she wants to do next and what she noticed build up as you talk.
+        # To use it, set conversation_agent_choice to 'character_engine_agent'. It
+        # needs Python 3.11+, the ai-character-engine package and an
+        # OpenAI-compatible LLM endpoint; see docs/character-engine-agent.md.
+        # Model, MCP and sentence splitting use the basic_memory_agent settings above.
+        # Run each background job every N turns; 0 turns it off. Every job is an
+        # extra LLM call, so raise these numbers on a slow machine.
+        emotion_every: 1
+        memory_every: 2
+        summary_every: 0
+        reflection_every: 6
+        goal_every: 4
+        timeout_seconds: 60 # per background job
+        max_rebase_turns: 3 # a result this many turns late is still used
+        goal_max_age_days: 7 # goals untouched for this long leave the prompt
+        goals_shown: 3 # how many goals (the most pressing) she keeps in mind
+        thoughts_shown: 2 # how many thoughts (the newest) she keeps in mind
+        max_history_messages: 80 # how many messages of the conversation are kept for the model
+
       letta_agent:
         host: 'localhost' # Host address
         port: 8283 # Port number

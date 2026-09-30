@@ -27,7 +27,7 @@ import asyncio
 import difflib
 import re
 from collections import OrderedDict
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -199,11 +199,16 @@ def self_memory_path(conf_uid: str) -> str:
         return ""
 
 
+def read_self_memory(conf_uid: str) -> str:
+    """讀不到就丟例外。要拿它當合併起點的人得知道「空」是真的空還是讀不到。"""
+    f = _self_memory_file(conf_uid)
+    return f.read_text(encoding="utf-8").strip() if f.is_file() else ""
+
+
 def load_self_memory(conf_uid: str) -> str:
     """在注入路徑上，絕不丟例外。"""
     try:
-        f = _self_memory_file(conf_uid)
-        return f.read_text(encoding="utf-8").strip() if f.is_file() else ""
+        return read_self_memory(conf_uid)
     except Exception as e:
         logger.warning(f"[self_memory] load failed for {conf_uid}: {e}")
         return ""
@@ -672,8 +677,16 @@ async def consolidate_core_memory(
     character_name: str = "",
     reply_language: str = "",
     protected_names: "Mapping[str, Sequence[str]] | None" = None,
+    conversation_half: bool = True,
+    through: "Callable[[Callable[[], Awaitable[str]]], Awaitable[str]] | None" = None,
 ) -> None:
     """一輪對話結束後背景執行：值得記的才更新 core_memory.md。
+
+    ``conversation_half=False``：對方的那一半不寫。給自己記得對方的 agent 用
+    （character_engine_agent 的記憶在引擎裡）；她自己的那一半照舊合併。
+
+    ``through``：模型呼叫交給它去做（character_engine_agent 的 ``aside``：等她
+    講完、排在引擎的背景工作後面）。不給就直接打——那會跟她的回覆搶同一顆模型。
 
     fire-and-forget——任何失敗只記 warning，絕不影響對話本身。
 
@@ -706,7 +719,16 @@ async def consolidate_core_memory(
                 current_self=current_self,
                 self_cap=SELF_CAP_CHARS,
             )
-            raw = await _request_rewrite(base_url, model, prompt, api_key, extra_body)
+            if through is None:
+                raw = await _request_rewrite(
+                    base_url, model, prompt, api_key, extra_body
+                )
+            else:
+                raw = await through(
+                    lambda: _request_rewrite(
+                        base_url, model, prompt, api_key, extra_body
+                    )
+                )
             # local import：conversation_quality 目前不匯入 memory_core，沒有循環
             # 匯入風險，但兩邊都用 local import 是既有慣例（見 service_context.py）。
             from .conversation_quality import normalize_output_language_variant
@@ -716,7 +738,9 @@ async def consolidate_core_memory(
             )
             conv_candidate, self_candidate = classify_memory_lines(raw, character_name)
             rejected = _rewrite_rejection_reason(conv_candidate, current, limit)
-            if rejected is None:
+            if not conversation_half:
+                pass
+            elif rejected is None:
                 _write_memory(conf_uid, history_uid, conv_candidate)
                 logger.info(
                     f"[core_memory] updated for {conf_uid}/{history_uid} "

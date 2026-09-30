@@ -255,7 +255,11 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
     if (!contentLoaded) return;
     setSavingContent(true);
     setSaveError(null);
-    const result = await saveMemoryContent(baseUrl, confUid, contentDraft);
+    // memory.content 是這次編輯的起點：載入時放進 textarea 的那一版，存檔成功後
+    // 換成剛存的。切分頁再切回來只刷新 cap，不動它，所以它跟 textarea 一致。
+    const result = await saveMemoryContent(
+      baseUrl, confUid, contentDraft, memory?.content,
+    );
     setSavingContent(false);
     setPendingSaveContent(false);
     if (result.ok) {
@@ -271,7 +275,7 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
     } else {
       setSaveError(result.error || t('settings.memory.saveContentFailed'));
     }
-  }, [baseUrl, confUid, contentDraft, contentLoaded, t]);
+  }, [baseUrl, confUid, contentDraft, contentLoaded, memory?.content, t]);
 
   // 破壞性操作 2／3：POST /api/memory/clear。pendingClear 就是確認步驟——先顯示
   // 確認區塊，使用者再按一次紅色按鈕才真的清空。

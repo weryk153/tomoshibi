@@ -99,6 +99,12 @@ def detect_context_window(base_url: str, model: str | None = None) -> int | None
     return None
 
 
+def cooling_down(base_url: str) -> bool:
+    """detect_context_window 現在呼叫會不會直接回 None、連問都不問。"""
+    last = _last_failed_at.get(str(base_url))
+    return last is not None and time.monotonic() - last < _RETRY_COOLDOWN
+
+
 def reset_cache() -> None:
     """給測試用；也讓換模型後可以重新探測。"""
     _cache.clear()

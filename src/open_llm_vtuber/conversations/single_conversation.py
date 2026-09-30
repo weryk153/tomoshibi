@@ -207,12 +207,20 @@ async def process_single_conversation(
                 context.character_config.conf_uid, context.history_uid, client_uid
             )
 
+        # 給 agent 的兩件它自己分不出來的事：這一輪屬於哪段對話（agent 是所有連線
+        # 共用的），以及使用者實際講的是哪一段（model_input_text 後面接了只給模型看
+        # 的提示）。character_engine_agent 靠這個讓引擎記得的是原話；其他 agent
+        # 不看這兩個欄位。
+        agent_metadata = {**(metadata or {}), "history_uid": context.history_uid}
+        if not is_proactive and isinstance(input_text, str):
+            agent_metadata["spoken_text"] = input_text
+
         # Create batch input
         batch_input = create_batch_input(
             input_text=model_input_text,
             images=images,
             from_name=context.character_config.human_name,
-            metadata=metadata,
+            metadata=agent_metadata,
         )
 
         # Store user message (check if we should skip storing to history)
@@ -404,7 +412,8 @@ async def process_single_conversation(
                 ),
                 images=images,
                 from_name=context.character_config.human_name,
-                metadata=metadata,
+                # 剛才那一輪沒有人聽到：自己記對話的 agent 要把它拿掉再答。
+                metadata={**agent_metadata, "redo": True},
             )
             # 重生的輸出也要過同一道護欄，否則它可能再講一次剛被丟掉的內容——
             # 實測遇過。這裡先整批收完再決定：重生本來就是罕見路徑，多等這一下
@@ -445,7 +454,7 @@ async def process_single_conversation(
                 input_text=build_proactive_retry_prompt(input_text),
                 images=images,
                 from_name=context.character_config.human_name,
-                metadata=metadata,
+                metadata=agent_metadata,
             )
             try:
                 retry_stream = context.agent_engine.chat(retry_batch_input)
@@ -624,6 +633,13 @@ async def process_single_conversation(
                             protected_names=getattr(
                                 context.character_config, "protected_names", None
                             ),
+                            # 自己記得對方的 agent（character_engine_agent）只要
+                            # 「她自己的記憶」那一半。
+                            conversation_half=not hasattr(
+                                context.agent_engine, "conversation_memory"
+                            ),
+                            # 這次呼叫跟她的回覆用同一顆模型：讓引擎排它。
+                            through=getattr(context.agent_engine, "aside", None),
                         )
                     )
                     # 保存 reference 避免 fire-and-forget task 被 GC（Python asyncio 已知坑）
