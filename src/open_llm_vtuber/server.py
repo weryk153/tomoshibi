@@ -22,6 +22,7 @@ from .live2d_config_route import init_live2d_config_route
 from .persona_route import init_persona_route
 from .translator_route import init_translator_route
 from .player_route import init_player_route
+from .engine_config_route import init_engine_config_route
 from .network_route import init_network_route
 from .voice_route import init_voice_route
 from .memory_route import init_memory_route
@@ -136,6 +137,7 @@ class WebSocketServer:
         self.app.include_router(init_persona_route())  # 人設預設
         self.app.include_router(init_translator_route())  # 翻譯
         self.app.include_router(init_player_route())  # 玩家層級設定
+        self.app.include_router(init_engine_config_route())  # 引擎驅動對話的開關
         self.app.include_router(init_network_route())  # 遠端存取
         self.app.include_router(init_voice_route())  # 語音清單與試聽
         self.app.include_router(
