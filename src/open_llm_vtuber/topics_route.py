@@ -1,8 +1,8 @@
 """主動話題：使用者維護一份話題清單，決定她閒下來時聊什麼。
 
-這條路徑的關鍵事實是：她主動說話用的 prompts/utils/proactive_speak_prompt.txt
-被後端每次觸發都重讀（prompt_loader.load_util，沒有快取）。所以只要覆寫那個檔，
-下一次主動開口就生效，不必重啟。
+她主動說話時，後端每次都呼叫 current_proactive_prompt() 照目前的設定組提示：
+新聞開著而且一天內抓過，才用 prompts/utils/proactive_speak_prompt.txt 裡抓好的
+新聞；否則只帶話題清單。所以存了設定，下一次主動開口就生效，不必重啟。
 
 一份清單，兩種模式：
 
@@ -223,6 +223,46 @@ def _compose_and_write(state: dict, *, news_blocks=None, got_any: bool = False) 
     )
     nt.write_prompt(content)
     return content
+
+
+# 新聞超過這麼久沒更新就不再給她：她會把舊聞當成眼前的事在講。
+NEWS_FRESH_HOURS = 24
+
+
+def _news_is_fresh(state: dict) -> bool:
+    if not state.get("news", {}).get("enabled"):
+        return False
+    stamp = state.get("last_news_refresh")
+    if not isinstance(stamp, str):
+        return False
+    try:
+        when = datetime.datetime.fromisoformat(stamp)
+    except ValueError:
+        return False
+    if when.tzinfo is None:
+        when = when.astimezone()
+    age = datetime.datetime.now().astimezone() - when
+    return age <= datetime.timedelta(hours=NEWS_FRESH_HOURS)
+
+
+def current_proactive_prompt() -> str:
+    """她主動開口這一刻該拿到的提示：照目前的設定，不是檔案裡剩下的。
+
+    提示檔只在存話題設定、抓新聞時重寫。新聞關掉、話題清空、或新聞放了好幾天
+    之後，檔案裡還是舊的內容——實際發生過她 40 天後還在講當時的颱風。新聞開著
+    而且夠新才用檔案；否則照目前的話題清單重組、不帶新聞。她提過的新聞拿掉。
+    """
+    state = _load_state()
+    nt = _get_news_module()
+    content = ""
+    if _news_is_fresh(state):
+        try:
+            content = Path(nt.PROMPT_PATH).read_text(encoding="utf-8")
+        except OSError:
+            content = ""
+    if not content:
+        content = nt.compose_content(manual_topics=state.get("topics", []))
+    return nt.drop_mentioned(content)
 
 
 async def _fetch_news_in_thread(topics: list) -> tuple[list, bool, int]:

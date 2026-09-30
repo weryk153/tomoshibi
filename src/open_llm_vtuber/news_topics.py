@@ -38,6 +38,11 @@ SEEN_PATH = str(_ROOT / "prompts" / "utils" / "seen_news.json")
 
 SEEN_MAX = 500  # seen 最多保留幾筆（超過淘汰最舊）
 SEEN_TTL_DAYS = 14  # 超過幾天的記錄淘汰
+# 她主動開口時提過的新聞標題：之後不再給她。跟 seen 分開——seen 是「抓過」，
+# 這是「講過」。
+MENTIONED_PATH = str(_ROOT / "prompts" / "utils" / "mentioned_news.json")
+MENTIONED_TTL_DAYS = 7
+NEWS_HEADER = "【今天的新聞"
 PER_CAT = 4  # 每個主題取幾則
 _FETCH_BUFFER = 8  # 多抓幾則當緩衝，被 seen 濾掉一批後仍湊得齊
 _TIMEOUT_SECONDS = 15
@@ -380,6 +385,114 @@ def proactive_material(content: str) -> list[str]:
             # 新聞一類一段，中間隔著空行：都屬於上面那個區塊。
             bodies[-1].append(section)
     return ["\n\n".join(parts) for parts in bodies if parts]
+
+
+def _plain(text: str) -> str:
+    return "".join(ch for ch in str(text or "").casefold() if ch.isalnum())
+
+
+def _mentions(remark: str, headline: str) -> bool:
+    """她這句話有沒有講到這則標題：有一段夠長的字一樣（中文四個字、英文十個字母）。"""
+    from difflib import SequenceMatcher
+
+    said, title = _plain(remark), _plain(normalize_title(headline))
+    if not said or not title:
+        return False
+    match = SequenceMatcher(None, said, title, autojunk=False).find_longest_match(
+        0, len(said), 0, len(title)
+    )
+    run = said[match.a : match.a + match.size]
+    wide = any(ord(ch) > 0x2E80 for ch in run)
+    return match.size >= (4 if wide else 10)
+
+
+def _news_part(content: str) -> tuple[str, str]:
+    """(新聞區塊以前的部分, 新聞區塊)；沒有新聞就是 (content, "")。"""
+    at = str(content or "").find(NEWS_HEADER)
+    if at < 0:
+        return str(content or ""), ""
+    return content[:at], content[at:]
+
+
+def _headlines(news: str) -> list[str]:
+    return [
+        line[2:].strip()
+        for line in news.splitlines()
+        if line.startswith("- ") and line[2:].strip()
+    ]
+
+
+def load_mentioned() -> dict:
+    """她提過的標題 {正規化標題: ISO 時間戳}，順便汰舊。壞檔當空的。"""
+    raw: dict[str, str] = {}
+    try:
+        path = Path(MENTIONED_PATH)
+        if path.is_file():
+            data = json.loads(path.read_text(encoding="utf-8"))
+            if isinstance(data, dict):
+                raw = {
+                    k: v
+                    for k, v in data.items()
+                    if isinstance(k, str) and isinstance(v, str)
+                }
+    except Exception as e:
+        logger.warning(f"[news] mentioned_news.json unreadable, treating as empty: {e}")
+    cutoff = _now() - datetime.timedelta(days=MENTIONED_TTL_DAYS)
+    kept = {}
+    for title, stamp in raw.items():
+        try:
+            when = datetime.datetime.fromisoformat(stamp)
+        except ValueError:
+            continue
+        if when.tzinfo is None:
+            when = when.astimezone()
+        if when >= cutoff:
+            kept[title] = stamp
+    return kept
+
+
+def note_mentioned(remark: str, content: str) -> None:
+    """她主動開口說了 remark；content 裡她提到的新聞標題記下來，之後不再給。"""
+    _, news = _news_part(content)
+    titles = [title for title in _headlines(news) if _mentions(remark, title)]
+    if not titles:
+        return
+    mentioned = load_mentioned()
+    stamp = _now().isoformat(timespec="seconds")
+    for title in titles:
+        mentioned[normalize_title(title)] = stamp
+    path = Path(MENTIONED_PATH)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(
+        json.dumps(mentioned, ensure_ascii=False, indent=2), encoding="utf-8"
+    )
+    os.replace(tmp, path)
+
+
+def drop_mentioned(content: str) -> str:
+    """拿掉她提過的新聞；分類空了連分類一起拿掉，新聞全空就整塊拿掉。"""
+    before, news = _news_part(content)
+    if not news:
+        return content
+    mentioned = load_mentioned()
+    if not mentioned:
+        return content
+    header, _, body = news.partition("\n")
+    groups = []
+    for group in body.split("\n\n"):
+        lines = [
+            line
+            for line in group.splitlines()
+            if not (
+                line.startswith("- ") and normalize_title(line[2:].strip()) in mentioned
+            )
+        ]
+        if any(line.startswith("- ") for line in lines):
+            groups.append("\n".join(lines))
+    if not groups:
+        return before.rstrip() + "\n"
+    return before + header + "\n" + "\n\n".join(groups).rstrip() + "\n"
 
 
 def write_prompt(content: str) -> None:

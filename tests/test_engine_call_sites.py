@@ -59,3 +59,22 @@ def test_a_proactive_turn_hands_the_agent_its_material():
     assert '"proactive_material": material,' in src
     assert "instruction = proactive_instruction(user_input)" in src
     assert '"proactive_instruction": instruction,' in src
+
+
+def test_a_proactive_turn_reads_the_topics_as_they_are_now():
+    """提示檔只在存設定、抓新聞時重寫。直接讀它的話，新聞關掉幾十天後她還在
+    講當時抓到的颱風。"""
+    from src.open_llm_vtuber.conversations import conversation_handler
+
+    src = inspect.getsource(conversation_handler)
+
+    assert "user_input = current_proactive_prompt()" in src
+    assert '"proactive_source": source,' in src
+
+
+def test_news_she_brought_up_is_noted_after_she_speaks_up():
+    src = inspect.getsource(single_conversation.process_single_conversation)
+    after = src.split("if is_proactive and full_response:", 1)[1]
+
+    assert "note_mentioned(" in after
+    assert '(metadata or {}).get("proactive_source")' in after

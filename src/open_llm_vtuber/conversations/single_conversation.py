@@ -584,6 +584,13 @@ async def process_single_conversation(
                     await remember_remark(context.history_uid, full_response)
                 except Exception as error:
                     logger.warning(f"Proactive remark not kept: {error}")
+            # 她提過的新聞之後不再給她，不然同一則標題每次開口都在素材裡。
+            try:
+                from ..news_topics import note_mentioned
+
+                note_mentioned(full_response, (metadata or {}).get("proactive_source"))
+            except Exception as error:
+                logger.warning(f"Mentioned news not noted: {error}")
 
         # 對話一輪後背景整理核心記憶（fire-and-forget，不阻塞使用者）。見 MEMORY_SYSTEM_DESIGN.md
         # 長期記憶關閉時（long_term_memory_enabled=False）跳過整理，連背景 task 都不建。
