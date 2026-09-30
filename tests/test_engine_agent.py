@@ -482,6 +482,56 @@ def test_interrupting_what_is_being_played_does_not_cut_off_another_connection(
     assert conversation == ["我是B", "嗯，我知道了。"]
 
 
+def test_a_finished_turn_is_let_go_once_its_host_task_ends(tmp_path):
+    """播放中的回合要記著，好讓打斷找得到；主機那一輪結束後就不用了。"""
+
+    async def scenario():
+        current = agent(companion(tmp_path, EngineLLM()))
+        for number in range(5):
+            await say(current, f"第 {number} 句", history_uid="h1")
+        for _ in range(5):
+            await asyncio.sleep(0)
+        return len(current._playing)
+
+    assert asyncio.run(scenario()) <= 1
+
+
+def test_an_interruption_is_delivered_once(tmp_path):
+    """A 被打斷後，它那一輪的 task 還在收尾。這時 B 打斷不能再落到 A 頭上。"""
+
+    async def scenario():
+        llm = EngineLLM("嗯，我知道了。", gate=asyncio.Event())
+        llm.gate.set()
+        engine = companion(tmp_path, llm)
+        current = agent(engine)
+        playing = asyncio.Event()
+
+        async def a_turn():
+            await say(current, "我是A", history_uid="h1")
+            await playing.wait()
+
+        a = asyncio.ensure_future(a_turn())
+        for _ in range(50):
+            await asyncio.sleep(0)
+        a.cancel()
+        current.handle_interrupt("嗯")
+        llm.gate.clear()
+        llm.started.clear()
+        b = asyncio.ensure_future(say(current, "我是B", history_uid="h2"))
+        await llm.started.wait()
+        b.cancel()
+        current.handle_interrupt("我")
+        with pytest.raises(asyncio.CancelledError):
+            await a
+        with pytest.raises(asyncio.CancelledError):
+            await b
+        llm.gate.set()
+        await say(current, "繼續", history_uid="h2")
+        return llm.said_by_both()
+
+    assert asyncio.run(scenario()) == ["我是B", "我 [Interrupted by user]", "繼續"]
+
+
 def test_the_same_conversation_in_two_windows(tmp_path):
     """A 在生成、B 排在後面，兩個都在同一段對話。主機取消 A 並回報聽到哪裡：
     被打斷的是 A，B 照常回答。"""

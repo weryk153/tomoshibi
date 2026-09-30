@@ -185,9 +185,9 @@ class CharacterEngineAgent(AgentInterface):
         if done.is_file() and history_uid in done.read_text("utf-8").splitlines():
             self._brought.add(history_uid)
             return
-        # 真實的檔案不只「對方：」一種寫法；分法沿用主機自己的，她自己的那一半
-        # 留在 self_memory.md 那條路。
-        about_the_user, _her_own = memory_core.classify_memory_lines(
+        # 真實的檔案不只「對方：」一種寫法；分法沿用主機自己的。她自己的那幾行
+        # 併進她自己的記憶：舊檔案裡有從來沒搬去那邊的。
+        about_the_user, her_own = memory_core.classify_memory_lines(
             memory_core.load_core_memory(self._conf_uid, history_uid),
             self._character_name,
         )
@@ -196,6 +196,16 @@ class CharacterEngineAgent(AgentInterface):
             companion.rewrite_memories(
                 history_uid, [*companion.memories(history_uid), *remembered]
             )
+        if her_own.strip():
+            current = memory_core.load_self_memory(self._conf_uid)
+            merged = memory_core.merge_self_memory(
+                current,
+                her_own,
+                memory_core.SELF_CAP_CHARS,
+                character_name=self._character_name,
+            )
+            if merged != current:
+                memory_core.save_self_memory(self._conf_uid, merged)
         # 搬完才記；搬到一半炸掉的話下一次還會再試。
         self._brought.add(history_uid)
         done.parent.mkdir(parents=True, exist_ok=True)
@@ -259,6 +269,11 @@ class CharacterEngineAgent(AgentInterface):
             entry for entry in (*self._turns, *self._playing) if entry[0].cancelling()
         ]
         meant = cancelled[-1][1:] if cancelled else self._last_ended
+        if cancelled:
+            # 送過一次就不再是打斷的對象；它的 task 收尾期間別的連線也可能打斷。
+            self._playing = [
+                entry for entry in self._playing if entry is not cancelled[-1]
+            ]
         try:
             if meant is None:
                 self._companion().interrupt(heard_response)
@@ -396,8 +411,13 @@ class CharacterEngineAgent(AgentInterface):
         finally:
             self._turns.remove(waiting)
             self._last_ended = (conversation, name)
-            # 主機那一輪還沒結束：她的字已經全出來了，語音還在播。
-            self._playing.append(waiting)
+            # 主機那一輪還沒結束：她的字已經全出來了，語音還在播。已經結束的
+            # 在這裡順手清掉，不然只有打斷時才清。
+            self._playing = [
+                entry
+                for entry in self._playing
+                if not entry[0].done() and entry[0] is not waiting[0]
+            ] + [waiting]
             # 主機打斷的方式是取消等著這個 generator 的 task。引擎那一輪得真的
             # 停下來，之後 handle_interrupt 才記得進去。
             if not turn.done():

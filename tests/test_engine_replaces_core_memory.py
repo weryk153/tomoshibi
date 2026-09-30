@@ -79,6 +79,8 @@ def test_what_the_host_remembered_before_is_handed_to_the_engine_once(
         "對方：名字是晨星。\n對方對貓過敏。\n對方 下週要去京都出差三天。\n養了一隻貓叫饅頭。"
     )
     assert after_restart == "對方：名字是晨星。"
+    # 她自己的那幾行不是丟掉，是併進她自己的記憶（舊檔案裡有從沒搬去那邊的）。
+    assert "紅莉栖：喜歡胡椒博士。" in memory_core.load_self_memory("kurisu")
 
 
 def test_the_memory_page_shows_and_edits_what_the_engine_remembers(tmp_path):

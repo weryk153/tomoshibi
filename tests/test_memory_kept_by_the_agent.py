@@ -47,20 +47,53 @@ def test_the_route_asks_the_connection_whose_conversation_it_resolved():
     assert memory_route._memory_keeper(contexts, "charA") is keeper
 
 
-def test_saving_forgets_only_what_the_page_showed():
+def test_saving_forgets_only_what_the_page_started_from():
+    """起點由前端送：伺服器記不住某個頁面顯示的是哪一版（同一段對話可以開兩個
+    頁面，切分頁回來也不重載文字框）。沒送就整份取代。"""
     edits = []
-    keeper = SimpleNamespace(
-        conversation_memory=lambda history_uid: "對方：住在台北。",
-        rewrite_conversation_memory=lambda history_uid,
-        text,
-        edited_from=None: edits.append((history_uid, text, edited_from)),
-    )
-    memory_route._remember_what_was_shown(
-        "charA", "conv1", keeper.conversation_memory("conv1")
-    )
-    memory_route._save_through(keeper, "charA", "conv1", "對方：喜歡烏龍茶。")
 
-    assert edits == [("conv1", "對方：喜歡烏龍茶。", "對方：住在台北。")]
+    def rewrite(history_uid, text, edited_from=None):
+        edits.append((history_uid, text, edited_from))
+
+    keeper = SimpleNamespace(rewrite_conversation_memory=rewrite)
+    memory_route._save_through(
+        keeper, "conv1", "對方：喜歡烏龍茶。", "對方：住在台北。"
+    )
+    memory_route._save_through(keeper, "conv1", "對方：喜歡烏龍茶。", None)
+    memory_route._save_through(keeper, "conv1", "對方：喜歡烏龍茶。", 42)
+
+    assert edits == [
+        ("conv1", "對方：喜歡烏龍茶。", "對方：住在台北。"),
+        ("conv1", "對方：喜歡烏龍茶。", None),
+        ("conv1", "對方：喜歡烏龍茶。", None),
+    ]
+
+
+def test_the_endpoints_pass_the_starting_point_and_skip_the_lock_for_the_agent():
+    import inspect
+
+    src = inspect.getsource(memory_route.init_memory_route)
+    assert (
+        src.count(
+            '_save_through(keeper, history_uid, content, body.get("edited_from"))'
+        )
+        == 1
+    )
+    assert src.count("needed=_needs_consolidation_lock(keeper=keeper)") == 2
+
+
+def test_the_page_sends_the_starting_point():
+    from pathlib import Path
+
+    page = Path(
+        "frontend-src/src/renderer/src/components/sidebar/setting/memory.tsx"
+    ).read_text()
+    api = Path("frontend-src/src/renderer/src/api/memory.ts").read_text()
+    assert (
+        "saveMemoryContent(\n      baseUrl, confUid, contentDraft, memory?.content,\n    )"
+        in page
+    )
+    assert "edited_from: editedFrom" in api
 
 
 def test_consolidation_keeps_her_own_half_and_leaves_the_users_to_the_engine(

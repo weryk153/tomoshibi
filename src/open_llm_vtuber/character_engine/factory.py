@@ -35,6 +35,9 @@ EYES_PROMPT = "用兩三句話說出畫面裡有什麼。只講看得到的，�
 # 問不到 window 時當它有這麼大。引擎預設的 8192 裝不下一份真的人設（Mao 的
 # 系統提示約 4500 token），主動發話那一輪會直接失敗。猜大了頂多推論端回錯。
 UNKNOWN_WINDOW_TOKENS = 16384
+# 問不到 window 就再問幾次（伺服器常比模型早起來），之後放棄：雲端端點或 Ollama
+# 永遠答不出來，而問一次是一次同步的網路請求，會把所有連線的語音卡住一下。
+WINDOW_PROBES = 5
 # 一輪可以包含工具呼叫（搜尋網頁要十幾秒）再加一段長回覆。
 TURN_TIMEOUT_SECONDS = 180.0
 # basic_memory_agent 留 20000 字、至少 24 則。語音對話一句很短，引擎預設的 40 則
@@ -152,14 +155,18 @@ class _Live:
     base_url: str = ""
     model: str = ""
     window: Optional[int] = None
+    probes: int = 0
 
 
 def _fit_the_window(live: _Live) -> None:
-    """伺服器常比模型早起來，那時問不到 window。之後每一輪都來問，問到了就換預算。"""
+    """伺服器常比模型早起來，那時問不到 window。之後再問幾次，問到了就換預算。"""
     from ai_character_engine.context.budget import ContextBudget
 
+    if live.window or live.probes >= WINDOW_PROBES:
+        return
+    live.probes += 1
     window = detect_context_window(live.base_url, live.model)
-    if window and window != live.window:
+    if window:
         live.window = window
         live.companion.runtime.context_builder.budget = ContextBudget(
             context_window_tokens=window
@@ -300,6 +307,7 @@ def build_companion(
         base_url=str(llm_config.get("base_url") or ""),
         model=str(llm_config.get("model") or ""),
         window=window,
+        probes=1,
     )
     logger.info(f"[engine] companion ready for {conf_uid} at {directory}")
     return key

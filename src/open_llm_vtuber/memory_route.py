@@ -24,7 +24,6 @@ conf_uid 前端知道（從 WebSocket 的 set-model-and-conf 來），沒帶就�
 
 import os
 import asyncio
-from collections import OrderedDict
 from contextlib import asynccontextmanager
 from typing import Any, Optional
 
@@ -266,22 +265,15 @@ def _memory_keeper(client_contexts: dict, conf_uid: str):
     return found
 
 
-# 記憶頁最後一次給使用者看的內容，(conf_uid, history_uid) → 內容。存檔時只把
-# 「看到、又被拿掉」的行算成刪掉：頁面開著的時候引擎新記下的不是使用者刪的。
-_SHOWN: "OrderedDict[tuple[str, str], str]" = OrderedDict()
-_SHOWN_KEPT = 64
-
-
-def _remember_what_was_shown(conf_uid: str, history_uid: str, content: str) -> None:
-    _SHOWN[(conf_uid, history_uid)] = content
-    _SHOWN.move_to_end((conf_uid, history_uid))
-    while len(_SHOWN) > _SHOWN_KEPT:
-        _SHOWN.popitem(last=False)
-
-
-def _save_through(keeper, conf_uid: str, history_uid: str, content: str) -> None:
+def _save_through(keeper, history_uid: str, content: str, edited_from) -> None:
+    """edited_from 是前端這次編輯的起點（載入時放進 textarea 的那一版）。只有起點
+    裡有、存回來時不見的行才算使用者刪掉的；頁面開著的時候引擎新記下的行不受
+    影響。伺服器自己記不住這件事——同一段對話可以開兩個頁面、切分頁回來也不會
+    重載文字框——所以由前端送。沒送就當整份取代。"""
     keeper.rewrite_conversation_memory(
-        history_uid, content, edited_from=_SHOWN.get((conf_uid, history_uid))
+        history_uid,
+        content,
+        edited_from=edited_from if isinstance(edited_from, str) else None,
     )
 
 
@@ -397,7 +389,6 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         keeper = _memory_keeper(client_contexts, conf_uid)
         if keeper is not None:
             content = keeper.conversation_memory(history_uid)
-            _remember_what_was_shown(conf_uid, history_uid, content)
             exists = bool(content)
         else:
             content = memory_core.load_core_memory(conf_uid, history_uid)
@@ -459,9 +450,8 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
                 conf_uid, needed=_needs_consolidation_lock(keeper=keeper)
             ):
                 if keeper is not None:
-                    _save_through(keeper, conf_uid, history_uid, content)
+                    _save_through(keeper, history_uid, content, body.get("edited_from"))
                     stored = keeper.conversation_memory(history_uid)
-                    _remember_what_was_shown(conf_uid, history_uid, stored)
                 elif not await asyncio.to_thread(
                     memory_core.save_core_memory, conf_uid, history_uid, content, cap
                 ):

@@ -198,6 +198,20 @@ def test_until_the_window_is_known_she_is_given_room_for_a_real_persona(monkeypa
     assert after == 20992
 
 
+def test_the_window_is_asked_for_a_few_times_not_on_every_turn_for_ever(monkeypatch):
+    """雲端端點或 Ollama 永遠答不出 window。問一次是一次網路請求、在 event loop 上
+    同步等，每輪都問等於每輪把所有連線的語音卡住一下。"""
+    asked = []
+    monkeypatch.setattr(
+        factory, "detect_context_window", lambda *a, **k: asked.append(1) and None
+    )
+    created = AgentFactory.create_agent(**factory_arguments())
+    for _ in range(20):
+        created._companion()
+
+    assert len(asked) <= factory.WINDOW_PROBES + 1
+
+
 def test_a_window_that_is_detected_later_does_not_replace_her(monkeypatch):
     """模型還沒載入的時候問不到 window；晚一點問到了，是同一個她、換一個預算。"""
     first = AgentFactory.create_agent(**factory_arguments())._companion()
