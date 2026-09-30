@@ -296,6 +296,14 @@ class CharacterEngineAgent(AgentInterface):
         except HostBridgeError as exc:
             logger.warning(f"[engine] interrupt not recorded ({exc})")
 
+    async def aside(self, make_call):
+        """主機自己的模型呼叫（整理她自己的記憶）從引擎走：等她講完、排在背景工作
+        後面，不跟回覆搶模型。引擎那一側剛好換掉的話，直接打。"""
+        try:
+            return await self._companion().aside(make_call)
+        except CompanionClosed:
+            return await make_call()
+
     def _remembered(self, reply: str) -> str:
         """她記得自己說了什麼。跟 BasicMemoryAgent._add_message 同一套：表情與動作
         標籤留著（她得讀到自己會做表情），演出標籤拿掉，字形跟畫面一致。"""

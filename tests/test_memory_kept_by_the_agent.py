@@ -144,3 +144,67 @@ def test_the_agents_memory_is_not_held_up_by_the_hosts_consolidation():
     「記憶正在整理中」。整理碰的是 self_memory.md，跟引擎的記憶無關，不用等它。"""
     assert memory_route._needs_consolidation_lock(keeper=object()) is False
     assert memory_route._needs_consolidation_lock(keeper=None) is True
+
+
+def test_consolidation_makes_its_model_call_the_way_the_agent_says(
+    tmp_path, monkeypatch
+):
+    """整理她自己的記憶是引擎之外的一次模型呼叫。直接打的話會跟她的回覆搶同一顆
+    本機模型；agent 有 aside 的話就從那裡走，等她講完、排在背景工作後面。"""
+    monkeypatch.chdir(tmp_path)
+    order = []
+
+    async def rewrite(*_args, **_kwargs):
+        order.append("call")
+        return "Mao：喜歡烏龍茶。"
+
+    async def through(make_call):
+        order.append("aside")
+        return await make_call()
+
+    monkeypatch.setattr(memory_core, "_request_rewrite", rewrite)
+    asyncio.run(
+        memory_core.consolidate_core_memory(
+            "mao",
+            "h1",
+            "我叫晨星",
+            "我喜歡烏龍茶",
+            "http://x",
+            "m",
+            character_name="Mao",
+            conversation_half=False,
+            through=through,
+        )
+    )
+
+    assert order == ["aside", "call"]
+    assert "喜歡烏龍茶" in memory_core.load_self_memory("mao")
+
+
+def test_the_conversation_hands_the_consolidation_call_to_the_agent():
+    import inspect
+
+    from src.open_llm_vtuber.conversations import single_conversation
+
+    src = inspect.getsource(single_conversation.process_single_conversation)
+
+    assert 'through=getattr(context.agent_engine, "aside", None)' in src
+
+
+def test_the_agent_makes_the_hosts_call_through_the_companion(tmp_path):
+    from tests.test_engine_agent import EngineLLM, agent, companion
+
+    async def scenario():
+        engine = companion(tmp_path, EngineLLM())
+        current = agent(engine)
+        seen = []
+
+        async def tidy():
+            seen.append("tidy")
+            return "tidied"
+
+        result = await current.aside(tidy)
+        await engine.close()
+        return result, seen
+
+    assert asyncio.run(scenario()) == ("tidied", ["tidy"])

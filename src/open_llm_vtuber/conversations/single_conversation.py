@@ -637,6 +637,8 @@ async def process_single_conversation(
                             conversation_half=not hasattr(
                                 context.agent_engine, "conversation_memory"
                             ),
+                            # 這次呼叫跟她的回覆用同一顆模型：讓引擎排它。
+                            through=getattr(context.agent_engine, "aside", None),
                         )
                     )
                     # 保存 reference 避免 fire-and-forget task 被 GC（Python asyncio 已知坑）
