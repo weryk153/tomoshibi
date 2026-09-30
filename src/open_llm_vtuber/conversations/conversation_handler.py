@@ -15,6 +15,8 @@ from .conversation_utils import EMOJI_LIST
 from .types import GroupConversationState
 from prompts import prompt_loader
 from ..news_topics import compose_content as default_proactive_prompt
+from ..news_topics import proactive_instruction, proactive_material
+from ..topics_route import current_proactive_prompt
 from ..conversation_quality import normalize_output_language_variant
 from ..proactive_context import (
     build_proactive_prompt,
@@ -285,18 +287,25 @@ async def handle_conversation_trigger(
         image_sources = [
             image.get("source") for image in raw_images or [] if isinstance(image, dict)
         ]
+        material: list[str] = []
+        instruction = ""
+        source = ""
         try:
             # Get proactive speak prompt from config
             prompt_name = "proactive_speak_prompt"
             prompt_file = context.system_config.tool_prompts.get(prompt_name)
-            if prompt_file:
+            if prompt_file == prompt_name:
+                # 照目前的話題設定組，不直接讀提示檔：檔案只在存設定、抓新聞時
+                # 重寫，新聞關掉或放了好幾天之後裡面還是舊的——她曾經在 40 天後
+                # 每次開口都在講當時的颱風。沒存過設定的人也由它給預設提示。
+                user_input = current_proactive_prompt()
+            elif prompt_file:
                 try:
                     user_input = prompt_loader.load_util(prompt_file)
                 except FileNotFoundError:
-                    # 這個檔是主動話題設定存檔時才寫出來的（news_topics.write_prompt），
-                    # 所以不進版控。新裝好、還沒存過話題的人沒有它——以前這裡直接跳到
-                    # 最外層，她只收到一句 "Please say something."，人設護欄全掉。
                     user_input = default_proactive_prompt()
+            if prompt_file:
+                source = user_input
                 verified_visual_facts = await extract_proactive_visual_facts(
                     context,
                     raw_images,
@@ -320,6 +329,10 @@ async def handle_conversation_trigger(
                     proactive_uid,
                     output_language,
                 )
+                material = proactive_material(user_input)
+                instruction = proactive_instruction(user_input)
+                if verified_search_facts:
+                    material.append(f"【查到的資料】\n{verified_search_facts}")
                 user_input = build_proactive_prompt(
                     base_prompt=user_input,
                     conf_uid=context.character_config.conf_uid,
@@ -352,6 +365,11 @@ async def handle_conversation_trigger(
                 proactive_uid,
             ),
             "proactive_image_sources": image_sources,
+            # 由引擎決定講什麼的 agent 只要素材（話題、新聞、查到的資料）。
+            "proactive_material": material,
+            "proactive_instruction": instruction,
+            # 她開口之後，拿來找出她提到了哪則新聞（news_topics.note_mentioned）。
+            "proactive_source": source,
             # The anchor is quoted into the prompt, so a weak model can echo it
             # back verbatim instead of continuing from it. Comparing against it
             # is what catches that; normalize first, because the anchor comes

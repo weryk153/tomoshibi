@@ -118,6 +118,7 @@ conf.yaml.bak.*
 *.bak
 prompts/utils/proactive_topics.json
 prompts/utils/seen_news.json
+prompts/utils/mentioned_news.json
 prompts/utils/proactive_speak_prompt.txt
 
 # Electron 外殼

@@ -141,3 +141,44 @@ def test_prompt_write_is_atomic(tmp_path, monkeypatch):
 
     assert target.read_text(encoding="utf-8") == "內容"
     assert not (tmp_path / "proactive_speak_prompt.txt.tmp").exists()
+
+
+def test_the_material_of_a_proactive_prompt_is_its_topic_and_news_sections():
+    from src.open_llm_vtuber.news_topics import compose_content, proactive_material
+
+    content = compose_content(
+        manual_topics=["天文", "動漫"],
+        news_blocks=["某某新聞標題"],
+        got_any=True,
+    )
+    material = proactive_material(content)
+
+    assert material == ["- 天文\n- 動漫", "某某新聞標題"]
+    assert proactive_material(compose_content()) == []
+
+
+def test_the_instruction_of_a_proactive_prompt_is_what_comes_before_the_material():
+    from src.open_llm_vtuber.news_topics import (
+        INSTRUCTION,
+        compose_content,
+        proactive_instruction,
+    )
+
+    content = compose_content(
+        manual_topics=["天文"], news_blocks=["標題"], got_any=True
+    )
+    instruction = proactive_instruction(content)
+
+    assert instruction.startswith(INSTRUCTION.strip()[:20])
+    assert "想換題的話" in instruction
+    assert "【" not in instruction and "天文" not in instruction
+
+
+def test_news_material_keeps_every_category_not_just_the_first():
+    from src.open_llm_vtuber.news_topics import compose_content, proactive_material
+
+    content = compose_content(
+        news_blocks=["國際：\n- 甲新聞", "台灣：\n- 乙新聞"], got_any=True
+    )
+
+    assert proactive_material(content) == ["國際：\n- 甲新聞\n\n台灣：\n- 乙新聞"]
