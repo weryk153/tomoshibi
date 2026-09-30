@@ -19,7 +19,8 @@ def test_every_call_to_the_agent_names_the_conversation_and_the_users_own_words(
     assert '"history_uid": context.history_uid' in src
     assert 'agent_metadata["spoken_text"] = input_text' in src
     assert src.count("create_batch_input(") == 3
-    assert src.count("metadata=agent_metadata,") == 3
+    assert src.count("metadata=agent_metadata,") == 2
+    assert src.count('metadata={**agent_metadata, "redo": True},') == 1
 
 
 def test_the_agent_factory_is_told_which_character_it_is_building_for():

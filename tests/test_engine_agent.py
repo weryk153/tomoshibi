@@ -879,3 +879,42 @@ def test_recent_lines_are_available_to_anchor_proactive_speech(tmp_path):
         return current.get_recent_context_for_proactive()
 
     assert asyncio.run(scenario()) == "使用者：你好\n角色：嗯，我知道了。"
+
+
+def test_a_reply_the_host_threw_away_is_not_kept_when_it_asks_again(tmp_path):
+    """整則回覆被跨輪護欄丟掉時，主機帶著提示再問一次。那一輪沒有人聽到：
+    留著的話，同一句話會在對話裡出現兩次，第一次配著沒人聽過的回覆。"""
+
+    async def scenario():
+        llm = EngineLLM("嗯，我知道了。")
+        engine = companion(tmp_path, llm)
+        current = agent(engine)
+        await say(current, "你好", history_uid="h1")
+        await say(current, "再說一次", history_uid="h1", spoken_text="再說一次")
+        await say(
+            current,
+            "再說一次\n\n（你最近說過這些，換個說法）",
+            history_uid="h1",
+            spoken_text="再說一次",
+            redo=True,
+        )
+        await say(current, "繼續", history_uid="h1")
+        return llm.said_by_both()
+
+    assert asyncio.run(scenario()) == [
+        "你好",
+        "嗯，我知道了。",
+        "再說一次",
+        "嗯，我知道了。",
+        "繼續",
+    ]
+
+
+def test_the_retry_after_the_guard_tells_the_agent_to_redo():
+    import inspect
+
+    from src.open_llm_vtuber.conversations import single_conversation
+
+    src = inspect.getsource(single_conversation.process_single_conversation)
+
+    assert 'metadata={**agent_metadata, "redo": True},' in src

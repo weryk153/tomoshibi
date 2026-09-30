@@ -375,6 +375,8 @@ class CharacterEngineAgent(AgentInterface):
         # agent 是共用的，「目前這段對話」是最後一個載入歷史的連線設的；
         # 主機有指明這一輪屬於哪一段的話以它為準。
         conversation = metadata.get("history_uid") or self._conversation
+        # 主機把上一則回覆整個丟掉、帶著提示再問一次：那一輪沒有人聽到。
+        redo = bool(metadata.get("redo"))
         self._hand_over(companion, conversation)
 
         outputs: asyncio.Queue = asyncio.Queue()
@@ -393,7 +395,9 @@ class CharacterEngineAgent(AgentInterface):
                     notes=notes,
                     # 在引擎那一輪裡面做：agent 是共用的，這一輪排隊的時候別的
                     # 連線可能正在講話，那時候不能換人設、換工具。
-                    before_turn=lambda: self._bring_up_to_date(companion),
+                    before_turn=lambda: self._bring_up_to_date(
+                        companion, take_back=conversation if redo else None
+                    ),
                     remember_as=self._remembered,
                     turn_id=name,
                 )
@@ -461,7 +465,10 @@ class CharacterEngineAgent(AgentInterface):
             frames.append(VisionFrame(image=image, source_type=source))
         return tuple(frames)
 
-    def _bring_up_to_date(self, companion) -> None:
+    def _bring_up_to_date(self, companion, *, take_back=None) -> None:
+        if take_back is not None:
+            # 在引擎那一輪裡面做：這時沒有別的連線在講話，最新的那一則才拿得掉。
+            companion.take_back(take_back)
         if companion.character.description != self._system:
             companion.character = replace(companion.character, description=self._system)
         if _TOOLS_REGISTERED_BY.get(companion) == id(self):

@@ -412,7 +412,8 @@ async def process_single_conversation(
                 ),
                 images=images,
                 from_name=context.character_config.human_name,
-                metadata=agent_metadata,
+                # 剛才那一輪沒有人聽到：自己記對話的 agent 要把它拿掉再答。
+                metadata={**agent_metadata, "redo": True},
             )
             # 重生的輸出也要過同一道護欄，否則它可能再講一次剛被丟掉的內容——
             # 實測遇過。這裡先整批收完再決定：重生本來就是罕見路徑，多等這一下
