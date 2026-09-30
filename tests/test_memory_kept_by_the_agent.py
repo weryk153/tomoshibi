@@ -208,3 +208,45 @@ def test_the_agent_makes_the_hosts_call_through_the_companion(tmp_path):
         return result, seen
 
     assert asyncio.run(scenario()) == ("tidied", ["tidy"])
+
+
+def test_a_hosts_call_waiting_when_the_engine_is_replaced_goes_to_the_new_one(tmp_path):
+    """Saving settings replaces the engine. A call that was waiting for the old
+    one must queue again behind the new one's reply and workers, not go
+    straight to the model beside it."""
+    from tests.test_engine_agent import EngineLLM, agent, companion, say
+
+    async def scenario():
+        gate = asyncio.Event()
+        talking_llm = EngineLLM(gate=gate)
+        old = companion(tmp_path / "old", talking_llm)
+        new = companion(tmp_path / "new", EngineLLM())
+        holder = [old]
+        current = agent(lambda: holder[0])
+        through = []
+        original = new.aside
+
+        async def recorded(make_call, **options):
+            through.append("new")
+            return await original(make_call, **options)
+
+        new.aside = recorded
+
+        async def tidy():
+            return "tidied"
+
+        talking = asyncio.ensure_future(say(current, "你好", history_uid="h1"))
+        await talking_llm.started.wait()
+        waiting = asyncio.ensure_future(current.aside(tidy))
+        for _ in range(20):
+            await asyncio.sleep(0)
+        holder[0] = new
+        old.retire()
+        gate.set()
+        await talking
+        result = await waiting
+        await old.close()
+        await new.close()
+        return result, through
+
+    assert asyncio.run(scenario()) == ("tidied", ["new"])

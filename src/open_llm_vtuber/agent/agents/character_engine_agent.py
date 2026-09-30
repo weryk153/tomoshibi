@@ -298,11 +298,17 @@ class CharacterEngineAgent(AgentInterface):
 
     async def aside(self, make_call):
         """主機自己的模型呼叫（整理她自己的記憶）從引擎走：等她講完、排在背景工作
-        後面，不跟回覆搶模型。引擎那一側剛好換掉的話，直接打。"""
-        try:
-            return await self._companion().aside(make_call)
-        except CompanionClosed:
-            return await make_call()
+        後面，不跟回覆搶模型。等的時候引擎那一側換掉了，就改排到新的那一個後面；
+        直接打的話正好跟新的那一個的回覆搶模型。"""
+        companion = self._companion()
+        while True:
+            try:
+                return await companion.aside(make_call)
+            except CompanionClosed:
+                successor = self._companion()
+                if successor is companion:
+                    raise
+                companion = successor
 
     def _remembered(self, reply: str) -> str:
         """她記得自己說了什麼。跟 BasicMemoryAgent._add_message 同一套：表情與動作
