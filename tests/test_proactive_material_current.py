@@ -116,3 +116,27 @@ def test_a_remark_that_mentions_no_headline_marks_nothing(files):
     nt.note_mentioned("喂，還醒著嗎？", tr.current_proactive_prompt())
 
     assert "沙德爾颱風路徑變了" in tr.current_proactive_prompt()
+
+
+def test_another_headline_on_the_same_story_goes_too(files):
+    """同一則新聞常有好幾個標題。只拿掉她講到的那個，她下一次就換另一個標題
+    講同一件事——實際跑出來過：颱風講完了又講一次颱風。"""
+    state, prompt, _ = files
+    _state(state, topics=[], enabled=True, refreshed_hours_ago=2)
+    prompt.write_text(
+        nt.compose_content(
+            news_blocks=[
+                "台灣：\n- 沙德爾颱風路徑變了！逼近台灣機會變大"
+                "\n- 沙德爾可達強颱下限、不排除通過台灣附近",
+                "科技：\n- 半導體新廠動工",
+            ],
+            got_any=True,
+        ),
+        encoding="utf-8",
+    )
+
+    nt.note_mentioned(
+        "你看，沙德爾颱風的路徑又變了，逼近的機會變大。", tr.current_proactive_prompt()
+    )
+
+    assert "沙德爾" not in tr.current_proactive_prompt()

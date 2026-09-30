@@ -392,7 +392,12 @@ def _plain(text: str) -> str:
 
 
 def _mentions(remark: str, headline: str) -> bool:
-    """她這句話有沒有講到這則標題：有一段夠長的字一樣（中文四個字、英文十個字母）。"""
+    """她這句話有沒有講到這則標題：有一段夠長的字一樣（中文三個字、英文十個字母）。
+
+    中文取三個字是為了連同一件事的其他標題一起算：她講「沙德爾颱風路徑變了」，
+    另一個標題只有「沙德爾」三個字跟她一樣；四個字的話那個標題會留下來，她
+    下次就換它再講一次颱風。多算到的標題只是少給她一則素材。
+    """
     from difflib import SequenceMatcher
 
     said, title = _plain(remark), _plain(normalize_title(headline))
@@ -403,7 +408,7 @@ def _mentions(remark: str, headline: str) -> bool:
     )
     run = said[match.a : match.a + match.size]
     wide = any(ord(ch) > 0x2E80 for ch in run)
-    return match.size >= (4 if wide else 10)
+    return match.size >= (3 if wide else 10)
 
 
 def _news_part(content: str) -> tuple[str, str]:
