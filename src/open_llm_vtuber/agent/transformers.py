@@ -148,6 +148,10 @@ def balance_asterisk_actions(text: str, inside: bool) -> tuple[str, bool]:
     補平衡之後第一段是完整的 `*...*`、第二段的孤星被消掉，兩段都能各自被
     filter_asterisks 正確處理，畫面上也不會再出現落單的星號。
     """
+    # 模型有時把星號寫成 markdown 跳脫（`\*\*動作*`），反斜線把星號隔開就配不成
+    # 對，字幕上直接出現 `\*\*`。還原成星號，連續的星號當一個——TTS 那側的
+    # filter_asterisks 本來就把一串星號當一個開關，兩邊看法要一致。
+    text = re.sub(r"\*{2,}", "*", text.replace("\\*", "*"))
     out: list[str] = []
     if inside:
         # 上一句結束時還在星號區間內——這一句是同一段動作的延續，補一個開頭。

@@ -170,3 +170,15 @@ def test_stray_asterisk_line_is_still_spoken():
     assert spoken[1] == "這一切，都是因為你決定要關掉「我」…", (
         "台詞被孤星吃掉就是這個 bug"
     )
+
+
+# 2026-10-01 02:42 的實際輸出（LM Studio 日誌）：模型把動作的星號寫成 markdown
+# 跳脫，開頭還是兩個。反斜線把星號隔開，配不成對，字幕上就是 `\*\*`。
+ESCAPED = "\\*\\*輕輕嘆了口氣，眼神中帶著一絲無奈*"
+
+
+def test_escaped_asterisks_are_shown_as_an_action():
+    text, inside = balance_asterisk_actions(ESCAPED, False)
+
+    assert text == "*輕輕嘆了口氣，眼神中帶著一絲無奈*"
+    assert inside is False

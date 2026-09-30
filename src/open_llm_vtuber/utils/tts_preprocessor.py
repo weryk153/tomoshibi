@@ -261,6 +261,9 @@ def filter_asterisks(text: str, state: "TTSFilterState") -> str:
     """
     if not text:
         return text
+    # 模型有時把星號寫成 markdown 跳脫（`\*`）。不還原的話反斜線把星號隔開，
+    # 動作描述會被唸出來。
+    text = text.replace("\\*", "*")
     if "*" not in text and not state.in_asterisk:
         # Nothing to filter and nothing left open from a previous fragment -
         # return the text untouched (no whitespace collapsing) so plain text
