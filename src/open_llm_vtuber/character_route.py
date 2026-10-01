@@ -391,6 +391,62 @@ def _build_character_config(
     return cc
 
 
+# 角色表單擁有的欄位（_build_character_config 會寫的那些）。其餘欄位表單看不到，
+# 只能照原樣留著。
+_FORM_OWNED = (
+    ("conf_name",),
+    ("conf_uid",),
+    ("live2d_model_name",),
+    ("persona_prompt",),
+    ("character_name",),
+    ("avatar",),
+    ("reply_language",),
+    ("tts_config", "tts_model"),
+    ("tts_config", "edge_tts", "voice"),
+    ("tts_config", "gpt_sovits_tts", "text_lang"),
+    ("tts_config", "gpt_sovits_tts", "ref_audio_path"),
+    ("tts_config", "gpt_sovits_tts", "prompt_text"),
+    ("tts_config", "gpt_sovits_tts", "prompt_lang"),
+)
+
+
+def _keep_what_the_form_does_not_own(existing: dict, from_form: dict) -> dict:
+    """表單的那幾欄照表單；表單沒有的欄位照磁碟上的原樣。
+
+    以前更新是用表單那幾欄整份重寫：protected_names、角色自己關掉的長期記憶、
+    字幕翻譯、gpt_sovits 的 api_url……存一次就全沒了，畫面上沒有任何警告。
+    """
+    import copy
+
+    def merge(base: dict, top: dict) -> dict:
+        for key, value in top.items():
+            if isinstance(value, dict) and isinstance(base.get(key), dict):
+                merge(base[key], value)
+            else:
+                base[key] = value
+        return base
+
+    def prune(node: dict) -> None:
+        for key in list(node):
+            if isinstance(node[key], dict):
+                prune(node[key])
+                if not node[key]:
+                    del node[key]
+
+    result = copy.deepcopy(existing)
+    for path in _FORM_OWNED:
+        node = result
+        for key in path[:-1]:
+            node = node.get(key) if isinstance(node, dict) else None
+            if not isinstance(node, dict):
+                break
+        else:
+            node.pop(path[-1], None)
+    merge(result, copy.deepcopy(from_form))
+    prune(result)
+    return result
+
+
 def _write_character_yaml(path: str, character_config: dict) -> None:
     """把角色設定寫成一個角色檔（原子寫入）。
 
@@ -1154,6 +1210,7 @@ def init_character_route() -> APIRouter:
                 .get("prompt_lang")
             ),
         )
+        cc = _keep_what_the_form_does_not_own(existing_cc, cc)
         try:
             await asyncio.to_thread(_write_character_yaml, path, cc)
         except Exception as e:
