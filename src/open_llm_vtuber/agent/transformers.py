@@ -12,6 +12,82 @@ from loguru import logger
 import re
 
 
+# 動作描寫裡，標點後面緊接著兩個星號：模型把同一段動作打成 `*A，**B*`。
+_ACTION_PAUSES = "，、,；;：:"
+_QUOTE_PAIRS = {"」": "「", "』": "『"}
+
+
+class MarkTidier:
+    """把模型多打的符號收掉，可以一段一段餵（串流）。
+
+    2026-10-01 兩個情境實測，212 則回覆裡 84 則有 `*忍不住縮成一團，**有點抖*`：
+    同一段動作在逗號後面多打兩個星號。照原樣，字幕多出 `*`，TTS 把後半段當台詞
+    唸出來。另有 11 則把「」當說話的引號卻漏了第一個開引號（`……啊！」*動作*  「……`），
+    畫面上是一個沒頭的 `」`。
+
+    - 動作裡、標點後面的一串星號拿掉（動作沒結束）；其他地方一串星號當一個。
+    - 前面沒有對應開引號的 `」`／`』` 拿掉。
+    """
+
+    def __init__(self) -> None:
+        self._inside = False
+        self._stars = 0
+        self._previous = ""
+        self._open = {opening: 0 for opening in _QUOTE_PAIRS.values()}
+
+    def feed(self, text: str) -> str:
+        out = []
+        for char in text:
+            if char == "*":
+                self._stars += 1
+                continue
+            out.append(self._settle_stars())
+            if char in self._open:
+                self._open[char] += 1
+            elif char in _QUOTE_PAIRS:
+                opening = _QUOTE_PAIRS[char]
+                if not self._open[opening]:
+                    continue
+                self._open[opening] -= 1
+            out.append(char)
+            self._previous = char
+        return "".join(out)
+
+    def finish(self) -> str:
+        return self._settle_stars()
+
+    def _settle_stars(self) -> str:
+        stars, self._stars = self._stars, 0
+        if not stars:
+            return ""
+        if self._inside and stars >= 2 and self._previous in _ACTION_PAUSES:
+            return ""
+        self._inside = not self._inside
+        self._previous = "*"
+        return "*"
+
+
+def tidy_marks(text: str) -> str:
+    """MarkTidier 的整段版：給已經拿到全文的人（存進紀錄的那一份）。"""
+    tidier = MarkTidier()
+    return tidier.feed(text) + tidier.finish()
+
+
+async def _tidied(stream):
+    """斷句之前先收符號：斷句器會在逗號切開，`*A，` 與 `**B*` 就分到兩句了。"""
+    tidier = MarkTidier()
+    async for item in stream:
+        if isinstance(item, str):
+            text = tidier.feed(item)
+            if text:
+                yield text
+        else:
+            yield item
+    rest = tidier.finish()
+    if rest:
+        yield rest
+
+
 def sentence_divider(
     faster_first_response: bool = True,
     segment_method: str = "pysbd",
@@ -42,7 +118,7 @@ def sentence_divider(
                 segment_method=segment_method,
                 valid_tags=valid_tags or [],
             )
-            stream_from_func = func(*args, **kwargs)
+            stream_from_func = _tidied(func(*args, **kwargs))
 
             # Process the mixed stream using the updated SentenceDivider
             async for item in divider.process_stream(stream_from_func):
