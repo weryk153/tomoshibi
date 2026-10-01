@@ -26,6 +26,7 @@ def test_defaults_match_what_was_measured_on_a_local_model():
     assert config.model_dump() == {
         "emotion_every": 1,
         "memory_every": 2,
+        "self_memory_every": 2,
         "summary_every": 0,
         "reflection_every": 6,
         "goal_every": 4,
@@ -36,6 +37,9 @@ def test_defaults_match_what_was_measured_on_a_local_model():
         "thoughts_shown": 2,
         "foreground_patience_seconds": 120.0,
         "max_history_messages": 80,
+        "background_base_url": "",
+        "background_model": "",
+        "background_api_key": "",
     }
 
 

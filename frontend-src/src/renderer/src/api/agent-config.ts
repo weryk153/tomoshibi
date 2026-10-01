@@ -72,9 +72,14 @@ export interface EngineSettings {
   reflection_every: number
   goals_shown: number
   thoughts_shown: number
+  // 背景工作另外用的端點與模型；空字串就是跟她講話用同一顆。
+  background_base_url: string
+  background_model: string
 }
 
-export type EngineSettingsChange = Partial<Pick<EngineSettings, 'enabled' | EngineEvery>>
+export type EngineSettingsChange = Partial<
+  Pick<EngineSettings, 'enabled' | EngineEvery | 'background_base_url' | 'background_model'>
+>
 
 interface EngineSaveResponse extends Omit<EngineSettings, 'available' | 'reason'> {
   ok: true

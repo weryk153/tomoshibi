@@ -143,6 +143,8 @@ function General({ onCancel }: GeneralProps): JSX.Element {
   const [engineError, setEngineError] = useState<string | null>(null);
   const [engineSaving, setEngineSaving] = useState(false);
   const [everyDrafts, setEveryDrafts] = useState<Record<EngineEvery, string> | null>(null);
+  // 背景工作另外用的模型：兩欄一起套用，填一半的話後端不會用。
+  const [backgroundDraft, setBackgroundDraft] = useState<{ url: string; model: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -159,6 +161,10 @@ function General({ onCancel }: GeneralProps): JSX.Element {
           reflection_every: String(result.data.reflection_every),
           goals_shown: String(result.data.goals_shown),
           thoughts_shown: String(result.data.thoughts_shown),
+        });
+        setBackgroundDraft({
+          url: result.data.background_base_url,
+          model: result.data.background_model,
         });
       } else {
         setEngineError(result.error);
@@ -189,6 +195,34 @@ function General({ onCancel }: GeneralProps): JSX.Element {
       setEngineError(result.error);
     }
   }, [baseUrl, engine, t]);
+
+  const handleBackgroundApply = useCallback(async () => {
+    if (!backgroundDraft) return;
+    const url = backgroundDraft.url.trim();
+    const model = backgroundDraft.model.trim();
+    setEngineSaving(true);
+    setEngineError(null);
+    const result = await saveEngineSettings(baseUrl, {
+      background_base_url: url,
+      background_model: model,
+    });
+    setEngineSaving(false);
+    if (!result.ok) {
+      setEngineError(result.error);
+      return;
+    }
+    setEngine((current) => (current ? { ...current, ...result.data } : current));
+    // 後端不寫它認為會弄壞設定檔的值（不是 http 網址、含引號或換行）。
+    if (result.data.background_base_url !== url || result.data.background_model !== model) {
+      setEngineError(t("settings.general.engineBackgroundInvalid"));
+      return;
+    }
+    toaster.create({
+      title: t("settings.general.engineSaved"),
+      type: "success",
+      duration: 3000,
+    });
+  }, [backgroundDraft, baseUrl, t]);
 
   useEffect(() => {
     if (!engine || !everyDrafts) return undefined;
@@ -503,6 +537,38 @@ function General({ onCancel }: GeneralProps): JSX.Element {
                 onChange={(value) => setEveryDrafts((current) => (current ? { ...current, [key]: value } : current))}
               />
             ))}
+            {backgroundDraft && (
+              <Stack gap={1}>
+                <Text fontSize="xs" color="whiteAlpha.600">
+                  {t("settings.general.engineBackgroundHelp")}
+                </Text>
+                <InputField
+                  label={t("settings.general.engineBackgroundUrl")}
+                  value={backgroundDraft.url}
+                  onChange={(value) => setBackgroundDraft((current) => (current ? { ...current, url: value } : current))}
+                  placeholder="http://127.0.0.1:1235/v1"
+                />
+                <InputField
+                  label={t("settings.general.engineBackgroundModel")}
+                  value={backgroundDraft.model}
+                  onChange={(value) => setBackgroundDraft((current) => (current ? { ...current, model: value } : current))}
+                  placeholder="qwen/qwen3.5-9b"
+                />
+                <Button
+                  size="xs"
+                  tone="blue"
+                  className="self-start"
+                  disabled={
+                    engineSaving
+                    || (backgroundDraft.url.trim() === engine.background_base_url
+                      && backgroundDraft.model.trim() === engine.background_model)
+                  }
+                  onClick={handleBackgroundApply}
+                >
+                  {t("common.apply")}
+                </Button>
+              </Stack>
+            )}
           </Stack>
         )}
         {engineError && (

@@ -104,6 +104,9 @@ character_config:
         reflection_every: 6
         goal_every: 4
         timeout_seconds: 60 # per background job
+        # Background jobs on another model, e.g. LM Studio on another computer; both empty = the model she talks with.
+        background_base_url: ''
+        background_model: ''
         max_rebase_turns: 3 # a result this many turns late is still used
         goal_max_age_days: 7 # goals untouched for this long leave the prompt
         goals_shown: 3 # how many goals (the most pressing) she keeps in mind

@@ -47,6 +47,8 @@ def test_reading_gives_the_choice_and_the_numbers():
         "reflection_every": 6,
         "goals_shown": 3,
         "thoughts_shown": 2,
+        "background_base_url": "",
+        "background_model": "",
     }
 
 
@@ -101,6 +103,8 @@ def test_a_conf_without_the_engine_block_gets_one(conf_file):
         "reflection_every": 6,
         "goals_shown": 3,
         "thoughts_shown": 2,
+        "background_base_url": "",
+        "background_model": "",
     }
 
 
@@ -173,3 +177,52 @@ def test_switching_on_is_refused_while_the_engine_cannot_be_used(monkeypatch):
     assert response.status_code == 400
     assert response.json()["error"] == "no engine"
     assert route.read_engine_settings()["enabled"] is False
+
+
+def test_the_background_model_is_written_and_read_back(conf_file):
+    route.write_engine_settings(
+        {
+            "background_base_url": " http://127.0.0.1:1235/v1 ",
+            "background_model": "qwen/qwen3.5-9b",
+        }
+    )
+
+    settings = route.read_engine_settings()
+    text = conf_file.read_text(encoding="utf-8")
+
+    assert settings["background_base_url"] == "http://127.0.0.1:1235/v1"
+    assert settings["background_model"] == "qwen/qwen3.5-9b"
+    assert "        background_base_url: 'http://127.0.0.1:1235/v1'\n" in text
+    # 清空就是回到跟她講話同一顆。
+    route.write_engine_settings({"background_base_url": "", "background_model": ""})
+    assert route.read_engine_settings()["background_model"] == ""
+
+
+def test_a_background_address_that_would_break_the_file_is_ignored(conf_file):
+    before = conf_file.read_text(encoding="utf-8")
+
+    route.write_engine_settings(
+        {
+            "background_base_url": "127.0.0.1:1235",  # 不是網址
+            "background_model": "x'\nmalicious: 1",  # 會弄壞 YAML
+        }
+    )
+
+    assert conf_file.read_text(encoding="utf-8") == before
+
+
+def test_what_the_settings_page_writes_reaches_the_engine():
+    """設定檔要先過 config_manager 的模型，它不認得的欄位會被靜靜丟掉：self_memory_every
+    加進設定頁之後，實際上從來沒傳到引擎。"""
+    from src.open_llm_vtuber.config_manager.agent import CharacterEngineAgentConfig
+
+    dumped = CharacterEngineAgentConfig(
+        self_memory_every=3,
+        background_base_url="http://127.0.0.1:1235/v1",
+        background_model="qwen/qwen3.5-9b",
+    ).model_dump()
+
+    for key in (*route.EVERY_KEYS, *route.TEXT_KEYS):
+        assert key in dumped, key
+    assert dumped["self_memory_every"] == 3
+    assert dumped["background_model"] == "qwen/qwen3.5-9b"

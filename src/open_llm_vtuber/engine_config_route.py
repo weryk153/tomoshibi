@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import re
 import sys
 from typing import Any
 
@@ -53,6 +54,10 @@ EVERY_DEFAULTS = {
     "thoughts_shown": 2,
 }
 EVERY_MAX = 99
+# 背景工作（情緒、記憶、目標…）另外用的端點與模型。空字串就是跟她講話用同一顆。
+TEXT_KEYS = ("background_base_url", "background_model")
+TEXT_MAX = 300
+_URL = re.compile(r"^https?://[^\s'\"#]+$")
 
 
 def _load_conf() -> Any:
@@ -74,7 +79,21 @@ def read_engine_settings() -> dict:
     }
     for key in EVERY_KEYS:
         settings[key] = _clamp(block.get(key), EVERY_DEFAULTS[key])
+    for key in TEXT_KEYS:
+        settings[key] = str(block.get(key) or "")
     return settings
+
+
+def _clean_text(key: str, value: Any) -> str | None:
+    """寫進 YAML 前先確認不會弄壞檔案；不合格就回 None，那一項不寫。"""
+    if not isinstance(value, str):
+        return None
+    value = value.strip()
+    if len(value) > TEXT_MAX or any(ch in value for ch in "\n\r'\"#"):
+        return None
+    if key == "background_base_url" and value and not _URL.match(value):
+        return None
+    return value
 
 
 def _clamp(value: Any, fallback: int) -> int:
@@ -117,6 +136,9 @@ def apply_engine_settings(lines: list[str], changes: dict) -> None:
                 numbers[key] = str(_clamp(int(changes[key]), EVERY_DEFAULTS[key]))
             except (TypeError, ValueError):
                 continue
+    for key in TEXT_KEYS:
+        if key in changes and (value := _clean_text(key, changes[key])) is not None:
+            numbers[key] = f"'{value}'"
     if numbers:
         settings_start, settings_end = block_extent(
             lines, "agent_settings", start_from=agent_start
@@ -181,7 +203,9 @@ def init_engine_config_route() -> APIRouter:
         body, bad = await _parse_body(request)
         if bad:
             return bad
-        changes = {k: body[k] for k in ("enabled", *EVERY_KEYS) if k in body}
+        changes = {
+            k: body[k] for k in ("enabled", *EVERY_KEYS, *TEXT_KEYS) if k in body
+        }
         if changes.get("enabled"):
             available, reason = engine_availability()
             if not available:

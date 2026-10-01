@@ -97,6 +97,9 @@ character_config:
         reflection_every: 6
         goal_every: 4
         timeout_seconds: 60 # 每个背景工作的超时秒数
+        # 后台工作改用另一个模型，例如另一台电脑上的 LM Studio；两个都留空就跟她说话用同一个。
+        background_base_url: ''
+        background_model: ''
         max_rebase_turns: 3 # 背景结果落后几轮以内仍然采用
         goal_max_age_days: 7 # 超过几天没更新的目标不再写进提示
         goals_shown: 3 # 她同时放在心上的目标最多几条（最急的优先）

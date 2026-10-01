@@ -65,6 +65,8 @@ TOO_OLD = (
     "做法：在專案目錄執行 uv sync 換回 pyproject.toml 釘的那一版，或把 conf.yaml 的 "
     "conversation_agent_choice 改回 basic_memory_agent。"
 )
+# 背景工作（情緒、記憶、目標…）另外用的端點。不是引擎的設定，先從設定裡拿出來。
+BACKGROUND_KEYS = ("background_base_url", "background_model", "background_api_key")
 # conf.yaml 裡的名字 → 引擎的名字
 _RENAMED_SETTINGS = {
     "timeout_seconds": "call_timeout_seconds",
@@ -104,8 +106,16 @@ def _vision(provider: str, llm_config: Mapping[str, Any], thinking_options: dict
     )
 
 
-def _clients(provider: str, llm_config: Mapping[str, Any]) -> tuple:
-    """(她講話用的, 背景認知用的, 看圖用的)。同一個端點、同一顆模型，設定不同。"""
+def _clients(
+    provider: str,
+    llm_config: Mapping[str, Any],
+    background: Optional[Mapping[str, Any]] = None,
+) -> tuple:
+    """(她講話用的, 背景認知用的, 看圖用的)。預設同一個端點、同一顆模型，設定不同。
+
+    background 有網址也有模型時，背景認知改用那一個（例如另一台電腦上的模型）：
+    她講話時就不用跟背景工作搶同一顆。只填一半就不用，免得拿半套設定去連。
+    """
     base_url = str(llm_config.get("base_url") or "").strip()
     model = str(llm_config.get("model") or "").strip()
     if provider == "claude_llm" or not base_url or not model:
@@ -128,12 +138,23 @@ def _clients(provider: str, llm_config: Mapping[str, Any]) -> tuple:
         "api_key": str(llm_config.get("llm_api_key") or "") or None,
         "backend": provider,
     }
+    elsewhere = dict(shared)
+    background = background or {}
+    base = str(background.get("background_base_url") or "").strip()
+    other = str(background.get("background_model") or "").strip()
+    if base and other:
+        elsewhere.update(
+            base_url=base,
+            model=other,
+            api_key=str(background.get("background_api_key") or "")
+            or shared["api_key"],
+        )
     return (
         _engine_client(
             **shared, timeout_seconds=REPLY_TIMEOUT_SECONDS, request_options=talking
         ),
         # 逾時由引擎的背景排程自己管。
-        _engine_client(**shared, timeout_seconds=None, request_options=thinking),
+        _engine_client(**elsewhere, timeout_seconds=None, request_options=thinking),
         _vision(provider, llm_config, thinking),
     )
 
@@ -262,6 +283,10 @@ def build_companion(
     if not hasattr(engine_companion, "SELF_MEMORY_LINE"):
         raise RuntimeError(TOO_OLD)
 
+    settings = dict(settings or {})
+    background = {
+        name: settings.pop(name) for name in BACKGROUND_KEYS if name in settings
+    }
     directory = storage_dir(conf_uid)
     key = str(directory.resolve())
     window = detect_context_window(
@@ -281,7 +306,8 @@ def build_companion(
                     "extra_body",
                 )
             },
-            "settings": dict(settings or {}),
+            "settings": settings,
+            "background": background,
             "language": language,
         },
         sort_keys=True,
@@ -293,7 +319,7 @@ def build_companion(
         _fit_the_window(live)
         return key
 
-    talking, thinking, eyes = _clients(provider, llm_config)
+    talking, thinking, eyes = _clients(provider, llm_config, background)
     if live:
         _let_go(live.companion)
     _LIVE[key] = _Live(
@@ -311,7 +337,7 @@ def build_companion(
                     "language": language,
                     **{
                         _RENAMED_SETTINGS.get(name, name): value
-                        for name, value in dict(settings or {}).items()
+                        for name, value in settings.items()
                     },
                 }
             ),
