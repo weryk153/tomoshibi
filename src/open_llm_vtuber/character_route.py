@@ -33,6 +33,7 @@ from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse
 from loguru import logger
 
+from . import character_settings
 from .default_personas import swap_for_model_change
 from .api_guard import (
     forbidden as _forbidden,
@@ -321,6 +322,18 @@ def _read_character_fields(path: str, *, is_base: bool) -> Optional[dict]:
         # 無條件寫成 edge_tts——使用者在角色面板存一次檔，訓練好的音色就被打回
         # 內建語音，畫面上沒有任何線索。讀得到才寫得回去。
         "tts_model": _dig(cc, "tts_config", "tts_model", default=""),
+        # 這兩個開關由 /api/characters/{filename}/settings 寫。開機升級後每個角色
+        # 檔都有自己的值，所以讀檔案本身就是實際值。
+        "translate_subtitle": bool(
+            _dig(
+                cc,
+                "tts_preprocessor_config",
+                "translator_config",
+                "translate_subtitle",
+                default=False,
+            )
+        ),
+        "long_term_memory_enabled": bool(cc.get("long_term_memory_enabled", True)),
     }
 
 
@@ -990,6 +1003,58 @@ def init_character_route() -> APIRouter:
             )
         logger.info(f"background uploaded: {filename} ({len(raw)} bytes)")
         return JSONResponse({"ok": True, "filename": filename})
+
+    @router.get("/api/characters/{filename}/settings")
+    async def read_character_settings(filename: str, request: Request):
+        if not _is_local_request(request):
+            return _forbidden()
+        if character_settings.file_for(filename) is None:
+            return JSONResponse(
+                status_code=404, content={"ok": False, "error": "Character not found."}
+            )
+        values = await asyncio.to_thread(character_settings.effective, filename)
+        return JSONResponse(
+            {"ok": True, "settings": {k: values[k] for k in character_settings.TOGGLES}}
+        )
+
+    @router.post("/api/characters/{filename}/settings")
+    async def save_character_settings(filename: str, request: Request):
+        if not _is_local_request(request):
+            return _forbidden()
+        if character_settings.file_for(filename) is None:
+            return JSONResponse(
+                status_code=404, content={"ok": False, "error": "Character not found."}
+            )
+        try:
+            body = await request.json()
+        except Exception:
+            return _bad_request("Invalid JSON body.")
+        if not isinstance(body, dict) or not body:
+            return _bad_request("Send at least one setting.")
+        unknown = set(body) - set(character_settings.TOGGLES)
+        if unknown or not all(isinstance(v, bool) for v in body.values()):
+            return _bad_request(
+                "Only translate_subtitle and long_term_memory_enabled, as true/false."
+            )
+        try:
+            await asyncio.to_thread(character_settings.write, filename, body)
+            values = await asyncio.to_thread(character_settings.effective, filename)
+        except Exception as e:
+            logger.error(
+                f"character settings write failed ({filename}): {type(e).__name__}"
+            )
+            return JSONResponse(
+                status_code=500,
+                content={"ok": False, "error": "Could not write character file."},
+            )
+        return JSONResponse(
+            {
+                "ok": True,
+                "settings": {k: values[k] for k in character_settings.TOGGLES},
+                # 正在用的角色要重新載入設定才生效；子專案 3 的提示列會用到。
+                "reload_required": True,
+            }
+        )
 
     # ------------------------------------------------------------------ #
     @router.put("/api/characters/{filename}")
