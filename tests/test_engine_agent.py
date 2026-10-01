@@ -366,6 +366,8 @@ def test_a_picture_that_cannot_be_read_does_not_cost_the_turn(tmp_path):
 
 
 def test_a_loaded_conversation_is_continued_and_owns_its_memory(tmp_path, monkeypatch):
+    # 搬舊記憶的記號寫在 chat_history/<conf_uid>/engine/：不換目錄的話寫進真的那份。
+    monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         agent_module,
         "get_history",
@@ -396,6 +398,7 @@ def test_a_conversation_the_engine_has_not_seen_is_taken_from_the_hosts_record(
 ):
     """設定一存，引擎那一側可能換了一個，而 agent 不會再被告知一次目前是哪段對話。
     主機在每一輪開頭就把使用者的話寫進紀錄了，所以最後那句不能再算一次。"""
+    monkeypatch.chdir(tmp_path)
     asked = []
 
     def history(conf_uid, history_uid):
