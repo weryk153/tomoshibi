@@ -78,7 +78,7 @@ def test_writing_the_base_character_goes_to_conf_yaml(tmp_path, monkeypatch):
     setup(tmp_path, monkeypatch)
     character_settings.write("conf.yaml", {"long_term_memory_enabled": False})
     text = (tmp_path / "conf.yaml").read_text(encoding="utf-8")
-    assert "long_term_memory_enabled: false" in text
+    assert "long_term_memory_enabled: False" in text
     assert "# 預設引擎" in text
 
 
@@ -121,3 +121,41 @@ def test_settings_endpoint_rejects_bad_input(tmp_path, monkeypatch):
         "/api/characters/..%2Fconf.yaml/settings", json={"translate_subtitle": True}
     ).status_code in (400, 404)
     assert (tmp_path / "characters" / "kurisu.yaml").read_text("utf-8") == before
+
+
+CONF_WITH_SECTIONS = """\
+system_config:
+  player_language: 'zh-TW'
+character_config:
+  conf_uid: 'base_uid'
+  tts_preprocessor_config:
+    translator_config:
+      translate_audio: True # 註解
+      translate_subtitle: False
+
+  # 直播平台集成
+live_config:
+  enabled: False
+"""
+
+
+def test_writing_the_base_character_changes_only_its_own_lines(tmp_path, monkeypatch):
+    """conf.yaml 是使用者手寫的主設定：只改（或插入）那一行，其餘逐字不動。
+    整份 round-trip 會把下一段的標題註解黏到新欄位上，還把 True 改寫成 true。"""
+    setup(tmp_path, monkeypatch)
+    (tmp_path / "conf.yaml").write_text(CONF_WITH_SECTIONS, encoding="utf-8")
+
+    character_settings.write(
+        "conf.yaml", {"long_term_memory_enabled": False, "translate_subtitle": True}
+    )
+
+    after = (tmp_path / "conf.yaml").read_text(encoding="utf-8").splitlines()
+    before = CONF_WITH_SECTIONS.splitlines()
+    assert "      translate_audio: True # 註解" in after
+    assert "      translate_subtitle: True" in after
+    assert "  long_term_memory_enabled: False" in after
+    assert after.index("  # 直播平台集成") == after.index("live_config:") - 1
+    assert len(after) == len(before) + 1
+    assert (
+        character_settings.effective("conf.yaml")["long_term_memory_enabled"] is False
+    )

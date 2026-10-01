@@ -496,8 +496,9 @@ def _write_character_yaml(path: str, character_config: dict) -> None:
 def _set_or_clear(container: dict, key: str, value: Optional[str]) -> None:
     """三態語意：None＝這次沒要改，空字串＝明確清掉，有值＝設定。
 
-    「清掉」這一態不能省。沒有它，使用者設過一次語言之後就再也回不去「沿用
-    全域預設」——那個設定會變成單向的門。
+    「清掉」用在底稿角色（conf.yaml）：回覆語言清掉就改用「你看的語言」，引擎
+    與參考音清掉就回到程式預設。其他角色清掉的欄位會在存檔當下補成底稿角色現在
+    的值（own_everything）。
     """
     if value is None:
         return
@@ -1287,6 +1288,16 @@ def init_character_route() -> APIRouter:
             ),
         )
         cc = _keep_what_the_form_does_not_own(existing_cc, cc)
+        # 表單選「跟底稿角色一樣」（送空字串）會把那一欄拿掉。當下就補成底稿現在的
+        # 值：每個角色自己存一份，不再沿用底稿（跟開機升級同一條規則）。
+        from .conf_upgrade import own_everything
+
+        base = read_yaml(CONF_PATH) or {}
+        own_everything(
+            cc,
+            base.get("character_config") or {},
+            str((base.get("system_config") or {}).get("player_language") or ""),
+        )
         try:
             await asyncio.to_thread(_write_character_yaml, path, cc)
         except Exception as e:

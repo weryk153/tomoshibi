@@ -349,7 +349,7 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         body, bad = await _parse_body(request)
         if bad:
             return bad
-        if "enabled" not in body:
+        if not isinstance(body.get("enabled"), bool):
             return _error(400, "Missing 'enabled' boolean.")
 
         # 開關是這個角色自己的：寫進她的角色檔（底稿角色寫 conf.yaml）。

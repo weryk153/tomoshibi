@@ -51,3 +51,14 @@ def test_an_unknown_character_is_404(tmp_path, monkeypatch):
     client = http(tmp_path, monkeypatch)
     r = client.post("/api/memory/toggle", json={"conf_uid": "nobody", "enabled": False})
     assert r.status_code == 404
+
+
+def test_the_switch_refuses_anything_but_true_or_false(tmp_path, monkeypatch):
+    """送字串 "false" 以前會被 bool() 當成 True，寫進去的是相反的值。"""
+    client = http(tmp_path, monkeypatch)
+    before = (tmp_path / "characters" / "kurisu.yaml").read_text("utf-8")
+    r = client.post(
+        "/api/memory/toggle", json={"conf_uid": "kurisu", "enabled": "false"}
+    )
+    assert r.status_code == 400
+    assert (tmp_path / "characters" / "kurisu.yaml").read_text("utf-8") == before

@@ -166,3 +166,34 @@ def test_a_new_character_owns_everything_from_the_start(tmp_path, monkeypatch):
         is False
     )
     assert own["reply_language"] == "Traditional Chinese (Taiwan)"
+
+
+def test_choosing_same_as_base_on_the_form_saves_the_value_now(tmp_path, monkeypatch):
+    """表單選「跟底稿角色一樣」（送空字串）時當下就存成底稿現在的值，不是留空等
+    下次開機才補——那樣中間這段時間改底稿會連帶改到她，重開後又固定住，前後不一。"""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from src.open_llm_vtuber import character_route
+
+    setup(tmp_path, monkeypatch)
+    monkeypatch.setattr(character_route, "CONF_PATH", "conf.yaml")
+    monkeypatch.setattr(character_route, "_is_local_request", lambda r: True)
+    monkeypatch.setattr(character_route, "_rescan_skins", lambda: None)
+    monkeypatch.setattr(character_route, "_load_model_dict", lambda: [{"name": "mao"}])
+    app = FastAPI()
+    app.include_router(character_route.init_character_route())
+    r = TestClient(app).put(
+        "/api/characters/kurisu.yaml",
+        json={
+            "conf_name": "紅莉栖",
+            "persona_prompt": "你是紅莉栖。",
+            "live2d_model_name": "mao",
+            "tts_model": "",
+            "reply_language": "",
+        },
+    )
+    assert r.status_code == 200, r.text
+    own = character_settings._load("characters/kurisu.yaml")["character_config"]
+    assert own["tts_config"]["tts_model"] == "edge_tts"
+    assert own["reply_language"] == "Traditional Chinese (Taiwan)"

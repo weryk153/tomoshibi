@@ -10,7 +10,7 @@ import os
 from typing import Any, Optional
 
 from .api_guard import make_yaml
-from .conf_editor import CONF_PATH, write_conf_document
+from .conf_editor import CONF_PATH
 
 OWNED: dict[str, tuple[str, ...]] = {
     "tts_model": ("tts_config", "tts_model"),
@@ -90,17 +90,70 @@ def _set(node: dict, path: tuple[str, ...], value: Any) -> None:
     node[path[-1]] = value
 
 
+def _render(value: Any) -> str:
+    if isinstance(value, bool):
+        return str(value)
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _write_conf_lines(changes: dict[str, Any]) -> None:
+    """conf.yaml 逐行改：只動（或插入）那幾行，註解與 True／False 的寫法原樣留著。
+
+    整份 round-trip 重寫會把下一段的標題註解黏到新插入的欄位上，還會把整個檔案的
+    True 改寫成 true——那是使用者滿是註解的主設定。
+    """
+    from .conf_editor import (
+        character_config_extent,
+        nested_extent,
+        read_conf_lines,
+        upsert_leaf,
+        upsert_nested_block,
+        write_conf,
+    )
+
+    lines = read_conf_lines()
+    for name, value in changes.items():
+        path = OWNED[name]
+        parent, leaf = path[:-1], path[-1]
+        try:
+            if parent:
+                start, end = nested_extent(lines, "character_config", *parent)
+            else:
+                start, end = character_config_extent(lines)
+            upsert_leaf(lines, start, end, leaf, _render(value))
+        except KeyError:
+            if not parent:
+                raise
+            try:
+                # 只少最後一層（例如沒有 translator_config）：補在上一層底下。
+                start, end = nested_extent(lines, "character_config", *parent[:-1])
+            except KeyError:
+                # 少不只一層：很少見，退回整份 round-trip（註解位置可能會動，但值對）。
+                return _write_document(CONF_PATH, changes, is_conf=True)
+            upsert_nested_block(lines, start, end, parent[-1], {leaf: _render(value)})
+    write_conf(lines)
+
+
 def write(filename: str, changes: dict[str, Any]) -> None:
     path = file_for(filename)
     if path is None:
         raise FileNotFoundError(filename)
+    if filename == "conf.yaml":
+        _write_conf_lines(changes)
+        return
+    _write_document(path, changes, is_conf=False)
+
+
+def _write_document(path: str, changes: dict[str, Any], *, is_conf: bool) -> None:
+    from .conf_editor import write_conf_document
+
     yaml = make_yaml()
     yaml.allow_unicode = True
     data = _load(path)
     cc = data.setdefault("character_config", {})
     for name, value in changes.items():
         _set(cc, OWNED[name], value)
-    if filename == "conf.yaml":
+    if is_conf:
         write_conf_document(lambda f: yaml.dump(data, f))
         return
     tmp = os.path.join(os.path.dirname(path), "." + os.path.basename(path) + ".tmp")

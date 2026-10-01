@@ -19,7 +19,6 @@ from .conf_editor import (
     rewrite_str_leaf,
     sub_block_extent,
     write_conf,
-    write_conf_document,
 )
 
 # 舊 agent 專屬、引擎 agent 不讀的 character_config 葉節點。
@@ -156,8 +155,11 @@ def upgrade_character_files(directory: str = "characters") -> dict[str, list[str
     results: dict[str, list[str]] = {}
 
     if "reply_language" not in base_cc and player_language:
+        from .character_settings import write
+
         base_cc["reply_language"] = player_language
-        write_conf_document(lambda f: yaml.dump(base, f))
+        # 逐行插入：conf.yaml 滿是註解，整份重寫會把下一段的標題註解黏過來。
+        write("conf.yaml", {"reply_language": player_language})
         results["conf.yaml"] = ["補上底稿角色的 reply_language"]
         logger.info("[conf] upgraded conf.yaml: 補上底稿角色的 reply_language")
 
