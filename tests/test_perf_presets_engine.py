@@ -89,4 +89,8 @@ def test_the_presets_are_listed_from_light_to_high(conf, monkeypatch):
     monkeypatch.setattr(perf_route, "_is_local_request", lambda r: True)
     app = FastAPI()
     app.include_router(perf_route.init_perf_route())
-    assert TestClient(app).get("/api/perf").json()["presets"] == ["light", "standard", "high"]
+    assert TestClient(app).get("/api/perf").json()["presets"] == [
+        "light",
+        "standard",
+        "high",
+    ]
