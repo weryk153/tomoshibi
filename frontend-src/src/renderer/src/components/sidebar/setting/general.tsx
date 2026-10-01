@@ -175,27 +175,6 @@ function General({ onCancel }: GeneralProps): JSX.Element {
     };
   }, [baseUrl]);
 
-  const handleEngineToggle = useCallback(async (checked: boolean) => {
-    if (!engine) return;
-    const previous = engine;
-    setEngine({ ...engine, enabled: checked });
-    setEngineSaving(true);
-    setEngineError(null);
-    const result = await saveEngineSettings(baseUrl, { enabled: checked });
-    setEngineSaving(false);
-    if (result.ok) {
-      setEngine((current) => (current ? { ...current, enabled: result.data.enabled } : current));
-      toaster.create({
-        title: t("settings.general.engineSaved"),
-        type: "success",
-        duration: 3000,
-      });
-    } else {
-      setEngine(previous);
-      setEngineError(result.error);
-    }
-  }, [baseUrl, engine, t]);
-
   const handleBackgroundApply = useCallback(async () => {
     if (!backgroundDraft) return;
     const url = backgroundDraft.url.trim();
@@ -495,19 +474,10 @@ function General({ onCancel }: GeneralProps): JSX.Element {
           <Text fontSize="xs" color="red.300">{mcpError}</Text>
         )}
 
-        <SwitchField
-          label={t("settings.general.enableEngine")}
-          checked={Boolean(engine?.enabled)}
-          onChange={handleEngineToggle}
-          disabled={!engine || !engine.available || engineSaving}
-        />
-        <Text fontSize="xs" color="whiteAlpha.600">
-          {t("settings.general.enableEngineHelp")}
-        </Text>
         {engine && !engine.available && (
           <Text fontSize="xs" color="orange.300">{engine.reason}</Text>
         )}
-        {engine?.enabled && everyDrafts && (
+        {engine && everyDrafts && (
           <Stack gap={1} pl={2}>
             <Text fontSize="xs" color="whiteAlpha.600">
               {t("settings.general.engineEveryHelp")}

@@ -68,7 +68,7 @@ const TABS: SettingsTab[] = [
   { value: 'asr', labelKey: 'settings.tabs.asr', group: 'intelligence', render: ({ active }) => <ASR active={active} /> },
   { value: 'tts', labelKey: 'settings.tabs.tts', group: 'intelligence', render: ({ active }) => <TTS active={active} /> },
   { value: 'agent', labelKey: 'settings.tabs.agent', group: 'intelligence', render: () => <Agent /> },
-  { value: 'memory', labelKey: 'settings.tabs.memory', group: 'intelligence', render: ({ active }) => <Memory active={active} /> },
+  { value: 'memory', labelKey: 'settings.tabs.memory', group: 'intelligence', render: () => <Memory /> },
   { value: 'perf', labelKey: 'settings.tabs.perf', group: 'system', render: () => <Perf /> },
   { value: 'remoteAccess', labelKey: 'settings.remoteAccess.tab', group: 'system', render: ({ active }) => <RemoteAccess active={active} /> },
   { value: 'about', labelKey: 'settings.tabs.about', group: 'system', render: () => <About /> },

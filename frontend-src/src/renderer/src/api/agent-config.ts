@@ -1,6 +1,6 @@
 // MCP 開關的 typed wrapper。後端見 src/open_llm_vtuber/translator_route.py 的
 // GET/POST /api/agent-config/use-mcpp。設定葉是
-// character_config.agent_config.agent_settings.basic_memory_agent.use_mcpp
+// character_config.agent_config.agent_settings.conversation.use_mcpp
 // （use_mcpp = MCP Plus，即工具／網路搜尋），缺省為 false。
 //
 // 跟其他 api/*.ts（characters.ts／memory.ts／perf.ts／topics.ts）同一套慣例：
@@ -52,17 +52,16 @@ export async function setUseMcpp(
   }
 }
 
-// 「由 AI Character Engine 驅動對話」：後端見 src/open_llm_vtuber/engine_config_route.py
-// 的 GET/POST /api/agent-config/character-engine。跟 use_mcpp 同一種存法（直接寫
-// conf.yaml、要重啟），多了 available／reason：引擎裝不起來時開關是灰的，旁邊
-// 說明為什麼。
+// AI Character Engine 的背景工作節奏與背景模型：後端見
+// src/open_llm_vtuber/engine_config_route.py 的 GET/POST /api/agent-config/character-engine。
+// 跟 use_mcpp 同一種存法（直接寫 conf.yaml、要重啟），多了 available／reason：
+// 引擎裝不起來時旁邊說明為什麼。
 
 export type EngineEvery =
   | 'emotion_every' | 'memory_every' | 'self_memory_every' | 'goal_every' | 'reflection_every'
   | 'goals_shown' | 'thoughts_shown'
 
 export interface EngineSettings {
-  enabled: boolean
   available: boolean
   reason: string
   emotion_every: number
@@ -78,7 +77,7 @@ export interface EngineSettings {
 }
 
 export type EngineSettingsChange = Partial<
-  Pick<EngineSettings, 'enabled' | EngineEvery | 'background_base_url' | 'background_model'>
+  Pick<EngineSettings, EngineEvery | 'background_base_url' | 'background_model'>
 >
 
 interface EngineSaveResponse extends Omit<EngineSettings, 'available' | 'reason'> {
