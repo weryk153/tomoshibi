@@ -40,8 +40,7 @@ function hasAllowedBackgroundExtension(filename: string): boolean {
 }
 
 // 回傳穩定識別字串（不是寫死的中文句子），交給 UI 層自己用 t() 翻譯——本專案
-// 把「寫死的使用者可見字串」視為 Critical 缺陷（見 api/memory.ts 的
-// CONSOLIDATION_INVALID_INTERVAL_ERROR 檔頭說明，同一個理由）。先驗型別再驗
+// 把「寫死的使用者可見字串」視為 Critical 缺陷：要出五個語系。先驗型別再驗
 // 大小：型別錯比大小錯更根本，沒必要對一個型別就不對的檔案再報「太大」。
 export function validateBackgroundFile(file: File): BackgroundFileError | null {
   const mimeOk = (BACKGROUND_ALLOWED_TYPES as readonly string[]).includes(file.type)

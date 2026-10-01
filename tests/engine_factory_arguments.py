@@ -21,7 +21,7 @@ def factory_arguments(choice="character_engine_agent"):
     return {
         "conversation_agent_choice": choice,
         "agent_settings": {
-            "basic_memory_agent": {"llm_provider": "lmstudio_llm", "use_mcpp": False},
+            "conversation": {"llm_provider": "lmstudio_llm", "use_mcpp": False},
             "character_engine_agent": {},
         },
         "llm_configs": {

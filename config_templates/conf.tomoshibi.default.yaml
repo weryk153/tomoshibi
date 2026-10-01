@@ -42,9 +42,7 @@ character_config:
   # 留空＝這個角色沒有自畫像路線：使用者說「畫你自己」時會被當成一般場景送去
   # 另一顆模型，外貌由模型自由發揮（實測每次都不一樣），也不會過濾掉它亂加的
   # 髮色瞳色。原創角色沒有對應標籤的話，留空是正常的。
-  long_term_memory_enabled: True # 長期（核心）記憶：關閉後不整理、也不注入記憶到提示詞
-  core_memory_max_chars: 1500 # 核心記憶字數上限（500–8000）。越大越能記、但每輪 token 越多、整理更易遺漏
-  memory_consolidation_interval: 1 # 每幾輪整理一次核心記憶（1/3/5）。1=每輪（預設）；弱機/本地模型設 3 或 5 可少一半 LLM 呼叫
+  long_term_memory_enabled: True # 長期記憶：引擎記住你說過的事、她自己說過的事。關掉時引擎不抽取、不帶進對話
 
   # ============== 提示词 ==============
 
@@ -64,17 +62,15 @@ character_config:
   #  =================== LLM 后端设置 ===================
 
   agent_config:
-    conversation_agent_choice: 'basic_memory_agent' # 对话代理选择
+    conversation_agent_choice: 'character_engine_agent' # 对话代理选择
 
     agent_settings:
-      basic_memory_agent:
-        # 基础 AI 代理，没什么特别的。
-        # 从 llm_config 中选择一个 llm 提供商
-        # 并在相应的字段中设置所需的参数
-        # 例如：
-        # 'openai_compatible_llm', 'llama_cpp_llm', 'claude_llm', 'ollama_llm'
-        # 'openai_llm', 'gemini_llm', 'zhipu_llm', 'deepseek_llm', 'groq_llm'
-        # 'mistral_llm', 'lmstudio_llm' 之类的
+      conversation:
+        # 她說話用的模型與工具。
+        # 從 llm_config 中選一個 llm 提供商，並在對應的欄位設好參數。
+        # 必須是 OpenAI 相容的端點（有 base_url 與 model），例如：
+        # 'openai_compatible_llm', 'ollama_llm', 'lmstudio_llm', 'openai_llm',
+        # 'gemini_llm', 'zhipu_llm', 'deepseek_llm', 'groq_llm', 'mistral_llm'
         llm_provider: 'openai_compatible_llm' # 使用的 LLM 提供商
         # 是否在第一句回应时遇上逗号就直接生成音频以减少首句延迟（默认：True）
         faster_first_response: True
@@ -84,6 +80,29 @@ character_config:
         # 'Plus' 意味着它包含了通过 OpenAI API 调用工具的能力。
         use_mcpp: False
         mcp_enabled_servers: ["time", "ddg-search"] # 启用的 MCP 服务器
+
+      character_engine_agent:
+        # 整段對話由 AI Character Engine 驅動：對話、記憶、工具都在引擎裡，
+        # 她對你的感覺、接下來想做的事、注意到的事會隨互動累積。
+        # 見 docs/character-engine-agent.md。
+        # 模型、MCP、斷句沿用上面 conversation 的設定。
+        # 每種背景工作每幾輪跑一次；0 為停用。每一種都是一次額外的 LLM 呼叫，
+        # 機器慢的話把數字調大。
+        emotion_every: 1
+        memory_every: 2
+        self_memory_every: 2
+        summary_every: 0
+        reflection_every: 6
+        goal_every: 4
+        timeout_seconds: 60 # 每個背景工作的逾時秒數
+        # 背景工作改用另一顆模型，例如另一台電腦上的 LM Studio；兩個都留空就跟她說話用同一顆。
+        background_base_url: ''
+        background_model: ''
+        max_rebase_turns: 3 # 背景結果落後幾輪以內仍然採用
+        goal_max_age_days: 7 # 超過幾天沒更新的目標不再寫進提示
+        goals_shown: 3 # 她同時放在心上的目標最多幾條（最急的優先）
+        thoughts_shown: 2 # 她同時放在心上的想法最多幾條（最新的優先）
+        max_history_messages: 80 # 對話最多留幾則給模型
 
       hume_ai_agent:
         api_key: ''

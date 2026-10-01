@@ -44,8 +44,8 @@ export function keepAliveToMode(value: number): KeepAliveMode {
 //
 // 只接受 number，不做字串轉型：若呼叫端直接把 <input> 的 event.target.value
 // （字串）丟進來，Number.isFinite('300') 是 false，會被悄悄夾到下界 1，
-// 而不是先幫忙 parseFloat／Number() 轉換——這裡刻意不做那個隱性轉換（跟
-// api/memory.ts 的 clampCap 是同一個決定），呼叫端必須自己先轉成 number。
+// 而不是先幫忙 parseFloat／Number() 轉換——這裡刻意不做那個隱性轉換，
+// 呼叫端必須自己先轉成 number。
 export function clampKeepAliveSeconds(value: number): number {
   if (!Number.isFinite(value)) return KEEP_ALIVE_SECONDS_MIN
   return Math.min(KEEP_ALIVE_MAX, Math.max(KEEP_ALIVE_SECONDS_MIN, value))
@@ -93,8 +93,6 @@ export interface PerfState {
   keep_alive: number
   keep_alive_min: number
   keep_alive_max: number
-  consolidation_interval: number
-  consolidation_interval_choices: number[]
   asr_models: string[]
   tts_models: string[]
   // gpt_sovits_tts 的 text_lang／prompt_lang 下拉選單的允許清單——見上方檔頭
@@ -252,19 +250,10 @@ export const setKeepAlive = (
 ): Promise<ApiResult<unknown>> =>
   apiPost<unknown>(baseUrl, '/api/perf/keep-alive', { keep_alive: value })
 
-// POST /api/perf/preset：一次原子寫入六個設定葉（見 perf_route.py 的
+// POST /api/perf/preset：一次原子寫入一組設定葉（見 perf_route.py 的
 // apply_preset／_apply_preset_bundle）。name 必須是後端 PRESETS 的其中一個
 // key（light／standard／high）；由 UI 的 SelectField 保證只送得出合法選項，
 // 這裡不重複驗證——跟 api/characters.ts 的 updateCharacter 一樣，交給後端的
 // 400 訊息。
 export const applyPreset = (baseUrl: string, name: string): Promise<ApiResult<unknown>> =>
   apiPost<unknown>(baseUrl, '/api/perf/preset', { name })
-
-// 刻意不包裝 POST /api/perf/consolidation。它與 POST /api/memory/consolidation
-// 寫的是同一個設定葉（character_config.memory_consolidation_interval）——
-// perf_route.py 的 _write_consolidation_interval 與 memory_route.py 的寫入
-// 呼叫同一支 _rewrite_int_leaf，作用在同一個 conf.yaml 位置；memory_route 的
-// handler 註解自己說是這個值的權威寫法，且 api/memory.ts 已經有
-// setMemoryConsolidation／isValidConsolidation 兩個包裝、驗證邏輯齊全，只是
-// 還沒有 UI 呼叫它們。整理頻率這裡不重複一份，perf 分頁直接呼叫
-// api/memory.ts 的既有函式。

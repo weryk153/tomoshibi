@@ -56,7 +56,7 @@ character_config:
   # --- Override Agent and LLM Config ---
   agent_config:
     agent_settings:
-      basic_memory_agent:
+      conversation:
         llm_provider: 'openai_llm' # Specify OpenAI for this character
     llm_configs:
       openai_llm:

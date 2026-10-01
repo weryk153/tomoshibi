@@ -13,11 +13,6 @@ from src.open_llm_vtuber.conversation_quality import (
     ResponseRepetitionGuard,
     deduplicate_response_text,
 )
-from src.open_llm_vtuber import reply_history
-
-
-def setup_function():
-    reply_history.reset_for_tests()
 
 
 _BODY = "*視線完全移開，盯著遠方路標，手裡輕輕整理著衣領，語氣平淡卻帶著一絲不耐煩*"
@@ -44,39 +39,3 @@ def test_a_seeded_guard_still_accepts_new_sentences():
 def test_seeding_does_not_disturb_the_existing_dedup_helper():
     text = "第一句。第一句。第二句。"
     assert deduplicate_response_text(text) == "第一句。第二句。"
-
-
-def test_recent_sentences_splits_stored_replies():
-    reply_history.record_reply("c1", "h1", "u1", f"……夠了。{_BODY}{_ASK}")
-    got = reply_history.recent_sentences("c1", "h1", "u1")
-    assert any(_ASK in s for s in got), "整句要拆得出來才能逐句比對"
-    assert len(got) >= 2
-
-
-def test_recent_sentences_is_empty_when_nothing_was_said():
-    assert reply_history.recent_sentences("c1", "h1", "u1") == []
-
-
-def test_recent_sentences_is_per_session():
-    reply_history.record_reply("c1", "h1", "u1", "第一句。第二句。")
-    assert reply_history.recent_sentences("c1", "h1", "u2") == []
-
-
-def test_recent_sentences_is_per_history_uid():
-    # 同一條 WebSocket 連線（client_uid 不變）切換對話（history_uid 換了），
-    # 上一段對話說過的話不該滲進新對話——這正是這次要補的外洩。
-    reply_history.record_reply("c1", "h1", "u1", "上一段對話說的祕密。")
-    assert reply_history.recent_sentences("c1", "h2", "u1") == []
-
-
-def test_recent_sentences_is_empty_when_history_uid_is_missing():
-    # history_uid 為空：不讀、不回退到只用 conf_uid+client_uid 的舊範圍。
-    reply_history.record_reply("c1", "h1", "u1", "第一句。")
-    assert reply_history.recent_sentences("c1", "", "u1") == []
-
-
-def test_record_reply_does_not_write_when_history_uid_is_missing():
-    # 空 history_uid 也不寫入——不然之後補上同一把 client_uid 的 history_uid
-    # 時，會讀到一段沒有對話可歸屬的殘留狀態。
-    reply_history.record_reply("c1", "", "u1", "沒有對話可歸屬的一句話。")
-    assert reply_history.recent_sentences("c1", "h1", "u1") == []

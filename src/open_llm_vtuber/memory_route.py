@@ -1,6 +1,10 @@
-"""長期記憶的設定頁後端：讓使用者不必手改 YAML 就能管理 AI 記住的東西。
+"""長期記憶的設定頁後端：看、改、清空她記得的事。
 
-記憶現在是每段對話一份（chat_history/<conf_uid>/<history_uid>/core_memory.md）。
+她記得什麼全在 AI Character Engine 裡：每段對話各一份（她對你的記憶），加上整個
+角色一份（她自己說過的事）。這裡只是把引擎那一份拿給頁面讀寫，經過這個角色的
+character_engine_agent，或沒有連線時她還在跑的引擎；兩者都沒有就拒絕寫入，不寫到
+任何不會被讀的地方。
+
 conf_uid 前端知道（從 WebSocket 的 set-model-and-conf 來），沒帶就退回 conf.yaml
 裡的基礎角色；history_uid 前端不知道——它活在每個連線各自的 ServiceContext 裡，
 要從 client_contexts 找當前那段對話。找不到就回 409，不猜一個：猜錯會編輯到
@@ -9,22 +13,13 @@ conf_uid 前端知道（從 WebSocket 的 set-model-and-conf 來），沒帶就�
 安全上有兩道，兩道都不能省：
 
 - 只接受本機請求（連同代理標頭的檢查）。
-- conf_uid 在被組成任何檔案路徑之前，先擋掉路徑符號、再比對已知角色的集合。
-  這是使用者送來的字串，直接拿去接路徑等於開放任意檔案截斷。
+- conf_uid 在被拿去找任何東西之前，先擋掉路徑符號、再比對已知角色的集合。
 
-開關與兩個數值存在 conf.yaml 的 character_config 底下，寫入走 conf_editor 的
-就地改寫——整份重新序列化會把使用者寫的註解洗掉。
-
-「清空」是把檔案截斷成空的，不刪檔也不動對話紀錄；使用者要的是「忘掉」，不是
-「把歷史消滅」。
-
-行為契約由 tests/test_memory_route_reads.py 與 tests/test_memory_conf_leaf_insert.py
-釘住。
+長期記憶開關存在 conf.yaml 的 character_config 底下，寫入走 conf_editor 的就地改寫。
 """
 
 import os
 import asyncio
-from contextlib import asynccontextmanager
 from typing import Any, Optional
 
 from fastapi import APIRouter, Request
@@ -34,7 +29,6 @@ from loguru import logger
 from .api_guard import (
     is_trusted_request as _is_local_request,
     forbidden as _forbidden,
-    make_yaml as _make_yaml,
 )
 
 from .conf_editor import (
@@ -45,25 +39,13 @@ from .conf_editor import (
     write_conf as _write_conf,
 )
 
-from .character_route import (
-    _conf_uid_of,
-    _existing_conf_uids,
-    _list_character_files,
-)
+from .character_route import _existing_conf_uids
 from .config_manager.utils import read_yaml
-from . import memory_core
 
 
 # --------------------------------------------------------------------------- #
 # Read helpers
 # --------------------------------------------------------------------------- #
-
-
-def _load_conf_plain() -> Any:
-    """Round-trip 讀 conf.yaml（只用來讀純量值）。"""
-    yaml = _make_yaml()
-    with open(CONF_PATH, "r", encoding="utf-8") as f:
-        return yaml.load(f)
 
 
 def _character_setting(key: str, default: Any, coerce=None) -> Any:
@@ -94,22 +76,6 @@ def _base_conf_uid() -> Optional[str]:
 def _memory_enabled_from_conf() -> bool:
     """長期記憶開著沒有。缺鍵時預設開啟，跟 Pydantic 的預設一致。"""
     return bool(_character_setting("long_term_memory_enabled", True))
-
-
-def _cap_from_conf() -> int:
-    """記憶字數上限，夾進 [CAP_MIN, CAP_MAX]。"""
-    return _character_setting(
-        "core_memory_max_chars", memory_core.CAP_CHARS, memory_core._clamp_cap
-    )
-
-
-def _interval_from_conf() -> int:
-    """整理頻率，夾進 memory_core 允許的集合。"""
-    return _character_setting(
-        "memory_consolidation_interval",
-        memory_core.CONSOLIDATE_INTERVAL_DEFAULT,
-        memory_core._clamp_interval,
-    )
 
 
 def _resolve_conf_uid(supplied: Optional[str]) -> tuple[Optional[str], Optional[str]]:
@@ -173,34 +139,6 @@ def _write_memory_enabled(enabled: bool) -> bool:
     return True
 
 
-def _write_core_memory_cap(cap: int) -> bool:
-    """設定記憶的字數上限。
-
-    The leaf must already exist in conf.yaml. Atomic + one-time .bak. Returns True.
-    """
-    lines = _read_conf_lines()
-    cc_start, cc_end = _character_config_extent(lines)
-    _upsert_leaf(lines, cc_start, cc_end, "core_memory_max_chars", str(int(cap)))
-    _write_conf(lines)
-    return True
-
-
-def _write_consolidation_interval(interval: int) -> bool:
-    """設定記憶整理的頻率。
-
-    The leaf must already exist in conf.yaml. Atomic + one-time .bak. Returns True.
-    (perf_route exposes the same setting via /api/perf/consolidation; this mirror lets
-    the memory tab save it through the memory namespace the FE already calls.)
-    """
-    lines = _read_conf_lines()
-    cc_start, cc_end = _character_config_extent(lines)
-    _upsert_leaf(
-        lines, cc_start, cc_end, "memory_consolidation_interval", str(int(interval))
-    )
-    _write_conf(lines)
-    return True
-
-
 # --------------------------------------------------------------------------- #
 # 端點共用的前置作業
 # --------------------------------------------------------------------------- #
@@ -227,19 +165,6 @@ async def _parse_body(
     return body, None
 
 
-def _bounded_int(body: dict, key: str, low: int, high: int):
-    """取出一個必填的整數欄位並檢查範圍。回傳 (值, 錯誤回應)。"""
-    if key not in body:
-        return None, _error(400, f"Missing '{key}' integer.")
-    try:
-        value = int(body[key])
-    except (TypeError, ValueError):
-        return None, _error(400, f"'{key}' must be an integer.")
-    if value < low or value > high:
-        return None, _error(400, f"'{key}' must be between {low} and {high}.")
-    return value, None
-
-
 def _resolved_uid(body: dict):
     """從 body 取出並驗證 conf_uid。回傳 (conf_uid, 錯誤回應)。"""
     conf_uid, err = _resolve_conf_uid(body.get("conf_uid"))
@@ -249,13 +174,10 @@ def _resolved_uid(body: dict):
 
 
 def _memory_keeper(client_contexts: dict, conf_uid: str):
-    """自己記得對方的 agent（character_engine_agent），沒有就回 None。
-
-    那種 agent 的記憶不在 core_memory.md 裡。記憶頁要讀寫的是它手上那一份，
-    不然使用者看到的、改的，跟她實際記得的是兩回事。
+    """這段對話的記憶在哪個 agent 手上；沒有就回 None。
 
     看的是 _resolve_history_uid 選中的那個連線：正在初始化的連線（還沒有
-    history_uid、agent 也還沒好）不算，不然會退回去讀另一段對話的 core_memory.md。
+    history_uid、agent 也還沒好）不算。
     """
     found = None
     for ctx in client_contexts.values():
@@ -291,46 +213,17 @@ def _engine_storage(conf_uid: str):
     return storage_dir(conf_uid)
 
 
-def _configured_for_the_engine(conf_uid: str) -> bool:
-    """這個角色現在設定成由引擎驅動。角色檔沒寫 agent 的話，跟底稿一樣。"""
-
-    def choice(path):
-        data = read_yaml(path) or {}
-        agent_config = (data.get("character_config") or {}).get("agent_config") or {}
-        return agent_config.get("conversation_agent_choice")
-
-    try:
-        base = choice(CONF_PATH)
-        for path in _list_character_files():
-            if _conf_uid_of(path) == conf_uid:
-                return (choice(path) or base) == "character_engine_agent"
-        return base == "character_engine_agent"
-    except Exception:
-        return False
-
-
 def _self_keeper(client_contexts: dict, conf_uid: str):
-    """她自己說過什麼也由它記的那一方：這個角色的 character_engine_agent，或沒有
-    連線時她還在跑的引擎。不是引擎在記就回 None（主機的 self_memory.md）。
+    """她自己說過的事由誰拿著：這個角色的 agent，或沒有連線時她還在跑的引擎。
 
     她自己的記憶在角色層，不屬於任何一段對話，所以不看 history_uid：這個角色
-    任何一個連線的 agent 都是同一份。
-
-    以連線上實際的 agent 為準，其次是設定：換回 basic_memory_agent 之後，上次
-    啟動過的引擎還留在記憶體裡，但她說話讀的已經是 self_memory.md 了。
+    任何一個連線的 agent 都是同一份。都沒有就回 None。
     """
-    agents = [
-        getattr(ctx, "agent_engine", None)
-        for ctx in client_contexts.values()
-        if getattr(getattr(ctx, "character_config", None), "conf_uid", None) == conf_uid
-    ]
-    for agent in agents:
-        if hasattr(agent, "self_memory"):
+    for ctx in client_contexts.values():
+        cfg = getattr(ctx, "character_config", None)
+        agent = getattr(ctx, "agent_engine", None)
+        if getattr(cfg, "conf_uid", None) == conf_uid and hasattr(agent, "self_memory"):
             return agent
-    if any(agent is not None for agent in agents):
-        return None
-    if not _configured_for_the_engine(conf_uid):
-        return None
     try:
         from .character_engine.factory import current_companion
 
@@ -342,20 +235,7 @@ def _self_keeper(client_contexts: dict, conf_uid: str):
     return _EngineSelfMemory(companion)
 
 
-def _engine_took_her_own_memory(conf_uid: str) -> bool:
-    """她設定成由引擎驅動，而引擎接手過她自己的記憶（self_memory.md 已經搬進
-    去）：那個檔案不會再被讀，寫進去的東西等於丟掉。"""
-    if not _configured_for_the_engine(conf_uid):
-        return False
-    try:
-        return (_engine_storage(conf_uid) / "brought-self-memory.txt").is_file()
-    except Exception:
-        return False
-
-
-ENGINE_NOT_RUNNING = (
-    "她的記憶由 AI Character Engine 管理，但引擎還沒啟動；先跟她開始一段對話再改。"
-)
+ENGINE_NOT_RUNNING = "她的引擎還沒啟動；先跟她開始一段對話再改她的記憶。"
 
 
 def _save_through(keeper, history_uid: str, content: str, edited_from) -> None:
@@ -404,45 +284,6 @@ async def _write_or_error(fn, *args, what: str):
         return _error(500, "Could not write config file.")
 
 
-# 整理持鎖跨整個 LLM 呼叫（最長 60 秒），前端 apiPost 的逾時只有 15～20 秒。記憶
-# 寫入端點如果進鎖後沒有等待上限，HTTP 請求會撐到前端自己斷線——畫面報「請求
-# 逾時」，但寫入其實已經在背後完成，使用者以為沒存到。等待有上限、逾時就
-# 明確回 503 讓使用者稍後重試，好過讓請求卡到前端先放棄。
-_LOCK_WAIT_SECONDS = 10
-
-
-class _LockBusy(Exception):
-    """等整理鎖等過了 _LOCK_WAIT_SECONDS；呼叫端接住、轉成 503。"""
-
-
-def _needs_consolidation_lock(*, keeper) -> bool:
-    """整理鎖保護的是 core_memory.md 的讀→重寫→寫回。自己記得對方的 agent 的記憶
-    不在那個檔案裡，整理跑到一半（最長 60 秒）也不用等它，等了只會讓使用者按下
-    清除得到「記憶正在整理中」。"""
-    return keeper is None
-
-
-@asynccontextmanager
-async def _hold_consolidation_lock(conf_uid: str, *, needed: bool = True):
-    """等整理鎖最多 _LOCK_WAIT_SECONDS 秒；等不到就丟 _LockBusy。
-
-    拿到鎖後才進入 with 區塊，寫入＋讀回都在鎖內做完才離開——不會有拿不到鎖
-    卻已經寫了一半檔案的狀態。
-    """
-    if not needed:
-        yield
-        return
-    lock = memory_core._consolidation_lock(conf_uid)
-    try:
-        await asyncio.wait_for(lock.acquire(), _LOCK_WAIT_SECONDS)
-    except asyncio.TimeoutError:
-        raise _LockBusy() from None
-    try:
-        yield
-    finally:
-        lock.release()
-
-
 # --------------------------------------------------------------------------- #
 # Route factory
 # --------------------------------------------------------------------------- #
@@ -451,18 +292,14 @@ async def _hold_consolidation_lock(conf_uid: str, *, needed: bool = True):
 def init_memory_route(client_contexts: dict) -> APIRouter:
     """長期記憶設定頁的 REST 端點。只接受本機請求。
 
-    - GET  /api/memory?conf_uid=<uid>   記憶開關、內容、字數與各項界限
-    - POST /api/memory                  整份覆寫記憶內容（使用者手動修正）
+    - GET  /api/memory?conf_uid=<uid>   記憶開關、這段對話的記憶、她自己的記憶
+    - POST /api/memory                  改這段對話的記憶（使用者手動修正）
     - POST /api/memory/toggle           開關長期記憶
-    - POST /api/memory/clear            清空記憶
-    - POST /api/memory/cap              設定字數上限
-    - POST /api/memory/consolidation    設定整理頻率
-    - POST /api/memory/self         整份覆寫她自己的記憶（角色層，所有對話共用；不需要連線）
-    - POST /api/memory/self/clear   清空她自己的記憶
+    - POST /api/memory/clear            清空這段對話的記憶
+    - POST /api/memory/self             改她自己的記憶（角色層；不需要連線）
+    - POST /api/memory/self/clear       清空她自己的記憶
 
-    每個寫入端點的回應都帶 restart_required：agent 的 system prompt 在 init 時就
-    烤好了，已經注入的記憶要等重選角色或重啟才會完全反映。存檔本身是即時的，
-    下一輪整理讀到的就是新值。
+    改記憶是即時的，引擎下一輪就照新的內容。開關要重新載入才生效。
     """
     router = APIRouter()
 
@@ -480,52 +317,19 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
             return bad
 
         keeper = _memory_keeper(client_contexts, conf_uid)
-        if keeper is not None:
-            content = keeper.conversation_memory(history_uid)
-            exists = bool(content)
-        else:
-            content = memory_core.load_core_memory(conf_uid, history_uid)
-            exists = os.path.isfile(memory_core.core_memory_path(conf_uid, history_uid))
         self_keeper = _self_keeper(client_contexts, conf_uid)
-        self_content = (
-            self_keeper.self_memory()
-            if self_keeper is not None
-            else memory_core.load_self_memory(conf_uid)
-        )
         return JSONResponse(
             {
                 "conf_uid": conf_uid,
                 "enabled": _memory_enabled_from_conf(),
-                # 這段對話的記憶在引擎手上：不按字數限制，下面的上限對它不起作用。
-                "engine_managed": keeper is not None,
-                "content": content,
-                "exists": exists,
-                "char_count": len(content),
-                # 她自己的記憶：角色層，所有對話共用。上限固定，不開放設定。
-                "self_content": self_content,
-                # 她自己的記憶在引擎手上：不按字數限制，下面的上限對它不起作用。
-                "self_engine_managed": self_keeper is not None,
-                "self_char_count": len(self_content),
-                "self_cap": memory_core.SELF_CAP_CHARS,
-                # 界限一律從後端送，UI 不要自己寫死一份——後端調整了那份副本不會
-                # 跟著動，畫面會強制一個伺服器早就不用的範圍，而且不會報錯。
-                "cap": _cap_from_conf(),
-                "cap_min": memory_core.CAP_MIN,
-                "cap_max": memory_core.CAP_MAX,
-                "consolidation_interval": _interval_from_conf(),
-                "consolidation_interval_choices": list(
-                    memory_core.CONSOLIDATE_INTERVAL_CHOICES
-                ),
+                "content": keeper.conversation_memory(history_uid) if keeper else "",
+                "self_content": self_keeper.self_memory() if self_keeper else "",
             }
         )
 
     @router.post("/api/memory")
     async def save_memory(request: Request):
-        """把記憶內容整份換成使用者編輯過的版本。
-
-        讓不會改設定檔的人也能直接修掉 AI 記錯或不想被記住的事。超過上限的內容
-        照存不截斷——偷偷砍掉使用者打的字比超長更意外，下一輪整理本來就會提煉。
-        """
+        """把這段對話的記憶換成使用者編輯過的版本：修掉她記錯或不想被記住的事。"""
         if not _is_local_request(request):
             return _forbidden()
         body, bad = await _parse_body(request)
@@ -544,35 +348,13 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         if not isinstance(content, str):
             return _error(400, "'content' must be a string.")
 
-        cap = _cap_from_conf()
-        # 跟整理排同一把鎖：整理跑到一半時寫檔，會被它 60 秒後的整份覆寫蓋掉。
         keeper = _memory_keeper(client_contexts, conf_uid)
-        try:
-            async with _hold_consolidation_lock(
-                conf_uid, needed=_needs_consolidation_lock(keeper=keeper)
-            ):
-                if keeper is not None:
-                    _save_through(keeper, history_uid, content, body.get("edited_from"))
-                    stored = keeper.conversation_memory(history_uid)
-                elif not await asyncio.to_thread(
-                    memory_core.save_core_memory, conf_uid, history_uid, content, cap
-                ):
-                    return _error(500, "Could not save core memory.")
-                else:
-                    # 讀回真正存下去的內容，讓 UI 的字數是誠實的。
-                    stored = memory_core.load_core_memory(conf_uid, history_uid)
-        except _LockBusy:
-            return _error(503, "記憶正在整理中，請幾秒後再試。")
-        logger.info(f"[memory] manually saved (conf_uid={conf_uid})")
-        return JSONResponse(
-            {
-                "ok": True,
-                "conf_uid": conf_uid,
-                "char_count": len(stored),
-                "cap": cap,
-                "restart_required": True,
-            }
-        )
+        if keeper is None:
+            return _error(409, ENGINE_NOT_RUNNING)
+        _save_through(keeper, history_uid, content, body.get("edited_from"))
+        stored = keeper.conversation_memory(history_uid)
+        logger.info(f"[memory] edited in the engine (conf_uid={conf_uid})")
+        return JSONResponse({"ok": True, "conf_uid": conf_uid, "content": stored})
 
     @router.post("/api/memory/toggle")
     async def toggle_memory(request: Request):
@@ -621,33 +403,17 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         if bad:
             return bad
 
-        # 跟整理排同一把鎖（見 save_memory 的說明）。
         keeper = _memory_keeper(client_contexts, conf_uid)
-        try:
-            async with _hold_consolidation_lock(
-                conf_uid, needed=_needs_consolidation_lock(keeper=keeper)
-            ):
-                if keeper is not None:
-                    keeper.rewrite_conversation_memory(history_uid, "")
-                elif not await asyncio.to_thread(
-                    memory_core.clear_core_memory, conf_uid, history_uid
-                ):
-                    return _error(500, "Could not clear core memory.")
-        except _LockBusy:
-            return _error(503, "記憶正在整理中，請幾秒後再試。")
+        if keeper is None:
+            return _error(409, ENGINE_NOT_RUNNING)
+        keeper.rewrite_conversation_memory(history_uid, "")
 
         logger.info(f"[memory] cleared (conf_uid={conf_uid})")
         return JSONResponse({"ok": True, "conf_uid": conf_uid, "cleared": True})
 
     @router.post("/api/memory/self")
     async def save_self_memory(request: Request):
-        """整份覆寫她自己的記憶。
-
-        只以 conf_uid 為鍵——self_memory.md 在角色層，不屬於任何一段對話，所以不需要
-        連線、不走 _resolved_history_uid 的 409。
-
-        寫入本身走整理的那把鎖：整理跑到一半時寫檔，會被它 60 秒後的 merge 蓋回去。
-        """
+        """改她自己的記憶。只以 conf_uid 為鍵：它在角色層，不屬於任何一段對話。"""
         if not _is_local_request(request):
             return _forbidden()
         body, bad = await _parse_body(request)
@@ -660,52 +426,19 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         if not isinstance(content, str):
             return _error(400, "'content' must be a string.")
         self_keeper = _self_keeper(client_contexts, conf_uid)
-        if self_keeper is not None:
-            # 引擎記的那一份。edited_from 的意思跟對話記憶一樣：只有頁面上有、
-            # 存回來不見的行才算刪掉，頁面開著時引擎新記下的不受影響。
-            edited_from = body.get("edited_from")
-            self_keeper.rewrite_self_memory(
-                content,
-                edited_from=edited_from if isinstance(edited_from, str) else None,
-            )
-            stored = self_keeper.self_memory()
-            logger.info(
-                f"[memory] self memory edited in the engine (conf_uid={conf_uid})"
-            )
-            return JSONResponse(
-                {
-                    "ok": True,
-                    "conf_uid": conf_uid,
-                    # 引擎有上限，存進去的不一定全部留下：頁面要顯示它實際記得的。
-                    "content": stored,
-                    "char_count": len(stored),
-                    "cap": memory_core.SELF_CAP_CHARS,
-                    "restart_required": False,
-                }
-            )
-        if _engine_took_her_own_memory(conf_uid):
+        if self_keeper is None:
             return _error(409, ENGINE_NOT_RUNNING)
-        # 跟整理排同一把鎖（見下面 clear 的說明），但等待有上限——見
-        # _hold_consolidation_lock 的說明。
-        try:
-            async with _hold_consolidation_lock(conf_uid):
-                if not await asyncio.to_thread(
-                    memory_core.save_self_memory, conf_uid, content
-                ):
-                    return _error(500, "Could not save self memory.")
-                stored = memory_core.load_self_memory(conf_uid)
-        except _LockBusy:
-            return _error(503, "記憶正在整理中，請幾秒後再試。")
-        logger.info(f"[memory] self memory manually saved (conf_uid={conf_uid})")
-        return JSONResponse(
-            {
-                "ok": True,
-                "conf_uid": conf_uid,
-                "char_count": len(stored),
-                "cap": memory_core.SELF_CAP_CHARS,
-                "restart_required": True,
-            }
+        # edited_from 的意思跟對話記憶一樣：只有頁面上有、存回來不見的行才算刪掉，
+        # 頁面開著時引擎新記下的不受影響。
+        edited_from = body.get("edited_from")
+        self_keeper.rewrite_self_memory(
+            content,
+            edited_from=edited_from if isinstance(edited_from, str) else None,
         )
+        stored = self_keeper.self_memory()
+        logger.info(f"[memory] self memory edited in the engine (conf_uid={conf_uid})")
+        # 引擎有上限，存進去的不一定全部留下：頁面要顯示它實際記得的。
+        return JSONResponse({"ok": True, "conf_uid": conf_uid, "content": stored})
 
     @router.post("/api/memory/self/clear")
     async def clear_self_memory(request: Request):
@@ -718,100 +451,10 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         if bad:
             return bad
         self_keeper = _self_keeper(client_contexts, conf_uid)
-        if self_keeper is not None:
-            self_keeper.rewrite_self_memory("")
-            logger.info(
-                f"[memory] self memory cleared in the engine (conf_uid={conf_uid})"
-            )
-            return JSONResponse({"ok": True, "conf_uid": conf_uid, "cleared": True})
-        if _engine_took_her_own_memory(conf_uid):
+        if self_keeper is None:
             return _error(409, ENGINE_NOT_RUNNING)
-        # 整理是「讀出兩份記憶 → 丟給 LLM（最久 60 秒）→ merge 寫回」。在鎖外
-        # 清空的話，整理若已經讀到舊的 self，60 秒後 merge 會把使用者剛刪掉的行
-        # 原樣寫回去——而設定頁刪除正是規格對「分類誤判」這個已知漏洞唯一的
-        # 緩解手段，復活等於把那個手段拿掉。self 記憶在角色層，鎖也以 conf_uid
-        # 為單位（見 memory_core._consolidation_lock），兩邊對得上。等待有上限，
-        # 見 _hold_consolidation_lock 的說明。
-        try:
-            async with _hold_consolidation_lock(conf_uid):
-                if not await asyncio.to_thread(memory_core.clear_self_memory, conf_uid):
-                    return _error(500, "Could not clear self memory.")
-        except _LockBusy:
-            return _error(503, "記憶正在整理中，請幾秒後再試。")
+        self_keeper.rewrite_self_memory("")
         logger.info(f"[memory] self memory cleared (conf_uid={conf_uid})")
         return JSONResponse({"ok": True, "conf_uid": conf_uid, "cleared": True})
-
-    @router.post("/api/memory/cap")
-    async def set_cap(request: Request):
-        """設定記憶的字數上限（[CAP_MIN, CAP_MAX] 之間）。"""
-        if not _is_local_request(request):
-            return _forbidden()
-        body, bad = await _parse_body(request)
-        if bad:
-            return bad
-
-        conf_uid, bad = _resolved_uid(body)
-        if bad:
-            return bad
-
-        cap, bad = _bounded_int(body, "cap", memory_core.CAP_MIN, memory_core.CAP_MAX)
-        if bad:
-            return bad
-
-        bad = await _write_or_error(_write_core_memory_cap, cap, what="cap write")
-        if bad:
-            return bad
-
-        logger.info(f"[memory] cap saved (cap={cap})")
-        return JSONResponse(
-            {
-                "ok": True,
-                "conf_uid": conf_uid,
-                "cap": cap,
-                "restart_required": True,
-            }
-        )
-
-    @router.post("/api/memory/consolidation")
-    async def set_consolidation(request: Request):
-        """設定整理頻率（每 N 輪整理一次，N 限定在允許的集合裡）。
-
-        1 = 每輪（預設）；3／5 可以把整理用的 LLM 呼叫省一半以上，適合弱機。
-        """
-        if not _is_local_request(request):
-            return _forbidden()
-        body, bad = await _parse_body(request)
-        if bad:
-            return bad
-
-        conf_uid, bad = _resolved_uid(body)
-        if bad:
-            return bad
-
-        if "interval" not in body:
-            return _error(400, "Missing 'interval' integer.")
-        try:
-            interval = int(body["interval"])
-        except (TypeError, ValueError):
-            return _error(400, "'interval' must be an integer.")
-        choices = list(memory_core.CONSOLIDATE_INTERVAL_CHOICES)
-        if interval not in choices:
-            return _error(400, f"'interval' must be one of {choices}.")
-
-        bad = await _write_or_error(
-            _write_consolidation_interval, interval, what="consolidation write"
-        )
-        if bad:
-            return bad
-
-        logger.info(f"[memory] consolidation interval saved (interval={interval})")
-        return JSONResponse(
-            {
-                "ok": True,
-                "conf_uid": conf_uid,
-                "consolidation_interval": interval,
-                "restart_required": True,
-            }
-        )
 
     return router

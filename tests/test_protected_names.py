@@ -49,82 +49,6 @@ def test_words_outside_the_list_are_untouched():
     assert "有點兇" in out
 
 
-def test_proactive_anchor_uses_the_characters_protected_names():
-    """主動說話的錨點會經過正規化，名單要一路傳到那裡。
-
-    錨點取自對話記憶，模型先前的錯字會原樣回流到 prompt 裡，等於把錯誤寫法
-    再示範一次給它看。所以這條路徑也要吃得到角色的名單。
-    """
-    from src.open_llm_vtuber.proactive_context import build_proactive_prompt
-
-    prompt = build_proactive_prompt(
-        "基本指令",
-        conf_uid="character",
-        client_uid="client",
-        output_language="Traditional Chinese (Taiwan)",
-        conversation_anchor="角色：這件事交給愛萊處理。",
-        protected_names={"愛徠": ["愛萊"]},
-    )
-
-    assert "愛徠" in prompt
-    assert "愛萊" not in prompt
-
-
-def test_conversation_handler_forwards_the_characters_protected_names(monkeypatch):
-    """名單住在角色設定裡，handler 負責把它交給 prompt 建構。
-
-    這一段是整條線唯一沒被其他測試覆蓋的接點：前面驗證了函式會用名單，
-    這裡驗證名單真的從角色設定流得過來。
-    """
-    import asyncio
-    from types import SimpleNamespace
-
-    from src.open_llm_vtuber.conversations import conversation_handler
-
-    captured = {}
-
-    def _capture(*args, **kwargs):
-        captured.update(kwargs)
-        return "prompt"
-
-    monkeypatch.setattr(conversation_handler, "build_proactive_prompt", _capture)
-    monkeypatch.setattr(
-        conversation_handler, "process_single_conversation", _noop_conversation
-    )
-
-    context = SimpleNamespace(
-        character_config=SimpleNamespace(
-            conf_uid="character",
-            reply_language="Traditional Chinese (Taiwan)",
-            protected_names={"愛徠": ["愛萊"]},
-        ),
-        system_config=SimpleNamespace(
-            player_language="",
-            tool_prompts={"proactive_speak_prompt": "proactive_speak_prompt"},
-        ),
-        history_uid="history",
-        agent_engine=SimpleNamespace(),
-    )
-
-    asyncio.run(
-        conversation_handler.handle_conversation_trigger(
-            msg_type="ai-speak-signal",
-            data={"idle_time": 60, "images": None},
-            client_uid="client",
-            context=context,
-            websocket=_SilentWebSocket(),
-            client_contexts={"client": context},
-            client_connections={"client": _SilentWebSocket()},
-            chat_group_manager=SimpleNamespace(get_client_group=lambda _uid: None),
-            received_data_buffers={},
-            current_conversation_tasks={},
-            broadcast_to_group=None,
-        )
-    )
-
-    assert captured.get("protected_names") == {"愛徠": ["愛萊"]}
-
-
 class _SilentWebSocket:
     async def send_text(self, payload):
         pass
@@ -147,18 +71,14 @@ def test_proactive_prompt_falls_back_when_topics_were_never_saved(monkeypatch):
 
     captured = {}
 
-    def _capture(*args, **kwargs):
+    async def _capture(**kwargs):
         captured.update(kwargs)
-        return "prompt"
 
     def _missing(name):
         raise FileNotFoundError(name)
 
     monkeypatch.setattr(conversation_handler.prompt_loader, "load_util", _missing)
-    monkeypatch.setattr(conversation_handler, "build_proactive_prompt", _capture)
-    monkeypatch.setattr(
-        conversation_handler, "process_single_conversation", _noop_conversation
-    )
+    monkeypatch.setattr(conversation_handler, "process_single_conversation", _capture)
 
     context = SimpleNamespace(
         character_config=SimpleNamespace(
@@ -190,4 +110,7 @@ def test_proactive_prompt_falls_back_when_topics_were_never_saved(monkeypatch):
         )
     )
 
-    assert captured["base_prompt"].startswith(news_topics.INSTRUCTION)
+    # 規矩取自內建的提示，不是退成一句 "Please say something."。
+    assert captured["metadata"]["proactive_instruction"].startswith(
+        news_topics.INSTRUCTION.strip()[:20]
+    )

@@ -49,8 +49,7 @@ The project uses a factory pattern for all AI engines:
 
 **Agent System** (`src/open_llm_vtuber/agent/`):
 - `agent_factory.py` - Factory for creating different agent types
-- `agents/` - Various agent implementations (basic_memory, hume_ai, letta, mem0)
-- `stateless_llm/` - Stateless LLM implementations (Claude, OpenAI, Ollama, etc.)
+- `agents/` - Agent implementations: `character_engine_agent` (the default; drives the conversation through AI Character Engine), plus hume_ai and letta
 
 **ASR Engines** (`src/open_llm_vtuber/asr/`):
 - Support for multiple ASR backends: Sherpa-ONNX, FunASR, Faster-Whisper, OpenAI Whisper, etc.
@@ -118,7 +117,7 @@ The codebase uses the missing `_cleanup_failed_connection` method pattern - when
 - **Live2D models**: `live2d-models/`
 - **VRM models**: `vrm-models/` — `<name>/<name>.vrm` + `<name>/motions/*.vrma`；掃描登記與對應驗證在 `src/open_llm_vtuber/vrm_models.py`，角色 renderer 的共用介面在 `frontend-src/src/renderer/src/avatar/character-renderer.ts`（見 `docs/add-vrm-character.md`）
 - **Character definitions**: `characters/`
-- **Chat history**: `chat_history/` — `<conf_uid>/<history_uid>.json` 逐字稿、`<conf_uid>/<history_uid>/core_memory.md` 該段對話的記憶、`<conf_uid>/self_memory.md` 她自己的記憶（所有對話共用）。這兩份記憶檔只有 `basic_memory_agent` 用；`character_engine_agent` 的記憶全在 `<conf_uid>/engine/`，舊檔只在第一次搬進去
+- **Chat history**: `chat_history/` — `<conf_uid>/<history_uid>.json` 逐字稿；記憶全在引擎的 `<conf_uid>/engine/`（這段對話的記憶、她自己的記憶）。舊版留下的 `<conf_uid>/<history_uid>/core_memory.md`、`<conf_uid>/self_memory.md` 不會搬進引擎（當下的話被記成事實，搬進去她會每輪照著講）
 - **Cache**: `cache/` (audio files, temporary data)
 
 ## Development Guidelines

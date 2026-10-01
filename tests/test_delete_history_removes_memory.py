@@ -16,16 +16,32 @@ edge-case 表格寫的是「對話被刪除 → 記憶跟著那個資料夾一�
 """
 
 import os
+from pathlib import Path
 
 from src.open_llm_vtuber import chat_history_manager as chm
-from src.open_llm_vtuber import memory_core
+
+
+def _old_core_memory(conf_uid: str, history_uid: str) -> Path:
+    """Tomoshibi 以前自己存的 core_memory.md；舊對話資料夾裡還會有。"""
+    return Path("chat_history", conf_uid, history_uid, "core_memory.md")
+
+
+def _load_old_core_memory(conf_uid: str, history_uid: str) -> str:
+    path = _old_core_memory(conf_uid, history_uid)
+    return path.read_text(encoding="utf-8") if path.is_file() else ""
+
+
+def _save_old_core_memory(conf_uid: str, history_uid: str, content: str) -> None:
+    path = _old_core_memory(conf_uid, history_uid)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
 
 
 def _make_conversation_with_memory(conf_uid: str, content: str = "私密的事") -> str:
     """建一段對話並存一份記憶，回傳它的 history_uid。"""
     history_uid = chm.create_new_history(conf_uid)
     assert history_uid
-    memory_core.save_core_memory(conf_uid, history_uid, content)
+    _save_old_core_memory(conf_uid, history_uid, content)
     return history_uid
 
 
@@ -72,7 +88,7 @@ def test_deleting_one_conversation_does_not_touch_a_sibling(tmp_path, monkeypatc
 
     assert chm.delete_history(conf_uid, delete_uid) is True
 
-    assert memory_core.load_core_memory(conf_uid, keep_uid) == "留著的事"
+    assert _load_old_core_memory(conf_uid, keep_uid) == "留著的事"
     assert os.path.isfile(chm._get_safe_history_path(conf_uid, keep_uid))
 
 
@@ -94,7 +110,7 @@ def test_hostile_history_uid_cannot_escape_the_character_directory(
     assert result is False
 
     # The victim's file and memory survive completely intact.
-    assert memory_core.load_core_memory("char-b", victim_uid) == "受害者的事"
+    assert _load_old_core_memory("char-b", victim_uid) == "受害者的事"
     assert os.path.isfile(chm._get_safe_history_path("char-b", victim_uid))
     assert os.path.isdir(chm._get_safe_history_memory_dir("char-b", victim_uid))
 
@@ -140,8 +156,8 @@ def test_dot_history_uid_must_not_wipe_the_whole_character_directory(
     assert os.path.isdir(chm._get_safe_history_memory_dir(conf_uid, keep_uid_1))
     assert os.path.isfile(chm._get_safe_history_path(conf_uid, keep_uid_2))
     assert os.path.isdir(chm._get_safe_history_memory_dir(conf_uid, keep_uid_2))
-    assert memory_core.load_core_memory(conf_uid, keep_uid_1) == "對話一的私事"
-    assert memory_core.load_core_memory(conf_uid, keep_uid_2) == "對話二的私事"
+    assert _load_old_core_memory(conf_uid, keep_uid_1) == "對話一的私事"
+    assert _load_old_core_memory(conf_uid, keep_uid_2) == "對話二的私事"
 
 
 def test_dotdot_history_uid_stays_refused(tmp_path, monkeypatch):
@@ -152,7 +168,7 @@ def test_dotdot_history_uid_stays_refused(tmp_path, monkeypatch):
     result = chm.delete_history("char-a", "..")
     assert result is False
 
-    assert memory_core.load_core_memory("char-b", victim_uid) == "受害者的事"
+    assert _load_old_core_memory("char-b", victim_uid) == "受害者的事"
     assert os.path.isfile(chm._get_safe_history_path("char-b", victim_uid))
     assert os.path.isdir(chm._get_safe_history_memory_dir("char-b", victim_uid))
 
@@ -160,17 +176,17 @@ def test_dotdot_history_uid_stays_refused(tmp_path, monkeypatch):
 def test_get_safe_history_memory_dir_matches_where_memory_core_writes(
     tmp_path, monkeypatch
 ):
-    """core_memory_path 與 _get_safe_history_memory_dir 對同一段對話要指向同一個
+    """舊 core_memory.md 的位置與 _get_safe_history_memory_dir 對同一段對話要指向同一個
     資料夾——這是刪除能不能連記憶一起清掉的前提。"""
     monkeypatch.chdir(tmp_path)
     conf_uid = "char-a"
     history_uid = "conv-1"
 
-    memory_core.save_core_memory(conf_uid, history_uid, "一些內容")
-    memory_file = memory_core.core_memory_path(conf_uid, history_uid)
+    _save_old_core_memory(conf_uid, history_uid, "一些內容")
+    memory_file = _old_core_memory(conf_uid, history_uid)
     memory_dir = chm._get_safe_history_memory_dir(conf_uid, history_uid)
 
-    # memory_core.core_memory_path returns a realpath (absolute); the chat
+    # the old memory path is relative here; the chat
     # history manager's sanitizer returns a plain relative path. Compare
     # resolved paths so the comparison holds regardless of that difference.
     assert os.path.realpath(os.path.dirname(memory_file)) == os.path.realpath(

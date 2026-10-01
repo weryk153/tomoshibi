@@ -33,6 +33,8 @@ from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse
 from loguru import logger
 
+from .config_manager.agent import conversation_block
+
 from .api_guard import (
     is_trusted_request as _is_local_request,
     forbidden as _forbidden,
@@ -94,16 +96,15 @@ def _get_edge_tts_voice(data: Any) -> Optional[str]:
 def _get_openai_llm(data: Any) -> Optional[Any]:
     """目前啟用中那個 LLM 供應商的設定區塊。
 
-    必須跟著 basic_memory_agent.llm_provider 走，不能寫死讀 openai_compatible_llm。
+    必須跟著 conversation.llm_provider 走，不能寫死讀 openai_compatible_llm。
     實測過的後果：使用者用 LM Studio，存一次翻譯設定就被改成 Ollama 的端點與模型
     ——翻譯從此連到一個沒在跑的服務，而且 conf.yaml 裡原本正確的值被覆蓋掉了。
 
-    記憶整理那條路犯過一模一樣的錯（resolve_consolidation_llm 已修）。凡是要沿用
-    「玩家設好的 LLM」的地方，都要問當前供應商是誰。
+    凡是要沿用「玩家設好的 LLM」的地方，都要問當前供應商是誰。
     """
     try:
         agent = data["character_config"]["agent_config"]
-        provider = agent["agent_settings"]["basic_memory_agent"]["llm_provider"]
+        provider = conversation_block(agent["agent_settings"])["llm_provider"]
         block = agent["llm_configs"].get(provider)
         if block is not None:
             return block

@@ -41,18 +41,15 @@ from .api_guard import (
 from .conf_editor import (
     CONF_PATH,
     block_extent,
-    character_config_extent,
     nested_extent,
     sub_block_extent as _sub_block_extent,
     read_conf_lines as _read_conf_lines,
     rewrite_int_leaf as _rewrite_int_leaf,
     rewrite_str_leaf as _rewrite_leaf,
-    upsert_leaf as _upsert_leaf,
     write_conf as _write_conf,
 )
 
 from .config_manager.utils import read_yaml
-from . import memory_core
 
 
 # --------------------------------------------------------------------------- #
@@ -92,8 +89,6 @@ PRESETS: dict[str, dict[str, Any]] = {
     "light": {
         "asr_model": "sherpa_onnx_asr",
         "tts_model": "edge_tts",
-        "core_memory_max_chars": 1000,
-        "memory_consolidation_interval": 3,
         "keep_alive": 300,
         # 引擎的背景工作：每一項都是多一次模型呼叫。
         "emotion_every": 2,
@@ -106,8 +101,6 @@ PRESETS: dict[str, dict[str, Any]] = {
     "standard": {
         "asr_model": "sherpa_onnx_asr",
         "tts_model": "edge_tts",
-        "core_memory_max_chars": 1500,
-        "memory_consolidation_interval": 1,
         "keep_alive": 1800,
         "emotion_every": 1,
         "memory_every": 2,
@@ -121,8 +114,6 @@ PRESETS: dict[str, dict[str, Any]] = {
     "high": {
         "asr_model": "sherpa_onnx_asr",
         "tts_model": "edge_tts",
-        "core_memory_max_chars": 3000,
-        "memory_consolidation_interval": 1,
         "keep_alive": 3600,
         "emotion_every": 1,
         "memory_every": 1,
@@ -250,20 +241,6 @@ def _keep_alive_from_conf() -> int:
         return 1800
 
 
-def _interval_from_conf() -> int:
-    """讀記憶整理的頻率（每 N 輪一次，夾在允許的集合內）。"""
-    try:
-        data = _load_plain()
-        v = (data.get("character_config", {}) or {}).get(
-            "memory_consolidation_interval"
-        )
-        if v is None:
-            return memory_core.CONSOLIDATE_INTERVAL_DEFAULT
-        return memory_core._clamp_interval(v)
-    except Exception:
-        return memory_core.CONSOLIDATE_INTERVAL_DEFAULT
-
-
 # --- 寫設定 ----------------------------------------------------------------- #
 #
 # 每一次寫入都限定在該子區塊的範圍內，絕不平掃整個檔案——好幾個引擎共用同樣的
@@ -372,16 +349,6 @@ def _write_keep_alive(keep_alive: int) -> bool:
     start, end = nested_extent(lines, "agent_config", "llm_configs", "ollama_llm")
     if not _rewrite_int_leaf(lines, start, end, "keep_alive", keep_alive):
         raise KeyError("keep_alive leaf not found in ollama_llm")
-    _write_conf(lines)
-    return True
-
-
-def _write_consolidation_interval(interval: int) -> bool:
-    """改寫記憶整理的頻率（每 N 輪一次）。"""
-    lines = _read_conf_lines()
-    start, end = character_config_extent(lines)
-    # 出廠的 conf.yaml 沒有這一行（程式端有預設值）：沒有就補上，不要報錯。
-    _upsert_leaf(lines, start, end, "memory_consolidation_interval", str(int(interval)))
     _write_conf(lines)
     return True
 
@@ -516,11 +483,10 @@ def _reference_voices() -> list:
 def init_perf_route() -> APIRouter:
     """引擎與硬體設定的端點。只接受可信來源。
 
-    - GET  /api/perf                  -> ASR/TTS engine + creds(masked) + keep_alive + interval
+    - GET  /api/perf                  -> ASR/TTS engine + creds(masked) + keep_alive
     - POST /api/perf/asr              -> set asr_model + cloud creds
     - POST /api/perf/tts              -> set tts_model + gpt_sovits fields
     - POST /api/perf/keep-alive       -> set ollama keep_alive
-    - POST /api/perf/consolidation    -> set memory_consolidation_interval
     - POST /api/perf/preset           -> apply a named preset bundle (atomic, one write)
     """
 
@@ -539,10 +505,6 @@ def init_perf_route() -> APIRouter:
                 "keep_alive": _keep_alive_from_conf(),
                 "keep_alive_min": KEEP_ALIVE_MIN,
                 "keep_alive_max": KEEP_ALIVE_MAX,
-                "consolidation_interval": _interval_from_conf(),
-                "consolidation_interval_choices": list(
-                    memory_core.CONSOLIDATE_INTERVAL_CHOICES
-                ),
                 "asr_models": sorted(ASR_MODELS),
                 "tts_models": sorted(TTS_MODELS),
                 "gpt_sovits_langs": sorted(GPT_SOVITS_LANGS),
@@ -661,36 +623,6 @@ def init_perf_route() -> APIRouter:
             {"ok": True, "keep_alive": keep_alive, "restart_required": True}
         )
 
-    @router.post("/api/perf/consolidation")
-    async def set_consolidation(request: Request):
-        """記憶整理的頻率（每 N 輪一次）。memory 分頁也有同一個設定。"""
-        if not _is_local_request(request):
-            return _forbidden()
-        body, bad = await _parse_body(request)
-        if bad:
-            return bad
-
-        if "interval" not in body:
-            return _error(400, "Missing 'interval' integer.")
-        try:
-            interval = int(body["interval"])
-        except (TypeError, ValueError):
-            return _error(400, "'interval' must be an integer.")
-        choices = list(memory_core.CONSOLIDATE_INTERVAL_CHOICES)
-        if interval not in choices:
-            return _error(400, f"'interval' must be one of {choices}.")
-
-        bad = await _write_or_error(
-            _write_consolidation_interval, interval, what="consolidation write"
-        )
-        if bad:
-            return bad
-
-        logger.info(f"[perf] consolidation saved (interval={interval})")
-        return JSONResponse(
-            {"ok": True, "consolidation_interval": interval, "restart_required": True}
-        )
-
     @router.post("/api/perf/preset")
     async def apply_preset(request: Request):
         """套用一組具名的預設（輕量／標準／高效能），一次寫入。
@@ -736,18 +668,9 @@ def _apply_preset_bundle(bundle: dict) -> bool:
     leaves pre-exist in conf.yaml (validated by the surgical writers, which raise
     KeyError if a leaf is missing -> the whole apply fails cleanly, nothing written).
     """
-    from .conf_editor import character_config_extent as _character_config_extent
 
     with open(CONF_PATH, "r", encoding="utf-8") as f:
         lines = f.readlines()
-
-    # --- character_config direct-child leaves ---
-    # 出廠的 conf.yaml 沒有這兩行（程式端有預設值）：沒有就補上。之前是找不到就
-    # 丟 KeyError，整個效能模式在沒改過這兩項的設定檔上都套用不了。
-    cc_start, cc_end = _character_config_extent(lines)
-    for leaf in ("core_memory_max_chars", "memory_consolidation_interval"):
-        if leaf in bundle:
-            cc_end = _upsert_leaf(lines, cc_start, cc_end, leaf, str(int(bundle[leaf])))
 
     # --- asr_model (re-find extent on the current lines; line count unchanged) ---
     if "asr_model" in bundle:

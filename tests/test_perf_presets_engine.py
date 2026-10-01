@@ -47,20 +47,11 @@ def test_a_preset_does_not_switch_the_engine_on_or_off(conf):
     assert engine_config_route.read_engine_settings()["enabled"] is before
 
 
-def test_a_preset_applies_to_a_config_that_never_set_the_memory_leaves(conf):
-    """出廠的 conf.yaml 沒有 core_memory_max_chars、memory_consolidation_interval；
-    之前找不到就丟 KeyError，效能模式整個套用不了。"""
+def test_a_preset_no_longer_writes_the_old_memory_leaves(conf):
+    """核心記憶上限與整理頻率只屬於拿掉的舊 agent；效能模式不再寫它們。"""
+    for preset in perf_route.PRESETS.values():
+        perf_route._apply_preset_bundle(preset)
+
     text = conf.read_text(encoding="utf-8")
     assert "core_memory_max_chars" not in text
-
-    perf_route._apply_preset_bundle(perf_route.PRESETS["light"])
-
-    text = conf.read_text(encoding="utf-8")
-    assert "core_memory_max_chars: 1000" in text
-    assert "memory_consolidation_interval: 3" in text
-
-
-def test_the_consolidation_interval_can_be_set_on_a_fresh_config(conf):
-    perf_route._write_consolidation_interval(5)
-
-    assert "memory_consolidation_interval: 5" in conf.read_text(encoding="utf-8")
+    assert "memory_consolidation_interval" not in text

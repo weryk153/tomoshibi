@@ -2,19 +2,11 @@
 // setting-ui.tsx 的三處註冊）——存檔是即時打 API，不需要外層抽屜的
 // Save/Cancel 去觸發。
 //
-// 三個區塊，由上而下：一鍵效能模式（POST /api/perf/preset，原子寫入六個設定
-// 葉）、模型保留時間（keep_alive 三選一）、記憶整理頻率（沿用 api/memory.ts
-// 既有的 setMemoryConsolidation，見該檔案的說明：整理頻率的權威寫法在
-// memory 命名空間，perf 命名空間的 /api/perf/consolidation 寫的是同一個
-// 設定葉，這裡不重複包一份）。
+// 兩個區塊，由上而下：一鍵效能模式（POST /api/perf/preset，原子寫入一組設定
+// 葉）、模型保留時間（keep_alive 三選一）。
 //
-// 這個分頁不需要 useConfig()／confUid：memory_consolidation_interval 存在
-// base conf.yaml 的 character_config 底下，不是逐角色檔案，perf_route.py／
-// memory_route.py 的寫入函式都沒有依 conf_uid 分流。setMemoryConsolidation
-// 仍要求傳一個 conf_uid 參數（介面跟 memory.tsx 共用），這裡固定傳空字串——
-// memory_route._resolve_conf_uid 對空字串一律視為「沒帶」而退回 base，不會
-// 400、也不會誤寫到某個角色專屬設定（memory.tsx 檔頭的同一段說明也適用在
-// 這裡）。
+// 這個分頁不需要 useConfig()／confUid：這些設定存在 base conf.yaml，不是逐角色
+// 檔案，perf_route.py 的寫入函式都沒有依 conf_uid 分流。
 import {
   useState, useEffect, useCallback, useMemo,
 } from 'react';
@@ -38,7 +30,6 @@ import {
   type PerfState,
   type KeepAliveMode,
 } from '@/api/perf.ts';
-import { setMemoryConsolidation } from '@/api/memory.ts';
 
 // keep_alive 的 UI 預設秒數草稿：使用者第一次把模式從永久常駐／立即卸載切到
 // 「自訂秒數」時要有個起始值。跟後端 perf_route._keep_alive_from_conf 的
@@ -60,16 +51,6 @@ function presetDescKey(name: string): string | null {
   if (name === 'light') return 'settings.perf.presetLightDesc';
   if (name === 'standard') return 'settings.perf.presetStandardDesc';
   if (name === 'high') return 'settings.perf.presetHighDesc';
-  return null;
-}
-
-// 整理頻率選項目前固定是 {1,3,5}（memory_core.CONSOLIDATE_INTERVAL_CHOICES），
-// 各自有專屬翻譯鍵。跟 presetNameKey 一樣，找不到對應鍵時直接顯示數字，不讓
-// 未來後端多開一個新選項時整個下拉選單壞掉。
-function consolidationLabelKey(n: number): string | null {
-  if (n === 1) return 'settings.perf.consolidationEvery1';
-  if (n === 3) return 'settings.perf.consolidationEvery3';
-  if (n === 5) return 'settings.perf.consolidationEvery5';
   return null;
 }
 
@@ -96,9 +77,8 @@ function Perf(): JSX.Element {
   );
   const [savingKeepAlive, setSavingKeepAlive] = useState(false);
 
-  // 載入現值。refreshTick 讓套用 preset 成功後可以重新拉一次，三個區塊都要
-  // 反映新寫入的值（preset 一次改了 asr/tts/keep_alive/consolidation 四個
-  // 會出現在這個分頁上的欄位）。
+  // 載入現值。refreshTick 讓套用 preset 成功後可以重新拉一次，兩個區塊都要
+  // 反映新寫入的值。
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
@@ -137,13 +117,6 @@ function Perf(): JSX.Element {
       { label: t('settings.perf.keepAliveCustom'), value: 'seconds' },
     ],
   }), [t]);
-
-  const consolidationCollection = useMemo(() => createListCollection({
-    items: (perf?.consolidation_interval_choices ?? []).map((n) => {
-      const key = consolidationLabelKey(n);
-      return { label: key ? t(key) : String(n), value: String(n) };
-    }),
-  }), [perf?.consolidation_interval_choices, t]);
 
   const handleApplyPreset = useCallback(async () => {
     if (!selectedPreset) return;
@@ -224,36 +197,6 @@ function Perf(): JSX.Element {
       });
     }
   }, [baseUrl, keepAliveSecondsDraft, t]);
-
-  const handleConsolidationChange = useCallback(async (value: string[]) => {
-    const interval = Number(value[0]);
-    // 先前這裡有一道 `if (!isValidConsolidation(interval)) return;`。它用的是
-    // api/memory.ts 裡寫死的 {1,3,5}，而上面的下拉選單是用伺服器送來的
-    // consolidation_interval_choices 建的——兩邊一旦不同步，使用者選得到卻存
-    // 不了，而且是一個沒有任何提示的 return。setMemoryConsolidation 自己就會
-    // 驗證並回傳可翻譯的錯誤鍵（它的註解特別為此設計），這道前置守衛只是讓那
-    // 條路徑永遠到不了。拿掉，讓錯誤真的浮上來。
-    const result = await setMemoryConsolidation(baseUrl, '', interval);
-    if (result.ok) {
-      setPerf((p) => (p ? { ...p, consolidation_interval: interval } : p));
-      toaster.create({
-        title: t('settings.perf.saved'),
-        description: t('settings.perf.restartHint'),
-        type: 'success',
-        duration: 4000,
-      });
-    } else {
-      toaster.create({
-        // result.error 可能是 i18n 鍵（api 層刻意回傳穩定識別碼）或是網路層的
-        // 人話訊息。用開頭判斷，別把後者也丟進 t()。
-        title: result.error
-          ? (result.error.startsWith('settings.') ? t(result.error) : result.error)
-          : t('settings.perf.saveFailed'),
-        type: 'error',
-        duration: 3000,
-      });
-    }
-  }, [baseUrl, t]);
 
   if (loadError) {
     return (
@@ -376,24 +319,6 @@ function Perf(): JSX.Element {
             </HStack>
           </Stack>
         )}
-      </Stack>
-
-      {/* 記憶整理頻率：下拉選單，選了就存——跟 memory.tsx 的開關類控制同一種
-          即時存檔模式，不需要額外的儲存按鈕（選單本身就是離散、確定的動作，
-          不像文字輸入框有「打到一半」的中間狀態）。呼叫的是 api/memory.ts 的
-          setMemoryConsolidation，不是 perf 命名空間那支未使用的版本——見本檔
-          檔頭與 api/perf.ts 檔尾的說明，兩個端點寫的是同一個設定葉，
-          memory 命名空間才是這個 UI 實際呼叫的權威寫法。 */}
-      <Stack gap={2}>
-        <Heading size="sm">{t('settings.perf.consolidationSectionTitle')}</Heading>
-        <SelectField
-          label={t('settings.perf.consolidationLabel')}
-          value={perf.consolidation_interval ? [String(perf.consolidation_interval)] : []}
-          onChange={handleConsolidationChange}
-          collection={consolidationCollection}
-          placeholder={t('settings.perf.consolidationPlaceholder')}
-        />
-        <Text fontSize="xs" color="whiteAlpha.600">{t('settings.perf.consolidationHelp')}</Text>
       </Stack>
     </Stack>
   );

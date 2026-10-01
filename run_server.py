@@ -211,6 +211,15 @@ def run(console_log_level: str, open_browser: bool = False):
         shutil.copy(_mcp_template, "mcp_servers.json")
         logger.info(f"mcp_servers.json not found — created it from {_mcp_template}.")
 
+    # 舊 conf.yaml（舊 agent 的名字與欄位）先升級，再驗證。失敗不擋開機：驗證時
+    # 舊名字照樣讀得到（config_manager.agent 的相容處理）。
+    try:
+        from src.open_llm_vtuber.conf_upgrade import upgrade_conf_file
+
+        upgrade_conf_file()
+    except Exception as e:
+        logger.warning(f"conf.yaml upgrade skipped ({type(e).__name__}: {e})")
+
     # Load configurations from yaml file
     config: Config = validate_config(read_yaml("conf.yaml"))
     server_config = config.system_config

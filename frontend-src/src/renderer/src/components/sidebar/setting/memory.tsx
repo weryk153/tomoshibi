@@ -2,9 +2,8 @@
 // （見 setting-ui.tsx 的三處註冊）——存檔是即時打 API，不需要外層抽屜的
 // Save/Cancel 去觸發。
 //
-// 版面依 spec §4.3：核心在前（開關、核心記憶上限），進階收在展開區但完整保留
-// （手動編輯核心記憶文字＋字數、深度回想開關與 top-k、重建索引）。第一版設計
-// 提議移除進階控制，spec 記載那是閹割不是精簡，這裡原樣保留、只是收起來。
+// 記憶全在引擎手上：核心是開關，手動編輯她自己的記憶與這段對話的記憶收在
+// 展開區。
 //
 // conf_uid 用 useConfig().confUid（既有的 CharacterConfigContext），由
 // websocket-handler 收到後端 'set-model-and-conf' 訊息時填入，代表「目前使用中
@@ -29,50 +28,24 @@ import { Button } from '@/components/ui/tw/primitives';
 import { toaster } from '@/components/ui/tw/toaster';
 import { useWebSocket } from '@/context/websocket-context';
 import { useConfig } from '@/context/character-config-context';
-import { SwitchField, NumberField } from './common';
+import { SwitchField } from './common';
 import {
   fetchMemory,
   saveMemoryContent,
   setMemoryEnabled,
-  setMemoryCap,
   clearMemory,
   saveSelfMemoryContent,
   clearSelfMemory,
-  clampCap,
   type MemoryState,
 } from '@/api/memory.ts';
 
-// 見 src/open_llm_vtuber/memory_core.py 的 CAP_MIN／CAP_MAX 與 memory_route.py
-// memory.ts 沒有把 cap 邊界匯出成常數——clampCap
-// 內部就會夾住，呼叫端本來就不需要知道邊界值才能送出合法請求——但
-// NumberField 的 min/max 需要實際數字才能限制輸入框與提示文字，所以在這裡重複
-// 一份，來源與 memory.ts 開頭引用的後端檔案一致。
-// 這四個是 fallback：memory 還沒載入完成時畫面仍要有可用的範圍。載入之後
-// 一律改用伺服器送來的 cap_min／cap_max
-// （見 api/memory.ts 的說明）——伺服器才是界限的權威。
-const CAP_MIN = 500;
-const CAP_MAX = 8000;
-
-interface MemoryProps {
-  // 這個分頁目前是不是使用者看得到的那個 tab（setting-ui.tsx 依 activeTab
-  // 算出）。用來在套用 perf 的一鍵模式後，使用者切回這個分頁時重新拉一次
-  // core_memory_max_chars 這個 preset 會寫的欄位——見下面
-  // 那個獨立的 fetchMemory effect 旁的說明。預設 true：萬一哪天有別的呼叫端
-  // 沒傳這個 prop（目前只有 setting-ui.tsx 一處註冊），行為退回「一律當作
-  // 可見」。
-  active?: boolean
-}
-
-function Memory({ active = true }: MemoryProps): JSX.Element {
+function Memory(): JSX.Element {
   const { t } = useTranslation();
   const { baseUrl } = useWebSocket();
   const { confUid } = useConfig();
 
   const [memory, setMemory] = useState<MemoryState | null>(null);
 
-  // 界限一律以伺服器為準，載入前才用上面的 fallback。
-  const capMin = memory?.cap_min ?? CAP_MIN;
-  const capMax = memory?.cap_max ?? CAP_MAX;
   const [loadError, setLoadError] = useState<string | null>(null);
   // refreshTick 的遞增端（重建索引）已隨深度回憶一起移除；讀取端與機制
   // 保留，之後的破壞性操作要重抓現值時直接 setRefreshTick 即可。
@@ -95,10 +68,6 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
   const [pendingSaveSelf, setPendingSaveSelf] = useState(false);
   const [pendingClearSelf, setPendingClearSelf] = useState(false);
   const [clearingSelf, setClearingSelf] = useState(false);
-
-  const [capDraft, setCapDraft] = useState('');
-  const [savingCap, setSavingCap] = useState(false);
-
 
   const [pendingClear, setPendingClear] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -135,7 +104,6 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
         setContentDraft(result.data.content);
         setSelfDraft(result.data.self_content);
         setContentLoaded(true);
-        setCapDraft(String(result.data.cap));
       } else {
         setLoadError(result.error);
       }
@@ -144,56 +112,6 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
       cancelled = true;
     };
   }, [baseUrl, confUid, refreshTick]);
-
-  // 套用 perf 分頁的一鍵模式會原子寫入 core_memory_max_chars
-  // 兩個這個分頁也在顯示的欄位（見 perf_route.PRESETS）。這個分頁如果早就掛載
-  // 著（Tabs.Content 預設不做 lazyMount，抽屜一打開就都掛了），畫面停在套用前
-  // 抓到的那份不會自動更新——跟 asr.tsx／tts.tsx 同一個破綻、同一份任務簡報
-  // Fix 1，只是這裡多一個地雷：下面存 cap 的按鈕（handleCapSave）送出的是
-  // capDraft 目前顯示的值，不是「有沒有改過」的差異——如果 capDraft 沒跟著更新
-  // 就停在套用前的舊值，使用者之後隨手按一次「儲存」（哪怕只是想存別的東西時
-  // 順手按到），就會把剛套用的 preset 值悄悄改回舊的，這是任務簡報點名的第二
-  // 種後果，不只是顯示不對。
-  //
-  // 這個 effect 故意不把 confUid 放進依賴陣列（用 closure 讀目前值就好，跟下面
-  // handleToggle 等 callback 讀 confUid 的方式一致）：confUid 改變（切換角色）
-  // 已經由上面那個 effect 完整處理（它的依賴陣列本來就有 confUid，會整份重新
-  // 載入，capDraft 也在裡面），這裡如果重複依賴 confUid，角色切換時會跟主要
-  // effect 的 fetchMemory 同時打出兩個請求，晚回來的那個可能用「切換前那個
-  // 角色」的 memory 狀態去比較 capDraft 有沒有異動，把不相干的一次判斷結果套
-  // 用到新角色身上。這裡只處理「同一個角色、分頁重新變成可見」這一種情境。
-  //
-  // 修法：切回這個分頁時只重新拉這兩個欄位，不叫 fetchMemory 整份重新載入——
-  // 特意不重用上面那個 effect／不去動 refreshTick，因為那個 effect 一啟動就會
-  // setContentDraft(result.data.content) 整份覆寫核心記憶文字框、並重置
-  // pendingSaveContent／pendingClear 兩個確認旗標。核心記憶的
-  // 存檔是整份取代（見檔頭與 handleContentSave 旁的說明），使用者這時可能正在
-  // textarea 裡打一段還沒存的手動編輯——切分頁再切回來就把打到一半的文字換成
-  // 伺服器的舊內容，是比這次要修的顯示錯誤更糟的資料遺失，絕對不能做。
-  //
-  // cap 有草稿（capDraft），用「目前草稿是否還等於上一次載入的伺服器值」判斷
-  // 有沒有在編輯中——沒異動就跟著刷新，有異動（使用者正在打字，還沒按下面的
-  // 儲存）就不覆寫，把使用者半打的數字保留下來。
-  //
-  // 讀取失敗時不設 loadError：這只是背景刷新，失敗了維持原本已經在畫面上、能
-  // 動作的那份資料。
-  useEffect(() => {
-    if (!active) return undefined;
-    let cancelled = false;
-    (async () => {
-      const result = await fetchMemory(baseUrl, confUid);
-      if (cancelled || !result.ok) return;
-      const data = result.data;
-      setCapDraft((prev) => (
-        memory && prev !== String(memory.cap) ? prev : String(data.cap)
-      ));
-      setMemory((m) => (m ? { ...m, cap: data.cap } : m));
-    })();
-    return (): void => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, baseUrl]);
 
   const handleToggle = useCallback(async (checked: boolean) => {
     const result = await setMemoryEnabled(baseUrl, confUid, checked);
@@ -214,38 +132,6 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
     }
   }, [baseUrl, confUid, t]);
 
-  // 兩個 clampCap 陷阱都要在這裡擋下：
-  // 1) NumberField 給的 value 是字串，clampCap 不會做字串轉數字（"6000" 會被
-  //    Number.isFinite 判定為非數字而夾到下界 500），所以先用 Number() 轉成
-  //    數字再交給 clampCap。
-  // 2) clampCap 只保證落在 [CAP_MIN, CAP_MAX] 之內，不保證是整數——750.5 會
-  //    原封不動通過，後端 int() 會悄悄把它截斷成 750。這裡用 Math.round 在
-  //    送出前抹平小數，不是只靠 <input step>：settingStyles 裡
-  //    numberInput.root 的 pattern 是 `[0-9]*\.?[0-9]*`，容許輸入小數點，
-  //    使用者用鍵盤打字仍能繞過 step 限制，唯一可靠的地方是送出前。
-  const handleCapSave = useCallback(async () => {
-    const clamped = Math.round(clampCap(Number(capDraft)));
-    setSavingCap(true);
-    const result = await setMemoryCap(baseUrl, confUid, clamped);
-    setSavingCap(false);
-    if (result.ok) {
-      setMemory((m) => (m ? { ...m, cap: clamped } : m));
-      setCapDraft(String(clamped));
-      toaster.create({
-        title: t('settings.memory.capSaved'),
-        description: t('settings.memory.restartHintSetting'),
-        type: 'success',
-        duration: 5000,
-      });
-    } else {
-      toaster.create({
-        title: result.error || t('settings.memory.saveFailed'),
-        type: 'error',
-        duration: 3000,
-      });
-    }
-  }, [baseUrl, confUid, capDraft, t]);
-
   // 破壞性操作 1／3：POST /api/memory 是整份取代，不是合併。contentLoaded 已
   // 在 UI 層擋住「現值還沒載入完成就存檔」，這裡再擋一次做為最後防線。真正的
   // 確認步驟是 pendingSaveContent：按第一次「儲存記憶」只會顯示確認區塊，要再
@@ -255,16 +141,14 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
     setSavingContent(true);
     setSaveError(null);
     // memory.content 是這次編輯的起點：載入時放進 textarea 的那一版，存檔成功後
-    // 換成剛存的。切分頁再切回來只刷新 cap，不動它，所以它跟 textarea 一致。
+    // 換成剛存的，所以它跟 textarea 一致。
     const result = await saveMemoryContent(
       baseUrl, confUid, contentDraft, memory?.content,
     );
     setSavingContent(false);
     setPendingSaveContent(false);
     if (result.ok) {
-      setMemory((m) => (m
-        ? { ...m, content: contentDraft, char_count: contentDraft.length }
-        : m));
+      setMemory((m) => (m ? { ...m, content: contentDraft } : m));
       toaster.create({
         title: t('settings.memory.saved'),
         description: t('settings.memory.restartHint'),
@@ -285,7 +169,7 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
     setPendingClear(false);
     if (result.ok) {
       setContentDraft('');
-      setMemory((m) => (m ? { ...m, content: '', char_count: 0 } : m));
+      setMemory((m) => (m ? { ...m, content: '' } : m));
       toaster.create({ title: t('settings.memory.cleared'), type: 'success', duration: 2500 });
     } else {
       toaster.create({
@@ -310,9 +194,7 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
       // 存檔時，被擠掉的那幾行會被當成新的又加回去。
       const stored = typeof result.data?.content === 'string' ? result.data.content : selfDraft;
       setSelfDraft(stored);
-      setMemory((m) => (m
-        ? { ...m, self_content: stored, self_char_count: stored.length }
-        : m));
+      setMemory((m) => (m ? { ...m, self_content: stored } : m));
       toaster.create({
         title: t('settings.memory.saved'),
         description: t('settings.memory.restartHint'),
@@ -331,7 +213,7 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
     setPendingClearSelf(false);
     if (result.ok) {
       setSelfDraft('');
-      setMemory((m) => (m ? { ...m, self_content: '', self_char_count: 0 } : m));
+      setMemory((m) => (m ? { ...m, self_content: '' } : m));
       toaster.create({ title: t('settings.memory.selfCleared'), type: 'success', duration: 2500 });
     } else {
       toaster.create({
@@ -363,34 +245,13 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
     <Stack {...settingStyles.common.container} maxW="none">
       <Text fontSize="sm" color="whiteAlpha.700">{t('settings.memory.description')}</Text>
 
-      {/* 核心：開關＋核心記憶上限，spec 要求打開分頁第一眼就看到 */}
+      {/* 核心：開關，打開分頁第一眼就看到 */}
       <SwitchField
         label={t('settings.memory.toggle')}
         checked={memory.enabled}
         onChange={handleToggle}
         help={t('settings.memory.toggleHelp')}
       />
-
-      {memory.engine_managed ? (
-        <Text fontSize="xs" color="whiteAlpha.600">{t('settings.memory.engineManaged')}</Text>
-      ) : (
-      <Stack gap={2}>
-        <NumberField
-          label={t('settings.memory.capLabel', { min: capMin, max: capMax })}
-          value={capDraft}
-          onChange={setCapDraft}
-          min={capMin}
-          max={capMax}
-          step={1}
-          help={t('settings.memory.capHelp', { min: CAP_MIN, max: CAP_MAX })}
-        />
-        <HStack>
-          <Button size="xs" tone="blue" onClick={handleCapSave} loading={savingCap}>
-            {t('common.save')}
-          </Button>
-        </HStack>
-      </Stack>
-      )}
 
       {/* 進階：收在展開區——手動編輯她自己的記憶與這段對話的記憶，不該是打開
           分頁第一眼看到的東西。 */}
@@ -418,9 +279,7 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
                 disabled={!contentLoaded}
               />
               <Text fontSize="xs" color="whiteAlpha.600">
-                {memory.self_engine_managed
-                  ? t('settings.memory.selfEngineManaged')
-                  : t('settings.memory.selfCharCount', { count: selfDraft.length, cap: memory.self_cap })}
+                {t('settings.memory.charCountNoCap', { count: selfDraft.length })}
               </Text>
               {saveSelfError && (
                 <Text fontSize="xs" color="red.300">{saveSelfError}</Text>
@@ -485,9 +344,7 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
                 disabled={!contentLoaded}
               />
               <Text fontSize="xs" color="whiteAlpha.600">
-                {memory.engine_managed
-                  ? t('settings.memory.charCountNoCap', { count: contentDraft.length })
-                  : t('settings.memory.charCount', { count: contentDraft.length, cap: memory.cap })}
+                {t('settings.memory.charCountNoCap', { count: contentDraft.length })}
               </Text>
               <Text fontSize="xs" color="whiteAlpha.500">{t('settings.memory.editHint')}</Text>
               {saveError && (

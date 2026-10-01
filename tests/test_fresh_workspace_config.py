@@ -8,6 +8,7 @@ ServerRegistry 初始化失敗，整個後端結束——CI 的打包實測在 m
 上都撞到。中文系統拿到的範本 use_mcpp: False，所以開發機上看不出來。
 """
 
+from src.open_llm_vtuber.config_manager.agent import conversation_block
 import inspect
 import json
 from pathlib import Path
@@ -51,6 +52,6 @@ def test_default_mcp_servers_cover_what_the_templates_enable():
             (ROOT / "config_templates" / name).read_text(encoding="utf-8")
         )
         agent = conf["character_config"]["agent_config"]["agent_settings"]
-        enabled = agent["basic_memory_agent"]["mcp_enabled_servers"]
+        enabled = conversation_block(agent)["mcp_enabled_servers"]
         missing = set(enabled) - set(servers)
         assert not missing, f"{name} 啟用了 {missing}，但預設的 mcp_servers.json 沒有"

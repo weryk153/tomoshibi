@@ -35,52 +35,8 @@ from .config_manager import (
     TranslatorConfig,
     read_yaml,
     validate_config,
+    with_conversation_block,
 )
-
-
-SELF_MEMORY_HEADING = "\n\n## 你對自己的認知（所有對話共用，自然運用、不要生硬複述）\n"
-CORE_MEMORY_HEADING = (
-    "\n\n## 你對對方的長期記憶（之前對話累積下來的，自然運用、不要生硬複述）\n"
-)
-
-
-def build_memory_blocks(self_mem: str, core_mem: str) -> str:
-    """把兩份記憶組成系統提示的兩塊。她自己的在前、對方的在後；空的不出。"""
-    out = ""
-    if self_mem:
-        out += SELF_MEMORY_HEADING + self_mem
-    if core_mem:
-        out += CORE_MEMORY_HEADING + core_mem
-    return out
-
-
-def split_memory_blocks(system_prompt: str) -> tuple[str, str, str]:
-    """build_memory_blocks 的反向：(拿掉記憶的系統提示, 她自己的, 對方的)。
-
-    給不把記憶放在系統提示裡的 agent 用。記憶每一輪都會被整理一次，而它在系統
-    提示的中段：它一變，推論端就得把後半段系統提示連同整段對話重讀一遍。
-
-    construct_system_prompt 把記憶接在通用對話規則（CORE_CONVERSATION_PROMPT）
-    前面，這裡靠那個位置認出記憶到哪裡結束。認不出來就原樣交回去，不猜。
-    """
-    from .conversation_quality import CORE_CONVERSATION_PROMPT
-
-    end = system_prompt.find(f"\n\n{CORE_CONVERSATION_PROMPT}")
-    starts = [
-        position
-        for heading in (SELF_MEMORY_HEADING, CORE_MEMORY_HEADING)
-        if 0 <= (position := system_prompt.find(heading)) < end
-    ]
-    if not starts:
-        return system_prompt, "", ""
-    start = min(starts)
-    memory = system_prompt[start:end]
-    about_her, _, about_the_user = memory.partition(CORE_MEMORY_HEADING)
-    return (
-        system_prompt[:start] + system_prompt[end:],
-        about_her.removeprefix(SELF_MEMORY_HEADING),
-        about_the_user,
-    )
 
 
 class ServiceContext:
@@ -315,8 +271,8 @@ class ServiceContext:
 
         # Initialize session-specific MCP components
         await self._init_mcp_components(
-            self.character_config.agent_config.agent_settings.basic_memory_agent.use_mcpp,
-            self.character_config.agent_config.agent_settings.basic_memory_agent.mcp_enabled_servers,
+            self.character_config.agent_config.agent_settings.conversation.use_mcpp,
+            self.character_config.agent_config.agent_settings.conversation.mcp_enabled_servers,
         )
 
         logger.debug(f"Loaded service context with cache: {character_config}")
@@ -370,7 +326,7 @@ class ServiceContext:
         # Initialize shared ToolAdapter if it doesn't exist yet
         if (
             not self.tool_adapter
-            and config.character_config.agent_config.agent_settings.basic_memory_agent.use_mcpp
+            and config.character_config.agent_config.agent_settings.conversation.use_mcpp
         ):
             if not self.mcp_server_registery:
                 logger.info(
@@ -382,8 +338,8 @@ class ServiceContext:
 
         # Initialize MCP Components before initializing Agent
         await self._init_mcp_components(
-            config.character_config.agent_config.agent_settings.basic_memory_agent.use_mcpp,
-            config.character_config.agent_config.agent_settings.basic_memory_agent.mcp_enabled_servers,
+            config.character_config.agent_config.agent_settings.conversation.use_mcpp,
+            config.character_config.agent_config.agent_settings.conversation.mcp_enabled_servers,
         )
 
         # init agent from character config
@@ -959,15 +915,7 @@ class ServiceContext:
 
             persona_prompt += prompt_content
 
-        # 注入兩份長期記憶：她自己的（角色層，所有對話共用）在前、對方的（屬於這一段
-        # 對話，不跨對話累積）在後。見 MEMORY_SYSTEM_DESIGN.md。
-        # 長期記憶關閉時（long_term_memory_enabled=False）兩份都不注入。
-        if getattr(target_character, "long_term_memory_enabled", True):
-            from .memory_core import load_core_memory, load_self_memory
-
-            self_mem = load_self_memory(target_character.conf_uid)
-            core_mem = load_core_memory(target_character.conf_uid, self.history_uid)
-            persona_prompt += build_memory_blocks(self_mem, core_mem)
+        # 她記得什麼不放在系統提示裡：引擎把記憶寫進對話的備註。
 
         # Generic conversation quality belongs to the capability layer, not to any
         # character's personality.
@@ -1056,7 +1004,9 @@ class ServiceContext:
 
             # Always merge against the on-disk base, never the previously active
             # character. Otherwise switching A -> B leaks omitted A settings into B.
-            new_character_config_data = deep_merge(base_character_data, alt_config_data)
+            new_character_config_data = deep_merge(
+                base_character_data, with_conversation_block(alt_config_data)
+            )
 
         new_config = validate_config(
             {

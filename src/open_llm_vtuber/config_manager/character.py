@@ -32,15 +32,11 @@ class CharacterConfig(I18nMixin):
     tts_preprocessor_config: TTSPreprocessorConfig = Field(
         ..., alias="tts_preprocessor_config"
     )
-    # 長期記憶的總開關。關掉會同時停掉整理與注入。
-    # behavior for confs that don't set this key. When False: skip consolidation
+    # 這個角色要不要有長期記憶（引擎記住你說過的事、她自己說過的事）。
+    # 關掉時引擎不抽取、不帶進對話。
     long_term_memory_enabled: bool = Field(
         default=True, alias="long_term_memory_enabled"
     )
-    # 記憶的字數上限。越大記得越多，但每輪的 token 也越多、整理時越容易漏掉東西。
-    # that don't set this key. Bigger = remembers more but more tokens/turn + slower
-    # + lossier consolidation. Bounded to [500, 8000] by the validator below.
-    core_memory_max_chars: int = Field(default=1500, alias="core_memory_max_chars")
     # 這個角色說話用的語言。留空＝沿用 system_config.player_language。
     #
     # 為什麼要在角色層級：player_language 是全域的，設成日文會讓每一個角色都
@@ -62,12 +58,6 @@ class CharacterConfig(I18nMixin):
     # 留空（預設）＝不保護任何名字，行為與沒有這個功能時完全相同。
     protected_names: dict[str, list[str]] = Field(
         default_factory=dict, alias="protected_names"
-    )
-    # 每幾輪整理一次記憶。3 或 5 可以把整理用的呼叫省一半以上，適合弱機。
-    # (every turn) preserves existing behavior. 3/5 halve+ the "tidy-up" LLM calls for
-    # weak/local models. Clamped to {1,3,5} by the validator below (fail-soft -> 1).
-    memory_consolidation_interval: int = Field(
-        default=1, alias="memory_consolidation_interval"
     )
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
@@ -110,48 +100,12 @@ class CharacterConfig(I18nMixin):
             en="Avatar image path for the character", zh="角色头像图片路径"
         ),
         "long_term_memory_enabled": Description(
-            en="Enable long-term (core) memory: consolidation + injection",
-            zh="啟用長期（核心）記憶：整理 + 注入",
-        ),
-        "core_memory_max_chars": Description(
-            en="Core memory size cap in characters (500-8000, default 1500). "
-            "Bigger = more tokens/turn + slower + lossier consolidation.",
-            zh="核心記憶字數上限（500–8000，預設 1500）。"
-            "越大越能記、但每輪 token 越多、整理舊記憶更易遺漏。",
-        ),
-        "memory_consolidation_interval": Description(
-            en="Consolidate core memory every N turns (1/3/5, default 1=every turn). "
-            "3/5 cut the tidy-up LLM calls roughly in half for weak/local models.",
-            zh="每幾輪整理一次核心記憶（1/3/5，預設 1=每輪）。"
-            "3/5 可把整理用的 LLM 呼叫省一半以上，適合弱機或本地模型。",
+            en="Long-term memory for this character: the engine remembers what you "
+            "said and what she said. Off = nothing is extracted or brought back.",
+            zh="這個角色要不要有長期記憶（引擎記住你說過的事、她自己說過的事）。"
+            "關掉時引擎不抽取、不帶進對話。",
         ),
     }
-
-    @field_validator("core_memory_max_chars")
-    def clamp_core_memory_max_chars(cls, v):
-        # 夾界的規則要跟 memory_core 一致，否則載入時與執行時對同一個值的看法會不同。
-        # the default on any bad value rather than rejecting the whole config.
-        try:
-            n = int(v)
-        except (TypeError, ValueError):
-            return 1500
-        return max(500, min(8000, n))
-
-        try:
-            n = int(v)
-        except (TypeError, ValueError):
-            return 3
-        return max(1, min(10, n))
-
-    @field_validator("memory_consolidation_interval")
-    def clamp_memory_consolidation_interval(cls, v):
-        # 夾進允許的集合；壞值一律回 1（每輪整理，最保守）。
-        # behavior) on any bad value rather than rejecting the whole config.
-        try:
-            n = int(v)
-        except (TypeError, ValueError):
-            return 1
-        return n if n in (1, 3, 5) else 1
 
     @field_validator("persona_prompt")
     def check_default_persona_prompt(cls, v):

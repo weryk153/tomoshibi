@@ -5,7 +5,7 @@
 
 from types import SimpleNamespace
 
-from src.open_llm_vtuber import memory_core, memory_route
+from src.open_llm_vtuber import memory_route
 
 
 def _context(conf_uid, history_uid, agent_engine):
@@ -23,7 +23,7 @@ def test_the_route_asks_the_agent_that_keeps_the_memory_itself():
     )
     contexts = {
         "other": _context("charB", "conv1", keeper),
-        "basic": _context("charA", "conv2", SimpleNamespace()),
+        "no-memory": _context("charA", "conv2", SimpleNamespace()),
     }
     assert memory_route._memory_keeper(contexts, "charA") is None
 
@@ -68,7 +68,7 @@ def test_saving_forgets_only_what_the_page_started_from():
     ]
 
 
-def test_the_endpoints_pass_the_starting_point_and_skip_the_lock_for_the_agent():
+def test_the_endpoints_pass_the_starting_point():
     import inspect
 
     src = inspect.getsource(memory_route.init_memory_route)
@@ -78,7 +78,6 @@ def test_the_endpoints_pass_the_starting_point_and_skip_the_lock_for_the_agent()
         )
         == 1
     )
-    assert src.count("needed=_needs_consolidation_lock(keeper=keeper)") == 2
 
 
 def test_the_page_sends_the_starting_point():
@@ -101,52 +100,6 @@ def test_the_page_sends_the_starting_point():
         in page
     )
     assert api.count("edited_from: editedFrom") == 2
-
-
-def test_an_agent_that_keeps_her_own_memory_gets_no_consolidation():
-    """引擎記得對方、也記得她自己說過什麼：主機那一套整理（一次模型呼叫，跟她的
-    回覆搶同一顆本機模型）整個不用做。"""
-    import inspect
-
-    from src.open_llm_vtuber.conversations import single_conversation
-
-    src = inspect.getsource(single_conversation.process_single_conversation)
-
-    assert 'not hasattr(context.agent_engine, "self_memory")' in src
-
-
-def test_the_agents_memory_is_not_held_up_by_the_hosts_consolidation():
-    """實機：整理「她自己的記憶」跑到一半（最長 60 秒）時按下清除，記憶頁回 503
-    「記憶正在整理中」。整理碰的是 self_memory.md，跟引擎的記憶無關，不用等它。"""
-    assert memory_route._needs_consolidation_lock(keeper=object()) is False
-    assert memory_route._needs_consolidation_lock(keeper=None) is True
-
-
-def test_the_memory_page_is_told_when_the_engine_keeps_the_memory(
-    tmp_path, monkeypatch
-):
-    """引擎的記憶不按字數限制。頁面要知道，不然會顯示一個不起作用的上限。"""
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(memory_route, "_is_local_request", lambda request: True)
-    monkeypatch.setattr(memory_route, "_resolve_conf_uid", lambda value: (value, None))
-    keeper = SimpleNamespace(
-        conversation_memory=lambda history_uid: "對方：名字是晨星。",
-        rewrite_conversation_memory=lambda history_uid, text, **_: None,
-    )
-    contexts = {"engine": _context("kurisu", "h1", keeper)}
-    app = FastAPI()
-    app.include_router(memory_route.init_memory_route(contexts))
-    client = TestClient(app)
-
-    engine = client.get("/api/memory", params={"conf_uid": "kurisu"}).json()
-    contexts["engine"] = _context("kurisu", "h1", SimpleNamespace())
-    basic = client.get("/api/memory", params={"conf_uid": "kurisu"}).json()
-
-    assert engine["engine_managed"] is True
-    assert basic["engine_managed"] is False
 
 
 def _page(monkeypatch, tmp_path, contexts):
@@ -185,7 +138,9 @@ def test_the_memory_page_shows_and_edits_her_own_memory_in_the_engine(
 ):
     keeper = _Keeper()
     client = _page(monkeypatch, tmp_path, {"engine": _context("kurisu", "h1", keeper)})
-    memory_core.save_self_memory("kurisu", "紅莉栖：舊檔案裡的。")
+    old_file = tmp_path / "chat_history" / "kurisu" / "self_memory.md"
+    old_file.parent.mkdir(parents=True, exist_ok=True)
+    old_file.write_text("紅莉栖：舊檔案裡的。", encoding="utf-8")
 
     shown = client.get("/api/memory", params={"conf_uid": "kurisu"}).json()
     saved = client.post(
@@ -199,11 +154,10 @@ def test_the_memory_page_shows_and_edits_her_own_memory_in_the_engine(
     cleared = client.post("/api/memory/self/clear", json={"conf_uid": "kurisu"}).json()
 
     assert shown["self_content"] == "紅莉栖喜歡胡椒博士。"
-    assert shown["self_engine_managed"] is True
     assert saved["ok"] is True and cleared["ok"] is True
     assert keeper.edits == [("紅莉栖怕蟑螂。", "紅莉栖喜歡胡椒博士。"), ("", None)]
-    # 主機那一份沒被碰：它只在第一次搬進引擎。
-    assert memory_core.load_self_memory("kurisu") == "紅莉栖：舊檔案裡的。"
+    # 舊檔案沒被碰，也沒被搬進引擎。
+    assert old_file.read_text(encoding="utf-8") == "紅莉栖：舊檔案裡的。"
 
 
 def test_turning_memory_off_also_stops_her_remembering_herself():
@@ -238,7 +192,6 @@ def test_without_a_connection_the_page_reaches_her_running_engine(
 
     engine = _Companion()
     monkeypatch.setattr(factory, "current_companion", lambda key: engine)
-    monkeypatch.setattr(memory_route, "_configured_for_the_engine", lambda uid: True)
     client = _page(monkeypatch, tmp_path, {})
 
     saved = client.post(
@@ -249,87 +202,3 @@ def test_without_a_connection_the_page_reaches_her_running_engine(
     assert memory_route._self_keeper({}, "kurisu").self_memory() == "二。\n三。"
     # 引擎留下多少，頁面就顯示多少：不然下次存檔，被擠掉的又會被當成新的加回去。
     assert saved["content"] == "二。\n三。"
-
-
-def test_an_edit_that_no_one_would_read_is_refused(tmp_path, monkeypatch):
-    """引擎接手過她自己的記憶、現在卻沒在跑：寫進 self_memory.md 的東西不會再
-    被讀，不能讓頁面說「已儲存」。"""
-    from src.open_llm_vtuber.character_engine import factory
-
-    monkeypatch.setattr(factory, "current_companion", lambda key: None)
-    monkeypatch.setattr(memory_route, "_configured_for_the_engine", lambda uid: True)
-    client = _page(monkeypatch, tmp_path, {})
-    marker = tmp_path / "chat_history" / "kurisu" / "engine" / "brought-self-memory.txt"
-    marker.parent.mkdir(parents=True)
-    marker.write_text("brought\n", encoding="utf-8")
-    memory_core.save_self_memory("kurisu", "紅莉栖：舊的。")
-
-    saved = client.post(
-        "/api/memory/self", json={"conf_uid": "kurisu", "content": "新的。"}
-    )
-    cleared = client.post("/api/memory/self/clear", json={"conf_uid": "kurisu"})
-
-    assert saved.status_code == 409 and cleared.status_code == 409
-    assert memory_core.load_self_memory("kurisu") == "紅莉栖：舊的。"
-
-
-def test_back_on_the_basic_agent_the_page_edits_the_file_she_reads(
-    tmp_path, monkeypatch
-):
-    """試過引擎、又換回 basic_memory_agent：上次啟動的引擎還在記憶體裡、搬過的
-    記號也還在，但她說話讀的是 self_memory.md。頁面要改的是那一份，不能 409。"""
-    from src.open_llm_vtuber.character_engine import factory
-
-    monkeypatch.setattr(factory, "current_companion", lambda key: _Companion())
-    marker = tmp_path / "chat_history" / "kurisu" / "engine" / "brought-self-memory.txt"
-    marker.parent.mkdir(parents=True)
-    marker.write_text("brought\n", encoding="utf-8")
-    with_connection = _page(
-        monkeypatch, tmp_path, {"basic": _context("kurisu", "h1", SimpleNamespace())}
-    )
-    saved = with_connection.post(
-        "/api/memory/self",
-        json={"conf_uid": "kurisu", "content": "紅莉栖：連線中改的。"},
-    )
-    assert saved.status_code == 200
-    assert memory_core.load_self_memory("kurisu") == "紅莉栖：連線中改的。"
-
-    monkeypatch.setattr(memory_route, "_configured_for_the_engine", lambda uid: False)
-    no_connection = _page(monkeypatch, tmp_path, {})
-    saved = no_connection.post(
-        "/api/memory/self",
-        json={"conf_uid": "kurisu", "content": "紅莉栖：重開之後改的。"},
-    )
-    assert saved.status_code == 200
-    assert memory_core.load_self_memory("kurisu") == "紅莉栖：重開之後改的。"
-
-
-def test_which_agent_a_character_is_set_to_comes_from_its_file_or_the_base(
-    tmp_path, monkeypatch
-):
-    from src.open_llm_vtuber import character_route
-
-    def conf(uid, choice=None):
-        agent = (
-            f"  agent_config:\n    conversation_agent_choice: '{choice}'\n"
-            if choice
-            else ""
-        )
-        return f"character_config:\n  conf_uid: '{uid}'\n{agent}"
-
-    base = tmp_path / "conf.yaml"
-    base.write_text(conf("mao", "character_engine_agent"), encoding="utf-8")
-    characters = tmp_path / "characters"
-    characters.mkdir()
-    (characters / "kurisu.yaml").write_text(
-        conf("kurisu", "basic_memory_agent"), encoding="utf-8"
-    )
-    (characters / "frieren.yaml").write_text(conf("frieren"), encoding="utf-8")
-    # read_yaml 只讀工作目錄底下的檔案，跟正式執行一樣用相對路徑。
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(memory_route, "CONF_PATH", "conf.yaml")
-    monkeypatch.setattr(character_route, "CHARACTERS_DIR", "characters")
-
-    assert memory_route._configured_for_the_engine("mao") is True
-    assert memory_route._configured_for_the_engine("kurisu") is False
-    assert memory_route._configured_for_the_engine("frieren") is True

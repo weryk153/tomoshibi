@@ -3,16 +3,18 @@ This module contains the pydantic model for the configurations of
 different types of agents.
 """
 
-from pydantic import BaseModel, Field
-from typing import Dict, ClassVar, Optional, Literal, List
+from collections.abc import Mapping
+from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Any, Dict, ClassVar, Optional, Literal, List
 from .i18n import I18nMixin, Description
 from .stateless_llm import StatelessLLMConfigs
 
 # ======== Configurations for different Agents ========
 
 
-class BasicMemoryAgentConfig(I18nMixin, BaseModel):
-    """Configuration for the basic memory agent."""
+class ConversationConfig(I18nMixin, BaseModel):
+    """對話用的模型與工具：引擎 agent 講話用哪一組 llm_configs、要不要開 MCP 工具、
+    斷句方式。這個區塊以前叫 basic_memory_agent（那個 agent 已經拿掉）。"""
 
     llm_provider: Literal[
         "stateless_llm_with_template",
@@ -36,8 +38,8 @@ class BasicMemoryAgentConfig(I18nMixin, BaseModel):
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "llm_provider": Description(
-            en="LLM provider to use for this agent",
-            zh="Basic Memory Agent 智能体使用的大语言模型选项",
+            en="Which llm_configs entry the conversation uses",
+            zh="對話使用的語言模型（llm_configs 裡的哪一組）",
         ),
         "faster_first_response": Description(
             en="Whether to respond as soon as encountering a comma in the first sentence to reduce latency (default: True)",
@@ -55,64 +57,6 @@ class BasicMemoryAgentConfig(I18nMixin, BaseModel):
             en="List of MCP servers to enable for the agent",
             zh="为智能体启用 MCP 服务器列表",
         ),
-    }
-
-
-class Mem0VectorStoreConfig(I18nMixin, BaseModel):
-    """Configuration for Mem0 vector store."""
-
-    provider: str = Field(..., alias="provider")
-    config: Dict = Field(..., alias="config")
-
-    DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
-        "provider": Description(
-            en="Vector store provider (e.g., qdrant)", zh="向量存储提供者（如 qdrant）"
-        ),
-        "config": Description(
-            en="Provider-specific configuration", zh="提供者特定配置"
-        ),
-    }
-
-
-class Mem0LLMConfig(I18nMixin, BaseModel):
-    """Configuration for Mem0 LLM."""
-
-    provider: str = Field(..., alias="provider")
-    config: Dict = Field(..., alias="config")
-
-    DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
-        "provider": Description(en="LLM provider name", zh="语言模型提供者名称"),
-        "config": Description(
-            en="Provider-specific configuration", zh="提供者特定配置"
-        ),
-    }
-
-
-class Mem0EmbedderConfig(I18nMixin, BaseModel):
-    """Configuration for Mem0 embedder."""
-
-    provider: str = Field(..., alias="provider")
-    config: Dict = Field(..., alias="config")
-
-    DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
-        "provider": Description(en="Embedder provider name", zh="嵌入模型提供者名称"),
-        "config": Description(
-            en="Provider-specific configuration", zh="提供者特定配置"
-        ),
-    }
-
-
-class Mem0Config(I18nMixin, BaseModel):
-    """Configuration for Mem0."""
-
-    vector_store: Mem0VectorStoreConfig = Field(..., alias="vector_store")
-    llm: Mem0LLMConfig = Field(..., alias="llm")
-    embedder: Mem0EmbedderConfig = Field(..., alias="embedder")
-
-    DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
-        "vector_store": Description(en="Vector store configuration", zh="向量存储配置"),
-        "llm": Description(en="LLM configuration", zh="语言模型配置"),
-        "embedder": Description(en="Embedder configuration", zh="嵌入模型配置"),
     }
 
 
@@ -175,7 +119,7 @@ class LettaConfig(I18nMixin, BaseModel):
 class CharacterEngineAgentConfig(I18nMixin, BaseModel):
     """character_engine_agent 的認知節奏。
 
-    對話的設定（llm_provider、use_mcpp…）沿用 basic_memory_agent 區塊，這裡只放
+    對話的設定（llm_provider、use_mcpp…）在 conversation 區塊，這裡只放
     引擎背景工作的部分。預設值跟引擎的 CompanionSettings 一致；character_engine/
     factory.py 把這份傳過去（timeout_seconds、max_rebase_turns 在那裡換成引擎的
     名字）。
@@ -269,28 +213,75 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
     }
 
 
-class AgentSettings(I18nMixin, BaseModel):
-    """Settings for different types of agents."""
+def conversation_block(agent_settings: Mapping | None) -> dict:
+    """原始 YAML 字典裡對話用的設定區塊：新名字 conversation，舊名字 basic_memory_agent。
 
-    basic_memory_agent: Optional[BasicMemoryAgentConfig] = Field(
-        None, alias="basic_memory_agent"
+    給不經過 pydantic、直接讀 conf.yaml 字典的人用（翻譯、語言模型頁、工具開關）。
+    """
+    if not isinstance(agent_settings, Mapping):
+        return {}
+    for key in ("conversation", "basic_memory_agent"):
+        block = agent_settings.get(key)
+        if isinstance(block, Mapping):
+            return dict(block)
+    return {}
+
+
+def with_conversation_block(character_config: Mapping) -> dict:
+    """角色檔深度合併到底稿之前，把舊名字 basic_memory_agent 改成 conversation。
+
+    底稿 conf.yaml 開機時已經升級成 conversation；角色檔還寫舊名字的話，合併後兩個
+    名字並存，pydantic 以 conversation（底稿的）為準，角色檔指定的模型就被蓋掉。
+    兩個名字都在時一樣以 conversation 為準。
+    """
+    agent_config = character_config.get("agent_config")
+    settings = (
+        agent_config.get("agent_settings")
+        if isinstance(agent_config, Mapping)
+        else None
     )
-    mem0_agent: Optional[Mem0Config] = Field(None, alias="mem0_agent")
+    if not isinstance(settings, Mapping) or not isinstance(
+        settings.get("basic_memory_agent"), Mapping
+    ):
+        return dict(character_config)
+    settings = dict(settings)
+    old = settings.pop("basic_memory_agent")
+    new = settings.get("conversation")
+    settings["conversation"] = {**old, **new} if isinstance(new, Mapping) else dict(old)
+    return {
+        **character_config,
+        "agent_config": {**agent_config, "agent_settings": settings},
+    }
+
+
+class AgentSettings(I18nMixin, BaseModel):
+    """Settings for the conversation and the agents."""
+
+    conversation: Optional[ConversationConfig] = Field(None, alias="conversation")
     hume_ai_agent: Optional[HumeAIConfig] = Field(None, alias="hume_ai_agent")
     letta_agent: Optional[LettaConfig] = Field(None, alias="letta_agent")
     character_engine_agent: Optional[CharacterEngineAgentConfig] = Field(
         None, alias="character_engine_agent"
     )
 
+    @model_validator(mode="before")
+    @classmethod
+    def _old_block_name(cls, data: Any) -> Any:
+        # 舊 conf.yaml 與角色檔的深度合併只有 basic_memory_agent；新名字在就以新名字為準。
+        if isinstance(data, Mapping) and "basic_memory_agent" in data:
+            data = dict(data)
+            old = data.pop("basic_memory_agent")
+            data.setdefault("conversation", old)
+        return data
+
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
+        "conversation": Description(
+            en="Model and tools for the conversation", zh="對話用的模型與工具"
+        ),
         "character_engine_agent": Description(
             en="Cognition cadence for the AI Character Engine agent",
             zh="AI Character Engine 代理的認知節奏",
         ),
-        "basic_memory_agent": Description(
-            en="Configuration for basic memory agent", zh="基础记忆代理配置"
-        ),
-        "mem0_agent": Description(en="Configuration for Mem0 agent", zh="Mem0代理配置"),
         "hume_ai_agent": Description(
             en="Configuration for Hume AI agent", zh="Hume AI 代理配置"
         ),
@@ -300,18 +291,23 @@ class AgentSettings(I18nMixin, BaseModel):
     }
 
 
+_RETIRED_CHOICES = {"basic_memory_agent", "mem0_agent"}
+
+
 class AgentConfig(I18nMixin, BaseModel):
     """This class contains all of the configurations related to agent."""
 
     conversation_agent_choice: Literal[
-        "basic_memory_agent",
-        "mem0_agent",
-        "hume_ai_agent",
-        "letta_agent",
-        "character_engine_agent",
-    ] = Field(..., alias="conversation_agent_choice")
+        "character_engine_agent", "hume_ai_agent", "letta_agent"
+    ] = Field("character_engine_agent", alias="conversation_agent_choice")
     agent_settings: AgentSettings = Field(..., alias="agent_settings")
     llm_configs: StatelessLLMConfigs = Field(..., alias="llm_configs")
+
+    @field_validator("conversation_agent_choice", mode="before")
+    @classmethod
+    def _retired_choice(cls, value: Any) -> Any:
+        # 舊 agent 拿掉了；mem0_agent 的程式本來就是空檔。兩者都改由引擎 agent 對話。
+        return "character_engine_agent" if value in _RETIRED_CHOICES else value
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "conversation_agent_choice": Description(
