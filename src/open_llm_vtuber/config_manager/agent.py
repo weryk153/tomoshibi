@@ -183,6 +183,7 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
 
     emotion_every: int = Field(1, alias="emotion_every", ge=0)
     memory_every: int = Field(2, alias="memory_every", ge=0)
+    self_memory_every: int = Field(2, alias="self_memory_every", ge=0)
     summary_every: int = Field(0, alias="summary_every", ge=0)
     reflection_every: int = Field(6, alias="reflection_every", ge=0)
     goal_every: int = Field(4, alias="goal_every", ge=0)
@@ -195,6 +196,10 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
         120.0, alias="foreground_patience_seconds", gt=0
     )
     max_history_messages: int = Field(80, alias="max_history_messages", ge=0)
+    # 背景工作另外用的端點與模型；兩個都有才用（character_engine/factory.py）。
+    background_base_url: str = Field("", alias="background_base_url")
+    background_model: str = Field("", alias="background_model")
+    background_api_key: str = Field("", alias="background_api_key")
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "max_history_messages": Description(
@@ -208,6 +213,22 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
         "memory_every": Description(
             en="Extract engine memories every N turns (0 disables)",
             zh="每幾輪擷取一次引擎記憶（0 為停用）",
+        ),
+        "self_memory_every": Description(
+            en="Remember what she said about herself every N turns (0 disables)",
+            zh="每幾輪記一次她自己說過的事（0 為停用）",
+        ),
+        "background_base_url": Description(
+            en="Another endpoint for the background jobs (empty: the one she talks with)",
+            zh="背景工作另外用的端點（空著就跟她講話用同一個）",
+        ),
+        "background_model": Description(
+            en="The model at that endpoint (both must be set to be used)",
+            zh="那個端點的模型（兩個都填才會用）",
+        ),
+        "background_api_key": Description(
+            en="API key for that endpoint (empty: the one she talks with)",
+            zh="那個端點的 API 金鑰（空著就沿用她講話那一個）",
         ),
         "summary_every": Description(
             en="Summarise the conversation every N turns (0 disables)",

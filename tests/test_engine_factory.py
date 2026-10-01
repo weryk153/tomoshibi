@@ -167,6 +167,55 @@ def test_she_talks_with_the_hosts_settings_and_thinks_with_plain_ones():
     assert {client.options["model"] for client in Offline.built} == {"stub"}
 
 
+def test_her_background_work_can_run_on_another_model():
+    """她講話用設定頁選的模型，背景工作（情緒、記憶、目標…）可以交給另一個端點，
+    例如另一台電腦上的同一顆模型：她講話時就不用跟背景工作搶。"""
+    arguments = factory_arguments()
+    arguments["agent_settings"]["character_engine_agent"] = {
+        "background_base_url": "http://127.0.0.1:1235/v1",
+        "background_model": "qwen/qwen3.5-9b",
+        "goal_every": 9,
+    }
+
+    agent = AgentFactory.create_agent(**arguments)
+    talking, thinking = Offline.built
+
+    assert talking.options["model"] == "stub"
+    assert talking.options["base_url"] != "http://127.0.0.1:1235/v1"
+    assert thinking.options["base_url"] == "http://127.0.0.1:1235/v1"
+    assert thinking.options["model"] == "qwen/qwen3.5-9b"
+    assert thinking.request_options["temperature"] == pytest.approx(0.1)
+    assert agent._companion().settings.goal_every == 9
+
+
+def test_half_a_background_endpoint_is_not_used():
+    """只填了網址或只填了模型：用講話那一顆，不要拿半套設定去連。"""
+    arguments = factory_arguments()
+    arguments["agent_settings"]["character_engine_agent"] = {
+        "background_base_url": "http://127.0.0.1:1235/v1",
+        "background_model": "",
+    }
+
+    AgentFactory.create_agent(**arguments)
+    talking, thinking = Offline.built
+
+    assert thinking.options["base_url"] == talking.options["base_url"]
+    assert thinking.options["model"] == talking.options["model"]
+
+
+def test_changing_the_background_model_builds_a_new_engine_side():
+    arguments = factory_arguments()
+    first = AgentFactory.create_agent(**arguments)._companion()
+    arguments = factory_arguments()
+    arguments["agent_settings"]["character_engine_agent"] = {
+        "background_base_url": "http://127.0.0.1:1235/v1",
+        "background_model": "qwen/qwen3.5-9b",
+    }
+    second = AgentFactory.create_agent(**arguments)._companion()
+
+    assert second is not first
+
+
 def test_the_cognition_settings_reach_the_engine():
     arguments = factory_arguments()
     arguments["agent_settings"]["character_engine_agent"] = {
