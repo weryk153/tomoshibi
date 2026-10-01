@@ -1,7 +1,7 @@
 # 用 AI Character Engine 的 agent
 
-選了 `character_engine_agent`，整段對話就由
-[AI Character Engine](https://github.com/weryk153/ai-character-engine) 驅動：
+Tomoshibi 的整段對話由
+[AI Character Engine](https://github.com/weryk153/ai-character-engine) 驅動（`character_engine_agent`）：
 
 - 對話、對話歷史、工具呼叫、看圖，都在引擎裡。
 - 她對你的感覺（心情、信任、好感、關係階段）會隨互動累積。
@@ -39,15 +39,15 @@ uv pip install -e ../ai-character-engine
 
 ## 啟用
 
-在 `conf.yaml`（或角色的 yaml）裡改一行：
+預設就是它，不用另外設定：
 
 ```yaml
 agent_config:
   conversation_agent_choice: 'character_engine_agent'
 ```
 
-模型、MCP、斷句這些設定沿用 `agent_settings.basic_memory_agent`，不用另外填。要改回來
-就把這一行改回 `basic_memory_agent`。
+模型、MCP、斷句這些設定在 `agent_settings.conversation`。舊的 `conf.yaml` 寫的是
+`basic_memory_agent`，開機時會自動升級一次（區塊改名、拿掉舊 agent 專屬的欄位）。
 
 引擎沒裝好時 App 照常開啟，log 會寫明原因與做法，聊天畫面會提示去設定頁。
 
@@ -135,21 +135,12 @@ ssh -f -N -o ServerAliveInterval=15 -L 1235:127.0.0.1:1234 <帳號>@<那台電�
 提示都是上一輪的延伸，推論端的快取才用得上。系統提示只有人設與一段「備註怎麼讀」
 的說明，狀態怎麼變都不會動到它。
 
-`basic_memory_agent` 把長期記憶放在系統提示的中段，而它每一輪都會被整理一次：它一
-變，推論端就得把後半段系統提示連同整段對話重讀一遍。寫進備註就只多讀新增的那幾行。
+記憶要是放在系統提示的中段，它一變，推論端就得把後半段系統提示連同整段對話重讀
+一遍。寫進備註就只多讀新增的那幾行。
 
 備註的標籤（`emotion`、`memory`、`goal`、`the user seems`、`For the next reply only`）
 是引擎的，英文；那是給模型讀的，使用者看不到。記憶、目標、體會的內容用她回話的
 語言寫（`player_language`／角色的 `reply_language`）。
-
-量過的數字（M4 16GB、`qwen/qwen3.5-9b`、LM Studio、GPT-SoVITS，實際伺服器走
-WebSocket，第 2–5 輪）：
-
-| | `basic_memory_agent` | `character_engine_agent` |
-|---|---|---|
-| 第一句語音出來 | 16.5–24.7 秒 | 6.6–10.6 秒 |
-| 推論端每輪沿用的 token | 2048 | 4352–5120 |
-| 推論端每輪重讀的 token | 2339–2998 | 445–879 |
 
 她也會從備註知道現在的日期與時間。問她幾點時，9B 的模型有一半的機會不呼叫時間
 工具而是編一個（實測 6 次裡 3 次）。
@@ -161,11 +152,7 @@ WebSocket，第 2–5 輪）：
 
 ## 目前的限制
 
-- 設定頁還沒有對應的 UI，要直接改 yaml。
 - 看圖多一次模型呼叫，有圖的那一輪第一句話會晚約 3 秒。
-- 模型不支援原生工具呼叫時，`basic_memory_agent` 會改用提示詞模式；這個 agent 沒有
-  那條退路。
-- 整則回覆被重複護欄丟掉而重生時，引擎那邊會算成兩輪（`basic_memory_agent` 也是）。
-- 被護欄丟掉的句子她自己還記得說過（`basic_memory_agent` 也是）。
+- 模型不支援原生工具呼叫時沒有提示詞模式的退路。
 - 兩個連線同時講話時，引擎一次只跑一輪，後到的要等前一個講完。
-- 字幕翻譯和 `core_memory` 的整理也用同一顆模型，它們不在「她回話時讓路」的機制裡。
+- 字幕翻譯也用同一顆模型，它不在「她回話時讓路」的機制裡。

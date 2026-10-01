@@ -61,17 +61,15 @@ character_config:
   #  =================== LLM 后端设置 ===================
 
   agent_config:
-    conversation_agent_choice: 'basic_memory_agent' # 对话代理选择
+    conversation_agent_choice: 'character_engine_agent' # 对话代理选择
 
     agent_settings:
-      basic_memory_agent:
-        # 基础 AI 代理，没什么特别的。
-        # 从 llm_config 中选择一个 llm 提供商
-        # 并在相应的字段中设置所需的参数
-        # 例如：
-        # 'openai_compatible_llm', 'llama_cpp_llm', 'claude_llm', 'ollama_llm'
-        # 'openai_llm', 'gemini_llm', 'zhipu_llm', 'deepseek_llm', 'groq_llm'
-        # 'mistral_llm', 'lmstudio_llm' 之类的
+      conversation:
+        # 她说话用的模型与工具。
+        # 从 llm_config 中选择一个 llm 提供商，并在相应的字段中设置所需的参数。
+        # 必须是 OpenAI 兼容的端点（有 base_url 与 model），例如：
+        # 'openai_compatible_llm', 'ollama_llm', 'lmstudio_llm', 'openai_llm',
+        # 'gemini_llm', 'zhipu_llm', 'deepseek_llm', 'groq_llm', 'mistral_llm' 之类的
         llm_provider: 'ollama_llm' # 使用的 LLM 提供商
         # 是否在第一句回应时遇上逗号就直接生成音频以减少首句延迟（默认：True）
         faster_first_response: True
@@ -83,11 +81,10 @@ character_config:
         mcp_enabled_servers: ["time", "ddg-search"] # 启用的 MCP 服务器
 
       character_engine_agent:
-        # 可选。整段对话由 AI Character Engine 驱动：对话、记忆、工具都在引擎里，
-        # 她对你的感觉、接下来想做的事、注意到的事会随互动累积。要启用请把
-        # conversation_agent_choice 改成 'character_engine_agent'。需要 OpenAI 兼容的
-        # LLM 端点，见 docs/character-engine-agent.md。
-        # 模型、MCP、断句沿用上面 basic_memory_agent 的设置。
+        # 整段对话由 AI Character Engine 驱动：对话、记忆、工具都在引擎里，
+        # 她对你的感觉、接下来想做的事、注意到的事会随互动累积。
+        # 见 docs/character-engine-agent.md。
+        # 模型、MCP、断句沿用上面 conversation 的设置。
         # 每种背景工作每几轮跑一次；0 为停用。每一种都是一次额外的 LLM 调用，
         # 机器慢的话把数字调大。
         emotion_every: 1
