@@ -6,8 +6,9 @@ readme = "README.md"
 requires-python = ">=3.11,<3.13"
 dependencies = [
     # 對話由 AI Character Engine 驅動（character_engine_agent）。釘在一個 commit：
-    # 引擎沒發版號，main 往前走時 Tomoshibi 不會跟著被改掉行為。
-    "ai-character-engine @ git+https://github.com/weryk153/ai-character-engine@a7f1dacc86da950d6f05a2304261efee5f1a2126",
+    # 引擎沒發版號，main 往前走時 Tomoshibi 不會跟著被改掉行為。用原始碼壓縮檔而不是
+    # git+https：後者要電腦上有 git，桌面版的使用者（尤其 Windows）多半沒有。
+    "ai-character-engine @ https://github.com/weryk153/ai-character-engine/archive/a7f1dacc86da950d6f05a2304261efee5f1a2126.tar.gz",
     "anthropic>=0.40.0",
     "azure-cognitiveservices-speech>=1.41.1",
     "chardet>=5.2.0",
