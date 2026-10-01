@@ -48,11 +48,8 @@ from .agent import (
     AgentConfig,
     AgentSettings,
     StatelessLLMConfigs,
-    BasicMemoryAgentConfig,
-    Mem0Config,
-    Mem0VectorStoreConfig,
-    Mem0LLMConfig,
-    Mem0EmbedderConfig,
+    ConversationConfig,
+    conversation_block,
 )
 
 # Import utility functions
@@ -79,11 +76,8 @@ __all__ = [
     "AgentConfig",
     "AgentSettings",
     "StatelessLLMConfigs",
-    "BasicMemoryAgentConfig",
-    "Mem0Config",
-    "Mem0VectorStoreConfig",
-    "Mem0LLMConfig",
-    "Mem0EmbedderConfig",
+    "ConversationConfig",
+    "conversation_block",
     # ASR related classes
     "ASRConfig",
     "AzureASRConfig",
