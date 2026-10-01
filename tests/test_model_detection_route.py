@@ -16,7 +16,7 @@ from src.open_llm_vtuber.model_probe import DetectedModel
 CONF = """character_config:
   agent_config:
     agent_settings:
-      basic_memory_agent:
+      conversation:
         llm_provider: 'openai_compatible_llm'
         use_mcpp: true
     llm_configs:

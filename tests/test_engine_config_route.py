@@ -12,7 +12,7 @@ CONF = """character_config:
   agent_config:
     conversation_agent_choice: 'basic_memory_agent' # 对话代理选择
     agent_settings:
-      basic_memory_agent:
+      conversation:
         llm_provider: 'openai_compatible_llm'
         use_mcpp: False
       character_engine_agent:
@@ -87,7 +87,7 @@ def test_a_conf_without_the_engine_block_gets_one(conf_file):
         "  agent_config:\n"
         "    conversation_agent_choice: 'basic_memory_agent'\n"
         "    agent_settings:\n"
-        "      basic_memory_agent:\n"
+        "      conversation:\n"
         "        llm_provider: 'openai_compatible_llm'\n",
         encoding="utf-8",
     )

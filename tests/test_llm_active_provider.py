@@ -27,7 +27,7 @@ def _write_conf(tmp_path, monkeypatch, llm_provider_line: str) -> dict:
         "character_config:\n"
         "  agent_config:\n"
         "    agent_settings:\n"
-        "      basic_memory_agent:\n"
+        "      conversation:\n"
         f"{llm_provider_line}"
         "    llm_configs:\n"
         "      openai_compatible_llm:\n"

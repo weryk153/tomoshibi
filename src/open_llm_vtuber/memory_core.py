@@ -758,7 +758,7 @@ def resolve_consolidation_llm(character_config: Any) -> tuple[str, str, str, dic
     providers expose the same base_url/model/key leaves.
     """
     agent_config = character_config.agent_config
-    provider = agent_config.agent_settings.basic_memory_agent.llm_provider
+    provider = agent_config.agent_settings.conversation.llm_provider
     llm_config = getattr(agent_config.llm_configs, provider, None)
     if llm_config is None:
         raise ValueError(f"Active LLM provider config not found: {provider}")

@@ -404,7 +404,7 @@ def test_she_can_see_through_the_same_model_without_its_reasoning(monkeypatch):
 
 def test_a_provider_the_engine_cannot_talk_to_is_refused_with_the_way_out():
     arguments = factory_arguments()
-    arguments["agent_settings"]["basic_memory_agent"]["llm_provider"] = "claude_llm"
+    arguments["agent_settings"]["conversation"]["llm_provider"] = "claude_llm"
     arguments["llm_configs"]["claude_llm"] = {"model": "claude", "base_url": "x"}
 
     with pytest.raises(ValueError) as caught:

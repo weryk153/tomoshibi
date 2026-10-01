@@ -7,7 +7,7 @@
   貓娘不一定），全域設定只是「沒特別指定時的預設」。
 - **玩家提示**（system_config.player_prompt）：一句關於你的話，會被注入每一個
   角色的 system prompt。
-- **工具開關**（…basic_memory_agent.use_mcpp）：讓角色能用 MCP 工具（網路搜尋等）。
+- **工具開關**（…conversation.use_mcpp）：讓角色能用 MCP 工具（網路搜尋等）。
 
 這幾個原本住在 translator_route 裡——那個模組長成了雜物櫃，翻譯設定跟玩家設定
 擠在一起，還順便擁有全域的 conf.yaml 編輯原語。搬出來之後兩邊都只剩自己的事。
@@ -39,6 +39,7 @@ from .api_guard import (
     make_yaml as _make_yaml,
 )
 from .conf_editor import CONF_PATH
+from .config_manager.agent import conversation_block
 
 
 def _load_conf() -> Any:
@@ -71,16 +72,16 @@ def _write_system_setting(key: str, value: str) -> None:
 def _write_use_mcpp(enabled: bool) -> None:
     """寫入巢狀在三層底下的 use_mcpp 布林。
 
-    路徑是 character_config → agent_config → agent_settings → basic_memory_agent。
+    路徑是 character_config → agent_config → agent_settings → conversation。
     一層一層往下找，每層找不到就丟 KeyError——這比讓它靜靜寫到錯的地方好。
     """
     lines = read_conf_lines()
     settings_start, settings_end = block_extent(lines, "agent_settings")
     agent_start, agent_end = block_extent(
-        lines, "basic_memory_agent", start_from=settings_start
+        lines, "conversation", start_from=settings_start
     )
     if agent_start >= settings_end:
-        raise KeyError("basic_memory_agent: not found inside agent_settings")
+        raise KeyError("conversation: not found inside agent_settings")
 
     # YAML 布林要寫成裸的 True／False，加引號就變成字串了。
     if not rewrite_bool_leaf(lines, agent_start, agent_end, "use_mcpp", enabled):
@@ -183,12 +184,11 @@ def init_player_route() -> APIRouter:
 
         def read() -> bool:
             data = _load_conf()
-            agent = (
+            agent = conversation_block(
                 ((data.get("character_config") or {}).get("agent_config") or {}).get(
                     "agent_settings"
                 )
-                or {}
-            ).get("basic_memory_agent") or {}
+            )
             return bool(agent.get("use_mcpp", False))
 
         return _read_or_error(read, what="use-mcpp", key="use_mcpp")

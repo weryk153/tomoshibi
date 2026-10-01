@@ -150,7 +150,7 @@ async def extract_proactive_search_facts(
         return None
     try:
         agent_settings = context.character_config.agent_config.agent_settings
-        bm = agent_settings.basic_memory_agent
+        bm = agent_settings.conversation
         if not getattr(bm, "use_mcpp", False):
             return None
         enabled = list(getattr(bm, "mcp_enabled_servers", []) or [])

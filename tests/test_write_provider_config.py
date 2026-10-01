@@ -14,7 +14,7 @@ CONF = """character_config:
   agent_config:
     conversation_agent_choice: 'basic_memory_agent'
     agent_settings:
-      basic_memory_agent:
+      conversation:
         llm_provider: 'openai_compatible_llm'
     llm_configs:
       openai_compatible_llm:
@@ -95,7 +95,7 @@ def test_missing_block_raises(conf_file):
         "character_config:\n"
         "  agent_config:\n"
         "    agent_settings:\n"
-        "      basic_memory_agent:\n"
+        "      conversation:\n"
         "        llm_provider: 'openai_compatible_llm'\n"
         "    llm_configs:\n"
         "      openai_compatible_llm:\n"
@@ -125,7 +125,7 @@ def test_write_openai_block_inserts_missing_leaf_instead_of_raising(conf_file):
         "character_config:\n"
         "  agent_config:\n"
         "    agent_settings:\n"
-        "      basic_memory_agent:\n"
+        "      conversation:\n"
         "        llm_provider: 'openai_compatible_llm'\n"
         "    llm_configs:\n"
         "      openai_compatible_llm:\n"

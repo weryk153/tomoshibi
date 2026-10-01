@@ -9,7 +9,7 @@ def _character(provider: str):
     return SimpleNamespace(
         agent_config=SimpleNamespace(
             agent_settings=SimpleNamespace(
-                basic_memory_agent=SimpleNamespace(llm_provider=provider),
+                conversation=SimpleNamespace(llm_provider=provider),
             ),
             llm_configs=SimpleNamespace(
                 openai_compatible_llm=SimpleNamespace(

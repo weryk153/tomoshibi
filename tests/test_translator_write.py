@@ -169,7 +169,7 @@ ACTIVE_LMSTUDIO = """\
 character_config:
   agent_config:
     agent_settings:
-      basic_memory_agent:
+      conversation:
         llm_provider: 'lmstudio_llm'
     llm_configs:
       openai_compatible_llm:

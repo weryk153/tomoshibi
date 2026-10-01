@@ -24,7 +24,7 @@ system_config:
 character_config:
   agent_config:
     agent_settings:
-      basic_memory_agent:
+      conversation:
         llm_provider: 'ollama_llm'  # 目前用哪一個
         faster_first_response: True
     llm_configs:
@@ -104,7 +104,7 @@ def test_provider_is_switched_over(conf):
     conf.write_text("".join(lines), encoding="utf-8")
 
     agent = _parsed(conf)["character_config"]["agent_config"]["agent_settings"][
-        "basic_memory_agent"
+        "conversation"
     ]
     assert agent["llm_provider"] == "openai_compatible_llm"
 

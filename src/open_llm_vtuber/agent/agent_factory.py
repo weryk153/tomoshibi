@@ -60,7 +60,7 @@ class AgentFactory:
             # 設定與它完全相同，所以共用 basic_memory_agent 這個設定區塊——設定頁、
             # MCP、記憶整理、翻譯都讀那個區塊，另開一份的話它們全部要跟著改。
             # Get the LLM provider choice from agent settings
-            basic_memory_settings: dict = agent_settings.get("basic_memory_agent", {})
+            basic_memory_settings: dict = agent_settings.get("conversation") or {}
             llm_provider: str = basic_memory_settings.get("llm_provider")
 
             if not llm_provider:

@@ -68,7 +68,7 @@ def _context(
             conf_uid="aoi",
             agent_config=SimpleNamespace(
                 agent_settings=SimpleNamespace(
-                    basic_memory_agent=SimpleNamespace(
+                    conversation=SimpleNamespace(
                         use_mcpp=use_mcpp,
                         mcp_enabled_servers=list(servers),
                     )

@@ -315,8 +315,8 @@ class ServiceContext:
 
         # Initialize session-specific MCP components
         await self._init_mcp_components(
-            self.character_config.agent_config.agent_settings.basic_memory_agent.use_mcpp,
-            self.character_config.agent_config.agent_settings.basic_memory_agent.mcp_enabled_servers,
+            self.character_config.agent_config.agent_settings.conversation.use_mcpp,
+            self.character_config.agent_config.agent_settings.conversation.mcp_enabled_servers,
         )
 
         logger.debug(f"Loaded service context with cache: {character_config}")
@@ -370,7 +370,7 @@ class ServiceContext:
         # Initialize shared ToolAdapter if it doesn't exist yet
         if (
             not self.tool_adapter
-            and config.character_config.agent_config.agent_settings.basic_memory_agent.use_mcpp
+            and config.character_config.agent_config.agent_settings.conversation.use_mcpp
         ):
             if not self.mcp_server_registery:
                 logger.info(
@@ -382,8 +382,8 @@ class ServiceContext:
 
         # Initialize MCP Components before initializing Agent
         await self._init_mcp_components(
-            config.character_config.agent_config.agent_settings.basic_memory_agent.use_mcpp,
-            config.character_config.agent_config.agent_settings.basic_memory_agent.mcp_enabled_servers,
+            config.character_config.agent_config.agent_settings.conversation.use_mcpp,
+            config.character_config.agent_config.agent_settings.conversation.mcp_enabled_servers,
         )
 
         # init agent from character config

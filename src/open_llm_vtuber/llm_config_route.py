@@ -32,13 +32,14 @@ from loguru import logger
 
 # --- 常數 ------------------------------------------------------------------- #
 
+from .config_manager.agent import conversation_block
 from .conf_editor import (
     nested_extent,
+    rewrite_str_leaf,
     read_conf_lines as _read_conf_lines,
     upsert_leaf,
     upsert_nested_block,
     write_conf as _write_conf,
-    split_leaf as _split_leaf,
 )
 from .api_guard import (
     forbidden as _forbidden,
@@ -126,11 +127,10 @@ def _get_openai_block(data: Any) -> Optional[Any]:
 def _get_llm_provider(data: Any) -> Optional[str]:
     """目前選中的是哪一個供應商；路徑缺任何一層就回 None。"""
     try:
-        return data["character_config"]["agent_config"]["agent_settings"][
-            "basic_memory_agent"
-        ]["llm_provider"]
+        agent_settings = data["character_config"]["agent_config"]["agent_settings"]
     except (KeyError, TypeError):
         return None
+    return conversation_block(agent_settings).get("llm_provider")
 
 
 def _get_system_host(data: Any) -> Optional[str]:
@@ -403,15 +403,14 @@ def _point_llm_provider_at(lines: list, provider: str) -> None:
     沒有這一步，一台 llm_provider 指著別的區塊的機器會「驗證通過、存檔成功」，
     然後 agent 繼續讀舊的供應商——哪裡都不會報錯，只是那次存檔完全沒有效果。
 
-    這個鍵目前只出現在 basic_memory_agent 底下，所以全檔掃第一個就對。
+    只改 agent_settings.conversation 底下那一個：別的 agent 區塊（letta_agent）也有
+    同名的鍵，全檔掃第一個會改錯地方。
     """
-    for i, line in enumerate(lines):
-        if not line.lstrip().startswith("llm_provider:"):
-            continue
-        indent, comment = _split_leaf(line)
-        lines[i] = f"{indent}llm_provider: '{provider}'{comment}\n"
-        return
-    raise KeyError("llm_provider: line not found in conf.yaml")
+    start, end = nested_extent(
+        lines, "character_config", "agent_config", "agent_settings", "conversation"
+    )
+    if not rewrite_str_leaf(lines, start, end, "llm_provider", provider):
+        upsert_leaf(lines, start, end, "llm_provider", f"'{provider}'")
 
 
 def _point_llm_provider_at_openai_compatible(lines: list) -> None:
@@ -482,7 +481,7 @@ def write_provider_config(provider: str, values: dict) -> None:
 def _edit_use_mcpp(lines: list, enabled: bool) -> None:
     """在既有的 ``lines`` 上套用 use_mcpp 開關的編輯，不讀檔、不寫檔。
 
-    這個鍵在 agent_settings.basic_memory_agent 底下，跟 llm_configs 是兄弟，
+    這個鍵在 agent_settings.conversation 底下，跟 llm_configs 是兄弟，
     所以走自己的 nested_extent。
     """
     start, end = nested_extent(
@@ -490,7 +489,7 @@ def _edit_use_mcpp(lines: list, enabled: bool) -> None:
         "character_config",
         "agent_config",
         "agent_settings",
-        "basic_memory_agent",
+        "conversation",
     )
     # 裸的 True／False，不是字串——這份設定檔裡既有的寫法（見
     # player_route.py 的 rewrite_bool_leaf）都是這樣，conf_editor 存在的目的
@@ -506,7 +505,7 @@ def write_provider_config_and_use_mcpp(
 
     provider 區塊的編輯與 use_mcpp 的編輯各自都能對 conf.yaml 做到原子寫入
     （temp + os.replace），但把它們拆成兩次獨立呼叫並不是一次交易：第一個
-    成功、第二個才丟例外的話（例如 basic_memory_agent 區塊結構壞掉讓
+    成功、第二個才丟例外的話（例如 conversation 區塊結構壞掉讓
     nested_extent 丟 KeyError），conf.yaml 已經被改了——provider、model、
     llm_provider 指標都切過去了——但呼叫端拿到的是「寫入失敗」。使用者以為
     什麼都沒存到，其實存了一半，比乾脆全部不存更糟。
