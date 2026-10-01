@@ -7,8 +7,8 @@
 
 - **語音辨識引擎**（asr_config.asr_model）與雲端引擎的憑證。注意設定頁那個「ASR」
   分頁管的是瀏覽器端的麥克風與 VAD，跟後端用哪個引擎無關——引擎的選擇在這裡。
-- **語音合成引擎**（tts_config.tts_model）與 GPT-SoVITS 的參考音訊設定。
-  text_split_method／batch_size 這些維持範本預設，不是使用者該面對的選擇。
+- **GPT-SoVITS 服務位址**（tts_config.gpt_sovits_tts.api_url）。用哪個引擎、
+  什麼參考音是每個角色自己的設定，在角色頁（character_route）改。
 - **效能預設**：一次套用一組引擎背景工作的頻率與放在心上的數量。只碰這些數字，
   不碰語音辨識與聲音。
 
@@ -24,6 +24,7 @@ restart_required 對這裡的每一個改動都是誠實的 True：引擎設定�
 
 import asyncio
 import os
+from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, Request
@@ -42,6 +43,7 @@ from .conf_editor import (
     sub_block_extent as _sub_block_extent,
     read_conf_lines as _read_conf_lines,
     rewrite_str_leaf as _rewrite_leaf,
+    upsert_nested_block,
     write_conf as _write_conf,
 )
 
@@ -153,32 +155,14 @@ def _asr_from_conf() -> dict:
 
 
 def _tts_from_conf() -> dict:
-    """讀語音合成的引擎與 GPT-SoVITS 的參考音訊設定。"""
-    out = {
-        "tts_model": "edge_tts",
-        "gpt_sovits_api_url": "",
-        "gpt_sovits_ref_audio_path": "",
-        "gpt_sovits_prompt_text": "",
-        "gpt_sovits_text_lang": "zh",
-        "gpt_sovits_prompt_lang": "zh",
-    }
+    """GPT-SoVITS 服務在哪。誰用哪個引擎、什麼參考音，是角色自己的設定（角色頁）。"""
+    out = {"gpt_sovits_api_url": ""}
     try:
         data = _load_plain()
         tts = (data.get("character_config", {}) or {}).get("tts_config", {}) or {}
-        m = tts.get("tts_model")
-        if m is not None:
-            out["tts_model"] = str(m)
         gs = tts.get("gpt_sovits_tts", {}) or {}
         if gs.get("api_url") is not None:
             out["gpt_sovits_api_url"] = str(gs.get("api_url"))
-        if gs.get("ref_audio_path") is not None:
-            out["gpt_sovits_ref_audio_path"] = str(gs.get("ref_audio_path"))
-        if gs.get("prompt_text") is not None:
-            out["gpt_sovits_prompt_text"] = str(gs.get("prompt_text"))
-        if gs.get("text_lang") is not None:
-            out["gpt_sovits_text_lang"] = str(gs.get("text_lang"))
-        if gs.get("prompt_lang") is not None:
-            out["gpt_sovits_prompt_lang"] = str(gs.get("prompt_lang"))
     except Exception:
         pass
     return out
@@ -257,29 +241,24 @@ def _write_asr(
     )
 
 
-def _write_tts(
-    tts_model: Optional[str],
-    gpt_sovits_api_url: Optional[str],
-    gpt_sovits_ref_audio_path: Optional[str],
-    gpt_sovits_prompt_text: Optional[str] = None,
-    gpt_sovits_text_lang: Optional[str] = None,
-    gpt_sovits_prompt_lang: Optional[str] = None,
-) -> bool:
-    """改寫語音合成引擎的選擇，以及 GPT-SoVITS 的參考音訊設定。"""
-    return _write_engine_settings(
-        "tts_config",
-        "tts_model",
-        tts_model,
-        {
-            "gpt_sovits_tts": {
-                "api_url": gpt_sovits_api_url,
-                "ref_audio_path": gpt_sovits_ref_audio_path,
-                "prompt_text": gpt_sovits_prompt_text,
-                "text_lang": gpt_sovits_text_lang,
-                "prompt_lang": gpt_sovits_prompt_lang,
-            }
-        },
-    )
+def _write_tts_service(api_url: str) -> bool:
+    """只改 GPT-SoVITS 服務位址（tts_config.gpt_sovits_tts.api_url）。
+
+    聲音（引擎、參考音、逐字稿、語言）是每個角色自己的，在角色頁改；這裡寫了等於
+    改到底稿角色，其他角色不受影響，使用者卻以為改了「全部」。
+    """
+    try:
+        return _write_engine_settings(
+            "tts_config", "tts_model", None, {"gpt_sovits_tts": {"api_url": api_url}}
+        )
+    except KeyError:
+        # 舊設定檔沒有 gpt_sovits_tts 區塊或 api_url：補上，不要讓安裝或存檔失敗。
+        lines = _read_conf_lines()
+        start, end = block_extent(lines, "tts_config")
+        quoted = "'" + api_url.replace("'", "''") + "'"
+        upsert_nested_block(lines, start, end, "gpt_sovits_tts", {"api_url": quoted})
+        _write_conf(lines)
+        return True
 
 
 # --------------------------------------------------------------------------- #
@@ -366,31 +345,54 @@ def _reference_voices() -> list:
     「換這個檔案」。原本 UI 只能手打絕對路徑——打錯了不會有任何錯誤訊息，
     只是合成時靜默失敗。
 
-    掃描的目錄是 conf.yaml 裡那個全域 ref_audio_path 的所在資料夾：使用者本來
-    就把參考音放在一起，不必再多一個設定項。
+    掃描的目錄：底稿與每個角色檔用到的 ref_audio_path 所在的資料夾（使用者本來
+    就把參考音放在一起），加上一鍵安裝附的參考音。安裝不再改底稿的
+    ref_audio_path，只看底稿會漏掉它。
 
     每個 wav 可以有一個同名的 .txt 當逐字稿（sidecar）。有的話一併回傳，前端
     選了就自動把 prompt_text 填上——參考音跟它的逐字稿是一組的，分開填等於
     給使用者一個對不起來就會壞掉的機會。
     """
-    conf = read_yaml(CONF_PATH) or {}
-    node: Any = conf
-    for key in ("character_config", "tts_config", "gpt_sovits_tts", "ref_audio_path"):
-        node = node.get(key) if isinstance(node, dict) else None
-    global_ref = str(node or "").strip()
-    if not global_ref:
-        return []
-    folder = os.path.dirname(global_ref)
-    if not folder or not os.path.isdir(folder):
-        return []
+    from . import gpt_sovits_installer
 
+    folders: list[str] = []
+    paths = [CONF_PATH, *sorted(str(p) for p in Path("characters").glob("*.yaml"))]
+    for path in paths:
+        try:
+            node: Any = read_yaml(path) or {}
+        except Exception:
+            continue
+        for key in (
+            "character_config",
+            "tts_config",
+            "gpt_sovits_tts",
+            "ref_audio_path",
+        ):
+            node = node.get(key) if isinstance(node, dict) else None
+        folder = os.path.dirname(str(node or "").strip())
+        if folder and folder not in folders:
+            folders.append(folder)
+    installed = str(gpt_sovits_installer.install_root() / "references")
+    if installed not in folders:
+        folders.append(installed)
+
+    voices: list = []
+    seen: set = set()
+    for folder in folders:
+        if os.path.isdir(folder):
+            voices.extend(_voices_in(folder, seen))
+    return voices
+
+
+def _voices_in(folder: str, seen: set) -> list:
     voices = []
     for name in sorted(os.listdir(folder)):
         if not name.lower().endswith((".wav", ".mp3", ".flac", ".m4a", ".ogg")):
             continue
         path = os.path.join(folder, name)
-        if not os.path.isfile(path):
+        if not os.path.isfile(path) or path in seen:
             continue
+        seen.add(path)
         transcript = ""
         sidecar = os.path.splitext(path)[0] + ".txt"
         if os.path.isfile(sidecar):
@@ -414,7 +416,7 @@ def init_perf_route() -> APIRouter:
 
     - GET  /api/perf                  -> ASR/TTS engine + creds(masked) + current preset
     - POST /api/perf/asr              -> set asr_model + cloud creds
-    - POST /api/perf/tts              -> set tts_model + gpt_sovits fields
+    - POST /api/perf/tts              -> set the GPT-SoVITS service address
     - POST /api/perf/preset           -> apply a named preset bundle (atomic, one write)
     """
 
@@ -483,43 +485,31 @@ def init_perf_route() -> APIRouter:
 
     @router.post("/api/perf/tts")
     async def set_tts(request: Request):
-        """設定語音合成引擎，以及 GPT-SoVITS 的參考音訊。"""
+        """設定 GPT-SoVITS 服務位址。聲音本身在角色頁。"""
         if not _is_local_request(request):
             return _forbidden()
         body, bad = await _parse_body(request)
         if bad:
             return bad
 
-        tts_model, bad = _choice(body, "tts_model", TTS_MODELS)
-        if bad:
-            return bad
-        text_lang, bad = _choice(body, "gpt_sovits_text_lang", GPT_SOVITS_LANGS)
-        if bad:
-            return bad
-        prompt_lang, bad = _choice(body, "gpt_sovits_prompt_lang", GPT_SOVITS_LANGS)
-        if bad:
-            return bad
-
+        voice_fields = {
+            "tts_model",
+            "gpt_sovits_ref_audio_path",
+            "gpt_sovits_prompt_text",
+            "gpt_sovits_text_lang",
+            "gpt_sovits_prompt_lang",
+        } & set(body)
+        if voice_fields:
+            return _error(400, "The voice is set per character on the Characters page.")
         api_url = _text(body, "gpt_sovits_api_url")
-        ref_audio = _text(body, "gpt_sovits_ref_audio_path")
-        # 參考音訊的逐字稿。它是選填的（沒有的話 GPT-SoVITS 品質變差但還是能跑），
-        # 所以空字串是「使用者刻意清空」這個合法值，不是「沒帶這個欄位」。也不做
-        # strip：逐字稿自己的前後空白不是我們該正規化的東西。
-        prompt_text = (
-            str(body["gpt_sovits_prompt_text"])
-            if body.get("gpt_sovits_prompt_text") is not None
-            else None
-        )
+        if not api_url:
+            return _error(400, "Missing gpt_sovits_api_url.")
 
-        fields = (tts_model, api_url, ref_audio, prompt_text, text_lang, prompt_lang)
-        if all(v is None for v in fields):
-            return _error(400, "Nothing to update.")
-
-        bad = await _write_or_error(_write_tts, *fields, what="tts write")
+        bad = await _write_or_error(_write_tts_service, api_url, what="tts write")
         if bad:
             return bad
 
-        logger.info(f"[perf] tts saved (model={tts_model})")
+        logger.info("[perf] gpt-sovits service address saved")
         return JSONResponse({"ok": True, **_tts_from_conf(), "restart_required": True})
 
     @router.post("/api/perf/preset")

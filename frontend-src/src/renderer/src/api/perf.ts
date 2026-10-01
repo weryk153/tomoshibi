@@ -13,29 +13,11 @@ export function presetSelection(current: string | undefined, presets: readonly s
   return current && presets.includes(current) ? current : PRESET_CUSTOM
 }
 
-// GET /api/perf 的形狀比這裡窄——後端還回傳目前的 asr_model／tts_model、
-// 遮罩過的雲端金鑰、gpt_sovits 的 api_url／ref_audio_path（perf_route.py 381-402）。
-// 這裡只型別化本任務的消費端（perf 分頁的一鍵模式／keep_alive／整理頻率、
-// 以及 asr／tts 分頁要用的引擎清單）實際需要的欄位；current asr_model／
-// tts_model 屬於後續任務（引擎選擇 UI）的範圍，留給那裡再擴充型別，不在
-// 這裡預先加沒人用的欄位。
-//
-// Task 3（asr 分頁的引擎選擇 UI）在這裡把 asr_model／groq_api_key_masked／
-// azure_api_key_masked／azure_region 四個欄位補上——這就是上一段註解說的
-// 「那裡」。Task 4（tts 分頁）接著補上 tts_model／gpt_sovits_api_url／
-// gpt_sovits_ref_audio_path 三個欄位：後兩者不是憑證（是 URL 與檔案路徑），
-// perf_route.py 的 _tts_from_conf 原樣回傳明碼，不像 groq/azure 金鑰要遮罩，
-// 所以可以直接塞回輸入框當初始值，不需要 asr.tsx 那套「遮罩字串絕不可以
-// 流進 state」的防線。
-//
-// 後續任務再補上 gpt_sovits_prompt_text／gpt_sovits_text_lang／
-// gpt_sovits_prompt_lang 三個欄位——這是 gpt_sovits_tts 九個設定裡真正卡住
-// 「能不能從 App 裡把音色克隆設定完」的關鍵缺口：prompt_text 是參考音檔的
-// 逐字稿，GPT-SoVITS 拿它去對齊「這段音檔說的是這些字」，沒填克隆效果差或
-// 直接失敗；text_lang／prompt_lang 分別是角色回覆的語言、參考音檔本身的語言。
-// 同樣不是密鑰，perf_route.py 原樣回傳明碼，可以直接塞回輸入框。
-// gpt_sovits_langs 是後端 GPT_SOVITS_LANGS 允許清單（見 perf_route.py），
-// UI 的語言下拉選單只能選這裡面的值，不接受自由輸入。
+// GET /api/perf：語音辨識引擎與遮罩過的雲端金鑰（asr 分頁）、GPT-SoVITS 服務
+// 位址（tts 分頁）、角色頁挑聲音用的清單（tts_models、gpt_sovits_langs、
+// reference_voices），以及效能模式。遮罩金鑰絕不可以流進輸入框的初始值，見
+// asr.tsx 檔頭。gpt_sovits_langs 是後端 GPT_SOVITS_LANGS 允許清單，語言下拉
+// 選單只能選這裡面的值。
 export interface PerfState {
   asr_models: string[]
   tts_models: string[]
@@ -48,12 +30,6 @@ export interface PerfState {
   presets: string[]
   // 目前的背景工作數字正好是哪一個預設；都對不上是 'custom'（見 presetSelection）。
   current_preset: string
-  // 已經不回這個欄位（角色檔不再釘語音辨識，聲音在角色頁看）；tts.tsx 下一步
-  // 拿掉讀它的地方之前先留成選填。
-  engine_overrides_by_character?: Record<string, {
-    tts_model?: string
-    asr_model?: string
-  }>
   asr_model: string
   // 一律是遮罩字串（例如 "sk-x****"）或空字串，絕不是明文——
   // perf_route.py 的 _asr_from_conf 用 _mask_key 讀出來就是這個形狀。UI 端
@@ -64,18 +40,8 @@ export interface PerfState {
   azure_api_key_masked: string
   // region 不是密鑰，後端原樣回傳明碼，可以放心塞回輸入框當初始值。
   azure_region: string
-  tts_model: string
-  // 見上面的檔頭說明：URL 與檔案路徑，不是密鑰，明碼往返安全。
+  // GPT-SoVITS 服務位址。聲音（引擎、參考音、語言）是角色自己的，不在這裡。
   gpt_sovits_api_url: string
-  gpt_sovits_ref_audio_path: string
-  // 參考音檔的逐字稿。跟 api_url／ref_audio_path 同樣是明碼往返、非密鑰，但
-  // 語意上允許是空字串（使用者故意留空，只是克隆效果會變差）——tts.tsx 因此
-  // 不把它放進「兩個必填欄位」那組存檔閘門，見 gptSovitsFieldsRequired 旁的
-  // 說明只講 api_url／ref_audio_path 兩個。
-  gpt_sovits_prompt_text: string
-  // 角色回覆的語言／參考音檔本身的語言，值必須落在 gpt_sovits_langs 允許清單內。
-  gpt_sovits_text_lang: string
-  gpt_sovits_prompt_lang: string
 }
 
 export const fetchPerf = (baseUrl: string): Promise<ApiResult<PerfState>> =>
@@ -136,49 +102,20 @@ export const setAsrCredentials = (
 ): Promise<ApiResult<AsrSaveResult>> =>
   apiPost<AsrSaveResult>(baseUrl, '/api/perf/asr', creds)
 
-// POST /api/perf/tts 的回應形狀（set_tts handler 最後一行：
-// {"ok": True, **_tts_from_conf(), "restart_required": True}）——不管這次送
-// 的是 tts_model 還是 gpt_sovits 欄位，回應都是同一包「現在的完整 tts 狀態」。
-// setTtsModel／setTtsConfig 共用這個型別，跟 AsrSaveResult／setAsrModel／
-// setAsrCredentials 是同一種分法。
+// POST /api/perf/tts 的回應形狀：{"ok": True, **_tts_from_conf(), "restart_required": True}。
 export interface TtsSaveResult {
-  tts_model: string
   gpt_sovits_api_url: string
-  gpt_sovits_ref_audio_path: string
-  gpt_sovits_prompt_text: string
-  gpt_sovits_text_lang: string
-  gpt_sovits_prompt_lang: string
   restart_required: boolean
 }
 
-// POST /api/perf/tts：只送 tts_model。edge_tts 不需要任何額外欄位就能動作，
-// 切換到它當下就送出（跟 asr.tsx 的 sherpa_onnx／faster_whisper 同一種
-// 即時存檔模式），不需要额外的存檔按鈕。
-export const setTtsModel = (baseUrl: string, model: string): Promise<ApiResult<TtsSaveResult>> =>
-  apiPost<TtsSaveResult>(baseUrl, '/api/perf/tts', { tts_model: model })
-
-// POST /api/perf/tts：送 gpt_sovits 的 api_url／ref_audio_path，可選帶上
-// tts_model。tts_model 是選填的——tts.tsx 只有在使用者切到 gpt_sovits_tts
-// 時才會帶上它，把「切換引擎」跟「這次順便存的欄位」包成同一次 POST 一起送，
-// 理由跟 setAsrCredentials 完全一樣：如果切換引擎那一刻就單獨送一次
-// tts_model（不等這兩個欄位），conf.yaml 會先被改成指向一個當下可能還沒有
-// 可用設定的引擎——service_context.py:411-414 找不到可達的 GPT-SoVITS 服務
-// 會靜默 fallback 回 edge_tts，變成「conf.yaml 寫著 gpt_sovits_tts，但其實在
-// 用 edge_tts、畫面卻還顯示 gpt_sovits_tts」，跟 asr.tsx 要擋的雲端引擎陷阱
-// 是同一種問題。edge_tts 不需要這兩個欄位，不會走這支函式，見 setTtsModel。
-export const setTtsConfig = (
+// POST /api/perf/tts：只設 GPT-SoVITS 服務位址。誰用 GPT-SoVITS、什麼參考音，
+// 是角色自己的設定（api/characters.ts 的 updateCharacter）；後端收到那些欄位
+// 會回 400。
+export const setTtsServiceUrl = (
   baseUrl: string,
-  config: {
-    tts_model?: string
-    gpt_sovits_api_url?: string
-    gpt_sovits_ref_audio_path?: string
-    gpt_sovits_prompt_text?: string
-    gpt_sovits_text_lang?: string
-    gpt_sovits_prompt_lang?: string
-  },
+  apiUrl: string,
 ): Promise<ApiResult<TtsSaveResult>> =>
-  apiPost<TtsSaveResult>(baseUrl, '/api/perf/tts', config)
-
+  apiPost<TtsSaveResult>(baseUrl, '/api/perf/tts', { gpt_sovits_api_url: apiUrl })
 
 // POST /api/perf/preset：一次寫入引擎背景工作的那組數字（見 perf_route.py 的
 // apply_preset／_apply_preset_bundle）。name 必須是後端 PRESETS 的其中一個

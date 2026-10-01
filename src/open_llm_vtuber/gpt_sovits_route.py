@@ -17,45 +17,23 @@ from starlette.responses import JSONResponse, StreamingResponse
 from . import gpt_sovits_installer as installer
 from . import gpt_sovits_service as service
 from .api_guard import forbidden as _forbidden, is_trusted_request as _is_local_request
-from .conf_editor import CONF_PATH
-from .config_manager.utils import read_yaml
-from .perf_route import GPT_SOVITS_LANGS, _write_tts
+from .perf_route import _write_tts_service
 
 
-def voice_text_lang(conf: dict) -> str:
-    """換成 GPT-SoVITS 之後唸哪種語言：沿用換之前的聲音講的語言。
+def _point_at_installed_service() -> None:
+    """裝好之後只把 GPT-SoVITS 服務位址指過去。
 
-    講哪種語言是使用者在聲音設定裡選的。原本用 Edge TTS 中文聲音的角色，換了引擎
-    還是講中文，不會突然改講日文。認不出來時才用參考音的語言。
+    哪個角色用 GPT-SoVITS、用哪段參考音，是那個角色自己的設定，到角色頁選；安裝
+    附的參考音會出現在那裡的清單裡。以前這裡直接把底稿角色的聲音換掉。
     """
-    tts = (conf.get("character_config") or {}).get("tts_config") or {}
-    engine = tts.get("tts_model")
-    raw = ""
-    if engine == "edge_tts":
-        raw = str((tts.get("edge_tts") or {}).get("voice") or "").split("-", 1)[0]
-    elif engine == "gpt_sovits_tts":
-        raw = str((tts.get("gpt_sovits_tts") or {}).get("text_lang") or "")
-    lang = raw.strip().lower().removeprefix("all_")
-    return lang if lang in GPT_SOVITS_LANGS else installer.REFERENCE_LANG
-
-
-def _use_installed_voice(reference: dict) -> None:
     try:
-        conf = read_yaml(CONF_PATH) or {}
-        _write_tts(
-            "gpt_sovits_tts",
-            installer.API_URL,
-            reference["path"],
-            reference["prompt_text"],
-            voice_text_lang(conf),
-            reference["prompt_lang"],
-        )
+        _write_tts_service(installer.API_URL)
     except Exception as e:
         logger.warning(
-            f"[gpt-sovits] couldn't switch the voice: {type(e).__name__}: {e}"
+            f"[gpt-sovits] couldn't save the service address: {type(e).__name__}: {e}"
         )
         raise installer.InstallError(
-            "GPT-SoVITS is installed, but switching the voice failed. Choose it in the voice settings."
+            "GPT-SoVITS is installed, but saving its address failed. Set it on the voice settings page."
         ) from e
 
 
@@ -102,9 +80,7 @@ def init_gpt_sovits_route() -> APIRouter:
                 try:
                     async for event in installer.install():
                         if event["status"] == "success":
-                            await asyncio.to_thread(
-                                _use_installed_voice, event["reference"]
-                            )
+                            await asyncio.to_thread(_point_at_installed_service)
                         yield line(event)
                 except installer.InstallError as e:
                     yield line({"status": "error", "error": str(e)})
