@@ -54,3 +54,53 @@ def test_raw_yaml_readers_get_either_name():
     }
     assert conversation_block({}) == {}
     assert conversation_block(None) == {}
+
+
+def test_a_character_file_with_the_old_name_still_overrides_the_upgraded_base():
+    """conf.yaml 開機升級成 conversation 之後，手寫角色檔若還寫 basic_memory_agent，
+    深度合併會兩個名字並存；不先改名的話，角色檔指定的模型被底稿蓋掉、沒有任何提示。"""
+    from src.open_llm_vtuber.config_manager import AgentSettings
+    from src.open_llm_vtuber.config_manager.agent import with_conversation_block
+    from src.open_llm_vtuber.service_context import deep_merge
+
+    base = {
+        "agent_config": {
+            "agent_settings": {
+                "conversation": {"llm_provider": "lmstudio_llm", "use_mcpp": True}
+            }
+        }
+    }
+    character = {
+        "agent_config": {
+            "agent_settings": {"basic_memory_agent": {"llm_provider": "ollama_llm"}}
+        }
+    }
+
+    merged = deep_merge(base, with_conversation_block(character))
+    settings = AgentSettings.model_validate(merged["agent_config"]["agent_settings"])
+
+    assert settings.conversation.llm_provider == "ollama_llm"
+    assert settings.conversation.use_mcpp is True
+
+
+def test_renaming_the_old_block_leaves_other_character_settings_alone():
+    from src.open_llm_vtuber.config_manager.agent import with_conversation_block
+
+    character = {
+        "conf_uid": "kurisu",
+        "agent_config": {"conversation_agent_choice": "x"},
+    }
+    assert with_conversation_block(character) == character
+    assert with_conversation_block({"conf_uid": "kurisu"}) == {"conf_uid": "kurisu"}
+
+
+def test_switching_characters_renames_before_merging():
+    import inspect
+
+    from src.open_llm_vtuber.service_context import ServiceContext
+
+    source = inspect.getsource(ServiceContext)
+    assert (
+        "deep_merge(\n                base_character_data, with_conversation_block(alt_config_data)\n            )"
+        in source
+    )

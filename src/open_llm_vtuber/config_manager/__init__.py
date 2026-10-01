@@ -50,6 +50,7 @@ from .agent import (
     StatelessLLMConfigs,
     ConversationConfig,
     conversation_block,
+    with_conversation_block,
 )
 
 # Import utility functions
@@ -78,6 +79,7 @@ __all__ = [
     "StatelessLLMConfigs",
     "ConversationConfig",
     "conversation_block",
+    "with_conversation_block",
     # ASR related classes
     "ASRConfig",
     "AzureASRConfig",

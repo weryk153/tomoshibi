@@ -35,6 +35,7 @@ from .config_manager import (
     TranslatorConfig,
     read_yaml,
     validate_config,
+    with_conversation_block,
 )
 
 
@@ -1003,7 +1004,9 @@ class ServiceContext:
 
             # Always merge against the on-disk base, never the previously active
             # character. Otherwise switching A -> B leaks omitted A settings into B.
-            new_character_config_data = deep_merge(base_character_data, alt_config_data)
+            new_character_config_data = deep_merge(
+                base_character_data, with_conversation_block(alt_config_data)
+            )
 
         new_config = validate_config(
             {

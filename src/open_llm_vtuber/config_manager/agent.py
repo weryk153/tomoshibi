@@ -227,6 +227,33 @@ def conversation_block(agent_settings: Mapping | None) -> dict:
     return {}
 
 
+def with_conversation_block(character_config: Mapping) -> dict:
+    """角色檔深度合併到底稿之前，把舊名字 basic_memory_agent 改成 conversation。
+
+    底稿 conf.yaml 開機時已經升級成 conversation；角色檔還寫舊名字的話，合併後兩個
+    名字並存，pydantic 以 conversation（底稿的）為準，角色檔指定的模型就被蓋掉。
+    兩個名字都在時一樣以 conversation 為準。
+    """
+    agent_config = character_config.get("agent_config")
+    settings = (
+        agent_config.get("agent_settings")
+        if isinstance(agent_config, Mapping)
+        else None
+    )
+    if not isinstance(settings, Mapping) or not isinstance(
+        settings.get("basic_memory_agent"), Mapping
+    ):
+        return dict(character_config)
+    settings = dict(settings)
+    old = settings.pop("basic_memory_agent")
+    new = settings.get("conversation")
+    settings["conversation"] = {**old, **new} if isinstance(new, Mapping) else dict(old)
+    return {
+        **character_config,
+        "agent_config": {**agent_config, "agent_settings": settings},
+    }
+
+
 class AgentSettings(I18nMixin, BaseModel):
     """Settings for the conversation and the agents."""
 
