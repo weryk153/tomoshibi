@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   buildCharacterUpdate, validateAvatarFile, AVATAR_MAX_CLIENT_BYTES,
+  characterSettingsPath,
   type CharacterRecord,
 } from './characters.ts'
 
@@ -144,4 +145,10 @@ test('型別錯又過大時，回報「不是圖片」而不是「太大」—�
 test('合法圖片回傳 null', () => {
   const ok = { name: 'a.png', size: 1000, type: 'image/png' } as File
   assert.equal(validateAvatarFile(ok), null)
+})
+
+test('character settings go to that character\'s own settings path', () => {
+  assert.equal(characterSettingsPath('kurisu.yaml'), '/api/characters/kurisu.yaml/settings')
+  assert.equal(characterSettingsPath('conf.yaml'), '/api/characters/conf.yaml/settings')
+  assert.equal(characterSettingsPath('a b.yaml'), '/api/characters/a%20b.yaml/settings')
 })

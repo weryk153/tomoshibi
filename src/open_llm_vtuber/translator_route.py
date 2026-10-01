@@ -4,7 +4,8 @@
 
 - **語音**（translate_audio）：回覆先翻成目標語言，再交給 TTS 唸出來。她的聲音
   講的是譯文。
-- **字幕**（translate_subtitle + subtitle_target_lang）：另外翻一份，只給畫面看。
+- **字幕**：另外翻一份成「你看的語言」，只給畫面看。開不開是每個角色自己的設定
+  （/api/characters/{filename}/settings），翻成什麼跟 player_language 走；這裡不管。
   **正典的回覆文字永遠不會被改動**——記憶與對話紀錄用的是原文，所以她「記得」的
   始終是自己人設語言裡的那句話。
 
@@ -44,7 +45,6 @@ from .conf_editor import (
     block_extent,
     read_conf_lines as _read_conf_lines,
     rewrite_bool_leaf as _rewrite_bool_leaf,
-    upsert_leaf,
     rewrite_str_leaf as _rewrite_leaf,
     write_conf as _write_conf,
 )
@@ -189,48 +189,6 @@ def _nested(block: Any, name: str, key: str, default: str = "") -> str:
         return default
 
 
-def _stored_subtitle_target() -> str:
-    """目前存著的字幕目標語言；讀不到就空字串。"""
-    try:
-        block = _get_translator_block(_load_conf())
-        value = block.get("subtitle_target_lang") if block else None
-        return str(value).strip() if value else ""
-    except Exception:
-        return ""
-
-
-def _subtitle_from(body: dict):
-    """從 body 取出字幕設定，回傳 (開關, 目標語言, 錯誤回應)。
-
-    兩個都只在呼叫端明確帶了那個鍵時才回非 None——部分更新不可以把沒提到的設定
-    清掉。
-
-    開啟字幕翻譯一定要有目標語言，否則 Pydantic 那關會擋下整份設定。呼叫端這次
-    沒帶目標語言時，讀目前存著的值來補；補不出來才拒絕。
-    """
-    enabled = bool(body["translate_subtitle"]) if "translate_subtitle" in body else None
-
-    target = None
-    if "subtitle_target_lang" in body:
-        raw = body.get("subtitle_target_lang")
-        target = str(raw).strip() if raw is not None else ""
-
-    if enabled and not (target if target is not None else _stored_subtitle_target()):
-        return (
-            None,
-            None,
-            JSONResponse(
-                status_code=400,
-                content={
-                    "ok": False,
-                    "error": "subtitle_target_lang is required when "
-                    "translate_subtitle is enabled.",
-                },
-            ),
-        )
-    return enabled, target, None
-
-
 def _engine_settings_from(body: dict, engine: str) -> dict:
     """整理出兩個供應商的設定值。
 
@@ -276,8 +234,6 @@ def _write_translator_config(
     llm_target_lang: Optional[str],
     llm_api_endpoint: Optional[str],
     llm_model: Optional[str],
-    subtitle_enabled: Optional[bool] = None,
-    subtitle_target_lang: Optional[str] = None,
 ) -> dict:
     """就地改寫翻譯設定，回傳「實際寫了哪些」。
 
@@ -303,24 +259,6 @@ def _write_translator_config(
     if not _rewrite_leaf(lines, tc_start, tc_end, "translate_provider", engine):
         raise KeyError("translate_provider leaf not found in translator_config")
     written["translate_provider"] = engine
-
-    # 字幕：純顯示用，跟 translate_audio 無關。早期的 conf.yaml 沒有這兩行，
-    # 補上而不是失敗。插入會讓行數增加，區塊尾端要跟著往後移，否則底下找
-    # llm／deeplx 時的範圍判斷會錯位。
-    if subtitle_enabled is not None:
-        tc_end = upsert_leaf(
-            lines, tc_start, tc_end, "translate_subtitle", str(bool(subtitle_enabled))
-        )
-        written["translate_subtitle"] = subtitle_enabled
-    if subtitle_target_lang is not None:
-        tc_end = upsert_leaf(
-            lines,
-            tc_start,
-            tc_end,
-            "subtitle_target_lang",
-            _quote_yaml_scalar(subtitle_target_lang),
-        )
-        written["subtitle_target_lang"] = subtitle_target_lang
 
     # 各供應商的巢狀葉節點：有給值才寫。
     nested = {
@@ -398,7 +336,6 @@ def init_translator_route() -> APIRouter:
             )
 
         provider = str(block.get("translate_provider") or "llm")
-        subtitle_target = block.get("subtitle_target_lang")
         return JSONResponse(
             {
                 "enabled": bool(block.get("translate_audio")),
@@ -420,10 +357,6 @@ def init_translator_route() -> APIRouter:
                 ),
                 "speak_voice": _get_edge_tts_voice(data) or "",
                 "default_jp_voice": DEFAULT_JP_VOICE,
-                "translate_subtitle": bool(block.get("translate_subtitle")),
-                "subtitle_target_lang": (
-                    str(subtitle_target) if subtitle_target is not None else ""
-                ),
             }
         )
 
@@ -448,10 +381,6 @@ def init_translator_route() -> APIRouter:
                 content={"ok": False, "error": "engine must be 'llm' or 'deeplx'."},
             )
 
-        subtitle_enabled, subtitle_target_lang, bad = _subtitle_from(body)
-        if bad:
-            return bad
-
         try:
             written = await asyncio.to_thread(
                 _write_translator_config,
@@ -463,8 +392,6 @@ def init_translator_route() -> APIRouter:
                 # 嗓音不從這裡設。說話的聲音是在角色管理裡選一次的，翻譯只管
                 # 翻成什麼語言。傳 None 讓寫入器完全不碰 edge_tts.voice。
                 speak_voice=None,
-                subtitle_enabled=subtitle_enabled,
-                subtitle_target_lang=subtitle_target_lang,
                 **_engine_settings_from(body, engine),
             )
         except Exception as e:
@@ -474,20 +401,12 @@ def init_translator_route() -> APIRouter:
                 content={"ok": False, "error": "Could not write config file."},
             )
 
-        logger.info(
-            f"[translator] saved (engine={engine}, subtitle={subtitle_enabled})"
-        )
+        logger.info(f"[translator] saved (engine={engine})")
         return JSONResponse(
             {
                 "ok": True,
                 "enabled": written["translate_audio"],
                 "engine": engine,
-                "translate_subtitle": (
-                    subtitle_enabled
-                    if subtitle_enabled is not None
-                    else bool(written.get("translate_subtitle"))
-                ),
-                "subtitle_target_lang": subtitle_target_lang or "",
                 # 回應形狀的相容欄位，UI 已經不讀它了。
                 "speak_voice": "",
                 "written": written,

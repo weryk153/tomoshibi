@@ -94,6 +94,8 @@ class TranslatorConfig(I18nMixin):
     # for the on-screen SUBTITLE only (the canonical reply R, used for
     # memory/history, is never mutated). Default off = show 原文 R verbatim.
     translate_subtitle: bool = Field(default=False, alias="translate_subtitle")
+    # 不再使用：字幕翻成「你看的語言」（system_config.player_language）。留著
+    # 只是讓舊 conf.yaml 與角色檔照樣讀得進來。
     subtitle_target_lang: Optional[str] = Field(
         default=None, alias="subtitle_target_lang"
     )
@@ -114,8 +116,8 @@ class TranslatorConfig(I18nMixin):
             zh="啟用僅顯示用的字幕翻譯（不影響記憶/歷史）",
         ),
         "subtitle_target_lang": Description(
-            en="Target language for the translated subtitle (label for llm / code for deeplx)",
-            zh="字幕翻譯的目標語言（llm 用語言標籤、deeplx 用語言代碼）",
+            en="Unused: subtitles are translated into player_language",
+            zh="已不使用：字幕翻成 player_language（你看的語言）",
         ),
         "deeplx": Description(
             en="Configuration for DeepLX translation service", zh="DeepLX 翻译服务配置"
@@ -148,10 +150,6 @@ class TranslatorConfig(I18nMixin):
         # audio path (deeplx / llm), so when it is enabled the matching block must be
         # present and a target language must be set.
         if values.translate_subtitle:
-            if not (values.subtitle_target_lang or "").strip():
-                raise ValueError(
-                    "subtitle_target_lang must be provided when translate_subtitle is True"
-                )
             if translate_provider == "deeplx" and values.deeplx is None:
                 raise ValueError(
                     "DeepLX configuration must be provided when translate_subtitle is True and translate_provider is 'deeplx'"

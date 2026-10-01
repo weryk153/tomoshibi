@@ -122,15 +122,6 @@ def test_the_other_providers_block_is_left_intact(conf):
     assert translator["deeplx"]["deeplx_target_lang"] == "JA"
 
 
-def test_missing_subtitle_leaves_are_inserted_not_fatal(conf):
-    # 舊的 conf.yaml 沒有字幕那兩行。整個存檔不該因此失敗。
-    _write(engine="llm", subtitle_enabled=True, subtitle_target_lang="繁體中文")
-    translator = _translator(conf)
-
-    assert translator["translate_subtitle"] is True
-    assert translator["subtitle_target_lang"] == "繁體中文"
-
-
 def test_edge_tts_voice_can_be_set_from_here(conf):
     _write(engine="llm", speak_voice="ja-JP-NanamiNeural")
     voice = _parsed(conf)["character_config"]["tts_config"]["edge_tts"]["voice"]

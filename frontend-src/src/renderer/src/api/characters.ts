@@ -8,6 +8,10 @@ import { apiGet, apiPost, apiPut, buildUrl, normalizeError, type ApiResult } fro
 
 export interface CharacterRecord {
   filename: string
+  // 這個角色自己的兩個開關（後端 GET /api/characters 一起回）。改它們走
+  // saveCharacterSettings，不走整份表單的 updateCharacter。
+  translate_subtitle?: boolean
+  long_term_memory_enabled?: boolean
   slug: string
   is_base: boolean
   conf_name: string | null
@@ -212,3 +216,31 @@ export async function uploadAvatar(
     return { ok: false, error: e instanceof Error ? e.message : '網路錯誤' }
   }
 }
+
+// 角色自己的開關：字幕翻成你看的語言、長期記憶。後端見 character_route.py 的
+// GET/POST /api/characters/{filename}/settings；底稿角色的 filename 是 conf.yaml。
+export interface CharacterToggles {
+  translate_subtitle: boolean
+  long_term_memory_enabled: boolean
+}
+
+export function characterSettingsPath(filename: string): string {
+  return `/api/characters/${encodeURIComponent(filename)}/settings`
+}
+
+export const fetchCharacterSettings = (
+  baseUrl: string,
+  filename: string,
+): Promise<ApiResult<{ settings: CharacterToggles }>> =>
+  apiGet<{ settings: CharacterToggles }>(baseUrl, characterSettingsPath(filename))
+
+export const saveCharacterSettings = (
+  baseUrl: string,
+  filename: string,
+  changes: Partial<CharacterToggles>,
+): Promise<ApiResult<{ settings: CharacterToggles; reload_required: boolean }>> =>
+  apiPost<{ settings: CharacterToggles; reload_required: boolean }>(
+    baseUrl,
+    characterSettingsPath(filename),
+    changes,
+  )

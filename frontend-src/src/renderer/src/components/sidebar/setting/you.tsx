@@ -51,12 +51,7 @@ import {
 } from '@/api/characters.ts';
 import type { TranslatorEngine, TranslatorTestResult } from '@/api/translator-config.ts';
 import { testTranslator } from '@/api/translator-config.ts';
-import {
-  useTranslatorSettings,
-  SUBTITLE_LANG_OPTIONS,
-  SUBTITLE_LANG_ORIGINAL,
-  subtitleStateToSelection,
-} from '@/hooks/sidebar/setting/use-translator-settings.ts';
+import { useTranslatorSettings } from '@/hooks/sidebar/setting/use-translator-settings.ts';
 
 // chat-history-panel.tsx 現在會讀這兩個 localStorage 鍵（userName 取
 // displayName || 'Me'，頭像走跟 AI 那側同一種 img+onError fallback）。鍵名跟
@@ -301,31 +296,19 @@ function You({ active = true }: YouProps): JSX.Element {
     return t('settings.voiceLang.readonly', { lang });
   }, [characters, confUid, t]);
 
-  // ---- Step 5：用其他語言發聲＋字幕翻譯（本任務新增，寫 conf.yaml，經
+  // ---- Step 5：用其他語言發聲（寫 conf.yaml，經
   // api/translator-config.ts／use-translator-settings.ts）----
   const {
     config: translatorConfig,
     loadError: translatorLoadError,
     engineSaving,
-    subtitleSaving,
     saveEngine,
-    saveSubtitleSelection,
   } = useTranslatorSettings(baseUrl, active);
 
   const engineCollection = useMemo(() => createListCollection({
     items: [
       { label: t('settings.translator.engineLlm'), value: 'llm' },
       { label: t('settings.translator.engineDeeplx'), value: 'deeplx' },
-    ],
-  }), [t]);
-
-  // 「原文（不翻譯）」哨兵值排最前面，其餘 30 個語言照 SUBTITLE_LANG_OPTIONS
-  // 既有順序——那份順序本身就是跟後端 deeplx.py 的 LANG_NAME_TO_DEEPL_CODE
-  // 同步的順序，不用再另外排序（例如按字母排）去打亂它跟後端表的對照關係。
-  const subtitleCollection = useMemo(() => createListCollection({
-    items: [
-      { label: t('settings.translator.subtitleLangOriginal'), value: SUBTITLE_LANG_ORIGINAL },
-      ...SUBTITLE_LANG_OPTIONS.map((opt) => ({ label: t(opt.labelKey), value: opt.value })),
     ],
   }), [t]);
 
@@ -395,39 +378,6 @@ function You({ active = true }: YouProps): JSX.Element {
       });
     }
   }, [deeplxEndpointDraft, translatorConfig, saveEngine, t]);
-
-  // 字幕語言：下拉選單選了就立刻送出（跟 Step 2 玩家語言同一種模式），不用
-  // 額外的存檔按鈕——mapSubtitleSelection／subtitleStateToSelection 兩個純
-  // 函式（見 use-translator-settings.ts）保證選單值跟
-  // {translate_subtitle, subtitle_target_lang} 之間的轉換只有一個實作。
-  const subtitleSelection = translatorConfig ? subtitleStateToSelection(translatorConfig) : SUBTITLE_LANG_ORIGINAL;
-
-  const handleSubtitleChange = useCallback(async (value: string[]) => {
-    const selected = value[0];
-    if (selected === undefined) return;
-    const result = await saveSubtitleSelection(selected);
-    if (result.ok) {
-      toaster.create({
-        title: t('settings.translator.saved'),
-        description: t('settings.translator.restartHint'),
-        type: 'success',
-        duration: 4000,
-      });
-    } else {
-      toaster.create({
-        title: result.error || t('settings.translator.saveFailed'),
-        type: 'error',
-        duration: 3000,
-      });
-    }
-  }, [saveSubtitleSelection, t]);
-
-  // 字幕會被翻譯兩次的警語：只有 llm 引擎才有這個風險（deeplx 很快，docstring
-  // 原文：「the 'llm' engine reuses...每句約 17～21 秒」對比 deeplx 不到 1 秒）
-  // ，而且要使用者真的選了一個非「原文」的字幕語言（等於 translate_subtitle
-  // 即將是 true）才有意義顯示。
-  const showSubtitleLatencyNote = translatorConfig?.engine === 'llm'
-    && subtitleSelection !== SUBTITLE_LANG_ORIGINAL;
 
   return (
     <Stack gap={4} pt={3} borderTopWidth="1px" borderColor="whiteAlpha.200">
@@ -601,37 +551,6 @@ function You({ active = true }: YouProps): JSX.Element {
                 </HStack>
               </Stack>
             )}
-
-            <Heading size="xs" pt={2}>{t('settings.translator.subtitleSectionTitle')}</Heading>
-            {showSubtitleLatencyNote && (
-              <Text fontSize="xs" color="orange.300">
-                {t('settings.translator.subtitleLatencyNote')}
-              </Text>
-            )}
-
-            {/* 「進階」子區塊：字幕語言選單本身。文案（advancedSubtitleHint）
-                明講「上方的閱讀語言已經決定字幕語言了」——指的就是上面 Step 2
-                的玩家語言選單，多數人不用碰這裡，預設「原文」已經符合大多數
-                期待。刻意不做成可收合的元件：真的收合需要額外的展開/收合
-                state，而目前是否已經選了非原文語言（=正在使用這個「進階」
-                功能）這件事本身就該一直可見，收合起來反而會讓使用中的設定
-                消失在畫面上。 */}
-            <Text fontSize="xs" color="whiteAlpha.500" fontWeight="semibold">
-              {t('settings.translator.advancedSubtitleTitle')}
-            </Text>
-            <Text fontSize="xs" color="whiteAlpha.500">
-              {t('settings.translator.advancedSubtitleHint')}
-            </Text>
-            <Box opacity={subtitleSaving ? 0.5 : 1} pointerEvents={subtitleSaving ? 'none' : 'auto'}>
-              <SelectField
-                label={t('settings.translator.subtitleLanguage')}
-                value={[subtitleSelection]}
-                onChange={handleSubtitleChange}
-                collection={subtitleCollection}
-                placeholder={t('settings.translator.subtitleLanguage')}
-              />
-            </Box>
-            <Text fontSize="xs" color="whiteAlpha.600">{t('settings.translator.subtitleLangHelp')}</Text>
 
             {/* 沒有這顆按鈕的話，翻譯壞掉跟翻譯關掉在畫面上完全一樣：角色照講、
                 沒有錯誤、設定看起來也對。跑一次真的翻譯是唯一分得出來的辦法。 */}
