@@ -86,8 +86,10 @@ def test_the_page_sends_the_starting_point():
 
     page = Path(
         "frontend-src/src/renderer/src/components/sidebar/setting/memory.tsx"
-    ).read_text()
-    api = Path("frontend-src/src/renderer/src/api/memory.ts").read_text()
+    ).read_text(encoding="utf-8")
+    api = Path("frontend-src/src/renderer/src/api/memory.ts").read_text(
+        encoding="utf-8"
+    )
     assert (
         "saveMemoryContent(\n      baseUrl, confUid, contentDraft, memory?.content,\n    )"
         in page
