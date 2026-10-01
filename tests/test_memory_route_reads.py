@@ -1,19 +1,17 @@
 """記憶設定的讀取與 conf_uid 驗證——重寫前的特徵測試。
 
-四個「從 conf.yaml 讀一個設定」的函式原本各寫一遍同樣的 try/read/dig/default，
+「從 conf.yaml 讀一個設定」的函式原本各寫一遍同樣的 try/read/dig/default，
 而真正需要被釘住的 _resolve_conf_uid（路徑穿越的防線）一個測試都沒有。
 
 契約：
 
 - 讀不到、壞檔、缺鍵，一律回程式端的預設值——設定頁不能因為 conf.yaml 有問題
   就整個打不開。
-- 讀出來的值會被夾進合法範圍，UI 永遠不會顯示一個超界的數字。
 - conf_uid 是使用者送來的：不在已知集合裡就拒絕，帶路徑符號的直接擋。
 """
 
 import pytest
 
-from src.open_llm_vtuber import memory_core
 from src.open_llm_vtuber import memory_route as mr
 
 
@@ -21,8 +19,6 @@ CONF = """\
 character_config:
   conf_uid: aoi
   long_term_memory_enabled: False
-  core_memory_max_chars: 3000
-  memory_consolidation_interval: 3
 """
 
 
@@ -53,8 +49,6 @@ def test_reads_the_saved_values(conf):
 
     assert mr._base_conf_uid() == "aoi"
     assert mr._memory_enabled_from_conf() is False
-    assert mr._cap_from_conf() == 3000
-    assert mr._interval_from_conf() == 3
 
 
 def test_missing_keys_fall_back_to_code_defaults(conf):
@@ -62,8 +56,6 @@ def test_missing_keys_fall_back_to_code_defaults(conf):
 
     # 記憶預設是開的（跟 Pydantic 的預設一致）。
     assert mr._memory_enabled_from_conf() is True
-    assert mr._cap_from_conf() == memory_core.CAP_CHARS
-    assert mr._interval_from_conf() == memory_core.CONSOLIDATE_INTERVAL_DEFAULT
 
 
 def test_broken_conf_does_not_break_the_panel(monkeypatch):
@@ -73,22 +65,7 @@ def test_broken_conf_does_not_break_the_panel(monkeypatch):
     monkeypatch.setattr(mr, "read_yaml", explode)
 
     assert mr._memory_enabled_from_conf() is True
-    assert mr._cap_from_conf() == memory_core.CAP_CHARS
-    assert mr._interval_from_conf() == memory_core.CONSOLIDATE_INTERVAL_DEFAULT
     assert mr._base_conf_uid() is None
-
-
-def test_out_of_range_values_are_clamped_on_read(conf):
-    # UI 顯示的數字永遠要在合法範圍內，就算 conf.yaml 被手改成離譜的值。
-    conf(
-        "character_config:\n"
-        "  conf_uid: aoi\n"
-        "  core_memory_max_chars: 999999\n"
-        "  memory_consolidation_interval: 4\n"
-    )
-
-    assert mr._cap_from_conf() == memory_core.CAP_MAX
-    assert mr._interval_from_conf() == memory_core.CONSOLIDATE_INTERVAL_DEFAULT
 
 
 # --- conf_uid 驗證 -----------------------------------------------------------

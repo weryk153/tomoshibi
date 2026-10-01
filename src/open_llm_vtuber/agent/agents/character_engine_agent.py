@@ -51,8 +51,7 @@ from .agent_interface import AgentInterface
 INTERRUPT_RULE = (
     "If a reply of yours ends with `[Interrupted by user]`, you were interrupted there."
 )
-# 她自己的記憶不放在系統提示裡（見 split_memory_blocks），這句用法說明留著。
-# 她記得對方什麼由引擎負責，主機那一份（core_memory.md）不送。
+# 她記得什麼由引擎寫進對話的備註；這句告訴她怎麼用。
 MEMORY_RULE = "備註裡的記憶是之前對話累積下來的，自然運用、不要生硬複述。"
 
 _DONE = object()
@@ -143,17 +142,13 @@ class CharacterEngineAgent(AgentInterface):
     # --- 主機交代的事 ---------------------------------------------------------
 
     def set_system(self, system: str) -> None:
-        """主機組好的系統提示。裡面的長期記憶拿掉：她記得對方什麼、她自己說過
-        什麼，都由引擎記、由引擎寫進對話的備註。主機的那兩份檔案只在第一次搬進
-        引擎（_bring_what_the_host_remembered、_bring_her_own_memory）。"""
-        from ...service_context import split_memory_blocks
-
-        system, _about_her, _about_the_user = split_memory_blocks(system)
+        """主機組好的系統提示（人設與通用規則）。她記得對方什麼、她自己說過什麼，
+        都由引擎記、寫進對話的備註；舊 agent 留下的兩份檔案只在第一次搬進引擎
+        （_bring_what_the_host_remembered、_bring_her_own_memory）。"""
         self._system = f"{system}\n\n{MEMORY_RULE}\n\n{INTERRUPT_RULE}"
 
     # --- 她記得對方什麼 -------------------------------------------------------
-    # 有這兩個方法，主機就知道這個 agent 自己記得對方：記憶頁讀寫的是這一份，
-    # 整理 core_memory.md 的那一半也不用做了。
+    # 記憶頁讀寫的是這一份。
 
     def conversation_memory(self, history_uid: str) -> str:
         return "\n".join(self._companion().memories(history_uid))
@@ -170,8 +165,7 @@ class CharacterEngineAgent(AgentInterface):
         )
 
     # --- 她記得自己什麼 -------------------------------------------------------
-    # 有這兩個方法，主機就知道她自己說過什麼也是引擎在記：記憶頁讀寫的是這一份，
-    # 主機那一套整理（self_memory.md）整個不用做。
+    # 記憶頁讀寫的是這一份。
 
     def self_memory(self) -> str:
         # 記憶頁可能在她第一次開口之前就打開：先把 self_memory.md 搬進來，不然

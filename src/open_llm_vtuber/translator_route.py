@@ -100,8 +100,7 @@ def _get_openai_llm(data: Any) -> Optional[Any]:
     實測過的後果：使用者用 LM Studio，存一次翻譯設定就被改成 Ollama 的端點與模型
     ——翻譯從此連到一個沒在跑的服務，而且 conf.yaml 裡原本正確的值被覆蓋掉了。
 
-    記憶整理那條路犯過一模一樣的錯（resolve_consolidation_llm 已修）。凡是要沿用
-    「玩家設好的 LLM」的地方，都要問當前供應商是誰。
+    凡是要沿用「玩家設好的 LLM」的地方，都要問當前供應商是誰。
     """
     try:
         agent = data["character_config"]["agent_config"]

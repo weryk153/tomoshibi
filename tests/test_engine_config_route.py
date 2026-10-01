@@ -37,9 +37,9 @@ def conf_file(tmp_path, monkeypatch):
     return path
 
 
-def test_reading_gives_the_choice_and_the_numbers():
+def test_reading_gives_the_numbers_and_the_engine_is_always_on():
     assert route.read_engine_settings() == {
-        "enabled": False,
+        "enabled": True,
         "emotion_every": 1,
         "memory_every": 2,
         "self_memory_every": 2,
@@ -52,21 +52,12 @@ def test_reading_gives_the_choice_and_the_numbers():
     }
 
 
-def test_switching_on_rewrites_the_choice_in_place(conf_file):
-    route.write_engine_settings({"enabled": True})
-
-    text = conf_file.read_text(encoding="utf-8")
-    assert "conversation_agent_choice: 'character_engine_agent' # 对话代理选择" in text
-    assert route.read_engine_settings()["enabled"] is True
-
-
-def test_switching_off_goes_back_to_the_basic_agent(conf_file):
-    route.write_engine_settings({"enabled": True})
+def test_the_old_switch_no_longer_writes_the_choice(conf_file):
+    """引擎是唯一的對話方式；舊畫面送來的 enabled 不再改 conversation_agent_choice。"""
+    before = conf_file.read_text(encoding="utf-8")
     route.write_engine_settings({"enabled": False})
 
-    assert "conversation_agent_choice: 'basic_memory_agent'" in conf_file.read_text(
-        encoding="utf-8"
-    )
+    assert conf_file.read_text(encoding="utf-8") == before
 
 
 def test_the_numbers_are_written_where_they_live_and_the_rest_is_kept(conf_file):
@@ -146,11 +137,11 @@ def test_the_endpoints_read_and_write_and_say_a_restart_is_needed(monkeypatch):
     client = TestClient(app)
 
     before = client.get("/api/agent-config/character-engine").json()
-    assert before["enabled"] is False
+    assert before["enabled"] is True
     assert before["available"] is True
 
     saved = client.post(
-        "/api/agent-config/character-engine", json={"enabled": True, "memory_every": 3}
+        "/api/agent-config/character-engine", json={"memory_every": 3}
     ).json()
     assert saved["ok"] is True
     assert saved["restart_required"] is True
@@ -160,23 +151,6 @@ def test_the_endpoints_read_and_write_and_say_a_restart_is_needed(monkeypatch):
     after = client.get("/api/agent-config/character-engine").json()
     assert after["enabled"] is True
     assert after["memory_every"] == 3
-
-
-def test_switching_on_is_refused_while_the_engine_cannot_be_used(monkeypatch):
-    from fastapi import FastAPI
-    from fastapi.testclient import TestClient
-
-    monkeypatch.setattr(route, "_is_local_request", lambda request: True)
-    monkeypatch.setattr(route, "engine_availability", lambda: (False, "no engine"))
-    app = FastAPI()
-    app.include_router(route.init_engine_config_route())
-    client = TestClient(app)
-
-    response = client.post("/api/agent-config/character-engine", json={"enabled": True})
-
-    assert response.status_code == 400
-    assert response.json()["error"] == "no engine"
-    assert route.read_engine_settings()["enabled"] is False
 
 
 def test_the_background_model_is_written_and_read_back(conf_file):

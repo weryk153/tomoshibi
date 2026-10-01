@@ -1,9 +1,8 @@
-"""主機的長期記憶（core_memory.md、self_memory.md）怎麼到她那裡。
+"""她記得什麼怎麼到她那裡。
 
-主機把記憶寫在系統提示的中段，而記憶每一輪都會被整理一次。LM Studio 的紀錄：
-每一輪都只有 cached_tokens=2048，後面 2300～3400 個 token 連同整段對話全部重讀，
-兩種 agent 都一樣。character_engine_agent 把記憶從系統提示裡拿掉：她記得對方什麼、
-她自己說過什麼，都由引擎記、由引擎寫進對話的備註，系統提示就不會再跟著記憶變。
+記憶不放在系統提示裡：記憶每一輪都會變，放在系統提示中段會讓 LM Studio 的快取
+每輪從那裡重讀。她記得對方什麼、她自己說過什麼，都由引擎記、由引擎寫進對話的
+備註，系統提示只放人設與怎麼用記憶。
 """
 
 import asyncio
@@ -14,9 +13,6 @@ pytest.importorskip("ai_character_engine")
 
 from datetime import datetime  # noqa: E402
 
-from src.open_llm_vtuber.conversation_quality import (  # noqa: E402
-    CORE_CONVERSATION_PROMPT,
-)
 from tests.test_engine_agent import (  # noqa: E402
     CONTEXT_MARK,
     EngineLLM,
@@ -24,24 +20,6 @@ from tests.test_engine_agent import (  # noqa: E402
     companion,
     say,
 )
-from tests.test_memory_blocks_split import composed  # noqa: E402
-
-
-def test_the_hosts_copy_of_her_own_memory_is_not_sent(tmp_path):
-    """她自己的記憶由引擎記。主機系統提示裡那一份（self_memory.md）不再送：兩份
-    並存的話，同一件事她會讀到兩次，刪掉的那一份還會從另一份回來。"""
-
-    async def scenario():
-        llm = EngineLLM()
-        current = agent(companion(tmp_path, llm))
-        current.set_system(composed("紅莉栖：喜歡胡椒博士。", ""))
-        await say(current, "你好")
-        return llm.calls[0]
-
-    sent = asyncio.run(scenario())
-
-    assert "胡椒博士" not in "".join(message.content for message in sent)
-    assert CORE_CONVERSATION_PROMPT in sent[0].content
 
 
 def test_her_own_memory_comes_from_the_engine(tmp_path):
@@ -62,7 +40,7 @@ def test_how_to_use_the_memory_is_still_said(tmp_path):
     async def scenario():
         llm = EngineLLM()
         current = agent(companion(tmp_path, llm))
-        current.set_system(composed("紅莉栖：喜歡胡椒博士。", ""))
+        current.set_system("你是紅莉栖。")
         await say(current, "你好")
         return llm.calls[0][0].content
 

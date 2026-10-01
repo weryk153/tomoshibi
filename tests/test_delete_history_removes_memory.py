@@ -21,11 +21,18 @@ from src.open_llm_vtuber import chat_history_manager as chm
 from src.open_llm_vtuber import memory_core
 
 
+def _save_old_core_memory(conf_uid: str, history_uid: str, content: str) -> None:
+    """Tomoshibi 以前自己存的 core_memory.md；舊對話資料夾裡還會有。"""
+    path = memory_core._memory_file(conf_uid, history_uid)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
 def _make_conversation_with_memory(conf_uid: str, content: str = "私密的事") -> str:
     """建一段對話並存一份記憶，回傳它的 history_uid。"""
     history_uid = chm.create_new_history(conf_uid)
     assert history_uid
-    memory_core.save_core_memory(conf_uid, history_uid, content)
+    _save_old_core_memory(conf_uid, history_uid, content)
     return history_uid
 
 
@@ -160,17 +167,17 @@ def test_dotdot_history_uid_stays_refused(tmp_path, monkeypatch):
 def test_get_safe_history_memory_dir_matches_where_memory_core_writes(
     tmp_path, monkeypatch
 ):
-    """core_memory_path 與 _get_safe_history_memory_dir 對同一段對話要指向同一個
+    """memory_core._memory_file 與 _get_safe_history_memory_dir 對同一段對話要指向同一個
     資料夾——這是刪除能不能連記憶一起清掉的前提。"""
     monkeypatch.chdir(tmp_path)
     conf_uid = "char-a"
     history_uid = "conv-1"
 
-    memory_core.save_core_memory(conf_uid, history_uid, "一些內容")
-    memory_file = memory_core.core_memory_path(conf_uid, history_uid)
+    _save_old_core_memory(conf_uid, history_uid, "一些內容")
+    memory_file = memory_core._memory_file(conf_uid, history_uid)
     memory_dir = chm._get_safe_history_memory_dir(conf_uid, history_uid)
 
-    # memory_core.core_memory_path returns a realpath (absolute); the chat
+    # memory_core._memory_file may return a realpath (absolute); the chat
     # history manager's sanitizer returns a plain relative path. Compare
     # resolved paths so the comparison holds regardless of that difference.
     assert os.path.realpath(os.path.dirname(memory_file)) == os.path.realpath(

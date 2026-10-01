@@ -52,8 +52,6 @@ def get_recent_proactive(conf_uid: str, client_uid: str) -> list[str]:
     return list(_recent_by_session.get(key, ()))
 
 
-
-
 def should_force_statement(conf_uid: str, client_uid: str) -> bool:
     """Return whether the previous proactive turn already asked a question."""
     recent = get_recent_proactive(conf_uid, client_uid)

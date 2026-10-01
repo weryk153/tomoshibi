@@ -26,14 +26,11 @@ from .conf_editor import (
     CONF_PATH,
     block_extent,
     read_conf_lines,
-    rewrite_str_leaf,
-    upsert_leaf,
     upsert_nested_block,
     write_conf,
 )
 
 ENGINE_CHOICE = "character_engine_agent"
-BASIC_CHOICE = "basic_memory_agent"
 # 畫面開得出來的幾個；其餘（timeout、goal_max_age_days…）留在 YAML。
 EVERY_KEYS = (
     "emotion_every",
@@ -74,9 +71,8 @@ def read_engine_settings() -> dict:
     data = _load_conf()
     agent_config = _agent_config(data)
     block = (agent_config.get("agent_settings") or {}).get(ENGINE_CHOICE) or {}
-    settings = {
-        "enabled": agent_config.get("conversation_agent_choice") == ENGINE_CHOICE
-    }
+    # 引擎是唯一的對話方式；前端不再有開關，這個欄位留給還讀它的舊畫面。
+    settings = {"enabled": True}
     for key in EVERY_KEYS:
         settings[key] = _clamp(block.get(key), EVERY_DEFAULTS[key])
     for key in TEXT_KEYS:
@@ -115,19 +111,6 @@ def apply_engine_settings(lines: list[str], changes: dict) -> None:
     """同 write_engine_settings，改在已經讀進來的行上；給要一次寫入多項設定的人
     （效能模式）用。"""
     agent_start, agent_end = block_extent(lines, "agent_config")
-
-    if "enabled" in changes:
-        choice = ENGINE_CHOICE if changes["enabled"] else BASIC_CHOICE
-        if not rewrite_str_leaf(
-            lines, agent_start, agent_end, "conversation_agent_choice", choice
-        ):
-            agent_end = upsert_leaf(
-                lines,
-                agent_start,
-                agent_end,
-                "conversation_agent_choice",
-                f"'{choice}'",
-            )
 
     numbers = {}
     for key in EVERY_KEYS:
@@ -203,15 +186,7 @@ def init_engine_config_route() -> APIRouter:
         body, bad = await _parse_body(request)
         if bad:
             return bad
-        changes = {
-            k: body[k] for k in ("enabled", *EVERY_KEYS, *TEXT_KEYS) if k in body
-        }
-        if changes.get("enabled"):
-            available, reason = engine_availability()
-            if not available:
-                return JSONResponse(
-                    status_code=400, content={"ok": False, "error": reason}
-                )
+        changes = {k: body[k] for k in (*EVERY_KEYS, *TEXT_KEYS) if k in body}
         try:
             await asyncio.to_thread(write_engine_settings, changes)
             settings = await asyncio.to_thread(read_engine_settings)

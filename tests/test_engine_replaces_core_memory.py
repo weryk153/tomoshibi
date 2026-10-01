@@ -1,8 +1,7 @@
-"""選了 character_engine_agent，「她記得對方什麼」由引擎負責。
+"""「她記得對方什麼」「她自己的事」都由引擎負責。
 
-core_memory.md 是主機自己的那一套：每幾輪用一次模型把整份重寫。引擎的記憶是逐條
-的、帶出處的，而且背景工作會讓路給對話。兩套並存的時候，同一件事她會讀到兩次，
-整理還多佔一次模型。她自己的記憶（self_memory.md）也一樣，引擎有自己的一份。
+core_memory.md、self_memory.md 是 Tomoshibi 以前自己的那一套。那一套已經拿掉，
+留下的舊檔案由引擎匯入一次。
 """
 
 import asyncio
@@ -20,25 +19,17 @@ from tests.test_engine_agent import (  # noqa: E402
     companion,
     say,
 )
-from tests.test_memory_blocks_split import composed  # noqa: E402
+
+
+def write_old_self_memory(conf_uid, text):
+    """Tomoshibi 以前自己存的 self_memory.md；現在只剩引擎匯入時讀它。"""
+    path = memory_core._self_memory_file(conf_uid)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
 
 
 def notes_of(llm, turn=-1):
     return "\n".join(m.content for m in llm.calls[turn] if CONTEXT_MARK in m.content)
-
-
-def test_the_hosts_memory_of_the_user_is_no_longer_sent(tmp_path):
-    async def scenario():
-        llm = EngineLLM()
-        current = agent(companion(tmp_path, llm))
-        current.set_system(composed("紅莉栖：喜歡胡椒博士。", "對方：住在台北。"))
-        await say(current, "你好")
-        return llm.calls[0][0].content, notes_of(llm)
-
-    system, notes = asyncio.run(scenario())
-
-    assert "台北" not in system + notes
-    assert "胡椒博士" not in system + notes
 
 
 def test_what_the_host_remembered_before_is_handed_to_the_engine_once(
@@ -82,7 +73,7 @@ def test_what_the_host_remembered_before_is_handed_to_the_engine_once(
     assert after_restart == "對方：名字是晨星。"
     # 她自己的那幾行不是丟掉，是進她自己的記憶（舊檔案裡有從沒搬去那邊的）。
     assert her_own == "紅莉栖：喜歡胡椒博士。"
-    assert memory_core.load_self_memory("kurisu") == ""
+    assert memory_core.read_self_memory("kurisu") == ""
 
 
 def test_what_she_remembered_of_herself_before_is_handed_to_the_engine_once(
@@ -91,7 +82,7 @@ def test_what_she_remembered_of_herself_before_is_handed_to_the_engine_once(
     """self_memory.md 是她在所有對話裡說過自己的事。換 agent 之後搬進引擎一次；
     使用者之後在記憶頁刪掉的，重開之後不能又跑回來。"""
     monkeypatch.chdir(tmp_path)
-    memory_core.save_self_memory("kurisu", "紅莉栖：在學鋼琴。\n紅莉栖：喜歡胡椒博士。")
+    write_old_self_memory("kurisu", "紅莉栖：在學鋼琴。\n紅莉栖：喜歡胡椒博士。")
 
     async def scenario():
         first = agent(
@@ -117,7 +108,7 @@ def test_an_unreadable_self_memory_is_brought_over_once_it_can_be_read(
     tmp_path, monkeypatch
 ):
     monkeypatch.chdir(tmp_path)
-    memory_core.save_self_memory("kurisu", "紅莉栖：喜歡胡椒博士。")
+    write_old_self_memory("kurisu", "紅莉栖：喜歡胡椒博士。")
     readable = memory_core.read_self_memory
 
     def unreadable(conf_uid):
@@ -218,7 +209,7 @@ def test_what_she_said_before_the_engine_kept_it_counts_as_her_oldest(
     """每段舊對話第一次打開，都會把它 core_memory.md 裡她自己的那幾行搬進來。當成
     最新的話，搬幾段之後她最近說的會被擠出去。"""
     monkeypatch.chdir(tmp_path)
-    memory_core.save_self_memory("kurisu", "紅莉栖：以前說過的。")
+    write_old_self_memory("kurisu", "紅莉栖：以前說過的。")
 
     async def scenario():
         engine = companion(tmp_path, EngineLLM())
@@ -238,7 +229,7 @@ def test_the_memory_page_before_her_first_word_shows_what_she_remembers(
 ):
     """記憶頁在她開口之前打開：以前顯示空的，清掉之後第一輪又把舊檔案搬回來。"""
     monkeypatch.chdir(tmp_path)
-    memory_core.save_self_memory("kurisu", "紅莉栖：在學鋼琴。")
+    write_old_self_memory("kurisu", "紅莉栖：在學鋼琴。")
 
     async def scenario():
         current = agent(

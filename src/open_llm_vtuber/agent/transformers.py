@@ -354,7 +354,7 @@ def tts_filter(
             stream = func(*args, **kwargs)
             config = tts_preprocessor_config or TTSPreprocessorConfig()
             # Fresh per invocation of this generator (i.e. fresh per streamed
-            # response - see basic_memory_agent.py / letta_agent.py, which
+            # response - see character_engine_agent.py / letta_agent.py, which
             # call the decorated `chat` function once per turn). This is
             # what guarantees an unterminated marker (e.g. an unclosed
             # asterisk) at the end of one response can never leak into and

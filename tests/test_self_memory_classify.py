@@ -5,11 +5,7 @@
 記憶——那一邊是私人的，放錯不會外洩。
 """
 
-from src.open_llm_vtuber.memory_core import (
-    SELF_CAP_CHARS,
-    build_consolidation_prompt,
-    classify_memory_lines,
-)
+from src.open_llm_vtuber.memory_core import classify_memory_lines
 
 NAME = "紅莉栖"
 
@@ -154,56 +150,3 @@ def test_mixed_input_preserves_order_within_each_bucket():
     conv, self_ = classify_memory_lines(text, NAME)
     assert conv == "對方叫小明。\n對方喜歡貓。"
     assert self_ == "紅莉栖喜歡咖啡。\n紅莉栖討厭夏天。"
-
-
-def _prompt(**kw):
-    base = dict(
-        current="對方叫小明。",
-        user_input="今天好累",
-        ai_response="辛苦了。",
-        cap=1500,
-        character_name=NAME,
-        current_self="紅莉栖喜歡咖啡。",
-    )
-    base.update(kw)
-    return build_consolidation_prompt(**base)
-
-
-def test_prompt_has_no_two_section_markers():
-    # 兩段格式的殘留（【對話記憶】／【<name>自己】）不該再出現。
-    assert "【" not in _prompt()
-
-
-def test_prompt_has_no_placeholder_text_for_empty_memories():
-    p = _prompt(current="", current_self="")
-    assert "（目前還沒有任何記憶）" not in p
-    assert "（目前還沒有任何關於自己的記憶）" not in p
-
-
-def test_current_self_lines_precede_current_lines():
-    p = _prompt(current="對方叫小明。", current_self="紅莉栖喜歡咖啡。")
-    assert p.index("紅莉栖喜歡咖啡。") < p.index("對方叫小明。")
-
-
-def test_prompt_states_the_two_caps_separately():
-    """預算句要跟 _acceptable_rewrite 的拒收門檻講同一件事。
-
-    合計上限（cap + self_cap）會讓模型以為對話記憶那半可以寫到 2300 字，而
-    _acceptable_rewrite 對那一半是用 int(cap * 1.5) 拒收——模型照著提示詞寫，
-    寫出來的東西被丟掉。所以兩個上限分開講，各自釘住自己的數字。
-    """
-    p = _prompt(cap=1500)
-    assert str(1500) in p
-    assert str(SELF_CAP_CHARS) in p
-    assert str(1500 + SELF_CAP_CHARS) not in p
-
-
-def test_prompt_keeps_the_old_subject_rules():
-    # 既有測試（test_memory_uses_in_world_subject.py 等）釘住這些字串，不能掉。
-    p = _prompt()
-    assert "「對方」或「紅莉栖」開頭" in p
-    assert "使用者" not in p
-    assert "拒絕" in p
-    assert "聽不" in p
-    assert "測試" in p
-    assert "主詞" in p
