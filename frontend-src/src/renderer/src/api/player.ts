@@ -43,6 +43,13 @@ export const PLAYER_LANGUAGES: readonly PlayerLanguageOption[] = [
   { value: 'zh-CN', labelKey: 'settings.playerLanguage.optZhCn' },
 ]
 
+// 選單要列哪些值：五個代碼，加上存著的值不在其中時的那一個（舊版存英文名字，
+// 例如 'Traditional Chinese (Taiwan)'）。不列的話選單整個顯示空白，看起來像沒設。
+export function playerLanguageValues(current: string): string[] {
+  const values = PLAYER_LANGUAGES.map((opt) => opt.value)
+  return current && !values.includes(current) ? [...values, current] : values
+}
+
 // 後端把換行摺成空白（強制單行）——見 translator_route.py 的
 // save_player_prompt：`re.sub(r"\s*\n\s*", " ", prompt).strip()`。前端在送出
 // 前先做同樣的正規化，使用者才不會看到「我打了三行，存檔後從後端讀回來

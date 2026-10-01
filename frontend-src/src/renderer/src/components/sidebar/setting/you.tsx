@@ -45,6 +45,7 @@ import {
   fetchPlayerPrompt,
   setPlayerPrompt,
   PLAYER_LANGUAGES,
+  playerLanguageValues,
 } from '@/api/player.ts';
 import {
   fetchCharacters, AVATAR_MAX_CLIENT_BYTES, type CharacterRecord,
@@ -125,11 +126,13 @@ function You({ active = true }: YouProps): JSX.Element {
   }, [setAvatarDataUrl, t]);
 
   // ---- Step 2：玩家語言（寫 conf.yaml，經 setPlayerLanguage）----
-  const languageCollection = useMemo(() => createListCollection({
-    items: PLAYER_LANGUAGES.map((opt) => ({ label: t(opt.labelKey), value: opt.value })),
-  }), [t]);
-
   const [playerLang, setPlayerLangState] = useState('');
+  const languageCollection = useMemo(() => createListCollection({
+    items: playerLanguageValues(playerLang).map((value) => {
+      const known = PLAYER_LANGUAGES.find((opt) => opt.value === value);
+      return { label: known ? t(known.labelKey) : value, value };
+    }),
+  }), [playerLang, t]);
   const [languageLoadError, setLanguageLoadError] = useState<string | null>(null);
   const [languageSaving, setLanguageSaving] = useState(false);
 

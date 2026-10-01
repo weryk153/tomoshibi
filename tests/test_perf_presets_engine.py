@@ -79,3 +79,14 @@ def test_the_current_preset_is_recognised_and_anything_else_is_custom(conf):
 def test_keep_alive_is_gone():
     assert not hasattr(perf_route, "_write_keep_alive")
     assert not hasattr(perf_route, "_keep_alive_from_conf")
+
+
+def test_the_presets_are_listed_from_light_to_high(conf, monkeypatch):
+    """選單照字母排是「高效能、輕量、標準」，看起來沒有順序。"""
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    monkeypatch.setattr(perf_route, "_is_local_request", lambda r: True)
+    app = FastAPI()
+    app.include_router(perf_route.init_perf_route())
+    assert TestClient(app).get("/api/perf").json()["presets"] == ["light", "standard", "high"]

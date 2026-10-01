@@ -436,7 +436,7 @@ def init_perf_route() -> APIRouter:
                 "tts_models": sorted(TTS_MODELS),
                 "gpt_sovits_langs": sorted(GPT_SOVITS_LANGS),
                 "reference_voices": _reference_voices(),
-                "presets": sorted(PRESETS.keys()),
+                "presets": list(PRESETS),
                 "current_preset": _current_preset(),
             }
         )
