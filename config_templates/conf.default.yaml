@@ -93,8 +93,7 @@ character_config:
         # conversation, memory and tools live in the engine, and how she feels about
         # you, what she wants to do next and what she noticed build up as you talk.
         # To use it, set conversation_agent_choice to 'character_engine_agent'. It
-        # needs Python 3.11+, the ai-character-engine package and an
-        # OpenAI-compatible LLM endpoint; see docs/character-engine-agent.md.
+        # needs an OpenAI-compatible LLM endpoint; see docs/character-engine-agent.md.
         # Model, MCP and sentence splitting use the basic_memory_agent settings above.
         # Run each background job every N turns; 0 turns it off. Every job is an
         # extra LLM call, so raise these numbers on a slow machine.

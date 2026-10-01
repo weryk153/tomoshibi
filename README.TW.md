@@ -41,7 +41,7 @@ app 沒有簽章，第一次開會被系統擋：
 
 ### 從原始碼執行
 
-需要 Python 3.10～3.12 和 [uv](https://github.com/astral-sh/uv)。
+需要 Python 3.11～3.12 和 [uv](https://github.com/astral-sh/uv)。
 
 ```bash
 git clone https://github.com/weryk153/tomoshibi.git && cd tomoshibi

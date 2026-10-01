@@ -41,7 +41,7 @@
 
 ### 소스에서 실행하기
 
-Python 3.10~3.12와 [uv](https://github.com/astral-sh/uv)가 필요해요.
+Python 3.11~3.12와 [uv](https://github.com/astral-sh/uv)가 필요해요.
 
 ```bash
 git clone https://github.com/weryk153/tomoshibi.git && cd tomoshibi

@@ -158,3 +158,4 @@ Uses **uv** (modern Python package manager):
 - Generated requirements: `requirements.txt` (auto-generated)
 - Optional dependencies for specific features (e.g., `bilibili` extra)
 - **torch is an optional extra, not a default dependency**: only `fun_asr`, `coqui_tts` and `silero_vad` import it, and only when selected. Use `uv sync --extra torch` for those; the factories raise a message saying so when it is missing. Keeping it out of the default install saves ~350MB for everyone, including the desktop app's first launch.
+- **AI Character Engine is a regular dependency**, installed by `uv sync` from GitHub and pinned to a commit in `pyproject.toml` (it is not on PyPI). It needs Python ≥3.11, so the project is on 3.12 (`.python-version`). To try local engine changes, `uv pip install -e ../ai-character-engine`; the next `uv sync` puts the pinned version back. Moving the pin means pushing the engine first.

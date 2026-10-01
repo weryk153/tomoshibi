@@ -41,7 +41,7 @@ The app isn't signed, so the system blocks it the first time:
 
 ### Run from source
 
-Needs Python 3.10–3.12 and [uv](https://github.com/astral-sh/uv).
+Needs Python 3.11–3.12 and [uv](https://github.com/astral-sh/uv).
 
 ```bash
 git clone https://github.com/weryk153/tomoshibi.git && cd tomoshibi
