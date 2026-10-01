@@ -26,6 +26,8 @@ from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse
 from loguru import logger
 
+from . import character_settings
+
 from .api_guard import (
     is_trusted_request as _is_local_request,
     forbidden as _forbidden,
@@ -33,10 +35,6 @@ from .api_guard import (
 
 from .conf_editor import (
     CONF_PATH,
-    character_config_extent as _character_config_extent,
-    read_conf_lines as _read_conf_lines,
-    upsert_leaf as _upsert_leaf,
-    write_conf as _write_conf,
 )
 
 from .character_route import _existing_conf_uids
@@ -73,9 +71,12 @@ def _base_conf_uid() -> Optional[str]:
     return str(uid) if uid else None
 
 
-def _memory_enabled_from_conf() -> bool:
-    """長期記憶開著沒有。缺鍵時預設開啟，跟 Pydantic 的預設一致。"""
-    return bool(_character_setting("long_term_memory_enabled", True))
+def _memory_enabled_for(conf_uid: str) -> bool:
+    """這個角色的長期記憶開著沒有：她自己的檔案為準，沒寫就照底稿，再沒有就開著。"""
+    filename = character_settings.filename_for_uid(conf_uid)
+    if filename is None:
+        return True
+    return bool(character_settings.effective(filename)["long_term_memory_enabled"])
 
 
 def _resolve_conf_uid(supplied: Optional[str]) -> tuple[Optional[str], Optional[str]]:
@@ -122,21 +123,6 @@ def _resolve_history_uid(client_contexts: dict, conf_uid: str):
 
 # --- 寫設定 ----------------------------------------------------------------- #
 # --------------------------------------------------------------------------- #
-
-
-def _write_memory_enabled(enabled: bool) -> bool:
-    """開關長期記憶。
-
-    The leaf must already exist in conf.yaml (added by hand). Atomic + one-time .bak.
-    Returns True on success.
-    """
-    lines = _read_conf_lines()
-    cc_start, cc_end = _character_config_extent(lines)
-    _upsert_leaf(
-        lines, cc_start, cc_end, "long_term_memory_enabled", str(bool(enabled))
-    )
-    _write_conf(lines)
-    return True
 
 
 # --------------------------------------------------------------------------- #
@@ -321,7 +307,7 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         return JSONResponse(
             {
                 "conf_uid": conf_uid,
-                "enabled": _memory_enabled_from_conf(),
+                "enabled": _memory_enabled_for(conf_uid),
                 "content": keeper.conversation_memory(history_uid) if keeper else "",
                 "self_content": self_keeper.self_memory() if self_keeper else "",
             }
@@ -363,21 +349,30 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         body, bad = await _parse_body(request)
         if bad:
             return bad
-        if "enabled" not in body:
+        if not isinstance(body.get("enabled"), bool):
             return _error(400, "Missing 'enabled' boolean.")
 
-        # conf_uid 驗證過只為了回應的形狀；開關本身是基礎 character_config 的，
-        # 那是執行中的設定唯一會讀的地方。
+        # 開關是這個角色自己的：寫進她的角色檔（底稿角色寫 conf.yaml）。
         conf_uid, bad = _resolved_uid(body)
         if bad:
             return bad
+        filename = await asyncio.to_thread(
+            character_settings.filename_for_uid, conf_uid
+        )
+        if filename is None:
+            return _error(404, "Character not found.")
 
         enabled = bool(body["enabled"])
-        bad = await _write_or_error(_write_memory_enabled, enabled, what="toggle write")
+        bad = await _write_or_error(
+            character_settings.write,
+            filename,
+            {"long_term_memory_enabled": enabled},
+            what="toggle write",
+        )
         if bad:
             return bad
 
-        logger.info(f"[memory] toggle saved (enabled={enabled})")
+        logger.info(f"[memory] toggle saved (conf_uid={conf_uid}, enabled={enabled})")
         return JSONResponse(
             {
                 "ok": True,

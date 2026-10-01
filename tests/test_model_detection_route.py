@@ -158,10 +158,18 @@ def test_apply_without_a_profile_still_succeeds(client, monkeypatch):
     assert "extra_body" not in path.read_text(encoding="utf-8")
 
 
-def test_apply_syncs_use_mcpp_with_tool_support(client, monkeypatch):
-    """工具能力偵測得到就別讓使用者猜。不支援卻開著＝每輪白付 mcp_prompt 的
-    ~388 token 加上工具 schema，而模型只會忽略它們。"""
+def _use_mcpp_lines(text):
+    return [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip().startswith("use_mcpp:")
+    ]
+
+
+def test_applying_a_model_without_tools_leaves_the_switch_alone(client, monkeypatch):
+    """工具開關是使用者的選擇。偵測到的模型不支援工具時只提示，不替他關掉。"""
     c, path = client
+    before = _use_mcpp_lines(path.read_text(encoding="utf-8"))
     no_tools = DetectedModel(
         id="plain:8b",
         backend="lmstudio",
@@ -173,24 +181,29 @@ def test_apply_syncs_use_mcpp_with_tool_support(client, monkeypatch):
     monkeypatch.setattr(route, "list_ollama_models", lambda base_url: [])
     monkeypatch.setattr(route, "_validate_combo", _ok_validate)
 
-    c.post(
+    body = c.post(
         "/api/llm-config/apply-detected",
         json={"backend": "lmstudio", "model": "plain:8b"},
-    )
-    assert "use_mcpp: False" in path.read_text(encoding="utf-8")
+    ).json()
+
+    assert _use_mcpp_lines(path.read_text(encoding="utf-8")) == before
+    assert body["applied"]["tools"] is False
 
 
-def test_apply_enables_use_mcpp_for_a_tool_capable_model(client, monkeypatch):
+def test_applying_a_tool_capable_model_leaves_the_switch_alone(client, monkeypatch):
     c, path = client
+    before = _use_mcpp_lines(path.read_text(encoding="utf-8"))
     monkeypatch.setattr(route, "list_lmstudio_models", lambda base_url: [LMS])
     monkeypatch.setattr(route, "list_ollama_models", lambda base_url: [])
     monkeypatch.setattr(route, "_validate_combo", _ok_validate)
 
-    c.post(
+    body = c.post(
         "/api/llm-config/apply-detected",
         json={"backend": "lmstudio", "model": "qwen/qwen3.5-9b"},
-    )
-    assert "use_mcpp: True" in path.read_text(encoding="utf-8")
+    ).json()
+
+    assert _use_mcpp_lines(path.read_text(encoding="utf-8")) == before
+    assert body["applied"]["tools"] is True
 
 
 def test_apply_blocks_when_validation_fails(client, monkeypatch):
@@ -254,6 +267,7 @@ def test_apply_ollama_describe_failure_leaves_use_mcpp_untouched(client, monkeyp
     after = path.read_text(encoding="utf-8")
     assert "use_mcpp: true" in after, "describe 失敗不該覆寫使用者原本的 use_mcpp"
     assert "model: 'qwen2.5:3b'" in after, "provider 區塊本身還是要照樣寫入"
+    assert body["applied"]["tools"] is None, "問不到能力時說不知道，不是說不支援"
 
 
 def test_apply_rejects_model_id_with_control_characters(client, monkeypatch):

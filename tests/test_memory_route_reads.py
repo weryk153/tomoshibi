@@ -48,14 +48,6 @@ def test_reads_the_saved_values(conf):
     conf(CONF)
 
     assert mr._base_conf_uid() == "aoi"
-    assert mr._memory_enabled_from_conf() is False
-
-
-def test_missing_keys_fall_back_to_code_defaults(conf):
-    conf("character_config:\n  conf_uid: aoi\n")
-
-    # 記憶預設是開的（跟 Pydantic 的預設一致）。
-    assert mr._memory_enabled_from_conf() is True
 
 
 def test_broken_conf_does_not_break_the_panel(monkeypatch):
@@ -64,7 +56,6 @@ def test_broken_conf_does_not_break_the_panel(monkeypatch):
 
     monkeypatch.setattr(mr, "read_yaml", explode)
 
-    assert mr._memory_enabled_from_conf() is True
     assert mr._base_conf_uid() is None
 
 

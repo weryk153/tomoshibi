@@ -2,7 +2,6 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   buildTranslatorSavePayload,
-  isTranslatorPayloadValid,
   isTranslatorEngine,
   VALID_ENGINES,
   type TranslatorConfigState,
@@ -22,72 +21,26 @@ const CURRENT: TranslatorConfigState = {
   deeplx_endpoint: 'http://localhost:1188/v2/translate',
   speak_voice: 'zh-CN-XiaoyiNeural',
   default_jp_voice: 'ja-JP-NanamiNeural',
-  translate_subtitle: false,
-  subtitle_target_lang: '',
 }
 
-test('buildTranslatorSavePayload：只改字幕語言時，四個沒有 UI 控制項的隱藏欄位原樣保留', () => {
+test('buildTranslatorSavePayload：只切換引擎時，沒有 UI 控制項的隱藏欄位原樣保留', () => {
   const payload = buildTranslatorSavePayload(CURRENT, {
-    translate_subtitle: true,
-    subtitle_target_lang: '日文',
-  })
-  assert.equal(payload.llm_target_lang, '英文')
-  assert.equal(payload.llm_endpoint, 'http://localhost:9999/v1/chat/completions')
-  assert.equal(payload.llm_model, 'custom/model-name')
-  assert.equal(payload.deeplx_target_lang, 'DE')
-  // 這次操作本身要生效的欄位也要在 payload 裡。
-  assert.equal(payload.translate_subtitle, true)
-  assert.equal(payload.subtitle_target_lang, '日文')
-  // 沒被這次操作碰到的引擎／deeplx endpoint 也保持原值。
-  assert.equal(payload.engine, 'llm')
-  assert.equal(payload.deeplx_endpoint, 'http://localhost:1188/v2/translate')
-})
-
-test('buildTranslatorSavePayload：只切換引擎時，字幕設定與隱藏欄位原樣保留', () => {
-  const withSubtitle: TranslatorConfigState = {
-    ...CURRENT,
-    translate_subtitle: true,
-    subtitle_target_lang: '韓文',
-  }
-  const payload = buildTranslatorSavePayload(withSubtitle, {
     engine: 'deeplx',
     deeplx_endpoint: 'http://localhost:1188/v2/translate',
   })
   assert.equal(payload.engine, 'deeplx')
-  assert.equal(payload.translate_subtitle, true)
-  assert.equal(payload.subtitle_target_lang, '韓文')
   assert.equal(payload.llm_target_lang, '英文')
   assert.equal(payload.llm_endpoint, 'http://localhost:9999/v1/chat/completions')
   assert.equal(payload.llm_model, 'custom/model-name')
+  assert.equal(payload.deeplx_target_lang, 'DE')
 })
 
-test('buildTranslatorSavePayload：沒有任何 edits 時，payload 完全等於目前狀態', () => {
+test('buildTranslatorSavePayload：字幕設定不再經過這裡', () => {
   const payload = buildTranslatorSavePayload(CURRENT, {})
   assert.equal(payload.engine, CURRENT.engine)
   assert.equal(payload.deeplx_endpoint, CURRENT.deeplx_endpoint)
-  assert.equal(payload.translate_subtitle, CURRENT.translate_subtitle)
-  assert.equal(payload.subtitle_target_lang, CURRENT.subtitle_target_lang)
-})
-
-test('isTranslatorPayloadValid：translate_subtitle=true 但 target 是空字串時擋下', () => {
-  const payload = buildTranslatorSavePayload(CURRENT, {
-    translate_subtitle: true,
-    subtitle_target_lang: '',
-  })
-  assert.equal(isTranslatorPayloadValid(payload), false)
-})
-
-test('isTranslatorPayloadValid：translate_subtitle=false 時，target 是空字串也算合法', () => {
-  const payload = buildTranslatorSavePayload(CURRENT, {})
-  assert.equal(isTranslatorPayloadValid(payload), true)
-})
-
-test('isTranslatorPayloadValid：translate_subtitle=true 且 target 非空時合法', () => {
-  const payload = buildTranslatorSavePayload(CURRENT, {
-    translate_subtitle: true,
-    subtitle_target_lang: '日文',
-  })
-  assert.equal(isTranslatorPayloadValid(payload), true)
+  assert.equal('translate_subtitle' in payload, false)
+  assert.equal('subtitle_target_lang' in payload, false)
 })
 
 test('isTranslatorEngine：只接受 llm／deeplx', () => {

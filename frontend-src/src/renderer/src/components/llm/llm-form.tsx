@@ -14,6 +14,7 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/tw/primitives';
 import { useWebSocket } from '@/context/websocket-context';
 import { InputField, SelectField } from '../sidebar/setting/common';
+import { fetchUseMcpp } from '@/api/agent-config.ts';
 import { settingStyles } from '../sidebar/setting/setting-styles';
 import {
   fetchLlmConfig,
@@ -21,6 +22,7 @@ import {
   fetchOllamaModels,
   detectModels,
   applyDetectedModel,
+  shouldWarnNoTools,
   pullOllamaModel,
   installOllama,
   type LlmMode,
@@ -186,7 +188,15 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
     model: string
     baseUrl: string
     note: string | null
+    noTools: boolean
   } | null>(null);
+
+  // 工具開關開著、剛套用的模型卻確定不支援工具時提醒一句（開關本身不動）。
+  const warnsNoTools = useCallback(async (tools: boolean | null): Promise<boolean> => {
+    if (tools !== false) return false;
+    const current = await fetchUseMcpp(backendBaseUrl);
+    return current.ok && shouldWarnNoTools(tools, current.data);
+  }, [backendBaseUrl]);
 
   type PullPhase = 'idle' | 'preparing' | 'downloading' | 'applying' | 'error';
   const [pullPhase, setPullPhase] = useState<PullPhase>('idle');
@@ -259,9 +269,10 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
       model: result.data.applied.model,
       baseUrl: chosen.base_url,
       note: result.data.note ?? null,
+      noTools: await warnsNoTools(result.data.applied.tools),
     });
     setApplyPhase('applied');
-  }, [detectResult, selectedKey, backendBaseUrl, t]);
+  }, [detectResult, selectedKey, backendBaseUrl, t, warnsNoTools]);
 
   // 套用成功後不直接呼叫 onSaved：在首次精靈裡，onSaved 一叫外層就把整個
   // LlmForm 換成「已完成」畫面，note（例如「已為你關閉思考模式」）會連顯示
@@ -327,9 +338,10 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
       model: applied.data.applied.model,
       baseUrl: chosen.base_url,
       note: applied.data.note ?? null,
+      noTools: await warnsNoTools(applied.data.applied.tools),
     });
     setApplyPhase('applied');
-  }, [backendBaseUrl, runDetect, t]);
+  }, [backendBaseUrl, runDetect, t, warnsNoTools]);
 
   const handlePullRecommended = useCallback(async () => {
     if (!detectResult) return;
@@ -447,6 +459,7 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
               {t('setup.detectApplied', { model: appliedInfo.model })}
             </Text>
             {appliedInfo.note && <NoticeBox text={appliedInfo.note} tone="blue" />}
+            {appliedInfo.noTools && <NoticeBox text={t('setup.modelHasNoTools')} />}
             <Text fontSize="sm" color="whiteAlpha.700">
               {t('setup.savedReady')}
             </Text>

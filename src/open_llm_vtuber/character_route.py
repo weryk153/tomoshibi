@@ -12,9 +12,10 @@
   硬碟上沒人認領。
 - **檔名一律是 ASCII slug**（mili.yaml），中文顯示名字放在 conf_name。這樣可以
   完全避開網址與路徑組合的邊界情況。
-- **底稿 conf.yaml 在這裡是唯讀的。** 角色檔是我們自己產生的，沒有使用者寫的
-  註解要保護，所以整份用 ruamel 序列化就好；conf.yaml 不一樣，它有滿滿的註解，
-  絕不從這裡改寫。
+- **底稿 conf.yaml 只用 round-trip 改指定的鍵。** 角色檔是我們自己產生的，整份
+  用 ruamel 序列化就好；conf.yaml 滿是使用者寫的註解，只改表單擁有的那幾個葉節點
+  （_update_base_character_config）。兩個開關（字幕翻譯、長期記憶）走
+  character_settings。
 
 寫入一律「先寫暫存檔再 os.replace」，避免存到一半斷電留下半個角色。
 """
@@ -33,6 +34,7 @@ from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse
 from loguru import logger
 
+from . import character_settings
 from .default_personas import swap_for_model_change
 from .api_guard import (
     forbidden as _forbidden,
@@ -321,6 +323,18 @@ def _read_character_fields(path: str, *, is_base: bool) -> Optional[dict]:
         # 無條件寫成 edge_tts——使用者在角色面板存一次檔，訓練好的音色就被打回
         # 內建語音，畫面上沒有任何線索。讀得到才寫得回去。
         "tts_model": _dig(cc, "tts_config", "tts_model", default=""),
+        # 這兩個開關由 /api/characters/{filename}/settings 寫。開機升級後每個角色
+        # 檔都有自己的值，所以讀檔案本身就是實際值。
+        "translate_subtitle": bool(
+            _dig(
+                cc,
+                "tts_preprocessor_config",
+                "translator_config",
+                "translate_subtitle",
+                default=False,
+            )
+        ),
+        "long_term_memory_enabled": bool(cc.get("long_term_memory_enabled", True)),
     }
 
 
@@ -385,7 +399,7 @@ def _build_character_config(
             tts = cc.setdefault("tts_config", {})
             tts.setdefault("gpt_sovits_tts", {})[key] = value
     # 引擎：留空＝不釘，角色沿用 conf.yaml 的 tts_model（deep_merge 時繼承）。
-    # 這是唯一會寫 tts_config.tts_model 的地方。
+    # tts_model 只有角色表單會寫（語音合成頁與一鍵安裝只設服務位址）。
     if tts_model:
         cc.setdefault("tts_config", {})["tts_model"] = tts_model
     return cc
@@ -482,8 +496,9 @@ def _write_character_yaml(path: str, character_config: dict) -> None:
 def _set_or_clear(container: dict, key: str, value: Optional[str]) -> None:
     """三態語意：None＝這次沒要改，空字串＝明確清掉，有值＝設定。
 
-    「清掉」這一態不能省。沒有它，使用者設過一次語言之後就再也回不去「沿用
-    全域預設」——那個設定會變成單向的門。
+    「清掉」用在底稿角色（conf.yaml）：回覆語言清掉就改用「你看的語言」，引擎
+    與參考音清掉就回到程式預設。其他角色清掉的欄位會在存檔當下補成底稿角色現在
+    的值（own_everything）。
     """
     if value is None:
         return
@@ -844,6 +859,16 @@ def init_character_route() -> APIRouter:
             prompt_text=fields["prompt_text"] or None,
             prompt_lang=fields["prompt_lang"] or None,
         )
+        # 表單沒填的角色欄位，用底稿角色現在的值補上：她一開始就有自己的一份，
+        # 之後改底稿角色不會連帶改到她（跟開機升級同一條規則）。
+        from .conf_upgrade import own_everything
+
+        base = read_yaml(CONF_PATH) or {}
+        own_everything(
+            cc,
+            base.get("character_config") or {},
+            str((base.get("system_config") or {}).get("player_language") or ""),
+        )
         try:
             await asyncio.to_thread(_write_character_yaml, path, cc)
         except Exception as e:
@@ -990,6 +1015,58 @@ def init_character_route() -> APIRouter:
             )
         logger.info(f"background uploaded: {filename} ({len(raw)} bytes)")
         return JSONResponse({"ok": True, "filename": filename})
+
+    @router.get("/api/characters/{filename}/settings")
+    async def read_character_settings(filename: str, request: Request):
+        if not _is_local_request(request):
+            return _forbidden()
+        if character_settings.file_for(filename) is None:
+            return JSONResponse(
+                status_code=404, content={"ok": False, "error": "Character not found."}
+            )
+        values = await asyncio.to_thread(character_settings.effective, filename)
+        return JSONResponse(
+            {"ok": True, "settings": {k: values[k] for k in character_settings.TOGGLES}}
+        )
+
+    @router.post("/api/characters/{filename}/settings")
+    async def save_character_settings(filename: str, request: Request):
+        if not _is_local_request(request):
+            return _forbidden()
+        if character_settings.file_for(filename) is None:
+            return JSONResponse(
+                status_code=404, content={"ok": False, "error": "Character not found."}
+            )
+        try:
+            body = await request.json()
+        except Exception:
+            return _bad_request("Invalid JSON body.")
+        if not isinstance(body, dict) or not body:
+            return _bad_request("Send at least one setting.")
+        unknown = set(body) - set(character_settings.TOGGLES)
+        if unknown or not all(isinstance(v, bool) for v in body.values()):
+            return _bad_request(
+                "Only translate_subtitle and long_term_memory_enabled, as true/false."
+            )
+        try:
+            await asyncio.to_thread(character_settings.write, filename, body)
+            values = await asyncio.to_thread(character_settings.effective, filename)
+        except Exception as e:
+            logger.error(
+                f"character settings write failed ({filename}): {type(e).__name__}"
+            )
+            return JSONResponse(
+                status_code=500,
+                content={"ok": False, "error": "Could not write character file."},
+            )
+        return JSONResponse(
+            {
+                "ok": True,
+                "settings": {k: values[k] for k in character_settings.TOGGLES},
+                # 正在用的角色要重新載入設定才生效；子專案 3 的提示列會用到。
+                "reload_required": True,
+            }
+        )
 
     # ------------------------------------------------------------------ #
     @router.put("/api/characters/{filename}")
@@ -1211,6 +1288,16 @@ def init_character_route() -> APIRouter:
             ),
         )
         cc = _keep_what_the_form_does_not_own(existing_cc, cc)
+        # 表單選「跟底稿角色一樣」（送空字串）會把那一欄拿掉。當下就補成底稿現在的
+        # 值：每個角色自己存一份，不再沿用底稿（跟開機升級同一條規則）。
+        from .conf_upgrade import own_everything
+
+        base = read_yaml(CONF_PATH) or {}
+        own_everything(
+            cc,
+            base.get("character_config") or {},
+            str((base.get("system_config") or {}).get("player_language") or ""),
+        )
         try:
             await asyncio.to_thread(_write_character_yaml, path, cc)
         except Exception as e:

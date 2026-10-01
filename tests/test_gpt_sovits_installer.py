@@ -150,42 +150,25 @@ def test_reference_is_7_to_10_seconds_with_few_katakana():
     assert text == "きょうはいいてんきです。"
 
 
-@pytest.mark.parametrize(
-    ("tts", "expected"),
-    [
-        ({"tts_model": "edge_tts", "edge_tts": {"voice": "zh-CN-XiaoyiNeural"}}, "zh"),
-        ({"tts_model": "edge_tts", "edge_tts": {"voice": "ja-JP-NanamiNeural"}}, "ja"),
-        (
-            {"tts_model": "gpt_sovits_tts", "gpt_sovits_tts": {"text_lang": "all_ko"}},
-            "ko",
-        ),
-        ({"tts_model": "edge_tts", "edge_tts": {"voice": "de-DE-KatjaNeural"}}, "ja"),
-        ({}, "ja"),
-    ],
-)
-def test_switching_engine_keeps_the_spoken_language(tts, expected):
-    assert route.voice_text_lang({"character_config": {"tts_config": tts}}) == expected
-
-
-def test_installed_voice_is_written_to_conf(tmp_path, monkeypatch):
+def test_installing_points_at_the_service_and_leaves_voices_alone(
+    tmp_path, monkeypatch
+):
+    """安裝只設服務位址；誰用 GPT-SoVITS、什麼參考音，到角色頁選。"""
     shutil.copy(TEMPLATE, tmp_path / "conf.yaml")
     monkeypatch.chdir(tmp_path)
-    reference = {
-        "path": str(tmp_path / "ref.wav"),
-        "prompt_text": "テスト。",
-        "prompt_lang": "ja",
-    }
-    route._use_installed_voice(reference)
+    before = yaml.safe_load((tmp_path / "conf.yaml").read_text(encoding="utf-8"))[
+        "character_config"
+    ]["tts_config"]
+
+    route._point_at_installed_service()
+
     tts = yaml.safe_load((tmp_path / "conf.yaml").read_text(encoding="utf-8"))[
         "character_config"
     ]["tts_config"]
-    assert tts["tts_model"] == "gpt_sovits_tts"
     assert tts["gpt_sovits_tts"]["api_url"] == "http://127.0.0.1:9880/tts"
-    assert tts["gpt_sovits_tts"]["ref_audio_path"] == reference["path"]
-    assert tts["gpt_sovits_tts"]["prompt_text"] == "テスト。"
-    assert tts["gpt_sovits_tts"]["prompt_lang"] == "ja"
-    # 模板預設是中文的 Edge TTS 聲音，換引擎後照樣講中文。
-    assert tts["gpt_sovits_tts"]["text_lang"] == "zh"
+    assert tts["tts_model"] == before["tts_model"]
+    for key in ("ref_audio_path", "prompt_text", "prompt_lang", "text_lang"):
+        assert tts["gpt_sovits_tts"].get(key) == before["gpt_sovits_tts"].get(key)
 
 
 def _character(model: str, url: str) -> str:
@@ -211,6 +194,23 @@ def test_autostart_only_when_a_config_uses_the_local_api(tmp_path, monkeypatch):
     assert gs.wanted_by_config() is False  # 別台機器上的，不歸我們開
     (tmp_path / "characters" / "me.yaml").write_text(
         _character("gpt_sovits_tts", "http://localhost:9880/tts")
+    )
+    assert gs.wanted_by_config() is True
+
+
+def test_a_character_using_gpt_sovits_reaches_the_service_set_on_the_page(
+    tmp_path, monkeypatch
+):
+    """服務位址只寫在 conf.yaml；角色檔只說「我用 GPT-SoVITS」，沒有自己的位址。"""
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "conf.yaml").write_text(
+        _character("edge_tts", "http://127.0.0.1:9880/tts")
+    )
+    (tmp_path / "characters").mkdir()
+    (tmp_path / "characters" / "kurisu.yaml").write_text(
+        yaml.safe_dump(
+            {"character_config": {"tts_config": {"tts_model": "gpt_sovits_tts"}}}
+        )
     )
     assert gs.wanted_by_config() is True
 

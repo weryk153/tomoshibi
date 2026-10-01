@@ -103,7 +103,7 @@ _KNOWN_DEEPL_CODES = {
 def resolve_deepl_target_lang(value: str) -> str:
     """把存下來的語言值轉成 DeepL 的目標代碼。
 
-    - A human language name from SUBTITLE_LANG_OPTIONS (e.g. '德文') -> its code.
+    - A human language name (e.g. '德文', or what subtitle_target() returns) -> its code.
     - An already-valid DeepL code (e.g. 'JA', 'EN-US') -> returned as-is (upper).
     - Anything unknown -> returned unchanged so DeepLX can decide (and the caller's
       existing fail-soft path handles a rejection). We never raise here.
@@ -118,6 +118,27 @@ def resolve_deepl_target_lang(value: str) -> str:
     if v.upper() in _KNOWN_DEEPL_CODES:
         return v.upper()
     return v
+
+
+_PLAYER_LANGUAGE_TO_NAME = {
+    "zh-tw": "繁體中文",
+    "traditional chinese (taiwan)": "繁體中文",
+    "traditional chinese": "繁體中文",
+    "zh-cn": "簡體中文",
+    "simplified chinese": "簡體中文",
+    "en": "英文",
+    "english": "英文",
+    "ja": "日文",
+    "japanese": "日文",
+    "ko": "韓文",
+    "korean": "韓文",
+}
+
+
+def subtitle_target(player_language: str) -> str:
+    """「你看的語言」→ 字幕要翻成的語言名字（LLM 直接用，DeepL 再轉代碼）。"""
+    value = str(player_language or "").strip()
+    return _PLAYER_LANGUAGE_TO_NAME.get(value.lower(), value)
 
 
 class DeepLXTranslate(TranslateInterface):

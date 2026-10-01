@@ -98,6 +98,7 @@ chat_history/<conf_uid>/engine/cognition.jsonl  體會
 
 - 引擎從她的話裡抽出來，整個角色共用、所有對話都看得到，每輪放進備註
   （`you said about yourself`）。頻率是 `self_memory_every`，長期記憶關掉時跟著關。
+  長期記憶開關是每個角色各自的（記憶頁的開關、或角色檔的 `long_term_memory_enabled`）。
 - 記憶頁「她自己的記憶」顯示的、編輯的，是引擎的這一份。
 - 舊版留下的 `core_memory.md`、`self_memory.md` 不搬進引擎。舊的整理會把她當下說的
   話（「現在凌晨兩點半，去遠方不太方便」）記成事實，搬進來她每一輪都會照著講。

@@ -31,7 +31,7 @@ import { useWebSocket } from '@/context/websocket-context';
 import { useConfig } from '@/context/character-config-context';
 import { useSwitchCharacter } from '@/hooks/utils/use-switch-character';
 import {
-  SelectField, InputField, TextareaField, Field, Button,
+  SelectField, InputField, TextareaField, Field, Button, SwitchField,
 } from './common';
 import {
   fetchCharacters,
@@ -42,6 +42,7 @@ import {
   buildCharacterUpdate,
   uploadAvatar,
   validateAvatarFile,
+  saveCharacterSettings,
   type CharacterRecord,
   type CharacterEdits,
   type CharacterCreate,
@@ -403,6 +404,28 @@ function Characters(): JSX.Element {
     () => (characters ?? []).find((c) => c.filename === selectedFilename) ?? null,
     [characters, selectedFilename],
   );
+
+  // 字幕翻成你看的語言：這個角色自己的開關，改了就存（不跟整份表單一起存）。
+  const handleSubtitleToggle = useCallback(async (checked: boolean) => {
+    if (!selectedRecord) return;
+    const { filename } = selectedRecord;
+    const result = await saveCharacterSettings(baseUrl, filename, { translate_subtitle: checked });
+    if (result.ok) {
+      setCharacters((list) => (list ?? []).map((c) => (
+        c.filename === filename
+          ? { ...c, translate_subtitle: result.data.settings.translate_subtitle }
+          : c
+      )));
+      toaster.create({
+        title: t('settings.characters.saved', { name: selectedRecord.conf_name ?? filename }),
+        description: t('settings.characters.reloadToApply'),
+        type: 'success',
+        duration: 4000,
+      });
+    } else {
+      toaster.create({ title: result.error, type: 'error', duration: 3000 });
+    }
+  }, [baseUrl, selectedRecord, t]);
 
   const openEdit = useCallback((record: CharacterRecord) => {
     // 遞增世代號：任何還在飛的頭像上傳（不論屬於哪個表單）從這一刻起都是舊世代，
@@ -1173,6 +1196,14 @@ function Characters(): JSX.Element {
           placeholder={t('settings.characters.replyLanguagePlaceholder')}
           help={t('settings.characters.replyLanguageHelp')}
         />
+        {selectedRecord && (
+          <SwitchField
+            label={t('settings.characters.translateSubtitle')}
+            checked={Boolean(selectedRecord.translate_subtitle)}
+            onChange={handleSubtitleToggle}
+            help={t('settings.characters.translateSubtitleHelp')}
+          />
+        )}
 
         {ttsModels.length > 0 && (
           <Stack gap={2}>

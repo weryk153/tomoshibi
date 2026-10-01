@@ -14,7 +14,7 @@
 //    由抽屜驅動。這個區塊自己的按鈕就放在這個小節結尾，緊接在 VAD 欄位
 //    之後、引擎選擇區塊之前。
 // 2. 引擎下拉選單（下半部）：只有 sherpa_onnx_asr／faster_whisper 兩個不需要
-//    憑證的選項才會「切換當下」即時打 API（跟 perf.tsx 的 keep_alive 模式
+//    憑證的選項才會「切換當下」即時打 API（跟其他即時存檔的下拉選單
 //    同一種模式）。
 // 3. 需要憑證的雲端引擎（groq_whisper_asr／azure_asr）：選了不會立刻送出，
 //    只是记成本機草稿（pendingEngine），必须連同憑證一起按下面的「儲存」
@@ -54,7 +54,6 @@ import {
 import { Button } from '@/components/ui/tw/primitives';
 import { toaster } from '@/components/ui/tw/toaster';
 import { useWebSocket } from '@/context/websocket-context';
-import { useConfig } from '@/context/character-config-context';
 import {
   fetchPerf,
   setAsrModel,
@@ -94,7 +93,6 @@ const CREDENTIAL_ENGINES = new Set(['groq_whisper_asr', 'azure_asr']);
 function ASR({active = true}: ASRProps): JSX.Element {
   const { t } = useTranslation();
   const { baseUrl } = useWebSocket();
-  const { confName } = useConfig();
   const {
     localSettings,
     autoStopMic,
@@ -157,10 +155,6 @@ function ASR({active = true}: ASRProps): JSX.Element {
   const [perf, setPerf] = useState<PerfState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [engineSaving, setEngineSaving] = useState(false);
-
-  // 只在目前這個角色真的釘了引擎時才警告，理由同 tts.tsx。
-  const asrCharacterOverride = perf?.engine_overrides_by_character?.[confName]?.asr_model
-    || null;
 
   // 選了 groq/azure 但還沒連同憑證送出時的本機草稿——不是 null 就代表「畫面
   // 上選的引擎」跟「conf.yaml 現在真正生效的引擎」（perf.asr_model）不一致，
@@ -284,7 +278,7 @@ function ASR({active = true}: ASRProps): JSX.Element {
   //   handleSaveCredentials），conf.yaml 才會被改——那個函式會擋下「還沒有
   //   任何可用憑證」的送出，見它旁邊的 disabled 判斷。
   // - 選到 sherpa_onnx_asr／faster_whisper：兩個都不需要憑證，切換當下就能
-  //   真的動作，沿用即時存檔（跟 perf.tsx 的 keep_alive 模式同一種模式）。
+  //   真的動作，沿用即時存檔（跟其他下拉選單同一種模式）。
   const handleEngineChange = useCallback(async (value: string[]) => {
     const model = value[0];
     if (!model || !perf) return;
@@ -320,7 +314,7 @@ function ASR({active = true}: ASRProps): JSX.Element {
     }
   }, [baseUrl, perf, applySaveResult, t]);
 
-  // 憑證是文字輸入框，不做每個按鍵都送出——跟 perf.tsx 的自訂 keep_alive 秒數
+  // 憑證是文字輸入框，不做每個按鍵都送出——跟其他文字輸入框
   // 同一種模式，要有明確的「儲存」按鈕使用者才知道自己送出了什麼。
   //
   // 有 pendingEngine（使用者選了一個還沒送出的 groq/azure）時，這次連同
@@ -527,16 +521,6 @@ function ASR({active = true}: ASRProps): JSX.Element {
             影響——分頁裡同時存在三種存檔機制，光靠操作當下彈出的 toast 不夠，
             使用者需要隨時能看到「這格歸誰管」。 */}
         <Text fontSize="xs" color="blue.300">{t('settings.perf.asrEngineSectionNote')}</Text>
-        {/* 角色檔自己的 asr_config 會蓋掉這裡選的引擎，跟 tts.tsx 同一個
-            陷阱——選了、存了、卻沒有生效，畫面上卻沒有任何線索。 */}
-        {asrCharacterOverride && (
-          <Text fontSize="xs" color="orange.300">
-            {t('settings.perf.asrCharacterOverride', {
-              character: confName,
-              engine: asrCharacterOverride,
-            })}
-          </Text>
-        )}
         <Text fontSize="xs" color="whiteAlpha.600">{t('settings.perf.asrEngineHelp')}</Text>
 
         {loadError && (

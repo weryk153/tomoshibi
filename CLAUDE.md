@@ -116,7 +116,7 @@ The codebase uses the missing `_cleanup_failed_connection` method pattern - when
   - **Any commit that changes `frontend-src/` must rebuild and commit `frontend/` too.** `frontend/` is what the backend actually serves, so a change left unbuilt simply does not take effect — and nothing warns you. This has already happened once: a fix adding a missing i18n key was committed without a rebuild, so the broken UI label stayed broken in the served bundle. Locale JSON in particular is bundled into the JS, so translation edits always change the output. To check whether `frontend/` is stale: run `pnpm --dir frontend-src run build:web` and see whether `git status --short -- frontend/` comes back non-empty.
 - **Live2D models**: `live2d-models/`
 - **VRM models**: `vrm-models/` — `<name>/<name>.vrm` + `<name>/motions/*.vrma`；掃描登記與對應驗證在 `src/open_llm_vtuber/vrm_models.py`，角色 renderer 的共用介面在 `frontend-src/src/renderer/src/avatar/character-renderer.ts`（見 `docs/add-vrm-character.md`）
-- **Character definitions**: `characters/`
+- **Character definitions**: `characters/` — each file owns that character's voice, reply language, subtitle translation and long-term memory switch (`OWNED` in `src/open_llm_vtuber/character_settings.py`); startup fills in missing ones (`conf_upgrade.upgrade_character_files`)
 - **Chat history**: `chat_history/` — `<conf_uid>/<history_uid>.json` 逐字稿；記憶全在引擎的 `<conf_uid>/engine/`（這段對話的記憶、她自己的記憶）。舊版留下的 `<conf_uid>/<history_uid>/core_memory.md`、`<conf_uid>/self_memory.md` 不會搬進引擎（當下的話被記成事實，搬進去她會每輪照著講）
 - **Cache**: `cache/` (audio files, temporary data)
 

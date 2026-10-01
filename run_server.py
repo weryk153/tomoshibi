@@ -220,6 +220,15 @@ def run(console_log_level: str, open_browser: bool = False):
     except Exception as e:
         logger.warning(f"conf.yaml upgrade skipped ({type(e).__name__}: {e})")
 
+    # 角色檔：補齊這個角色自己的設定（聲音、語言、字幕翻譯、長期記憶），拿掉
+    # 不歸角色管的語音辨識與舊 agent 選項。一樣不擋開機。
+    try:
+        from src.open_llm_vtuber.conf_upgrade import upgrade_character_files
+
+        upgrade_character_files()
+    except Exception as e:
+        logger.warning(f"Character file upgrade skipped ({type(e).__name__}: {e})")
+
     # Load configurations from yaml file
     config: Config = validate_config(read_yaml("conf.yaml"))
     server_config = config.system_config

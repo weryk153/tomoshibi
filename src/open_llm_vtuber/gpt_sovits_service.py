@@ -116,16 +116,27 @@ def stop() -> None:
 
 
 def wanted_by_config() -> bool:
-    """有沒有哪一份角色設定用的是本機 9880 的 GPT-SoVITS。"""
-    for path in [Path(CONF_PATH), *sorted(Path("characters").glob("*.yaml"))]:
+    """有沒有哪個角色用的是本機 9880 的 GPT-SoVITS。
+
+    服務位址通常只寫在 conf.yaml（語音合成頁）；角色檔只說「我用 GPT-SoVITS」。
+    角色檔自己沒寫位址時，用 conf.yaml 的。
+    """
+
+    def tts_of(path: Path) -> dict:
         try:
             data = read_yaml(str(path)) or {}
         except Exception:
-            continue
-        tts = (data.get("character_config") or {}).get("tts_config") or {}
+            return {}
+        return (data.get("character_config") or {}).get("tts_config") or {}
+
+    base = tts_of(Path(CONF_PATH))
+    base_url = (base.get("gpt_sovits_tts") or {}).get("api_url")
+    for path in [Path(CONF_PATH), *sorted(Path("characters").glob("*.yaml"))]:
+        tts = tts_of(path)
         if tts.get("tts_model") != "gpt_sovits_tts":
             continue
-        url = urlparse(str((tts.get("gpt_sovits_tts") or {}).get("api_url") or ""))
+        own = (tts.get("gpt_sovits_tts") or {}).get("api_url")
+        url = urlparse(str(own or base_url or ""))
         if url.hostname in _LOCAL_HOSTS and url.port == installer.API_PORT:
             return True
     return False

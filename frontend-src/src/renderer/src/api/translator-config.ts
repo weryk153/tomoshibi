@@ -9,9 +9,8 @@
 // 2. buildTranslatorSavePayload：純函式，決定「這次到底送什麼」——見它上面的
 //    大段說明，這是整個模組裡最容易踩雷的一塊，值得獨立測試。
 //
-// 不在這裡放語言選單的資料（SUBTITLE_LANG_OPTIONS）：那是 UI 選項，跟後端
-// deeplx.py 的 LANG_NAME_TO_DEEPL_CODE 表同步，放在
-// hooks/sidebar/setting/use-translator-settings.ts——見該檔案檔頭說明。
+// 字幕翻譯不在這裡：開不開是每個角色自己的設定（api/characters.ts 的
+// saveCharacterSettings），翻成什麼語言跟「你看的語言」走。
 
 import { apiGet, apiPost, type ApiResult } from './http.ts'
 
@@ -39,8 +38,6 @@ export interface TranslatorConfigState {
   deeplx_endpoint: string
   speak_voice: string
   default_jp_voice: string
-  translate_subtitle: boolean
-  subtitle_target_lang: string
 }
 
 export const fetchTranslatorConfig = (
@@ -52,14 +49,11 @@ export const fetchTranslatorConfig = (
 export interface TranslatorConfigSaveResult {
   enabled: boolean
   engine: string
-  translate_subtitle: boolean
-  subtitle_target_lang: string
   restart_required: boolean
 }
 
 // UI 實際提供控制項的欄位子集。engine：兩個選項的下拉選單。deeplx_endpoint：
-// 只有 engine=deeplx 時才顯示的輸入框。translate_subtitle／subtitle_target_lang：
-// 字幕語言下拉選單（見 use-translator-settings.ts 的 mapSubtitleSelection）。
+// 只有 engine=deeplx 時才顯示的輸入框。
 //
 // 刻意不包含 llm_target_lang／llm_endpoint／llm_model／deeplx_target_lang——
 // 這四個沒有對應的 UI 控制項（i18n 的 50 個鍵裡沒有讓使用者填它們的欄位；
@@ -71,8 +65,6 @@ export interface TranslatorConfigSaveResult {
 export interface TranslatorConfigEdits {
   engine?: TranslatorEngine
   deeplx_endpoint?: string
-  translate_subtitle?: boolean
-  subtitle_target_lang?: string
 }
 
 // 把「目前從 GET 拿到的完整設定」＋「這次使用者實際改的欄位」合併成 POST
@@ -82,7 +74,7 @@ export interface TranslatorConfigEdits {
 //     'JA'，見 translator_route.py 500-501／496-499），不是「保留原值」。
 //   - llm_endpoint／llm_model：沒送才會觸發從目前的 AI 設定重新推導
 //     （510-525 行），不是單純的預設值，但一樣不是「保留 conf.yaml 現有值」。
-// 如果這裡漏送任何一個，效果是「使用者只是想切换翻譯引擎或字幕語言，結果
+// 如果這裡漏送任何一個，效果是「使用者只是想切换翻譯引擎，結果
 // conf.yaml 裡跟這次操作完全無關的欄位被靜默改掉」——跟任務要防的
 // extra_body／timeout 陷阱是同一種事故，只是換了欄位。所以這個函式無條件把
 // 這四個隱藏欄位原樣帶上（來自 current，不是來自 edits——UI 沒有暴露它們的
@@ -99,24 +91,7 @@ export function buildTranslatorSavePayload(
     llm_model: current.llm_model,
     deeplx_target_lang: current.deeplx_target_lang,
     deeplx_endpoint: edits.deeplx_endpoint ?? current.deeplx_endpoint,
-    translate_subtitle: edits.translate_subtitle ?? current.translate_subtitle,
-    subtitle_target_lang: edits.subtitle_target_lang ?? current.subtitle_target_lang,
   }
-}
-
-// 送出前的存檔前檢查，對應後端 466-485 行的驗證：translate_subtitle=true 卻
-// target lang 是空字串會被 400 擋下。UI 目前的字幕下拉選單設計上不可能送出
-// 這個組合（「原文」選項本身就把 translate_subtitle 設回 false，見
-// use-translator-settings.ts 的 mapSubtitleSelection），但存檔前仍在這裡擋
-// 一次——純函式，不必等一次網路來回才發現送不出去，也防将来 UI 改法時
-// 不小心又踩回這個組合。刻意回傳 boolean 而不是專屬錯誤訊息鍵：50 個既有
-// i18n 鍵裡沒有對應這個情境的文案，呼叫端擋下時直接沿用既有的
-// settings.translator.saveFailed，不新造一個理論上不會被使用者看到的鍵。
-export function isTranslatorPayloadValid(payload: Record<string, unknown>): boolean {
-  if (payload.translate_subtitle && !String(payload.subtitle_target_lang ?? '').trim()) {
-    return false
-  }
-  return true
 }
 
 export const saveTranslatorConfig = (

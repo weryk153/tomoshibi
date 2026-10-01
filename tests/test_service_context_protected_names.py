@@ -29,9 +29,8 @@ def test_subtitle_translator_is_built_with_the_characters_names(monkeypatch):
     context = _context_with({"愛徠": ["愛萊"]})
     translator_config = SimpleNamespace(
         translate_provider="llm",
-        subtitle_target_lang="德文",
         llm=SimpleNamespace(model_dump=lambda: {"target_lang": "繁體中文"}),
     )
-    context._build_subtitle_translator(translator_config)
+    context._build_subtitle_translator(translator_config, "de")
 
     assert captured["protected_names"] == {"愛徠": ["愛萊"]}

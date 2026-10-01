@@ -57,3 +57,14 @@ test('PLAYER_LANGUAGES 的五個代碼與 i18n 鍵一一對應', () => {
     ],
   )
 })
+
+test('a saved language that is not one of the five codes still shows in the menu', async () => {
+  const { playerLanguageValues } = await import('./player.ts')
+  // 舊版存的是英文名字（Traditional Chinese (Taiwan)），不在選項裡就整個顯示空白。
+  assert.deepEqual(
+    playerLanguageValues('Traditional Chinese (Taiwan)'),
+    ['zh-TW', 'en', 'ja', 'ko', 'zh-CN', 'Traditional Chinese (Taiwan)'],
+  )
+  assert.deepEqual(playerLanguageValues('ja'), ['zh-TW', 'en', 'ja', 'ko', 'zh-CN'])
+  assert.deepEqual(playerLanguageValues(''), ['zh-TW', 'en', 'ja', 'ko', 'zh-CN'])
+})

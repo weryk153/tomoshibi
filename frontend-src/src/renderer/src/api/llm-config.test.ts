@@ -39,3 +39,11 @@ test('ollama 模式即使沒有金鑰也要能組出 payload——後端會自�
   assert.equal(p.api_key, '')
   assert.equal(p.provider, 'ollama')
 })
+
+test('warn only when the switch is on and the model has no tools', async () => {
+  const { shouldWarnNoTools } = await import('./llm-config.ts')
+  assert.equal(shouldWarnNoTools(false, true), true)
+  assert.equal(shouldWarnNoTools(false, false), false)
+  assert.equal(shouldWarnNoTools(true, true), false)
+  assert.equal(shouldWarnNoTools(null, true), false)
+})

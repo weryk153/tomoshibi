@@ -358,6 +358,11 @@ class ServiceContext:
         self.init_translate(
             config.character_config.tts_preprocessor_config.translator_config,
             voice_lang=derive_voice_lang(config.character_config),
+            # self.system_config 要到這個函式最後才換成新的；字幕翻成這次載入的
+            # 「你看的語言」，不是上一份的。
+            player_language=(
+                config.system_config or self.system_config
+            ).player_language,
         )
 
         # store typed config references
@@ -649,7 +654,10 @@ class ServiceContext:
             self.agent_engine = None
 
     def init_translate(
-        self, translator_config: TranslatorConfig, voice_lang: str | None = None
+        self,
+        translator_config: TranslatorConfig,
+        voice_lang: str | None = None,
+        player_language: str | None = None,
     ) -> None:
         """依設定建立或更新翻譯引擎。
 
@@ -668,7 +676,7 @@ class ServiceContext:
           re-runs on switch), so a new character's V takes effect immediately.
         - ``subtitle_translate_engine``: DISPLAY-ONLY path (translates the reply text
           for the on-screen subtitle). Built only when ``translate_subtitle`` is True.
-          It targets ``subtitle_target_lang`` and NEVER mutates the canonical reply
+          It targets the language you read (``player_language``) and NEVER mutates the canonical reply
           (memory/history stay on the original reply R).
         Subtitle may be disabled independently; disabled -> its engine is reset to None.
         """
@@ -680,6 +688,10 @@ class ServiceContext:
         # otherwise identical (e.g. two characters that share a translator block but
         # have different voice languages).
         voice_lang_changed = voice_lang != self._audio_translate_voice_lang
+        # 字幕翻成「你看的語言」：它換了也要重建字幕引擎。
+        player_language_changed = player_language != getattr(
+            self, "_subtitle_player_language", None
+        )
 
         # --- AUDIO translation engine (now ALWAYS built; gate is per-sentence) ---
         # translate_audio is kept as an internal auto-on flag (always True in conf), so
@@ -722,15 +734,19 @@ class ServiceContext:
         if not translator_config.translate_subtitle:
             logger.debug("Subtitle translation is disabled.")
             self.subtitle_translate_engine = None
-        elif not self.subtitle_translate_engine or config_changed:
+        elif (
+            not self.subtitle_translate_engine
+            or config_changed
+            or player_language_changed
+        ):
             logger.info(
                 "Initializing subtitle Translator: "
-                f"{translator_config.translate_provider} -> "
-                f"{translator_config.subtitle_target_lang}"
+                f"{translator_config.translate_provider} -> {player_language}"
             )
             self.subtitle_translate_engine = self._build_subtitle_translator(
-                translator_config
+                translator_config, player_language or ""
             )
+            self._subtitle_player_language = player_language
         else:
             logger.info(
                 "Subtitle translation already initialized with the same config."
@@ -742,22 +758,25 @@ class ServiceContext:
         )
 
     def _build_subtitle_translator(
-        self, translator_config: TranslatorConfig
+        self, translator_config: TranslatorConfig, player_language: str
     ) -> TranslateInterface | None:
         """給字幕另外建一個翻譯引擎。
 
         Reuses the SAME provider as the audio path but overrides only the target
-        language with ``subtitle_target_lang`` so the subtitle can differ from the
+        language with the one you read (``player_language``) so the subtitle can differ from the
         spoken voice. The canonical reply is never touched by this engine; on any
         runtime error LLMTranslate already returns the original text (fail-soft).
         Returns None if it cannot be built (subtitle then falls back to the
         original reply R at call sites).
         """
+        from .translate.deeplx import subtitle_target
+
         provider = translator_config.translate_provider
-        target = (translator_config.subtitle_target_lang or "").strip()
+        # 字幕翻成「你看的語言」：跟 player_language 走，不是角色自己存的值。
+        target = subtitle_target(player_language)
         if not target:
             logger.warning(
-                "translate_subtitle is on but subtitle_target_lang is empty; "
+                "translate_subtitle is on but player_language is empty; "
                 "subtitle translation disabled."
             )
             return None

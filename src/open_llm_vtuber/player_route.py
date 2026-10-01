@@ -149,6 +149,16 @@ def init_player_route() -> APIRouter:
             payload={"language": language},
         )
 
+    @router.get("/api/player-language")
+    async def get_player_language(request: Request):
+        if not _is_local_request(request):
+            return _forbidden()
+        return _read_or_error(
+            lambda: _system_setting("player_language"),
+            what="player-language",
+            key="language",
+        )
+
     @router.get("/api/player-prompt")
     async def get_player_prompt(request: Request):
         if not _is_local_request(request):

@@ -121,10 +121,18 @@ export interface ApplyDetectedResult {
     model: string
     is_vlm: boolean
     supports_tools: boolean
+    // 能不能用工具：true／false；問不到（Ollama 的 /api/show 失敗）是 null。
+    tools: boolean | null
     max_context: number | null
   }
   note?: string | null
   error?: string
+}
+
+// 「使用」偵測到的模型不會改工具開關（那是使用者的選擇）。開關開著、這顆模型
+// 卻確定不支援工具時，才提醒一句；不知道（null）就不說，免得誤報。
+export function shouldWarnNoTools(tools: boolean | null, useMcpp: boolean): boolean {
+  return useMcpp && tools === false
 }
 
 // 逾時比照 saveLlmConfig：套用前會做一次真實 ping，本機模型冷啟動預算 90 秒
