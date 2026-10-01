@@ -18,7 +18,7 @@ from ..context_window import cooling_down, detect_context_window
 from ..utils.path_safety import safe_join
 
 # 背景工作要的是穩定的 JSON，不是有個性的對話。只帶「關掉思考模式」這類欄位：
-# 沒帶的話每個背景工作都會先思考到逾時（memory_core._request_rewrite 出過同一件事）；
+# 沒帶的話每個背景工作都會先思考到逾時（舊的記憶整理出過同一件事）；
 # 而對話用的 presence_penalty／repeat_penalty 會懲罰 JSON 裡本來就該重複的鍵名。
 _REASONING_KEYS = (
     "reasoning_effort",

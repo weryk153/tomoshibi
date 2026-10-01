@@ -27,7 +27,6 @@ from ai_character_engine.tools.models import ToolDefinition
 from ai_character_engine.vision.models import VisionFrame
 from loguru import logger
 
-from ... import memory_core
 from ...chat_history_manager import get_history
 from ...config_manager import TTSPreprocessorConfig
 from ...conversation_quality import (
@@ -106,10 +105,6 @@ class CharacterEngineAgent(AgentInterface):
         self._tools = self._tool_definitions(tool_manager) if use_mcpp else []
         self._tool_executor = tool_executor
         self._conversation: Optional[str] = None
-        # 這個 agent 已經確認過、不用再搬 core_memory.md 的對話。
-        self._brought: set = set()
-        # self_memory.md 已經確認搬過了（整個角色一份）。
-        self._her_own_brought = False
         # 還沒結束的每一輪：(等著它的 task, 它屬於哪段對話, 它的名字)。
         self._turns: list = []
         # 已經講完、但主機那一輪還活著（語音還在播）的：打斷時被取消的是它們的 task。
@@ -143,8 +138,8 @@ class CharacterEngineAgent(AgentInterface):
 
     def set_system(self, system: str) -> None:
         """主機組好的系統提示（人設與通用規則）。她記得對方什麼、她自己說過什麼，
-        都由引擎記、寫進對話的備註；舊 agent 留下的兩份檔案只在第一次搬進引擎
-        （_bring_what_the_host_remembered、_bring_her_own_memory）。"""
+        都由引擎記、寫進對話的備註。舊 agent 留下的記憶檔不搬：那是當下的話被記成
+        事實，搬進來她每一輪都會照著講。"""
         self._system = f"{system}\n\n{MEMORY_RULE}\n\n{INTERRUPT_RULE}"
 
     # --- 她記得對方什麼 -------------------------------------------------------
@@ -168,85 +163,15 @@ class CharacterEngineAgent(AgentInterface):
     # 記憶頁讀寫的是這一份。
 
     def self_memory(self) -> str:
-        # 記憶頁可能在她第一次開口之前就打開：先把 self_memory.md 搬進來，不然
-        # 頁面上是空的，使用者清掉之後，第一輪又把舊檔案搬回來。
-        companion = self._companion()
-        self._bring_her_own_memory(companion)
-        return "\n".join(companion.self_memories())
+        return "\n".join(self._companion().self_memories())
 
     def rewrite_self_memory(
         self, text: str, *, edited_from: Optional[str] = None
     ) -> None:
-        companion = self._companion()
-        self._bring_her_own_memory(companion)
-        companion.rewrite_self_memories(
+        self._companion().rewrite_self_memories(
             text.splitlines(),
             edited_from=None if edited_from is None else edited_from.splitlines(),
         )
-
-    def _bring_her_own_memory(self, companion) -> None:
-        """換成這個 agent 之前的 self_memory.md，搬進引擎一次。
-
-        搬過就記在檔案裡：使用者之後在記憶頁刪掉的，重開之後不能又跑回來。讀不到
-        不等於沒有，那時不記，下次再試。
-        """
-        from ...character_engine.factory import storage_dir
-
-        if self._her_own_brought or not self._conf_uid:
-            return
-        done = storage_dir(self._conf_uid) / "brought-self-memory.txt"
-        if not done.is_file():
-            try:
-                lines = memory_core.read_self_memory(self._conf_uid).splitlines()
-            except Exception as exc:
-                logger.warning(
-                    f"[engine] self memory unreadable, kept for later ({exc})"
-                )
-                return
-            lines = [line.strip() for line in lines if line.strip()]
-            if lines:
-                # 比引擎記下的任何一條都舊：先被擠掉，也不佔掉最新的那幾個位置。
-                companion.rewrite_self_memories(
-                    [*companion.self_memories(), *lines], from_before=True
-                )
-            done.parent.mkdir(parents=True, exist_ok=True)
-            done.write_text("brought\n", encoding="utf-8")
-        self._her_own_brought = True
-
-    def _bring_what_the_host_remembered(self, companion, history_uid: str) -> None:
-        """換成這個 agent 之前累積的 core_memory.md，搬一次。
-
-        搬過的對話記在檔案裡：使用者之後在記憶頁刪掉的，重開之後不能又跑回來。
-        """
-        from ...character_engine.factory import storage_dir
-
-        if history_uid in self._brought:
-            return
-        done = storage_dir(self._conf_uid) / "brought-from-core-memory.txt"
-        if done.is_file() and history_uid in done.read_text("utf-8").splitlines():
-            self._brought.add(history_uid)
-            return
-        # 真實的檔案不只「對方：」一種寫法；分法沿用主機自己的。她自己的那幾行
-        # 進她自己的記憶：舊檔案裡有從來沒搬去 self_memory.md 的。
-        about_the_user, her_own = memory_core.classify_memory_lines(
-            memory_core.load_core_memory(self._conf_uid, history_uid),
-            self._character_name,
-        )
-        remembered = [line for line in about_the_user.splitlines() if line.strip()]
-        if remembered:
-            companion.rewrite_memories(
-                history_uid, [*companion.memories(history_uid), *remembered]
-            )
-        own = [line.strip() for line in her_own.splitlines() if line.strip()]
-        if own:
-            companion.rewrite_self_memories(
-                [*companion.self_memories(), *own], from_before=True
-            )
-        # 搬完才記；搬到一半炸掉的話下一次還會再試。
-        self._brought.add(history_uid)
-        done.parent.mkdir(parents=True, exist_ok=True)
-        with done.open("a", encoding="utf-8") as file:
-            file.write(history_uid + "\n")
 
     def set_memory_from_history(self, conf_uid: str, history_uid: str) -> None:
         """之後的每一輪都屬於這段對話。引擎沒看過它的話，從主機的紀錄接著講。"""
@@ -257,8 +182,6 @@ class CharacterEngineAgent(AgentInterface):
     def _hand_over(self, companion, history_uid: Optional[str]) -> None:
         if not history_uid or not self._conf_uid:
             return
-        self._bring_her_own_memory(companion)
-        self._bring_what_the_host_remembered(companion, history_uid)
         if companion.has_conversation(history_uid):
             return
         messages = []

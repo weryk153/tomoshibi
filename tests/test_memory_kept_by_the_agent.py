@@ -5,7 +5,7 @@
 
 from types import SimpleNamespace
 
-from src.open_llm_vtuber import memory_core, memory_route
+from src.open_llm_vtuber import memory_route
 
 
 def _context(conf_uid, history_uid, agent_engine):
@@ -138,7 +138,7 @@ def test_the_memory_page_shows_and_edits_her_own_memory_in_the_engine(
 ):
     keeper = _Keeper()
     client = _page(monkeypatch, tmp_path, {"engine": _context("kurisu", "h1", keeper)})
-    old_file = memory_core._self_memory_file("kurisu")
+    old_file = tmp_path / "chat_history" / "kurisu" / "self_memory.md"
     old_file.parent.mkdir(parents=True, exist_ok=True)
     old_file.write_text("紅莉栖：舊檔案裡的。", encoding="utf-8")
 
@@ -156,8 +156,8 @@ def test_the_memory_page_shows_and_edits_her_own_memory_in_the_engine(
     assert shown["self_content"] == "紅莉栖喜歡胡椒博士。"
     assert saved["ok"] is True and cleared["ok"] is True
     assert keeper.edits == [("紅莉栖怕蟑螂。", "紅莉栖喜歡胡椒博士。"), ("", None)]
-    # 舊檔案沒被碰：它只在第一次搬進引擎。
-    assert memory_core.read_self_memory("kurisu") == "紅莉栖：舊檔案裡的。"
+    # 舊檔案沒被碰，也沒被搬進引擎。
+    assert old_file.read_text(encoding="utf-8") == "紅莉栖：舊檔案裡的。"
 
 
 def test_turning_memory_off_also_stops_her_remembering_herself():

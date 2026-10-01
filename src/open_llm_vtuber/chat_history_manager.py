@@ -72,8 +72,8 @@ def _get_safe_history_memory_dir(conf_uid: str, history_uid: str) -> str:
 
     Mirrors ``_get_safe_history_path`` exactly (same sanitizer, same base_dir,
     same confinement check) so the json file and its memory directory can never
-    disagree about what counts as safe — memory_core lays the directory down as
-    chat_history/<conf_uid>/<history_uid>/core_memory.md, i.e. the json path
+    disagree about what counts as safe — the old memory agent laid the directory down
+    as chat_history/<conf_uid>/<history_uid>/core_memory.md, i.e. the json path
     with ".json" swapped for a trailing "/".
     """
     safe_conf_uid = _sanitize_path_component(conf_uid)
