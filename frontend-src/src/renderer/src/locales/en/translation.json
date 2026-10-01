@@ -111,7 +111,8 @@
     "voiceContinue": "Continue",
     "voiceFailed": "Install failed: {{error}}",
     "voiceRetry": "Try again",
-    "voiceHelp": "The default voice comes from the Tsukuyomi-chan Corpus (CV: Rei Yumesaki). You can switch to another reference clip in voice settings."
+    "voiceHelp": "The default voice comes from the Tsukuyomi-chan Corpus (CV: Rei Yumesaki). You can switch to another reference clip in voice settings.",
+    "modelHasNoTools": "This model can't use tools, so web search and the time tool won't work with it. The tools switch is unchanged."
   },
   "effects": {
     "characterEntrance": {

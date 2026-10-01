@@ -111,7 +111,8 @@
     "voiceContinue": "繼續",
     "voiceFailed": "安裝失敗：{{error}}",
     "voiceRetry": "再試一次",
-    "voiceHelp": "預設聲音來自つくよみちゃんコーパス（CV.夢前黎）。之後可以在語音設定換成別的參考音。"
+    "voiceHelp": "預設聲音來自つくよみちゃんコーパス（CV.夢前黎）。之後可以在語音設定換成別的參考音。",
+    "modelHasNoTools": "這顆模型不支援工具，網路搜尋與時間工具在它身上不會動。工具開關沒有改。"
   },
   "effects": {
     "characterEntrance": {

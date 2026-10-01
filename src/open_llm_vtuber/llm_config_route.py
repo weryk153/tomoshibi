@@ -371,8 +371,8 @@ def _validate_path_with_ruamel(provider: str) -> None:
     touch the file. Uses ruamel round-trip load (per spec) so a malformed/missing
     structure fails loudly instead of corrupting the config.
 
-    provider 是必填參數，沒有預設值：兩個呼叫端（write_provider_config、
-    write_provider_config_and_use_mcpp）都會傳它們真正要寫的那個區塊，不能
+    provider 是必填參數，沒有預設值：呼叫端（write_provider_config）會傳它真正
+    要寫的那個區塊，不能
     偷懶沿用 openai_compatible_llm 當預設值——不然哪天多了個忘記傳這個參數的
     呼叫端，目標明明是 lmstudio_llm，卻只驗證了 openai_compatible_llm 存不
     存在，驗過了但目標區塊其實不在，會晚一步才在逐行編輯時才炸開，而且是
@@ -425,9 +425,8 @@ def _point_llm_provider_at_openai_compatible(lines: list) -> None:
 def _edit_provider_config(lines: list, provider: str, values: dict) -> None:
     """在既有的 ``lines`` 上套用 provider 設定的編輯，不讀檔、不寫檔。
 
-    純粹的記憶體編輯步驟，從 ``write_provider_config`` 抽出來，讓它能跟其他
-    編輯步驟（例如 ``_edit_use_mcpp``）在同一份 ``lines`` 上合併成一次寫入——
-    見 ``write_provider_config_and_use_mcpp`` 的說明。
+    純粹的記憶體編輯步驟，從 ``write_provider_config`` 抽出來，需要時能跟其他
+    編輯步驟在同一份 ``lines`` 上合併成一次寫入。
 
     provider 必須在 WRITABLE_PROVIDERS 裡——它會被拿去組 YAML 路徑，而呼叫端的
     值來自請求。
@@ -465,8 +464,8 @@ def write_provider_config(provider: str, values: dict) -> None:
 
     編輯本身委派給 ``_edit_provider_config``；這裡只負責讀檔、驗證、寫檔這三個
     單獨呼叫時該做的事。需要跟別的編輯合成一次原子寫入時，不要疊呼叫這個函式
-    （那樣會各自讀寫兩次，中間有半套生效的窗口），改用
-    ``write_provider_config_and_use_mcpp``。
+    （那樣會各自讀寫兩次，中間有半套生效的窗口），在同一份 lines 上呼叫
+    ``_edit_provider_config``。
     """
     if provider not in WRITABLE_PROVIDERS:
         raise ValueError(f"Refusing to write unknown provider block: {provider!r}")
@@ -475,52 +474,6 @@ def write_provider_config(provider: str, values: dict) -> None:
 
     lines = _read_conf_lines()
     _edit_provider_config(lines, provider, values)
-    _write_conf(lines)
-
-
-def _edit_use_mcpp(lines: list, enabled: bool) -> None:
-    """在既有的 ``lines`` 上套用 use_mcpp 開關的編輯，不讀檔、不寫檔。
-
-    這個鍵在 agent_settings.conversation 底下，跟 llm_configs 是兄弟，
-    所以走自己的 nested_extent。
-    """
-    start, end = nested_extent(
-        lines,
-        "character_config",
-        "agent_config",
-        "agent_settings",
-        "conversation",
-    )
-    # 裸的 True／False，不是字串——這份設定檔裡既有的寫法（見
-    # player_route.py 的 rewrite_bool_leaf）都是這樣，conf_editor 存在的目的
-    # 就是不要去改動使用者檔案原本的風格。
-    upsert_leaf(lines, start, end, "use_mcpp", str(bool(enabled)))
-
-
-def write_provider_config_and_use_mcpp(
-    provider: str, values: dict, use_mcpp: bool
-) -> None:
-    """套用偵測到的模型設定：provider 區塊與 use_mcpp 兩個編輯要嘛都套上，要嘛
-    都不動——給 apply-detected 這種「兩個鍵邏輯上是同一次操作」的呼叫端用。
-
-    provider 區塊的編輯與 use_mcpp 的編輯各自都能對 conf.yaml 做到原子寫入
-    （temp + os.replace），但把它們拆成兩次獨立呼叫並不是一次交易：第一個
-    成功、第二個才丟例外的話（例如 conversation 區塊結構壞掉讓
-    nested_extent 丟 KeyError），conf.yaml 已經被改了——provider、model、
-    llm_provider 指標都切過去了——但呼叫端拿到的是「寫入失敗」。使用者以為
-    什麼都沒存到，其實存了一半，比乾脆全部不存更糟。
-
-    做法：只讀一次 lines，兩個編輯都在記憶體裡的同一份 lines 上做完才真正
-    寫檔一次——任何一步丟例外，檔案都還沒被碰過。
-    """
-    if provider not in WRITABLE_PROVIDERS:
-        raise ValueError(f"Refusing to write unknown provider block: {provider!r}")
-
-    _validate_path_with_ruamel(provider)
-
-    lines = _read_conf_lines()
-    _edit_provider_config(lines, provider, values)
-    _edit_use_mcpp(lines, use_mcpp)
     _write_conf(lines)
 
 
@@ -918,23 +871,10 @@ def init_llm_config_route() -> APIRouter:
         if profile:
             values["extra_body"] = profile["extra_body"]
 
+        # 工具開關是使用者的選擇，偵測到的模型只拿來提示（applied.tools），不替他
+        # 開或關：以前「使用」一顆不支援工具的模型，網路搜尋就被悄悄關掉。
         try:
-            if capability_known:
-                # provider 區塊與 use_mcpp 是同一次操作的兩個鍵，走合併入口
-                # 一次讀、一次寫——避免第一個編輯落地、第二個才失敗時，
-                # conf.yaml 已經半套生效但回應卻說寫入失敗
-                # （見 write_provider_config_and_use_mcpp）。
-                await asyncio.to_thread(
-                    write_provider_config_and_use_mcpp,
-                    provider,
-                    values,
-                    chosen.supports_tools,
-                )
-            else:
-                # 沒問到能力就不動 use_mcpp，留著使用者原本在 Settings 裡的
-                # 選擇——一次 fail-soft 的探測失敗不該變成一次確定的設定
-                # 變更。
-                await asyncio.to_thread(write_provider_config, provider, values)
+            await asyncio.to_thread(write_provider_config, provider, values)
         except Exception as e:
             logger.warning(f"apply-detected write failed: {type(e).__name__}: {e}")
             return _bad("Could not write conf.yaml.")
@@ -947,6 +887,8 @@ def init_llm_config_route() -> APIRouter:
                     "model": chosen.id,
                     "is_vlm": chosen.is_vlm,
                     "supports_tools": chosen.supports_tools,
+                    # 能不能用工具：True／False，問不到（Ollama 的 /api/show 失敗）是 None。
+                    "tools": chosen.supports_tools if capability_known else None,
                     "max_context": chosen.max_context,
                 },
                 "note": profile["note"] if profile else None,
