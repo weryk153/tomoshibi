@@ -118,7 +118,7 @@ The codebase uses the missing `_cleanup_failed_connection` method pattern - when
 - **Live2D models**: `live2d-models/`
 - **VRM models**: `vrm-models/` — `<name>/<name>.vrm` + `<name>/motions/*.vrma`；掃描登記與對應驗證在 `src/open_llm_vtuber/vrm_models.py`，角色 renderer 的共用介面在 `frontend-src/src/renderer/src/avatar/character-renderer.ts`（見 `docs/add-vrm-character.md`）
 - **Character definitions**: `characters/`
-- **Chat history**: `chat_history/` — `<conf_uid>/<history_uid>.json` 逐字稿、`<conf_uid>/<history_uid>/core_memory.md` 該段對話的記憶、`<conf_uid>/self_memory.md` 她自己的記憶（所有對話共用）
+- **Chat history**: `chat_history/` — `<conf_uid>/<history_uid>.json` 逐字稿、`<conf_uid>/<history_uid>/core_memory.md` 該段對話的記憶、`<conf_uid>/self_memory.md` 她自己的記憶（所有對話共用）。這兩份記憶檔只有 `basic_memory_agent` 用；`character_engine_agent` 的記憶全在 `<conf_uid>/engine/`，舊檔只在第一次搬進去
 - **Cache**: `cache/` (audio files, temporary data)
 
 ## Development Guidelines

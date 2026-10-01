@@ -98,6 +98,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         # 引擎的背景工作：每一項都是多一次模型呼叫。
         "emotion_every": 2,
         "memory_every": 3,
+        "self_memory_every": 3,
         "goal_every": 8,
         "reflection_every": 12,
     },
@@ -110,6 +111,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "keep_alive": 1800,
         "emotion_every": 1,
         "memory_every": 2,
+        "self_memory_every": 2,
         "goal_every": 4,
         "reflection_every": 6,
     },
@@ -124,6 +126,7 @@ PRESETS: dict[str, dict[str, Any]] = {
         "keep_alive": 3600,
         "emotion_every": 1,
         "memory_every": 1,
+        "self_memory_every": 1,
         "goal_every": 3,
         "reflection_every": 4,
     },

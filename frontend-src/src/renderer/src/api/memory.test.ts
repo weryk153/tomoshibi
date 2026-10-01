@@ -66,4 +66,7 @@ test('記憶在引擎手上時，頁面會知道（字數上限對它不起作�
   assert.equal(mapMemoryResponse({ ...base, engine_managed: false }).engine_managed, false)
   // 舊後端沒有這個欄位：當成不是引擎。
   assert.equal(mapMemoryResponse(base).engine_managed, false)
+  // 她自己的記憶是另一個旗標：引擎在跑、但這段對話還沒接上時兩者會不同。
+  assert.equal(mapMemoryResponse({ ...base, self_engine_managed: true }).self_engine_managed, true)
+  assert.equal(mapMemoryResponse(base).self_engine_managed, false)
 })

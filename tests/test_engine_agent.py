@@ -243,6 +243,27 @@ def test_what_she_said_on_her_own_stays_in_the_conversation(tmp_path):
     assert not any("主動開口的指示" in content for _, content in lines)
 
 
+def test_after_asking_on_her_own_her_next_remark_asks_nothing(tmp_path):
+    """主機算出上一次主動開口已經問過問題時，這次的問句由引擎拿掉。以前只是在
+    素材裡叮嚀一句，小模型照樣問。"""
+
+    async def remark(**metadata):
+        llm = EngineLLM("你在做什麼？")
+        current = agent(companion(tmp_path / str(len(metadata)), llm))
+        outputs = await say(
+            current,
+            "（主動開口的指示）",
+            history_uid="h1",
+            proactive_speak=True,
+            skip_memory=True,
+            **metadata,
+        )
+        return spoken(outputs)
+
+    assert asyncio.run(remark()) == "你在做什麼？"
+    assert asyncio.run(remark(proactive_forbid_question=True)) == ""
+
+
 def test_the_conversation_keeps_what_she_said_on_her_own():
     import inspect
 

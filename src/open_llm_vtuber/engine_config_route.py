@@ -37,6 +37,7 @@ BASIC_CHOICE = "basic_memory_agent"
 EVERY_KEYS = (
     "emotion_every",
     "memory_every",
+    "self_memory_every",
     "goal_every",
     "reflection_every",
     "goals_shown",
@@ -45,6 +46,7 @@ EVERY_KEYS = (
 EVERY_DEFAULTS = {
     "emotion_every": 1,
     "memory_every": 2,
+    "self_memory_every": 2,
     "goal_every": 4,
     "reflection_every": 6,
     "goals_shown": 3,

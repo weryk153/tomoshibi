@@ -60,6 +60,12 @@ NOT_COMPATIBLE = (
     "做法：換一個 OpenAI 相容的 llm_provider，或把 conversation_agent_choice 改回 "
     "basic_memory_agent。"
 )
+TOO_OLD = (
+    "安裝的 AI Character Engine 太舊：這版 Tomoshibi 要引擎自己記得她說過的話"
+    "（ai_character_engine.companion.SELF_MEMORY_LINE）。\n"
+    "做法：更新引擎（uv pip install -U <引擎的路徑或 wheel>），或把 conf.yaml 的 "
+    "conversation_agent_choice 改回 basic_memory_agent。"
+)
 # conf.yaml 裡的名字 → 引擎的名字
 _RENAMED_SETTINGS = {
     "timeout_seconds": "call_timeout_seconds",
@@ -249,6 +255,13 @@ def build_companion(
         raise RuntimeError(
             UNAVAILABLE.format(python=sys.version.split()[0], error=exc)
         ) from exc
+    # 舊版引擎收到它不認得的設定（self_memory_every）只會丟一個看不懂的 TypeError，
+    # 或少了主機已經不再自己做的檢查。SELF_MEMORY_LINE 跟這裡用到的其他新東西
+    # （speak_up 的 statement_only、from_before、引擎那一側的輸出檢查）同一版起才有。
+    import ai_character_engine.companion as engine_companion
+
+    if not hasattr(engine_companion, "SELF_MEMORY_LINE"):
+        raise RuntimeError(TOO_OLD)
 
     directory = storage_dir(conf_uid)
     key = str(directory.resolve())

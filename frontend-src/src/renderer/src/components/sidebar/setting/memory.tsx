@@ -300,12 +300,18 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
     if (!contentLoaded) return;
     setSavingSelf(true);
     setSaveSelfError(null);
-    const result = await saveSelfMemoryContent(baseUrl, confUid, selfDraft);
+    const result = await saveSelfMemoryContent(
+      baseUrl, confUid, selfDraft, memory?.self_content,
+    );
     setSavingSelf(false);
     setPendingSaveSelf(false);
     if (result.ok) {
+      // 引擎有上限，存進去的不一定全部留下：顯示它實際記得的那一份。不然下次
+      // 存檔時，被擠掉的那幾行會被當成新的又加回去。
+      const stored = typeof result.data?.content === 'string' ? result.data.content : selfDraft;
+      setSelfDraft(stored);
       setMemory((m) => (m
-        ? { ...m, self_content: selfDraft, self_char_count: selfDraft.length }
+        ? { ...m, self_content: stored, self_char_count: stored.length }
         : m));
       toaster.create({
         title: t('settings.memory.saved'),
@@ -316,7 +322,7 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
     } else {
       setSaveSelfError(result.error || t('settings.memory.saveContentFailed'));
     }
-  }, [baseUrl, confUid, selfDraft, contentLoaded, t]);
+  }, [baseUrl, confUid, selfDraft, contentLoaded, memory?.self_content, t]);
 
   const handleSelfClear = useCallback(async () => {
     setClearingSelf(true);
@@ -412,7 +418,9 @@ function Memory({ active = true }: MemoryProps): JSX.Element {
                 disabled={!contentLoaded}
               />
               <Text fontSize="xs" color="whiteAlpha.600">
-                {t('settings.memory.selfCharCount', { count: selfDraft.length, cap: memory.self_cap })}
+                {memory.self_engine_managed
+                  ? t('settings.memory.selfEngineManaged')
+                  : t('settings.memory.selfCharCount', { count: selfDraft.length, cap: memory.self_cap })}
               </Text>
               {saveSelfError && (
                 <Text fontSize="xs" color="red.300">{saveSelfError}</Text>

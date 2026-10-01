@@ -18,7 +18,14 @@ def _engine_settings(settings: dict, *, long_term_memory: bool) -> dict:
     """記憶頁關掉長期記憶時，引擎也不再抽記憶、不再把記憶帶進對話。"""
     if long_term_memory:
         return dict(settings)
-    return {**settings, "memory_every": 0, "memories_recalled": 0}
+    return {
+        **settings,
+        "memory_every": 0,
+        "memories_recalled": 0,
+        "self_memory_every": 0,
+        # 以前記過的也不再帶進對話：關掉之前，主機那一套兩份記憶都不注入。
+        "self_memories_shown": 0,
+    }
 
 
 class AgentFactory:

@@ -322,6 +322,19 @@ def should_suppress_proactive_text(
         if _is_near_duplicate(normalized, recent_output):
             return True
 
+    return breaks_what_the_host_knows(normalized, image_sources)
+
+
+def breaks_what_the_host_knows(
+    text: str, image_sources: list[str] | None = None
+) -> bool:
+    """主動開口的一句話，違反只有主機知道的事：畫面上看不到她說的東西（只給了
+    螢幕截圖卻說你的表情、說她替你按了按鈕）、她自稱是程式、這個角色不講的話。
+
+    跟重複、客服腔、只應一聲這些不同：把關她說話的引擎看不到截圖是哪裡來的，也
+    不知道人設不准她承認自己是程式，所以接了引擎之後這一段仍由主機擋。
+    """
+    normalized = " ".join(str(text or "").split())
     valid_sources = {
         source for source in (image_sources or []) if source in {"camera", "screen"}
     }

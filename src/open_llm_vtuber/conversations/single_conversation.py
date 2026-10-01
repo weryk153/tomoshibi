@@ -30,6 +30,7 @@ from ..reply_history import (
     record_reply,
 )
 from ..proactive_context import (
+    breaks_what_the_host_knows,
     build_proactive_retry_prompt,
     record_proactive_response,
     record_suppressed_proactive,
@@ -158,6 +159,10 @@ async def process_single_conversation(
     full_response = ""  # Initialize full_response here
     subtitle_response_parts: List[str] = []
     is_proactive = bool(metadata and metadata.get("proactive_speak"))
+    # 自己把關她說出口的話的 agent（character_engine_agent）：主機這一側的防重複、
+    # 客服腔與主動開口過濾整個跳過。兩邊各擋一次的話，主機擋掉的句子引擎不知道，
+    # 她記得的跟使用者聽到的就對不上。
+    own_checks = bool(getattr(context.agent_engine, "checks_what_she_says", False))
     # 護欄帶著最近幾則回覆的句子當種子。單看一則的話攔不到實測最常見的重複
     # ——模型換掉開頭四個字、正文整段照抄，整則比對認為那是不同的回覆。
     # 主動發言有自己的跨輪機制（proactive_context），不種，免得兩層打架。
@@ -202,7 +207,7 @@ async def process_single_conversation(
         # 只餵給模型，不進 input_text 本身：下面的 store_message 用的是 input_text，
         # 混進去的話這段提示會永久留在對話歷史與長期記憶裡。
         model_input_text = input_text
-        if not is_proactive and isinstance(input_text, str):
+        if not is_proactive and not own_checks and isinstance(input_text, str):
             model_input_text = input_text + build_recent_reply_guidance(
                 context.character_config.conf_uid, context.history_uid, client_uid
             )
@@ -311,10 +316,12 @@ async def process_single_conversation(
                             _protected(context),
                         )
 
-                    if isinstance(
-                        output_item, SentenceOutput
-                    ) and is_generic_assistant_boilerplate(
-                        output_item.display_text.text
+                    if (
+                        not own_checks
+                        and isinstance(output_item, SentenceOutput)
+                        and is_generic_assistant_boilerplate(
+                            output_item.display_text.text
+                        )
                     ):
                         logger.info("Suppressed generic assistant boilerplate")
                         continue
@@ -322,21 +329,31 @@ async def process_single_conversation(
                     if (
                         is_proactive
                         and isinstance(output_item, SentenceOutput)
-                        and should_suppress_proactive_text(
-                            output_item.display_text.text,
-                            forbid_question=bool(
-                                metadata and metadata.get("proactive_forbid_question")
-                            ),
-                            image_sources=(
-                                metadata.get("proactive_image_sources")
-                                if metadata
-                                else None
-                            ),
-                            recent_outputs=(
-                                metadata.get("proactive_recent_outputs")
-                                if metadata
-                                else None
-                            ),
+                        and (
+                            # 引擎管不到的只剩主機才知道的事（截圖是哪裡來的、
+                            # 人設不准她自稱程式）；其餘由引擎擋過了。
+                            breaks_what_the_host_knows(
+                                output_item.display_text.text,
+                                (metadata or {}).get("proactive_image_sources"),
+                            )
+                            if own_checks
+                            else should_suppress_proactive_text(
+                                output_item.display_text.text,
+                                forbid_question=bool(
+                                    metadata
+                                    and metadata.get("proactive_forbid_question")
+                                ),
+                                image_sources=(
+                                    metadata.get("proactive_image_sources")
+                                    if metadata
+                                    else None
+                                ),
+                                recent_outputs=(
+                                    metadata.get("proactive_recent_outputs")
+                                    if metadata
+                                    else None
+                                ),
+                            )
                         )
                     ):
                         # 印出被擋的內容。只寫「Suppressed」的話，事後完全無法判斷
@@ -358,9 +375,11 @@ async def process_single_conversation(
                         )
                         continue
 
-                    if isinstance(
-                        output_item, SentenceOutput
-                    ) and not repetition_guard.accept(output_item.display_text.text):
+                    if (
+                        not own_checks
+                        and isinstance(output_item, SentenceOutput)
+                        and not repetition_guard.accept(output_item.display_text.text)
+                    ):
                         logger.info("Suppressed repeated or near-duplicate sentence")
                         continue
 
@@ -395,7 +414,7 @@ async def process_single_conversation(
         # 整則都被護欄丟掉了——代表這一輪講的每一句最近都講過。與其讓她沈默，
         # 帶著「你剛說過這些」重生一次。這條路以前只有主動發言走，現在一般回覆
         # 也需要，因為逐句護欄會整輪丟光。
-        if not is_proactive and not full_response:
+        if not is_proactive and not own_checks and not full_response:
             logger.info("整則回覆都被跨輪護欄丟掉，重生一次")
             retry_input = create_batch_input(
                 # 用 model_input_text：它已經帶著「你最近說過這些」。少了那段，
@@ -446,7 +465,7 @@ async def process_single_conversation(
                     subtitle_response_parts=subtitle_response_parts,
                 )
 
-        if is_proactive and not full_response:
+        if is_proactive and not own_checks and not full_response:
             logger.info(
                 "All proactive sentences were suppressed; retrying once as a statement"
             )
@@ -610,6 +629,8 @@ async def process_single_conversation(
             if (
                 _mem_on
                 and not is_proactive
+                # 她自己說過什麼也是引擎在記的 agent：主機這一套整理整個不用做。
+                and not hasattr(context.agent_engine, "self_memory")
                 and isinstance(input_text, str)
                 and input_text.strip()
             ):
@@ -648,13 +669,6 @@ async def process_single_conversation(
                             protected_names=getattr(
                                 context.character_config, "protected_names", None
                             ),
-                            # 自己記得對方的 agent（character_engine_agent）只要
-                            # 「她自己的記憶」那一半。
-                            conversation_half=not hasattr(
-                                context.agent_engine, "conversation_memory"
-                            ),
-                            # 這次呼叫跟她的回覆用同一顆模型：讓引擎排它。
-                            through=getattr(context.agent_engine, "aside", None),
                         )
                     )
                     # 保存 reference 避免 fire-and-forget task 被 GC（Python asyncio 已知坑）

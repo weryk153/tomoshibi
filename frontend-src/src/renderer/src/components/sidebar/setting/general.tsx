@@ -154,6 +154,7 @@ function General({ onCancel }: GeneralProps): JSX.Element {
         setEveryDrafts({
           emotion_every: String(result.data.emotion_every),
           memory_every: String(result.data.memory_every),
+          self_memory_every: String(result.data.self_memory_every),
           goal_every: String(result.data.goal_every),
           reflection_every: String(result.data.reflection_every),
           goals_shown: String(result.data.goals_shown),
@@ -477,7 +478,7 @@ function General({ onCancel }: GeneralProps): JSX.Element {
             <Text fontSize="xs" color="whiteAlpha.600">
               {t("settings.general.engineEveryHelp")}
             </Text>
-            {(["emotion_every", "memory_every", "goal_every", "reflection_every"] as EngineEvery[]).map((key) => (
+            {(["emotion_every", "memory_every", "self_memory_every", "goal_every", "reflection_every"] as EngineEvery[]).map((key) => (
               <NumberField
                 key={key}
                 label={t(`settings.general.engine_${key}`)}

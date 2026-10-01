@@ -384,3 +384,18 @@ def test_long_term_memory_on_leaves_the_engine_settings_alone():
 
     assert settings.memory_every == 3
     assert settings.memories_recalled > 0
+
+
+def test_an_engine_too_old_for_this_host_is_refused_with_the_way_out(monkeypatch):
+    import ai_character_engine.companion as engine_companion
+
+    monkeypatch.delattr(engine_companion, "SELF_MEMORY_LINE")
+
+    with pytest.raises(RuntimeError, match="太舊"):
+        factory.build_companion(
+            conf_uid="kurisu",
+            character_name="紅莉栖",
+            system="你是紅莉栖。",
+            provider="lmstudio_llm",
+            llm_config={"base_url": "http://127.0.0.1:1234/v1", "model": "m"},
+        )
