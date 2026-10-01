@@ -40,6 +40,7 @@ from ...stage_director import strip_stage_performance_tag
 from ..input_types import BatchInput, TextSource
 from ..output_types import SentenceOutput
 from ..transformers import (
+    tidy_marks,
     actions_extractor,
     display_processor,
     sentence_divider,
@@ -339,7 +340,7 @@ class CharacterEngineAgent(AgentInterface):
         """她記得自己說了什麼。跟 BasicMemoryAgent._add_message 同一套：表情與動作
         標籤留著（她得讀到自己會做表情），演出標籤拿掉，字形跟畫面一致。"""
         return normalize_output_language_variant(
-            deduplicate_response_text(strip_stage_performance_tag(reply)),
+            deduplicate_response_text(strip_stage_performance_tag(tidy_marks(reply))),
             self._player_language,
         )
 
