@@ -2,8 +2,8 @@
 
 主機把記憶寫在系統提示的中段，而記憶每一輪都會被整理一次。LM Studio 的紀錄：
 每一輪都只有 cached_tokens=2048，後面 2300～3400 個 token 連同整段對話全部重讀，
-兩種 agent 都一樣。character_engine_agent 把記憶從系統提示裡拿出來、交給引擎寫進
-對話的備註，系統提示就不會再跟著記憶變。
+兩種 agent 都一樣。character_engine_agent 把記憶從系統提示裡拿掉：她記得對方什麼、
+她自己說過什麼，都由引擎記、由引擎寫進對話的備註，系統提示就不會再跟著記憶變。
 """
 
 import asyncio
@@ -27,50 +27,35 @@ from tests.test_engine_agent import (  # noqa: E402
 from tests.test_memory_blocks_split import composed  # noqa: E402
 
 
-def test_her_own_memory_arrives_as_notes_and_the_persona_stays_the_same(tmp_path):
+def test_the_hosts_copy_of_her_own_memory_is_not_sent(tmp_path):
+    """她自己的記憶由引擎記。主機系統提示裡那一份（self_memory.md）不再送：兩份
+    並存的話，同一件事她會讀到兩次，刪掉的那一份還會從另一份回來。"""
+
     async def scenario():
         llm = EngineLLM()
         current = agent(companion(tmp_path, llm))
         current.set_system(composed("紅莉栖：喜歡胡椒博士。", ""))
         await say(current, "你好")
-        # 每一輪之後記憶都會被整理一次，主機接著重組系統提示。
-        current.set_system(composed("紅莉栖：喜歡胡椒博士。\n紅莉栖：怕蟑螂。", ""))
-        await say(current, "還記得我嗎")
-        return llm.calls
+        return llm.calls[0]
 
-    first, second = asyncio.run(scenario())
+    sent = asyncio.run(scenario())
 
-    assert first[0] == second[0]
-    assert "胡椒博士" not in first[0].content
-    assert CORE_CONVERSATION_PROMPT in first[0].content
-    assert second[: len(first)] == first
-
-    (first_note,) = [m.content for m in first if CONTEXT_MARK in m.content]
-    assert "- 你對自己的認知：紅莉栖：喜歡胡椒博士。" in first_note
-
-    new_note = [m.content for m in second if CONTEXT_MARK in m.content][-1]
-    assert "- 你對自己的認知：紅莉栖：怕蟑螂。" in new_note
-    assert "胡椒博士" not in new_note
+    assert "胡椒博士" not in "".join(message.content for message in sent)
+    assert CORE_CONVERSATION_PROMPT in sent[0].content
 
 
-def test_what_she_no_longer_knows_of_herself_is_no_longer_sent(tmp_path):
+def test_her_own_memory_comes_from_the_engine(tmp_path):
     async def scenario():
         llm = EngineLLM()
-        current = agent(companion(tmp_path, llm))
-        current.set_system(composed("紅莉栖：住在秋葉原。", ""))
+        engine = companion(tmp_path, llm)
+        current = agent(engine)
+        engine.rewrite_self_memories(["紅莉栖喜歡胡椒博士。"])
         await say(current, "你好")
-        current.set_system(composed("紅莉栖：搬到池袋了。", ""))
-        await say(current, "你搬家了")
-        corrected = "".join(llm.sent())
-        current.set_system(composed("", ""))
-        await say(current, "忘了吧")
-        return corrected, "".join(llm.sent())
+        return [m.content for m in llm.calls[0] if CONTEXT_MARK in m.content]
 
-    corrected, cleared = asyncio.run(scenario())
+    (note,) = asyncio.run(scenario())
 
-    assert "秋葉原" not in corrected
-    assert "搬到池袋了" in corrected
-    assert "池袋" not in cleared
+    assert "紅莉栖喜歡胡椒博士。" in note
 
 
 def test_how_to_use_the_memory_is_still_said(tmp_path):

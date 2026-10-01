@@ -37,6 +37,8 @@ export interface MemoryState {
   // 這段對話的記憶在引擎手上（character_engine_agent）：不按字數限制，cap 對它
   // 不起作用。
   engine_managed: boolean
+  // 她自己的記憶在引擎手上：同上，self_cap 對它不起作用。
+  self_engine_managed: boolean
 }
 
 // 四個記憶寫入端點都可能等整理鎖（memory_route.py 的 _hold_consolidation_lock，
@@ -63,6 +65,7 @@ interface MemoryGetResponse {
   self_char_count: number
   self_cap: number
   engine_managed?: boolean
+  self_engine_managed?: boolean
 }
 
 // cap 是數字輸入框；使用者清空輸入框時 value 會是 NaN，直接送給後端會被
@@ -93,6 +96,7 @@ export function mapMemoryResponse(d: MemoryGetResponse): MemoryState {
     self_char_count: d.self_char_count,
     self_cap: d.self_cap,
     engine_managed: d.engine_managed === true,
+    self_engine_managed: d.self_engine_managed === true,
   }
 }
 
@@ -182,15 +186,18 @@ export const clearMemory = (baseUrl: string, confUid: string): Promise<ApiResult
   )
 
 // POST /api/memory/self：整份取代她自己的記憶（角色層，不需要連線）。
+// editedFrom 跟 saveMemoryContent 的同義：她自己的記憶在引擎手上時，只有起點
+// 裡有、存回來不見的行才算刪掉。
 export const saveSelfMemoryContent = (
   baseUrl: string,
   confUid: string,
   content: string,
-): Promise<ApiResult<unknown>> =>
-  apiPost<unknown>(
+  editedFrom?: string,
+): Promise<ApiResult<{ content?: string }>> =>
+  apiPost<{ content?: string }>(
     baseUrl,
     '/api/memory/self',
-    { conf_uid: confUid, content },
+    { conf_uid: confUid, content, edited_from: editedFrom },
     MEMORY_WRITE_TIMEOUT_MS,
   )
 

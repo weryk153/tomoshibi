@@ -78,3 +78,38 @@ def test_news_she_brought_up_is_noted_after_she_speaks_up():
 
     assert "note_mentioned(" in after
     assert '(metadata or {}).get("proactive_source")' in after
+
+
+def test_an_agent_that_checks_what_she_says_is_not_filtered_again():
+    """引擎已經不讓她重複、不講客服腔、主動開口不只應一聲。主機再擋一次的話，
+    主機擋掉的句子引擎不知道：她記得自己講過、使用者卻沒聽到。"""
+    src = inspect.getsource(single_conversation.process_single_conversation)
+
+    assert (
+        'own_checks = bool(getattr(context.agent_engine, "checks_what_she_says", False))'
+        in src
+    )
+    assert (
+        "if not is_proactive and not own_checks and isinstance(input_text, str):" in src
+    )
+    assert src.count("not own_checks\n") == 2
+    # 主機才知道的事（截圖來源、人設）引擎管不到，主動開口照樣由主機擋。
+    assert "breaks_what_the_host_knows(" in src
+    assert (
+        "if own_checks\n                            else should_suppress_proactive_text("
+        in src
+    )
+    assert "if not is_proactive and not own_checks and not full_response:" in src
+    assert "if is_proactive and not own_checks and not full_response:" in src
+
+
+def test_what_only_the_host_knows_is_still_checked_for_her_remarks():
+    """只給了螢幕截圖，她卻說看到你的表情、說她替你按了按鈕：截圖從哪裡來、
+    人設不准她自稱程式，這些引擎都不知道。"""
+    from src.open_llm_vtuber.proactive_context import breaks_what_the_host_knows
+
+    assert breaks_what_the_host_knows("你盯著螢幕發呆的表情好好笑。", ["screen"])
+    assert breaks_what_the_host_knows("我剛才替你按了那個按鈕。", ["screen"])
+    assert breaks_what_the_host_knows("畢竟我只是個程式。")
+    assert not breaks_what_the_host_knows("你那張表情真好笑。", ["camera"])
+    assert not breaks_what_the_host_knows("今天的雲很漂亮。", ["screen"])

@@ -45,7 +45,11 @@ from .conf_editor import (
     write_conf as _write_conf,
 )
 
-from .character_route import _existing_conf_uids
+from .character_route import (
+    _conf_uid_of,
+    _existing_conf_uids,
+    _list_character_files,
+)
 from .config_manager.utils import read_yaml
 from . import memory_core
 
@@ -265,6 +269,95 @@ def _memory_keeper(client_contexts: dict, conf_uid: str):
     return found
 
 
+class _EngineSelfMemory:
+    """沒有連線開著時，直接找這個角色還在跑的引擎；介面跟 agent 那兩個方法一樣。"""
+
+    def __init__(self, companion):
+        self._companion = companion
+
+    def self_memory(self) -> str:
+        return "\n".join(self._companion.self_memories())
+
+    def rewrite_self_memory(self, text: str, *, edited_from=None) -> None:
+        self._companion.rewrite_self_memories(
+            text.splitlines(),
+            edited_from=None if edited_from is None else edited_from.splitlines(),
+        )
+
+
+def _engine_storage(conf_uid: str):
+    from .character_engine.factory import storage_dir
+
+    return storage_dir(conf_uid)
+
+
+def _configured_for_the_engine(conf_uid: str) -> bool:
+    """這個角色現在設定成由引擎驅動。角色檔沒寫 agent 的話，跟底稿一樣。"""
+
+    def choice(path):
+        data = read_yaml(path) or {}
+        agent_config = (data.get("character_config") or {}).get("agent_config") or {}
+        return agent_config.get("conversation_agent_choice")
+
+    try:
+        base = choice(CONF_PATH)
+        for path in _list_character_files():
+            if _conf_uid_of(path) == conf_uid:
+                return (choice(path) or base) == "character_engine_agent"
+        return base == "character_engine_agent"
+    except Exception:
+        return False
+
+
+def _self_keeper(client_contexts: dict, conf_uid: str):
+    """她自己說過什麼也由它記的那一方：這個角色的 character_engine_agent，或沒有
+    連線時她還在跑的引擎。不是引擎在記就回 None（主機的 self_memory.md）。
+
+    她自己的記憶在角色層，不屬於任何一段對話，所以不看 history_uid：這個角色
+    任何一個連線的 agent 都是同一份。
+
+    以連線上實際的 agent 為準，其次是設定：換回 basic_memory_agent 之後，上次
+    啟動過的引擎還留在記憶體裡，但她說話讀的已經是 self_memory.md 了。
+    """
+    agents = [
+        getattr(ctx, "agent_engine", None)
+        for ctx in client_contexts.values()
+        if getattr(getattr(ctx, "character_config", None), "conf_uid", None) == conf_uid
+    ]
+    for agent in agents:
+        if hasattr(agent, "self_memory"):
+            return agent
+    if any(agent is not None for agent in agents):
+        return None
+    if not _configured_for_the_engine(conf_uid):
+        return None
+    try:
+        from .character_engine.factory import current_companion
+
+        companion = current_companion(str(_engine_storage(conf_uid).resolve()))
+    except Exception:
+        return None
+    if companion is None or not hasattr(companion, "self_memories"):
+        return None
+    return _EngineSelfMemory(companion)
+
+
+def _engine_took_her_own_memory(conf_uid: str) -> bool:
+    """她設定成由引擎驅動，而引擎接手過她自己的記憶（self_memory.md 已經搬進
+    去）：那個檔案不會再被讀，寫進去的東西等於丟掉。"""
+    if not _configured_for_the_engine(conf_uid):
+        return False
+    try:
+        return (_engine_storage(conf_uid) / "brought-self-memory.txt").is_file()
+    except Exception:
+        return False
+
+
+ENGINE_NOT_RUNNING = (
+    "她的記憶由 AI Character Engine 管理，但引擎還沒啟動；先跟她開始一段對話再改。"
+)
+
+
 def _save_through(keeper, history_uid: str, content: str, edited_from) -> None:
     """edited_from 是前端這次編輯的起點（載入時放進 textarea 的那一版）。只有起點
     裡有、存回來時不見的行才算使用者刪掉的；頁面開著的時候引擎新記下的行不受
@@ -393,7 +486,12 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         else:
             content = memory_core.load_core_memory(conf_uid, history_uid)
             exists = os.path.isfile(memory_core.core_memory_path(conf_uid, history_uid))
-        self_content = memory_core.load_self_memory(conf_uid)
+        self_keeper = _self_keeper(client_contexts, conf_uid)
+        self_content = (
+            self_keeper.self_memory()
+            if self_keeper is not None
+            else memory_core.load_self_memory(conf_uid)
+        )
         return JSONResponse(
             {
                 "conf_uid": conf_uid,
@@ -405,6 +503,8 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
                 "char_count": len(content),
                 # 她自己的記憶：角色層，所有對話共用。上限固定，不開放設定。
                 "self_content": self_content,
+                # 她自己的記憶在引擎手上：不按字數限制，下面的上限對它不起作用。
+                "self_engine_managed": self_keeper is not None,
                 "self_char_count": len(self_content),
                 "self_cap": memory_core.SELF_CAP_CHARS,
                 # 界限一律從後端送，UI 不要自己寫死一份——後端調整了那份副本不會
@@ -559,6 +659,32 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         content = body.get("content")
         if not isinstance(content, str):
             return _error(400, "'content' must be a string.")
+        self_keeper = _self_keeper(client_contexts, conf_uid)
+        if self_keeper is not None:
+            # 引擎記的那一份。edited_from 的意思跟對話記憶一樣：只有頁面上有、
+            # 存回來不見的行才算刪掉，頁面開著時引擎新記下的不受影響。
+            edited_from = body.get("edited_from")
+            self_keeper.rewrite_self_memory(
+                content,
+                edited_from=edited_from if isinstance(edited_from, str) else None,
+            )
+            stored = self_keeper.self_memory()
+            logger.info(
+                f"[memory] self memory edited in the engine (conf_uid={conf_uid})"
+            )
+            return JSONResponse(
+                {
+                    "ok": True,
+                    "conf_uid": conf_uid,
+                    # 引擎有上限，存進去的不一定全部留下：頁面要顯示它實際記得的。
+                    "content": stored,
+                    "char_count": len(stored),
+                    "cap": memory_core.SELF_CAP_CHARS,
+                    "restart_required": False,
+                }
+            )
+        if _engine_took_her_own_memory(conf_uid):
+            return _error(409, ENGINE_NOT_RUNNING)
         # 跟整理排同一把鎖（見下面 clear 的說明），但等待有上限——見
         # _hold_consolidation_lock 的說明。
         try:
@@ -591,6 +717,15 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
         conf_uid, bad = _resolved_uid(body)
         if bad:
             return bad
+        self_keeper = _self_keeper(client_contexts, conf_uid)
+        if self_keeper is not None:
+            self_keeper.rewrite_self_memory("")
+            logger.info(
+                f"[memory] self memory cleared in the engine (conf_uid={conf_uid})"
+            )
+            return JSONResponse({"ok": True, "conf_uid": conf_uid, "cleared": True})
+        if _engine_took_her_own_memory(conf_uid):
+            return _error(409, ENGINE_NOT_RUNNING)
         # 整理是「讀出兩份記憶 → 丟給 LLM（最久 60 秒）→ merge 寫回」。在鎖外
         # 清空的話，整理若已經讀到舊的 self，60 秒後 merge 會把使用者剛刪掉的行
         # 原樣寫回去——而設定頁刪除正是規格對「分類誤判」這個已知漏洞唯一的

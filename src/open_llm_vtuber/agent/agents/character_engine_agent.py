@@ -52,11 +52,7 @@ INTERRUPT_RULE = (
 )
 # 她自己的記憶不放在系統提示裡（見 split_memory_blocks），這句用法說明留著。
 # 她記得對方什麼由引擎負責，主機那一份（core_memory.md）不送。
-ABOUT_HERSELF = "你對自己的認知"
-MEMORY_RULE = (
-    f"備註裡的「{ABOUT_HERSELF}」與 memory 是之前對話累積下來的，"
-    "自然運用、不要生硬複述。"
-)
+MEMORY_RULE = "備註裡的記憶是之前對話累積下來的，自然運用、不要生硬複述。"
 
 _DONE = object()
 # 這一輪的輸出要送去哪裡。agent 是所有連線共用的，不能記在 agent 身上：第二個
@@ -77,6 +73,10 @@ _TOOLS_REGISTERED_BY: "weakref.WeakKeyDictionary[Any, int]" = (
 
 
 class CharacterEngineAgent(AgentInterface):
+    # 她說出口的話由引擎把關（不重複、不講客服腔、不留只剩標點的碎片、主動開口
+    # 不只是應一聲）。主機自己那一層過濾對這個 agent 跳過，不然兩邊各擋一次。
+    checks_what_she_says = True
+
     def __init__(
         self,
         *,
@@ -112,6 +112,8 @@ class CharacterEngineAgent(AgentInterface):
         self._conversation: Optional[str] = None
         # 這個 agent 已經確認過、不用再搬 core_memory.md 的對話。
         self._brought: set = set()
+        # self_memory.md 已經確認搬過了（整個角色一份）。
+        self._her_own_brought = False
         # 還沒結束的每一輪：(等著它的 task, 它屬於哪段對話, 它的名字)。
         self._turns: list = []
         # 已經講完、但主機那一輪還活著（語音還在播）的：打斷時被取消的是它們的 task。
@@ -144,16 +146,13 @@ class CharacterEngineAgent(AgentInterface):
     # --- 主機交代的事 ---------------------------------------------------------
 
     def set_system(self, system: str) -> None:
-        """主機組好的系統提示。裡面的長期記憶拿出來，改由引擎寫進對話的備註。"""
+        """主機組好的系統提示。裡面的長期記憶拿掉：她記得對方什麼、她自己說過
+        什麼，都由引擎記、由引擎寫進對話的備註。主機的那兩份檔案只在第一次搬進
+        引擎（_bring_what_the_host_remembered、_bring_her_own_memory）。"""
         from ...service_context import split_memory_blocks
 
-        system, about_her, _about_the_user = split_memory_blocks(system)
+        system, _about_her, _about_the_user = split_memory_blocks(system)
         self._system = f"{system}\n\n{MEMORY_RULE}\n\n{INTERRUPT_RULE}"
-        self._memory = [
-            f"- {ABOUT_HERSELF}：{line.strip()}"
-            for line in about_her.splitlines()
-            if line.strip()
-        ]
 
     # --- 她記得對方什麼 -------------------------------------------------------
     # 有這兩個方法，主機就知道這個 agent 自己記得對方：記憶頁讀寫的是這一份，
@@ -173,6 +172,56 @@ class CharacterEngineAgent(AgentInterface):
             edited_from=None if edited_from is None else edited_from.splitlines(),
         )
 
+    # --- 她記得自己什麼 -------------------------------------------------------
+    # 有這兩個方法，主機就知道她自己說過什麼也是引擎在記：記憶頁讀寫的是這一份，
+    # 主機那一套整理（self_memory.md）整個不用做。
+
+    def self_memory(self) -> str:
+        # 記憶頁可能在她第一次開口之前就打開：先把 self_memory.md 搬進來，不然
+        # 頁面上是空的，使用者清掉之後，第一輪又把舊檔案搬回來。
+        companion = self._companion()
+        self._bring_her_own_memory(companion)
+        return "\n".join(companion.self_memories())
+
+    def rewrite_self_memory(
+        self, text: str, *, edited_from: Optional[str] = None
+    ) -> None:
+        companion = self._companion()
+        self._bring_her_own_memory(companion)
+        companion.rewrite_self_memories(
+            text.splitlines(),
+            edited_from=None if edited_from is None else edited_from.splitlines(),
+        )
+
+    def _bring_her_own_memory(self, companion) -> None:
+        """換成這個 agent 之前的 self_memory.md，搬進引擎一次。
+
+        搬過就記在檔案裡：使用者之後在記憶頁刪掉的，重開之後不能又跑回來。讀不到
+        不等於沒有，那時不記，下次再試。
+        """
+        from ...character_engine.factory import storage_dir
+
+        if self._her_own_brought or not self._conf_uid:
+            return
+        done = storage_dir(self._conf_uid) / "brought-self-memory.txt"
+        if not done.is_file():
+            try:
+                lines = memory_core.read_self_memory(self._conf_uid).splitlines()
+            except Exception as exc:
+                logger.warning(
+                    f"[engine] self memory unreadable, kept for later ({exc})"
+                )
+                return
+            lines = [line.strip() for line in lines if line.strip()]
+            if lines:
+                # 比引擎記下的任何一條都舊：先被擠掉，也不佔掉最新的那幾個位置。
+                companion.rewrite_self_memories(
+                    [*companion.self_memories(), *lines], from_before=True
+                )
+            done.parent.mkdir(parents=True, exist_ok=True)
+            done.write_text("brought\n", encoding="utf-8")
+        self._her_own_brought = True
+
     def _bring_what_the_host_remembered(self, companion, history_uid: str) -> None:
         """換成這個 agent 之前累積的 core_memory.md，搬一次。
 
@@ -187,7 +236,7 @@ class CharacterEngineAgent(AgentInterface):
             self._brought.add(history_uid)
             return
         # 真實的檔案不只「對方：」一種寫法；分法沿用主機自己的。她自己的那幾行
-        # 併進她自己的記憶：舊檔案裡有從來沒搬去那邊的。
+        # 進她自己的記憶：舊檔案裡有從來沒搬去 self_memory.md 的。
         about_the_user, her_own = memory_core.classify_memory_lines(
             memory_core.load_core_memory(self._conf_uid, history_uid),
             self._character_name,
@@ -197,26 +246,11 @@ class CharacterEngineAgent(AgentInterface):
             companion.rewrite_memories(
                 history_uid, [*companion.memories(history_uid), *remembered]
             )
-        if her_own.strip():
-            try:
-                current = memory_core.read_self_memory(self._conf_uid)
-            except Exception as exc:
-                # 讀不到不等於沒有：現在存會把整份蓋成舊檔案的那幾行。
-                logger.warning(
-                    f"[engine] self memory unreadable, kept for later ({exc})"
-                )
-                return
-            # 舊檔案的那幾行比她現在的記憶舊：相近的留現在的，裝不下先丟舊的。
-            merged = memory_core.merge_self_memory(
-                her_own,
-                current,
-                memory_core.SELF_CAP_CHARS,
-                character_name=self._character_name,
+        own = [line.strip() for line in her_own.splitlines() if line.strip()]
+        if own:
+            companion.rewrite_self_memories(
+                [*companion.self_memories(), *own], from_before=True
             )
-            if merged != current and not memory_core.save_self_memory(
-                self._conf_uid, merged
-            ):
-                return
         # 搬完才記；搬到一半炸掉的話下一次還會再試。
         self._brought.add(history_uid)
         done.parent.mkdir(parents=True, exist_ok=True)
@@ -232,6 +266,7 @@ class CharacterEngineAgent(AgentInterface):
     def _hand_over(self, companion, history_uid: Optional[str]) -> None:
         if not history_uid or not self._conf_uid:
             return
+        self._bring_her_own_memory(companion)
         self._bring_what_the_host_remembered(companion, history_uid)
         if companion.has_conversation(history_uid):
             return
@@ -295,20 +330,6 @@ class CharacterEngineAgent(AgentInterface):
         except HostBridgeError as exc:
             logger.warning(f"[engine] interrupt not recorded ({exc})")
 
-    async def aside(self, make_call):
-        """主機自己的模型呼叫（整理她自己的記憶）從引擎走：等她講完、排在背景工作
-        後面，不跟回覆搶模型。等的時候引擎那一側換掉了，就改排到新的那一個後面；
-        直接打的話正好跟新的那一個的回覆搶模型。"""
-        companion = self._companion()
-        while True:
-            try:
-                return await companion.aside(make_call)
-            except CompanionClosed:
-                successor = self._companion()
-                if successor is companion:
-                    raise
-                companion = successor
-
     async def remember_remark(self, conversation, remark: str) -> None:
         """她主動開口的那一輪帶著一大段指示，以 skip_memory 進行；說出口的那句另外
         記進對話，像她自己說的話一樣。主機在那一輪播完之後呼叫。"""
@@ -361,8 +382,6 @@ class CharacterEngineAgent(AgentInterface):
         # 她主動說的話已經留在對話裡（remember_remark），不再以一次性的備註帶過去：
         # 那樣她會把引號裡的話照唸一遍。
         notes.append(self._group_note)
-        # 以 "- " 開頭的是她知道的事：引擎在一段對話裡只講一次，之後只補新的。
-        notes += self._memory
         # 問她幾點，小模型有一半的機會不呼叫時間工具而是編一個。這是這一輪的事，
         # 不是「她知道的事」：每輪都不一樣，當成後者會每輪去改上一則備註。
         now = self._now()
@@ -398,8 +417,6 @@ class CharacterEngineAgent(AgentInterface):
             for item in metadata.get("proactive_material") or ()
             if str(item).strip()
         ]
-        if metadata.get("proactive_forbid_question"):
-            material.append("你上一次主動開口已經問過問題了，這次不要再問，用陳述句。")
 
         def ask(companion):
             # 在引擎那一輪裡面做：agent 是共用的，這一輪排隊的時候別的連線可能
@@ -431,6 +448,8 @@ class CharacterEngineAgent(AgentInterface):
                     remember_as=self._remembered,
                     turn_id=name,
                     keep=False,
+                    # 上一次主動開口已經問過問題：這次的問句由引擎拿掉，不只是叮嚀。
+                    statement_only=bool(metadata.get("proactive_forbid_question")),
                     # 主機自己的規矩（中文，實測出來的）；沒有就用引擎的。
                     instruction=str(metadata.get("proactive_instruction") or "")
                     or None,
