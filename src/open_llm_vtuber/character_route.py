@@ -857,6 +857,16 @@ def init_character_route() -> APIRouter:
             prompt_text=fields["prompt_text"] or None,
             prompt_lang=fields["prompt_lang"] or None,
         )
+        # 表單沒填的角色欄位，用底稿角色現在的值補上：她一開始就有自己的一份，
+        # 之後改底稿角色不會連帶改到她（跟開機升級同一條規則）。
+        from .conf_upgrade import own_everything
+
+        base = read_yaml(CONF_PATH) or {}
+        own_everything(
+            cc,
+            base.get("character_config") or {},
+            str((base.get("system_config") or {}).get("player_language") or ""),
+        )
         try:
             await asyncio.to_thread(_write_character_yaml, path, cc)
         except Exception as e:
