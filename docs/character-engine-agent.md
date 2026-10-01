@@ -15,29 +15,27 @@ Tomoshibi 這一側只做轉接：把一輪輸入交給引擎、把引擎吐出�
 
 ## 需求
 
-- Python 3.11 或 3.12。引擎不支援 3.10。
-- `ai-character-engine` 套件。它目前不在 PyPI 上，要從原始碼或 wheel 安裝。
+- Python 3.11 或 3.12（`.python-version` 是 3.12，uv 會自己下載）。
 - OpenAI 相容的 LLM 端點（LM Studio、Ollama 的 `/v1`、OpenAI 相容 API）。對話由引擎
   直接呼叫模型，所以 `claude_llm` 這類不相容的 provider 不能用；選了會在啟動時
   說明原因。
 
 ## 安裝
 
-建一個 3.12 的環境，把引擎裝進去。用另一個資料夾名稱可以不動原本的 `.venv`：
+引擎是 Tomoshibi 的一般依賴，`uv sync` 就會裝好（從 GitHub 裝，`pyproject.toml` 釘在
+一個 commit）。啟動照常：
 
 ```sh
-UV_PROJECT_ENVIRONMENT=.venv-engine uv sync --python 3.12
-uv pip install --python .venv-engine/bin/python -e ../ai-character-engine
+uv run run_server.py
 ```
 
-啟動時用這個環境：
+改引擎本身時，可以暫時換成本機的原始碼：
 
 ```sh
-.venv-engine/bin/python run_server.py
+uv pip install -e ../ai-character-engine
 ```
 
-`uv run` 預設用的是 `.venv`，不是這個環境；而 `uv sync` 會移除 lock 檔裡沒有的套件，
-引擎不在 lock 檔裡。所以用上面這種直接指定直譯器的方式啟動，更新依賴後要重裝引擎。
+下一次 `uv sync` 會換回 `pyproject.toml` 釘的那一版。
 
 ## 啟用
 

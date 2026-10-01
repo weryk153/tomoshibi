@@ -170,7 +170,7 @@
       "enableMcppHelp": "AI가 웹 검색 같은 도구를 사용할 수 있게 해요. 모든 모델이 지원하는 건 아니에요 — 도구 호출(function calling)을 지원하는 모델(GPT-4o / Claude / Gemini 또는 성능 좋은 로컬 빌드 등)이 필요해요. 작은 로컬 모델은 대개 사용하지 못하고 그냥 무시해요.",
       "mcppSaved": "웹 검색 / 도구 설정을 저장했어요. 백엔드를 다시 시작해야 적용돼요.",
       "enableEngine": "AI Character Engine이 대화를 이끌게 하기",
-      "enableEngineHelp": "대화할수록 당신에 대한 감정과 다음에 하고 싶은 일이 쌓이고, 기억과 목표는 엔진이 맡아요. Python 3.11 이상과 ai-character-engine 패키지가 필요해요. 백엔드를 다시 시작해야 적용돼요.",
+      "enableEngineHelp": "대화할수록 당신에 대한 감정과 다음에 하고 싶은 일이 쌓이고, 기억과 목표는 엔진이 맡아요. 백엔드를 다시 시작해야 적용돼요.",
       "engineSaved": "엔진 설정을 저장했어요. 백엔드를 다시 시작해야 적용돼요.",
       "engineEveryHelp": "백그라운드 작업을 몇 턴마다 실행할지 정해요. 0이면 꺼요. 각각 모델 호출이 한 번 늘어나니 느린 기기에서는 숫자를 키우세요.",
       "engine_emotion_every": "기분　매",

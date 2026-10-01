@@ -170,7 +170,7 @@
       "enableMcppHelp": "让 AI 能使用网络搜索等工具。并非每个模型都支持——需要支持工具调用（function calling）的模型，例如 GPT-4o / Claude / Gemini 或够强的本地版本。小型本地模型通常做不到，会直接忽略。",
       "mcppSaved": "已保存网络搜索／工具设置。需重新启动后端才会生效。",
       "enableEngine": "由 AI Character Engine 驱动对话",
-      "enableEngineHelp": "她对你的感觉、接下来想做的事会随着对话累积；记忆与目标由引擎负责。需要 Python 3.11 以上与 ai-character-engine 包。重新启动后端才会生效。",
+      "enableEngineHelp": "她对你的感觉、接下来想做的事会随着对话累积；记忆与目标由引擎负责。重新启动后端才会生效。",
       "engineSaved": "已保存引擎设置。需重新启动后端才会生效。",
       "engineEveryHelp": "每几轮跑一次后台工作；0 代表关闭。每一项都是多一次模型调用，机器慢的话把数字调大。",
       "engine_emotion_every": "情绪　每",

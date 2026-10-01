@@ -47,9 +47,8 @@ REPLY_TIMEOUT_SECONDS = 120.0
 
 UNAVAILABLE = (
     "character_engine_agent 需要 AI Character Engine（套件名 ai-character-engine），"
-    "而它要 Python 3.11 以上；目前是 Python {python}。\n"
-    "做法：用 3.11 或 3.12 建環境（uv sync --python 3.12），再把引擎裝進去"
-    "（uv pip install <引擎的路徑或 wheel>）。\n"
+    "它是 Tomoshibi 的依賴，卻沒有裝起來；目前是 Python {python}，引擎要 3.11 以上。\n"
+    "做法：在專案目錄執行 uv sync（.python-version 是 3.12，uv 會自己下載）。\n"
     "或者把 conf.yaml 的 conversation_agent_choice 改回 basic_memory_agent。\n"
     "原始錯誤：{error}"
 )
@@ -63,7 +62,7 @@ NOT_COMPATIBLE = (
 TOO_OLD = (
     "安裝的 AI Character Engine 太舊：這版 Tomoshibi 要引擎自己記得她說過的話"
     "（ai_character_engine.companion.SELF_MEMORY_LINE）。\n"
-    "做法：更新引擎（uv pip install -U <引擎的路徑或 wheel>），或把 conf.yaml 的 "
+    "做法：在專案目錄執行 uv sync 換回 pyproject.toml 釘的那一版，或把 conf.yaml 的 "
     "conversation_agent_choice 改回 basic_memory_agent。"
 )
 # conf.yaml 裡的名字 → 引擎的名字
