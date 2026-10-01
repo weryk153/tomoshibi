@@ -1,7 +1,7 @@
-"""效能模式也要調引擎背景工作的頻率。
+"""效能模式只調引擎背景工作的頻率與放在心上的數量。
 
-接引擎時真正影響速度的是情緒、記憶、目標、反思各幾輪跑一次；效能模式原本只
-調舊 agent 的核心記憶上限與整理頻率，在慢機器上選「輕量」引擎照跑不誤。
+接引擎時真正影響速度的是情緒、記憶、目標、反思各幾輪跑一次。語音辨識、聲音
+不歸效能模式管：以前選一次「高效能」就把聲音打回 edge-tts。
 """
 
 import shutil
@@ -40,13 +40,6 @@ def test_the_standard_preset_restores_the_engine_defaults(conf):
     )
 
 
-def test_a_preset_does_not_switch_the_engine_on_or_off(conf):
-    before = engine_config_route.read_engine_settings()["enabled"]
-    perf_route._apply_preset_bundle(perf_route.PRESETS["high"])
-
-    assert engine_config_route.read_engine_settings()["enabled"] is before
-
-
 def test_a_preset_no_longer_writes_the_old_memory_leaves(conf):
     """核心記憶上限與整理頻率只屬於拿掉的舊 agent；效能模式不再寫它們。"""
     for preset in perf_route.PRESETS.values():
@@ -55,3 +48,34 @@ def test_a_preset_no_longer_writes_the_old_memory_leaves(conf):
     text = conf.read_text(encoding="utf-8")
     assert "core_memory_max_chars" not in text
     assert "memory_consolidation_interval" not in text
+
+
+def test_a_preset_writes_only_performance_numbers(conf):
+    before = conf.read_text(encoding="utf-8")
+    perf_route._apply_preset_bundle(perf_route.PRESETS["light"])
+    after = conf.read_text(encoding="utf-8")
+
+    def leaf(text, key):
+        return [
+            line for line in text.splitlines() if line.strip().startswith(f"{key}:")
+        ]
+
+    for key in ("asr_model", "tts_model", "keep_alive"):
+        assert leaf(before, key) == leaf(after, key)
+
+
+def test_every_preset_sets_all_seven_numbers():
+    for preset in perf_route.PRESETS.values():
+        assert set(preset) == set(engine_config_route.EVERY_KEYS)
+
+
+def test_the_current_preset_is_recognised_and_anything_else_is_custom(conf):
+    perf_route._apply_preset_bundle(perf_route.PRESETS["high"])
+    assert perf_route._current_preset() == "high"
+    engine_config_route.write_engine_settings({"goal_every": 7})
+    assert perf_route._current_preset() == "custom"
+
+
+def test_keep_alive_is_gone():
+    assert not hasattr(perf_route, "_write_keep_alive")
+    assert not hasattr(perf_route, "_keep_alive_from_conf")

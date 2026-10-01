@@ -9,9 +9,8 @@
   分頁管的是瀏覽器端的麥克風與 VAD，跟後端用哪個引擎無關——引擎的選擇在這裡。
 - **語音合成引擎**（tts_config.tts_model）與 GPT-SoVITS 的參考音訊設定。
   text_split_method／batch_size 這些維持範本預設，不是使用者該面對的選擇。
-- **ollama_llm.keep_alive**：本地模型在記憶體裡待多久。
-- **記憶整理頻率**：memory_route 也有同一個設定的寫入端點，這裡再開一個是為了讓
-  「效能」分頁能一次調完，以及讓預設包能整批套用。
+- **效能預設**：一次套用一組引擎背景工作的頻率與放在心上的數量。只碰這些數字，
+  不碰語音辨識與聲音。
 
 兩件跟正確性有關的事：
 
@@ -25,7 +24,6 @@ restart_required 對這裡的每一個改動都是誠實的 True：引擎設定�
 
 import asyncio
 import os
-from pathlib import Path
 from typing import Any, Optional
 
 from fastapi import APIRouter, Request
@@ -41,10 +39,8 @@ from .api_guard import (
 from .conf_editor import (
     CONF_PATH,
     block_extent,
-    nested_extent,
     sub_block_extent as _sub_block_extent,
     read_conf_lines as _read_conf_lines,
-    rewrite_int_leaf as _rewrite_int_leaf,
     rewrite_str_leaf as _rewrite_leaf,
     write_conf as _write_conf,
 )
@@ -75,53 +71,53 @@ TTS_MODELS = {"edge_tts", "gpt_sovits_tts"}
 # comment), plus 'auto' for GPT-SoVITS's own language auto-detection.
 GPT_SOVITS_LANGS = {"zh", "en", "ja", "ko", "yue", "auto"}
 
-# keep_alive: -1 = pin in RAM forever; 0 = unload immediately; otherwise seconds.
-KEEP_ALIVE_MIN = -1
-KEEP_ALIVE_MAX = 86400  # 24h hard ceiling
-
-
-# 效能預設：一組挑好的數值，走的是底下那些既有的寫入器，不是另一條捷徑。
+# 效能預設：引擎背景工作每幾輪跑一次，以及她同時放在心上的目標／想法數量。
 #
-# 預設只是**起點**。套用之後每個控制項照樣可以個別調整，而且不點就完全不會動——
-# conf.yaml 出廠的值不受影響。
+# 只寫這幾個數字。語音辨識、聲音不歸效能預設管：以前三個預設都寫死 edge-tts，
+# 選一次「高效能」就把訓練好的聲音打回內建語音。標準＝出廠預設
+# （engine_config_route.EVERY_DEFAULTS）。
 PRESETS: dict[str, dict[str, Any]] = {
-    # 輕量：弱機 / 共用機。最省。
+    # 輕量：弱機 / 共用機。每一項背景工作都是多一次模型呼叫。
     "light": {
-        "asr_model": "sherpa_onnx_asr",
-        "tts_model": "edge_tts",
-        "keep_alive": 300,
-        # 引擎的背景工作：每一項都是多一次模型呼叫。
         "emotion_every": 2,
         "memory_every": 3,
         "self_memory_every": 3,
         "goal_every": 8,
         "reflection_every": 12,
+        "goals_shown": 2,
+        "thoughts_shown": 1,
     },
-    # 標準：預設值（基本等於出廠的輕量預設）。
     "standard": {
-        "asr_model": "sherpa_onnx_asr",
-        "tts_model": "edge_tts",
-        "keep_alive": 1800,
         "emotion_every": 1,
         "memory_every": 2,
         "self_memory_every": 2,
         "goal_every": 4,
         "reflection_every": 6,
+        "goals_shown": 3,
+        "thoughts_shown": 2,
     },
-    # 高效能：強機。ASR 維持內建的 sherpa_onnx_asr（離線、零額外相依）——不換成
-    # faster_whisper，因為它的相依沒打包進來、換了一重開就起不來。「高效能」差別在
-    # 記憶體 / keep_alive 這些旋鈕。TTS 也不自動換 gpt_sovits（需外部服務 + 參考音檔）。
+    # 高效能：強機，或背景工作另外交給一台電腦的模型。
     "high": {
-        "asr_model": "sherpa_onnx_asr",
-        "tts_model": "edge_tts",
-        "keep_alive": 3600,
         "emotion_every": 1,
         "memory_every": 1,
         "self_memory_every": 1,
         "goal_every": 3,
         "reflection_every": 4,
+        "goals_shown": 4,
+        "thoughts_shown": 3,
     },
 }
+
+
+def _current_preset() -> str:
+    """目前的數字正好是哪一個預設；都對不上就是 custom。"""
+    from .engine_config_route import EVERY_KEYS, read_engine_settings
+
+    now = read_engine_settings()
+    for name, bundle in PRESETS.items():
+        if all(int(now[key]) == int(bundle[key]) for key in EVERY_KEYS):
+            return name
+    return "custom"
 
 
 # --- 讀設定 ----------------------------------------------------------------- #
@@ -186,59 +182,6 @@ def _tts_from_conf() -> dict:
     except Exception:
         pass
     return out
-
-
-def _engine_overrides_by_character() -> dict:
-    """哪些角色檔自己釘了引擎。
-
-    角色一被載入，它自己的 asr_config／tts_config 就整個取代 conf.yaml 的——
-    init_tts／init_asr 讀的是角色那一份，不是全域那一份。
-
-    所以在這一頁選的引擎，下次切換角色時可能無聲無息被換回去，而畫面上沒有任何
-    線索。回報這些覆寫，UI 才能事先講清楚哪些設定其實不會生效——否則使用者會花
-    一個晚上想不通為什麼聲音一直沒變。
-
-    用 conf_name 當鍵：那是前端已經握有的東西（來自 set-model-and-conf）。
-    """
-    overrides: dict[str, dict[str, str]] = {}
-    characters_dir = Path("characters")
-    if not characters_dir.is_dir():
-        return overrides
-    for entry in sorted(characters_dir.glob("*.yaml")):
-        try:
-            data = read_yaml(str(entry)) or {}
-        except Exception:
-            continue
-        character = data.get("character_config", {}) or {}
-        name = str(character.get("conf_name") or entry.stem)
-        pinned = {}
-        tts_model = (character.get("tts_config", {}) or {}).get("tts_model")
-        if tts_model:
-            pinned["tts_model"] = str(tts_model)
-        asr_model = (character.get("asr_config", {}) or {}).get("asr_model")
-        if asr_model:
-            pinned["asr_model"] = str(asr_model)
-        if pinned:
-            overrides[name] = pinned
-    return overrides
-
-
-def _keep_alive_from_conf() -> int:
-    """讀本機模型在記憶體裡留多久（秒；-1 代表一直留著）。"""
-    try:
-        data = _load_plain()
-        ka = (
-            data.get("character_config", {})
-            .get("agent_config", {})
-            .get("llm_configs", {})
-            .get("ollama_llm", {})
-            .get("keep_alive")
-        )
-        if ka is None:
-            return 1800
-        return int(ka)
-    except Exception:
-        return 1800
 
 
 # --- 寫設定 ----------------------------------------------------------------- #
@@ -337,20 +280,6 @@ def _write_tts(
             }
         },
     )
-
-
-def _write_keep_alive(keep_alive: int) -> bool:
-    """改寫 ollama_llm.keep_alive（模型在記憶體裡留多久，秒；-1 代表永遠）。
-
-    路徑是 agent_config → llm_configs → ollama_llm。逐層鑽是必要的：keep_alive
-    這種名字在別的供應商區塊底下也可能出現。
-    """
-    lines = _read_conf_lines()
-    start, end = nested_extent(lines, "agent_config", "llm_configs", "ollama_llm")
-    if not _rewrite_int_leaf(lines, start, end, "keep_alive", keep_alive):
-        raise KeyError("keep_alive leaf not found in ollama_llm")
-    _write_conf(lines)
-    return True
 
 
 # --------------------------------------------------------------------------- #
@@ -483,10 +412,9 @@ def _reference_voices() -> list:
 def init_perf_route() -> APIRouter:
     """引擎與硬體設定的端點。只接受可信來源。
 
-    - GET  /api/perf                  -> ASR/TTS engine + creds(masked) + keep_alive
+    - GET  /api/perf                  -> ASR/TTS engine + creds(masked) + current preset
     - POST /api/perf/asr              -> set asr_model + cloud creds
     - POST /api/perf/tts              -> set tts_model + gpt_sovits fields
-    - POST /api/perf/keep-alive       -> set ollama keep_alive
     - POST /api/perf/preset           -> apply a named preset bundle (atomic, one write)
     """
 
@@ -502,15 +430,12 @@ def init_perf_route() -> APIRouter:
             {
                 **asr,
                 **tts,
-                "keep_alive": _keep_alive_from_conf(),
-                "keep_alive_min": KEEP_ALIVE_MIN,
-                "keep_alive_max": KEEP_ALIVE_MAX,
                 "asr_models": sorted(ASR_MODELS),
                 "tts_models": sorted(TTS_MODELS),
                 "gpt_sovits_langs": sorted(GPT_SOVITS_LANGS),
                 "reference_voices": _reference_voices(),
                 "presets": sorted(PRESETS.keys()),
-                "engine_overrides_by_character": _engine_overrides_by_character(),
+                "current_preset": _current_preset(),
             }
         )
 
@@ -597,38 +522,12 @@ def init_perf_route() -> APIRouter:
         logger.info(f"[perf] tts saved (model={tts_model})")
         return JSONResponse({"ok": True, **_tts_from_conf(), "restart_required": True})
 
-    @router.post("/api/perf/keep-alive")
-    async def set_keep_alive(request: Request):
-        """本地模型在記憶體裡待多久（秒；-1 代表一直留著）。"""
-        if not _is_local_request(request):
-            return _forbidden()
-        body, bad = await _parse_body(request)
-        if bad:
-            return bad
-
-        keep_alive, bad = _bounded_int(
-            body, "keep_alive", KEEP_ALIVE_MIN, KEEP_ALIVE_MAX
-        )
-        if bad:
-            return bad
-
-        bad = await _write_or_error(
-            _write_keep_alive, keep_alive, what="keep_alive write"
-        )
-        if bad:
-            return bad
-
-        logger.info(f"[perf] keep_alive saved (keep_alive={keep_alive})")
-        return JSONResponse(
-            {"ok": True, "keep_alive": keep_alive, "restart_required": True}
-        )
-
     @router.post("/api/perf/preset")
     async def apply_preset(request: Request):
         """套用一組具名的預設（輕量／標準／高效能），一次寫入。
 
-        預設碰到的每個葉節點都已經存在，所以一次掃描全部改完——不會出現改到一半
-        的中間狀態。套用之後每個控制項還是可以個別調整，預設只是起點。
+        一次讀、一次寫，不會出現改到一半的中間狀態。套用之後每個數字還是可以個別
+        調整，對不上任何預設時 GET 會說 custom。
         """
         if not _is_local_request(request):
             return _forbidden()
@@ -661,40 +560,10 @@ def init_perf_route() -> APIRouter:
 
 
 def _apply_preset_bundle(bundle: dict) -> bool:
-    """一次寫入把整組預設值全部套用。
-
-    Reads the file once, rewrites every targeted leaf in-place (scoped to the right
-    block extent), then one atomic write — so there is no partial-apply window. All
-    leaves pre-exist in conf.yaml (validated by the surgical writers, which raise
-    KeyError if a leaf is missing -> the whole apply fails cleanly, nothing written).
-    """
+    """一次寫入把整組預設值全部套用：讀一次、改引擎那幾個數字、寫一次。"""
 
     with open(CONF_PATH, "r", encoding="utf-8") as f:
         lines = f.readlines()
-
-    # --- asr_model (re-find extent on the current lines; line count unchanged) ---
-    if "asr_model" in bundle:
-        asr_start, asr_end = _asr_config_extent(lines)
-        if not _rewrite_leaf(
-            lines, asr_start, asr_end, "asr_model", str(bundle["asr_model"])
-        ):
-            raise KeyError("asr_model leaf not found")
-
-    # --- tts_model ---
-    if "tts_model" in bundle:
-        tts_start, tts_end = _tts_config_extent(lines)
-        if not _rewrite_leaf(
-            lines, tts_start, tts_end, "tts_model", str(bundle["tts_model"])
-        ):
-            raise KeyError("tts_model leaf not found")
-
-    # --- ollama 的 keep_alive（鑽三層）---
-    if "keep_alive" in bundle:
-        start, end = nested_extent(lines, "agent_config", "llm_configs", "ollama_llm")
-        if not _rewrite_int_leaf(
-            lines, start, end, "keep_alive", int(bundle["keep_alive"])
-        ):
-            raise KeyError("keep_alive leaf not found")
 
     # --- 引擎背景工作的頻率（接 character_engine_agent 時真正影響速度的是這幾個）---
     from .engine_config_route import EVERY_KEYS, apply_engine_settings

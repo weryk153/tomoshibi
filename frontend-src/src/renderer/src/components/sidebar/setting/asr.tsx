@@ -54,7 +54,6 @@ import {
 import { Button } from '@/components/ui/tw/primitives';
 import { toaster } from '@/components/ui/tw/toaster';
 import { useWebSocket } from '@/context/websocket-context';
-import { useConfig } from '@/context/character-config-context';
 import {
   fetchPerf,
   setAsrModel,
@@ -94,7 +93,6 @@ const CREDENTIAL_ENGINES = new Set(['groq_whisper_asr', 'azure_asr']);
 function ASR({active = true}: ASRProps): JSX.Element {
   const { t } = useTranslation();
   const { baseUrl } = useWebSocket();
-  const { confName } = useConfig();
   const {
     localSettings,
     autoStopMic,
@@ -157,10 +155,6 @@ function ASR({active = true}: ASRProps): JSX.Element {
   const [perf, setPerf] = useState<PerfState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [engineSaving, setEngineSaving] = useState(false);
-
-  // 只在目前這個角色真的釘了引擎時才警告，理由同 tts.tsx。
-  const asrCharacterOverride = perf?.engine_overrides_by_character?.[confName]?.asr_model
-    || null;
 
   // 選了 groq/azure 但還沒連同憑證送出時的本機草稿——不是 null 就代表「畫面
   // 上選的引擎」跟「conf.yaml 現在真正生效的引擎」（perf.asr_model）不一致，
@@ -527,16 +521,6 @@ function ASR({active = true}: ASRProps): JSX.Element {
             影響——分頁裡同時存在三種存檔機制，光靠操作當下彈出的 toast 不夠，
             使用者需要隨時能看到「這格歸誰管」。 */}
         <Text fontSize="xs" color="blue.300">{t('settings.perf.asrEngineSectionNote')}</Text>
-        {/* 角色檔自己的 asr_config 會蓋掉這裡選的引擎，跟 tts.tsx 同一個
-            陷阱——選了、存了、卻沒有生效，畫面上卻沒有任何線索。 */}
-        {asrCharacterOverride && (
-          <Text fontSize="xs" color="orange.300">
-            {t('settings.perf.asrCharacterOverride', {
-              character: confName,
-              engine: asrCharacterOverride,
-            })}
-          </Text>
-        )}
         <Text fontSize="xs" color="whiteAlpha.600">{t('settings.perf.asrEngineHelp')}</Text>
 
         {loadError && (
