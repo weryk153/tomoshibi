@@ -14,7 +14,7 @@
 //    由抽屜驅動。這個區塊自己的按鈕就放在這個小節結尾，緊接在 VAD 欄位
 //    之後、引擎選擇區塊之前。
 // 2. 引擎下拉選單（下半部）：只有 sherpa_onnx_asr／faster_whisper 兩個不需要
-//    憑證的選項才會「切換當下」即時打 API（跟 perf.tsx 的 keep_alive 模式
+//    憑證的選項才會「切換當下」即時打 API（跟其他即時存檔的下拉選單
 //    同一種模式）。
 // 3. 需要憑證的雲端引擎（groq_whisper_asr／azure_asr）：選了不會立刻送出，
 //    只是记成本機草稿（pendingEngine），必须連同憑證一起按下面的「儲存」
@@ -278,7 +278,7 @@ function ASR({active = true}: ASRProps): JSX.Element {
   //   handleSaveCredentials），conf.yaml 才會被改——那個函式會擋下「還沒有
   //   任何可用憑證」的送出，見它旁邊的 disabled 判斷。
   // - 選到 sherpa_onnx_asr／faster_whisper：兩個都不需要憑證，切換當下就能
-  //   真的動作，沿用即時存檔（跟 perf.tsx 的 keep_alive 模式同一種模式）。
+  //   真的動作，沿用即時存檔（跟其他下拉選單同一種模式）。
   const handleEngineChange = useCallback(async (value: string[]) => {
     const model = value[0];
     if (!model || !perf) return;
@@ -314,7 +314,7 @@ function ASR({active = true}: ASRProps): JSX.Element {
     }
   }, [baseUrl, perf, applySaveResult, t]);
 
-  // 憑證是文字輸入框，不做每個按鍵都送出——跟 perf.tsx 的自訂 keep_alive 秒數
+  // 憑證是文字輸入框，不做每個按鍵都送出——跟其他文字輸入框
   // 同一種模式，要有明確的「儲存」按鈕使用者才知道自己送出了什麼。
   //
   // 有 pendingEngine（使用者選了一個還沒送出的 groq/azure）時，這次連同

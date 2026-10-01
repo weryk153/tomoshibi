@@ -60,7 +60,7 @@ export interface AsrSaveResult {
 }
 
 // POST /api/perf/asr：只送 asr_model。引擎選擇是離散的下拉選單值，切換當下
-// 就送出（跟 perf.tsx 的 keep_alive 模式切換同一種即時存檔），不需要額外的
+// 就送出（即時存檔），不需要額外的
 // 存檔按鈕。
 export const setAsrModel = (baseUrl: string, model: string): Promise<ApiResult<AsrSaveResult>> =>
   apiPost<AsrSaveResult>(baseUrl, '/api/perf/asr', { asr_model: model })
