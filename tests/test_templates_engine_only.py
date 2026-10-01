@@ -21,3 +21,8 @@ def test_a_template_is_engine_only_and_valid(path):
     assert agent.conversation_agent_choice == "character_engine_agent"
     assert agent.agent_settings.conversation is not None
     assert agent.agent_settings.character_engine_agent is not None
+
+
+@pytest.mark.parametrize("path", TEMPLATES)
+def test_a_template_has_no_dead_keep_alive(path):
+    assert "keep_alive" not in open(path, encoding="utf-8").read()

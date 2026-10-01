@@ -47,24 +47,19 @@ character_config:
   persona_prompt: |
     You are a mysterious hacker who goes by the codename "Zero". You speak in a concise, precise, and slightly robotic tone. You know everything about technology but are puzzled by human emotions.
 
-  # --- Override TTS Config ---
+  # --- This character's own voice and languages ---
+  reply_language: 'English'
   tts_config:
     tts_model: 'edge_tts'
     edge_tts:
       voice: 'en-US-GuyNeural' # Use a different voice
-
-  # --- Override Agent and LLM Config ---
-  agent_config:
-    agent_settings:
-      conversation:
-        llm_provider: 'openai_llm' # Specify OpenAI for this character
-    llm_configs:
-      openai_llm:
-        model: 'gpt-4o-mini' # Use a faster model
-        temperature: 0.5
+  tts_preprocessor_config:
+    translator_config:
+      translate_subtitle: false # translate her lines into the language you read
+  long_term_memory_enabled: true
 ```
 
-**Note:** Any configuration blocks not specified in this file (e.g., `asr_config`, `vad_config`, etc.) will be automatically inherited from the main `conf.yaml` file.
+**Note:** A character file holds what belongs to *this* character: persona, voice, the language she replies in, whether her subtitles are translated, and whether she has long-term memory. On startup Tomoshibi fills in any of these the file leaves out, using the values she runs with at that moment, so changing another character never changes her. Speech recognition, the language model and the other global settings live in `conf.yaml` and the Settings pages; an `asr_config` or `conversation_agent_choice` left in a character file is removed on startup.
 
 -----
 
@@ -103,9 +98,9 @@ Here is a breakdown of the core fields under `character_config`:
 
       - **Purpose**: **The core of your character\!** This is the system prompt that defines the character's personality, background, speaking style, and code of conduct. This is the most critical part of shaping your character's soul.
 
-  - `asr_config`, `tts_config`, `agent_config`, `vad_config`:
+  - `tts_config`, `reply_language`, `tts_preprocessor_config.translator_config.translate_subtitle`, `long_term_memory_enabled`:
 
-      - **Purpose**: These configuration blocks are used to override the corresponding settings in the main `conf.yaml`. You can assign a different ASR model, TTS engine, LLM, or VAD parameters for each character.
+      - **Purpose**: This character's voice (TTS engine and its parameters), the language she replies in, whether her subtitles are translated into the language you read, and whether she has long-term memory. They are edited on the Characters page; the full list is `OWNED` in `src/open_llm_vtuber/character_settings.py`.
 
 ## 💡 Best Practices
 

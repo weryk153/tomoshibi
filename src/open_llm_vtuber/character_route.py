@@ -12,9 +12,10 @@
   硬碟上沒人認領。
 - **檔名一律是 ASCII slug**（mili.yaml），中文顯示名字放在 conf_name。這樣可以
   完全避開網址與路徑組合的邊界情況。
-- **底稿 conf.yaml 在這裡是唯讀的。** 角色檔是我們自己產生的，沒有使用者寫的
-  註解要保護，所以整份用 ruamel 序列化就好；conf.yaml 不一樣，它有滿滿的註解，
-  絕不從這裡改寫。
+- **底稿 conf.yaml 只用 round-trip 改指定的鍵。** 角色檔是我們自己產生的，整份
+  用 ruamel 序列化就好；conf.yaml 滿是使用者寫的註解，只改表單擁有的那幾個葉節點
+  （_update_base_character_config）。兩個開關（字幕翻譯、長期記憶）走
+  character_settings。
 
 寫入一律「先寫暫存檔再 os.replace」，避免存到一半斷電留下半個角色。
 """
@@ -398,7 +399,7 @@ def _build_character_config(
             tts = cc.setdefault("tts_config", {})
             tts.setdefault("gpt_sovits_tts", {})[key] = value
     # 引擎：留空＝不釘，角色沿用 conf.yaml 的 tts_model（deep_merge 時繼承）。
-    # 這是唯一會寫 tts_config.tts_model 的地方。
+    # tts_model 只有角色表單會寫（語音合成頁與一鍵安裝只設服務位址）。
     if tts_model:
         cc.setdefault("tts_config", {})["tts_model"] = tts_model
     return cc
