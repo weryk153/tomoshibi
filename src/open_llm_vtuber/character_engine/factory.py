@@ -40,8 +40,8 @@ UNKNOWN_WINDOW_TOKENS = 16384
 WINDOW_PROBES = 5
 # 一輪可以包含工具呼叫（搜尋網頁要十幾秒）再加一段長回覆。
 TURN_TIMEOUT_SECONDS = 180.0
-# basic_memory_agent 留 20000 字、至少 24 則。語音對話一句很短，引擎預設的 40 則
-# 會比原本更早忘記前面講過的；真的太長的時候引擎會照 token 預算自己挑。
+# 語音對話一句很短，引擎預設的 40 則會太早忘記前面講過的；真的太長的時候引擎
+# 會照 token 預算自己挑。
 HISTORY_MESSAGES = 80
 REPLY_TIMEOUT_SECONDS = 120.0
 
@@ -49,21 +49,19 @@ UNAVAILABLE = (
     "character_engine_agent 需要 AI Character Engine（套件名 ai-character-engine），"
     "它是 Tomoshibi 的依賴，卻沒有裝起來；目前是 Python {python}，引擎要 3.11 以上。\n"
     "做法：在專案目錄執行 uv sync（.python-version 是 3.12，uv 會自己下載）。\n"
-    "或者把 conf.yaml 的 conversation_agent_choice 改回 basic_memory_agent。\n"
     "原始錯誤：{error}"
 )
 NOT_COMPATIBLE = (
     "character_engine_agent 的對話由引擎直接呼叫模型，目前只支援 OpenAI 相容的端點"
     "（lmstudio_llm、ollama 的 /v1、openai_compatible_llm…），而且要有 base_url 與 "
     "model。目前的 llm_provider 是 {provider}。\n"
-    "做法：換一個 OpenAI 相容的 llm_provider，或把 conversation_agent_choice 改回 "
-    "basic_memory_agent。"
+    "做法：換一個 OpenAI 相容的 llm_provider（LM Studio、Ollama 的 /v1、"
+    "OpenAI 相容 API）。"
 )
 TOO_OLD = (
     "安裝的 AI Character Engine 太舊：這版 Tomoshibi 要引擎自己記得她說過的話"
     "（ai_character_engine.companion.SELF_MEMORY_LINE）。\n"
-    "做法：在專案目錄執行 uv sync 換回 pyproject.toml 釘的那一版，或把 conf.yaml 的 "
-    "conversation_agent_choice 改回 basic_memory_agent。"
+    "做法：在專案目錄執行 uv sync 換回 pyproject.toml 釘的那一版。"
 )
 # 背景工作（情緒、記憶、目標…）另外用的端點。不是引擎的設定，先從設定裡拿出來。
 BACKGROUND_KEYS = ("background_base_url", "background_model", "background_api_key")

@@ -94,14 +94,10 @@ class CharacterEngineAgent(AgentInterface):
         conf_uid: str = "",
         character_name: str = "",
         now: Callable[[], datetime] = datetime.now,
-        **_basic_agent_only,
     ):
         """companion 可以是 CharacterCompanion 本身，或是一個每次回傳「目前那一個」
         的函式。正式執行時給的是函式：設定變了引擎那一側會換一個，而舊的 agent
         還被別的連線拿著。
-
-        其餘參數跟 BasicMemoryAgent 同名同義，agent_factory 給兩者的是同一包；
-        用不到的（llm、interrupt_method…）收下不用。
         """
         self._companion_source = companion
         self._player_language = player_language
@@ -337,7 +333,7 @@ class CharacterEngineAgent(AgentInterface):
         await self._companion().remember_remark(conversation, self._remembered(remark))
 
     def _remembered(self, reply: str) -> str:
-        """她記得自己說了什麼。跟 BasicMemoryAgent._add_message 同一套：表情與動作
+        """她記得自己說了什麼：表情與動作
         標籤留著（她得讀到自己會做表情），演出標籤拿掉，字形跟畫面一致。"""
         return normalize_output_language_variant(
             deduplicate_response_text(strip_stage_performance_tag(tidy_marks(reply))),

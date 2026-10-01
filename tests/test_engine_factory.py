@@ -351,7 +351,7 @@ def test_saving_settings_while_she_talks_lets_her_finish(monkeypatch):
 
 
 def test_she_keeps_as_much_of_the_conversation_as_the_basic_agent():
-    """basic_memory_agent 留 20000 字、至少 24 則。引擎預設 40 則，語音對話一句
+    """引擎預設 40 則，語音對話一句
     很短，會比原本更早忘記前面講過的。"""
     default = AgentFactory.create_agent(**factory_arguments())._companion()
     assert default.settings.max_history_messages == 80
@@ -410,7 +410,7 @@ def test_a_provider_the_engine_cannot_talk_to_is_refused_with_the_way_out():
     with pytest.raises(ValueError) as caught:
         AgentFactory.create_agent(**arguments)
 
-    assert "basic_memory_agent" in str(caught.value)
+    assert "OpenAI 相容" in str(caught.value)
 
 
 def test_turning_long_term_memory_off_stops_the_engine_remembering_too():

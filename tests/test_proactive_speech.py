@@ -3,10 +3,7 @@ from types import SimpleNamespace
 
 import pytest
 
-import src.open_llm_vtuber.agent.agents.basic_memory_agent as basic_memory_module
-from src.open_llm_vtuber.agent.agents.basic_memory_agent import BasicMemoryAgent
 from src.open_llm_vtuber.agent.input_types import BatchInput, TextData, TextSource
-from src.open_llm_vtuber.config_manager import TTSPreprocessorConfig
 from src.open_llm_vtuber.conversation_quality import (
     build_turn_guidance,
     is_generic_assistant_boilerplate,
@@ -33,25 +30,6 @@ from src.open_llm_vtuber.proactive_context import (
 )
 
 
-class _FakeLLM:
-    async def chat_completion(self, messages, system=None, tools=None):
-        yield "接著剛才的話題聊。"
-
-
-class _FakeLive2D:
-    @staticmethod
-    def extract_emotion(_text):
-        return None
-
-    @staticmethod
-    def extract_emotion_keys(_text):
-        return []
-
-    @staticmethod
-    def extract_motions(_text):
-        return None
-
-
 class _FakeVisionFactLLM:
     def __init__(self):
         self.messages = None
@@ -64,128 +42,11 @@ class _FakeVisionFactLLM:
         yield "- 底部是終端機"
 
 
-def _tts_config() -> TTSPreprocessorConfig:
-    return TTSPreprocessorConfig(
-        remove_special_char=True,
-        translator_config={
-            "translate_audio": False,
-            "translate_provider": "deeplx",
-        },
-    )
-
-
 def _batch(text: str, *, skip_memory: bool) -> BatchInput:
     return BatchInput(
         texts=[TextData(source=TextSource.INPUT, content=text)],
         metadata={"skip_memory": skip_memory},
     )
-
-
-async def _drain(agent: BasicMemoryAgent, batch: BatchInput) -> None:
-    async for _ in agent.chat(batch):
-        pass
-
-
-def test_proactive_turn_does_not_pollute_normal_agent_memory():
-    agent = BasicMemoryAgent(
-        llm=_FakeLLM(),
-        system="system",
-        live2d_model=_FakeLive2D(),
-        tts_preprocessor_config=_tts_config(),
-    )
-    agent._memory = [
-        {"role": "user", "content": "我正在做一個桌面夥伴"},
-        {"role": "assistant", "content": "最難的是哪一段？"},
-    ]
-    before = list(agent._memory)
-
-    asyncio.run(_drain(agent, _batch("主動續話", skip_memory=True)))
-
-    assert agent._memory == before
-
-
-def test_normal_turn_still_enters_agent_memory():
-    agent = BasicMemoryAgent(
-        llm=_FakeLLM(),
-        system="system",
-        live2d_model=_FakeLive2D(),
-        tts_preprocessor_config=_tts_config(),
-    )
-
-    asyncio.run(_drain(agent, _batch("繼續", skip_memory=False)))
-
-    assert agent._memory == [
-        {"role": "user", "content": "繼續"},
-        {"role": "assistant", "content": "接著剛才的話題聊。"},
-    ]
-
-
-def test_recent_real_exchange_can_anchor_a_proactive_turn():
-    agent = BasicMemoryAgent(
-        llm=_FakeLLM(),
-        system="system",
-        live2d_model=_FakeLive2D(),
-        tts_preprocessor_config=_tts_config(),
-    )
-    agent._memory = [
-        {"role": "user", "content": "我剛把重複原因找到了"},
-        {"role": "assistant", "content": "原來藏在記憶流程裡。"},
-    ]
-
-    assert agent.get_recent_context_for_proactive() == (
-        "使用者：我剛把重複原因找到了\n角色：原來藏在記憶流程裡。"
-    )
-
-
-def test_next_real_user_turn_can_reply_to_latest_proactive_remark():
-    agent = BasicMemoryAgent(
-        llm=_FakeLLM(),
-        system="system",
-        live2d_model=_FakeLive2D(),
-        tts_preprocessor_config=_tts_config(),
-    )
-    batch = BatchInput(
-        texts=[TextData(source=TextSource.INPUT, content="好啊")],
-        metadata={"previous_proactive_response": "要不要先重新打開 Bionic？"},
-    )
-
-    messages = agent._to_messages(batch)
-
-    assert messages[-2] == {
-        "role": "assistant",
-        "content": "要不要先重新打開 Bionic？",
-    }
-    assert messages[-1]["content"][0]["text"] == "好啊"
-    assert agent._memory == [{"role": "user", "content": "好啊"}]
-
-
-def test_proactive_bridge_merges_with_prior_assistant_for_valid_role_order():
-    agent = BasicMemoryAgent(
-        llm=_FakeLLM(),
-        system="system",
-        live2d_model=_FakeLive2D(),
-        tts_preprocessor_config=_tts_config(),
-    )
-    agent._memory = [
-        {"role": "user", "content": "我找到重複原因了"},
-        {"role": "assistant", "content": "原來藏在記憶流程裡。"},
-    ]
-    batch = BatchInput(
-        texts=[TextData(source=TextSource.INPUT, content="嗯，再一下")],
-        metadata={"previous_proactive_response": "你已經寫兩小時了，記得休息。"},
-    )
-
-    messages = agent._to_messages(batch)
-
-    assert [message["role"] for message in messages] == [
-        "user",
-        "assistant",
-        "user",
-    ]
-    assert messages[-2]["content"] == (
-        "原來藏在記憶流程裡。\n\n你已經寫兩小時了，記得休息。"
-    )
-    assert messages[-1]["content"][0]["text"] == "嗯，再一下"
 
 
 def test_pending_proactive_remark_is_consumed_only_once():
@@ -223,37 +84,6 @@ def test_long_proactive_reply_keeps_enough_tail_for_the_users_next_reply():
             "long-reply-client",
         )[0]
     )
-
-
-def test_loading_old_history_omits_proactive_assistant_run(monkeypatch):
-    monkeypatch.setattr(
-        basic_memory_module,
-        "get_history",
-        lambda _conf_uid, _history_uid: [
-            {"role": "system", "content": "UI marker"},
-            {"role": "human", "content": "我正在修主動對話"},
-            {"role": "ai", "content": "目前卡在哪裡？"},
-            {"role": "ai", "content": "最近有什麼新鮮事？"},
-            {"role": "ai", "content": "工作還順利嗎？"},
-            {"role": "human", "content": "它一直重複"},
-            {"role": "ai", "content": "那要先隔離主動訊息。"},
-        ],
-    )
-    agent = BasicMemoryAgent(
-        llm=_FakeLLM(),
-        system="system",
-        live2d_model=_FakeLive2D(),
-        tts_preprocessor_config=_tts_config(),
-    )
-
-    agent.set_memory_from_history("character", "old-history")
-
-    assert agent._memory == [
-        {"role": "user", "content": "我正在修主動對話"},
-        {"role": "assistant", "content": "目前卡在哪裡？"},
-        {"role": "user", "content": "它一直重複"},
-        {"role": "assistant", "content": "那要先隔離主動訊息。"},
-    ]
 
 
 def test_short_idle_prioritizes_continuing_the_current_topic():
