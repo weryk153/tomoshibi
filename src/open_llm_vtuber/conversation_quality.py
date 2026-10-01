@@ -163,10 +163,6 @@ def is_repetitive_response_segment(text: str, previous_segments: list[str]) -> b
     return False
 
 
-# 句子切分：在句末標點之後切開，標點留在前一段。
-SENTENCE_SPLIT_RE = re.compile(r"(?<=[。！？!?；;\n])")
-
-
 class ResponseRepetitionGuard:
     """Track accepted sentence fragments for one response stream.
 
@@ -308,30 +304,6 @@ def build_turn_guidance(text: str, *, is_proactive: bool = False) -> str:
         if hint:
             return hint
     return ""
-
-
-def is_generic_assistant_boilerplate(text: str) -> bool:
-    """Detect canned support closings without imposing a character personality."""
-    normalized = " ".join(str(text or "").split())
-    generic_phrases = (
-        "有什麼可以幫",
-        "有什麼我可以幫",
-        "有什麼想聊",
-        "如果還有其他問題",
-        "如果需要進一步",
-        "如果你需要任何",
-        "需要幫忙的話",
-        "隨時告訴我",
-        "隨時問我",
-        "請隨時",
-        "我很樂意聆聽並提供幫助",
-        "提供幫助或討論其他話題",
-        "希望我們的交流能",
-        "請告訴我你現在最關心",
-        "我可以盡力回答",
-        "祝你程式編寫一切順利",
-    )
-    return any(phrase in normalized for phrase in generic_phrases)
 
 
 def _is_taiwan_traditional(language: str | None) -> bool:

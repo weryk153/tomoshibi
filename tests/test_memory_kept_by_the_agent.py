@@ -103,18 +103,6 @@ def test_the_page_sends_the_starting_point():
     assert api.count("edited_from: editedFrom") == 2
 
 
-def test_an_agent_that_keeps_her_own_memory_gets_no_consolidation():
-    """引擎記得對方、也記得她自己說過什麼：主機那一套整理（一次模型呼叫，跟她的
-    回覆搶同一顆本機模型）整個不用做。"""
-    import inspect
-
-    from src.open_llm_vtuber.conversations import single_conversation
-
-    src = inspect.getsource(single_conversation.process_single_conversation)
-
-    assert 'not hasattr(context.agent_engine, "self_memory")' in src
-
-
 def test_the_agents_memory_is_not_held_up_by_the_hosts_consolidation():
     """實機：整理「她自己的記憶」跑到一半（最長 60 秒）時按下清除，記憶頁回 503
     「記憶正在整理中」。整理碰的是 self_memory.md，跟引擎的記憶無關，不用等它。"""

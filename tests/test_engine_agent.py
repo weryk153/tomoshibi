@@ -959,16 +959,6 @@ def test_a_reply_the_host_threw_away_is_not_kept_when_it_asks_again(tmp_path):
     ]
 
 
-def test_the_retry_after_the_guard_tells_the_agent_to_redo():
-    import inspect
-
-    from src.open_llm_vtuber.conversations import single_conversation
-
-    src = inspect.getsource(single_conversation.process_single_conversation)
-
-    assert 'metadata={**agent_metadata, "redo": True},' in src
-
-
 def test_she_speaks_up_through_the_engine_with_the_hosts_material(tmp_path):
     """主動開口改由引擎決定講什麼：主機那一大段指示不送，只送素材（話題、新聞、
     查到的資料）。說出口的那句由主機過濾後再記（remember_remark），引擎不先記。"""

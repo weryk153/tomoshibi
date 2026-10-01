@@ -1,7 +1,6 @@
 from typing import Union, List, Dict, Any, Optional
 import asyncio
 import json
-from collections import OrderedDict
 from loguru import logger
 import numpy as np
 
@@ -18,55 +17,14 @@ from .types import WebSocketSend
 from .tts_manager import TTSTaskManager
 from ..chat_history_manager import store_message
 from ..service_context import ServiceContext
-from ..conversation_quality import (
-    ResponseRepetitionGuard,
-    is_generic_assistant_boilerplate,
-    normalize_output_language_variant,
-)
-from ..reply_history import (
-    build_recent_reply_guidance,
-    build_reply_retry_prompt,
-    recent_sentences,
-    record_reply,
-)
+from ..conversation_quality import normalize_output_language_variant
 from ..proactive_context import (
     breaks_what_the_host_knows,
-    build_proactive_retry_prompt,
     record_proactive_response,
-    record_suppressed_proactive,
-    should_suppress_proactive_text,
 )
 
 # Import necessary types from agent outputs
 from ..agent.output_types import SentenceOutput, AudioOutput
-
-# 保存背景核心記憶整理 task 的 reference，避免被 GC
-_BG_MEMORY_TASKS: set = set()
-
-# 每個連線各自數輪數，用來決定何時整理記憶。
-# key 是 (conf_uid, history_uid, client_uid)——history_uid 緊跟在 conf_uid 之後，
-# 是這個分支的慣例。原本只用 (conf_uid, client_uid)，於是同一條 WebSocket 連線
-# 切換對話（不重連）時輪數沿用舊對話：四輪私聊後開新對話，新對話第一輪就整理、
-# 第二到五輪反而不整理。內容不會外洩（consolidate_core_memory 本身帶的是正確
-# 的 context.history_uid），但節奏跟著連線走而不是跟著對話走，跟 reply_history
-# 修過的那次真實外洩是同一種漏洞形狀，只是這裡漏的是「什麼時候整理」而不是
-# 「說過什麼」。
-#
-# 只存在記憶體：重啟就歸零，整理週期重新開始，可以接受。但一個瀏覽器分頁不
-# 重啟只是不斷切換對話，key 會無限增生——用 OrderedDict 當 LRU，上限跟
-# reply_history.MAX_SESSIONS 一致，超過就淘汰最久沒動到的那個。
-MAX_TURN_COUNT_SESSIONS = 32
-_TURN_COUNTS: "OrderedDict[tuple[str, str, str], int]" = OrderedDict()
-
-
-def _bump_turn_count(key: "tuple[str, str, str]") -> int:
-    """記一輪、回傳累計輪數，並把這個 key 標成最近用過（LRU 淘汰用）。"""
-    n = _TURN_COUNTS.get(key, 0) + 1
-    _TURN_COUNTS[key] = n
-    _TURN_COUNTS.move_to_end(key)
-    while len(_TURN_COUNTS) > MAX_TURN_COUNT_SESSIONS:
-        _TURN_COUNTS.popitem(last=False)
-    return n
 
 
 def _effective_output_language(context: ServiceContext) -> str:
@@ -102,12 +60,7 @@ async def _speak(
 ) -> str:
     """把一句送去 TTS 與前端，回傳它貢獻給 full_response 的文字。
 
-    抽出來是因為現在有三個地方要送：串流當下放行的、串流結束時補送的、以及
-    重生之後的。三份一樣的十行參數列表很容易改了一份忘了另外兩份。
-
-    簡繁正規化也放這裡。原本只寫在主串流迴圈裡，重生那條路繞過它，於是重生
-    出來的句子沒被轉成正體——差一個「来」/「來」就讓逐字比對失效，重複因此
-    照樣漏出去。共用的出口只能有一個。
+    簡繁正規化在這裡做：送出去的每一句都經過同一個出口。
     """
     if isinstance(output_item, SentenceOutput):
         output_language = _effective_output_language(context)
@@ -159,23 +112,6 @@ async def process_single_conversation(
     full_response = ""  # Initialize full_response here
     subtitle_response_parts: List[str] = []
     is_proactive = bool(metadata and metadata.get("proactive_speak"))
-    # 自己把關她說出口的話的 agent（character_engine_agent）：主機這一側的防重複、
-    # 客服腔與主動開口過濾整個跳過。兩邊各擋一次的話，主機擋掉的句子引擎不知道，
-    # 她記得的跟使用者聽到的就對不上。
-    own_checks = bool(getattr(context.agent_engine, "checks_what_she_says", False))
-    # 護欄帶著最近幾則回覆的句子當種子。單看一則的話攔不到實測最常見的重複
-    # ——模型換掉開頭四個字、正文整段照抄，整則比對認為那是不同的回覆。
-    # 主動發言有自己的跨輪機制（proactive_context），不種，免得兩層打架。
-    repetition_guard = ResponseRepetitionGuard(
-        seen=(
-            []
-            if is_proactive
-            else recent_sentences(
-                context.character_config.conf_uid, context.history_uid, client_uid
-            )
-        )
-    )
-
     try:
         # Send initial signals
         await send_conversation_start_signals(websocket_send)
@@ -200,29 +136,15 @@ async def process_single_conversation(
             user_input, context.asr_engine, websocket_send
         )
 
-        # 預防重複：把最近說過的幾則接在這一輪的輸入後面，讓模型在「生成之前」
-        # 就知道自己剛講過什麼。事後偵測到重複再叫它重寫是沒用的——實測顯示那段
-        # 指示會被人設、記憶、表情規則的系統提示埋掉。
-        #
-        # 只餵給模型，不進 input_text 本身：下面的 store_message 用的是 input_text，
-        # 混進去的話這段提示會永久留在對話歷史與長期記憶裡。
-        model_input_text = input_text
-        if not is_proactive and not own_checks and isinstance(input_text, str):
-            model_input_text = input_text + build_recent_reply_guidance(
-                context.character_config.conf_uid, context.history_uid, client_uid
-            )
-
         # 給 agent 的兩件它自己分不出來的事：這一輪屬於哪段對話（agent 是所有連線
-        # 共用的），以及使用者實際講的是哪一段（model_input_text 後面接了只給模型看
-        # 的提示）。character_engine_agent 靠這個讓引擎記得的是原話；其他 agent
-        # 不看這兩個欄位。
+        # 共用的），以及使用者實際講的是哪一段——引擎記得的要是原話。
         agent_metadata = {**(metadata or {}), "history_uid": context.history_uid}
         if not is_proactive and isinstance(input_text, str):
             agent_metadata["spoken_text"] = input_text
 
         # Create batch input
         batch_input = create_batch_input(
-            input_text=model_input_text,
+            input_text=input_text,
             images=images,
             from_name=context.character_config.human_name,
             metadata=agent_metadata,
@@ -252,38 +174,6 @@ async def process_single_conversation(
             from ..sleep_mode import note_user_message
 
             note_user_message(context.character_config.conf_uid, input_text)
-
-        # 對話前刷新核心記憶到 system prompt（phase 1.5）：
-        # agent_engine 在 server 開機時烤死 system prompt、新連線只 pass by reference 不重讀，
-        # 導致背景 consolidation 寫入的新記憶要等重啟才生效。這裡在每輪對話前重讀 core_memory.md，
-        # 只有記憶真的變了（或這個 session context 第一次跑）才重建 prompt 並 set_system，
-        # 讓「越聊越認識你」免重啟即時生效，又不動到 agent 的對話歷史。見 MEMORY_SYSTEM_DESIGN.md
-        # 長期記憶關閉時跳過 phase-1.5 重注入（construct_system_prompt 本身也已 gate，
-        # 這裡短路避免無謂重建 prompt）。
-        try:
-            from ..memory_core import load_core_memory, load_self_memory
-
-            _mem_on = getattr(
-                context.character_config, "long_term_memory_enabled", True
-            )
-            agent = context.agent_engine
-            if _mem_on and hasattr(agent, "set_system"):
-                fresh_core = load_core_memory(
-                    context.character_config.conf_uid, context.history_uid
-                )
-                fresh_self = load_self_memory(context.character_config.conf_uid)
-                fresh_mem = (fresh_self, fresh_core)
-                if fresh_mem != getattr(context, "_core_mem_injected", None):
-                    refreshed_prompt = await context.construct_system_prompt(
-                        context.character_config.persona_prompt
-                    )
-                    agent.set_system(refreshed_prompt)
-                    context._core_mem_injected = fresh_mem
-                    logger.info(
-                        "[core_memory] system prompt refreshed with latest core memory"
-                    )
-        except Exception as _refresh_e:
-            logger.warning(f"[core_memory] refresh failed: {_refresh_e}")
 
         try:
             # agent.chat yields Union[SentenceOutput, Dict[str, Any]]
@@ -317,70 +207,20 @@ async def process_single_conversation(
                         )
 
                     if (
-                        not own_checks
-                        and isinstance(output_item, SentenceOutput)
-                        and is_generic_assistant_boilerplate(
-                            output_item.display_text.text
-                        )
-                    ):
-                        logger.info("Suppressed generic assistant boilerplate")
-                        continue
-
-                    if (
                         is_proactive
                         and isinstance(output_item, SentenceOutput)
-                        and (
-                            # 引擎管不到的只剩主機才知道的事（截圖是哪裡來的、
-                            # 人設不准她自稱程式）；其餘由引擎擋過了。
-                            breaks_what_the_host_knows(
-                                output_item.display_text.text,
-                                (metadata or {}).get("proactive_image_sources"),
-                            )
-                            if own_checks
-                            else should_suppress_proactive_text(
-                                output_item.display_text.text,
-                                forbid_question=bool(
-                                    metadata
-                                    and metadata.get("proactive_forbid_question")
-                                ),
-                                image_sources=(
-                                    metadata.get("proactive_image_sources")
-                                    if metadata
-                                    else None
-                                ),
-                                recent_outputs=(
-                                    metadata.get("proactive_recent_outputs")
-                                    if metadata
-                                    else None
-                                ),
-                            )
+                        # 引擎管不到的只剩主機才知道的事（截圖是哪裡來的、人設不准
+                        # 她自稱程式）；重複、客服腔、只應一聲由引擎擋。
+                        and breaks_what_the_host_knows(
+                            output_item.display_text.text,
+                            (metadata or {}).get("proactive_image_sources"),
                         )
                     ):
-                        # 印出被擋的內容。只寫「Suppressed」的話，事後完全無法判斷
-                        # 是過濾器太嚴還是模型真的在生廢話——實測 9 次觸發有 7 次
-                        # 整批被擋，而 log 對「擋掉了什麼」一個字都沒有。
+                        # 印出被擋的內容，事後才判斷得出是過濾器太嚴還是模型真的講錯。
                         logger.info(
-                            "Suppressed repetitive or generic proactive sentence: "
+                            "Suppressed proactive sentence the host knows is wrong: "
                             f"{output_item.display_text.text!r}"
                         )
-                        # 記下來，否則下一輪的提示詞不知道這句講過，模型會原封不動
-                        # 再生一次、再被擋——實測同一句被重生了三十幾次。
-                        record_suppressed_proactive(
-                            context.character_config.conf_uid,
-                            str(
-                                (metadata or {}).get("proactive_context_uid")
-                                or client_uid
-                            ),
-                            output_item.display_text.text,
-                        )
-                        continue
-
-                    if (
-                        not own_checks
-                        and isinstance(output_item, SentenceOutput)
-                        and not repetition_guard.accept(output_item.display_text.text)
-                    ):
-                        logger.info("Suppressed repeated or near-duplicate sentence")
                         continue
 
                     full_response += await _speak(
@@ -411,140 +251,6 @@ async def process_single_conversation(
             # full_response will contain partial response before error
         # --- End processing agent response ---
 
-        # 整則都被護欄丟掉了——代表這一輪講的每一句最近都講過。與其讓她沈默，
-        # 帶著「你剛說過這些」重生一次。這條路以前只有主動發言走，現在一般回覆
-        # 也需要，因為逐句護欄會整輪丟光。
-        if not is_proactive and not own_checks and not full_response:
-            logger.info("整則回覆都被跨輪護欄丟掉，重生一次")
-            retry_input = create_batch_input(
-                # 用 model_input_text：它已經帶著「你最近說過這些」。少了那段，
-                # 模型只被告知「換個說法」卻不知道要避開什麼。
-                input_text=build_reply_retry_prompt(
-                    model_input_text if isinstance(model_input_text, str) else "",
-                    "\n".join(
-                        recent_sentences(
-                            context.character_config.conf_uid,
-                            context.history_uid,
-                            client_uid,
-                        )[-3:]
-                    ),
-                ),
-                images=images,
-                from_name=context.character_config.human_name,
-                # 剛才那一輪沒有人聽到：自己記對話的 agent 要把它拿掉再答。
-                metadata={**agent_metadata, "redo": True},
-            )
-            # 重生的輸出也要過同一道護欄，否則它可能再講一次剛被丟掉的內容——
-            # 實測遇過。這裡先整批收完再決定：重生本來就是罕見路徑，多等這一下
-            # 不影響一般情況的延遲，而且收完才有辦法在「全部又是重複」時改口。
-            retry_items = []
-            try:
-                async for retry_item in context.agent_engine.chat(retry_input):
-                    if isinstance(retry_item, (SentenceOutput, AudioOutput)):
-                        retry_items.append(retry_item)
-            except Exception as e:
-                logger.warning(f"重生失敗（{type(e).__name__}: {e}）")
-
-            fresh = [
-                item
-                for item in retry_items
-                if not isinstance(item, SentenceOutput)
-                or repetition_guard.accept(item.display_text.text)
-            ]
-            if not fresh and retry_items:
-                # 重生出來的還是同一批內容。放行原樣——寧可重複，也不要她突然
-                # 沈默；沈默看起來像當掉，而使用者無從得知發生了什麼事。
-                logger.info("重生仍是重複的內容，放行以免整輪沈默")
-                fresh = retry_items
-            for item in fresh:
-                full_response += await _speak(
-                    item,
-                    context=context,
-                    websocket_send=websocket_send,
-                    tts_manager=tts_manager,
-                    subtitle_response_parts=subtitle_response_parts,
-                )
-
-        if is_proactive and not own_checks and not full_response:
-            logger.info(
-                "All proactive sentences were suppressed; retrying once as a statement"
-            )
-            retry_batch_input = create_batch_input(
-                input_text=build_proactive_retry_prompt(input_text),
-                images=images,
-                from_name=context.character_config.human_name,
-                metadata=agent_metadata,
-            )
-            try:
-                retry_stream = context.agent_engine.chat(retry_batch_input)
-                async for output_item in retry_stream:
-                    if not isinstance(output_item, (SentenceOutput, AudioOutput)):
-                        continue
-                    if isinstance(output_item, SentenceOutput):
-                        output_language = _effective_output_language(context)
-                        output_item.display_text.text = (
-                            normalize_output_language_variant(
-                                output_item.display_text.text,
-                                output_language,
-                                _protected(context),
-                            )
-                        )
-                        output_item.tts_text = normalize_output_language_variant(
-                            output_item.tts_text,
-                            output_language,
-                            _protected(context),
-                        )
-                        if is_generic_assistant_boilerplate(
-                            output_item.display_text.text
-                        ) or should_suppress_proactive_text(
-                            output_item.display_text.text,
-                            forbid_question=True,
-                            image_sources=(
-                                metadata.get("proactive_image_sources")
-                                if metadata
-                                else None
-                            ),
-                            recent_outputs=(
-                                metadata.get("proactive_recent_outputs")
-                                if metadata
-                                else None
-                            ),
-                        ):
-                            logger.info(
-                                "Suppressed retry sentence: "
-                                f"{output_item.display_text.text!r}"
-                            )
-                            record_suppressed_proactive(
-                                context.character_config.conf_uid,
-                                str(
-                                    (metadata or {}).get("proactive_context_uid")
-                                    or client_uid
-                                ),
-                                output_item.display_text.text,
-                            )
-                            continue
-                        if not repetition_guard.accept(output_item.display_text.text):
-                            logger.info(
-                                "Suppressed repeated or near-duplicate retry sentence"
-                            )
-                            continue
-
-                    response_part = await process_agent_output(
-                        output=output_item,
-                        character_config=context.character_config,
-                        live2d_model=context.live2d_model,
-                        tts_engine=context.tts_engine,
-                        websocket_send=websocket_send,
-                        tts_manager=tts_manager,
-                        translate_engine=context.translate_engine,
-                        subtitle_translate_engine=context.subtitle_translate_engine,
-                        subtitle_collector=subtitle_response_parts,
-                    )
-                    if response_part is not None:
-                        full_response += str(response_part)
-            except Exception as retry_error:
-                logger.warning(f"Proactive statement retry failed: {retry_error}")
-
         # 先存再收尾。full_response 在上面的串流迴圈結束時就已經完整，寫入歷史
         # 不需要等聲音——而 finalize_conversation_turn 會等 TTS 合成收尾、還要等
         # 前端回報 frontend-playback-complete（語音播完）。排在它後面的後果是：
@@ -564,15 +270,6 @@ async def process_single_conversation(
                 display_content=("".join(subtitle_response_parts) or None),
             )
             logger.info(f"AI response: {full_response}")
-            if not is_proactive:
-                # 記下來，下一輪才有東西可以比對。主動發言走 proactive_context
-                # 自己那套，不重複記。
-                record_reply(
-                    context.character_config.conf_uid,
-                    context.history_uid,
-                    client_uid,
-                    full_response,
-                )
 
         # 等待 TTS 收尾與送出 backend-synth-complete 都在 finalize_conversation_turn
         # 裡做了，這裡不要再做一次。先前這段會讓 backend-synth-complete 連送兩則，
@@ -595,8 +292,7 @@ async def process_single_conversation(
                 full_response,
             )
             logger.info("Proactive response recorded in rolling anti-repeat context")
-            # 自己記對話的 agent（character_engine_agent）：她說出口的那句留在對話裡，
-            # 指示不留。不然她不記得自己主動說過什麼。
+            # 她說出口的那句留在引擎的對話裡，指示不留。不然她不記得自己主動說過什麼。
             remember_remark = getattr(context.agent_engine, "remember_remark", None)
             if remember_remark is not None:
                 try:
@@ -610,77 +306,6 @@ async def process_single_conversation(
                 note_mentioned(full_response, (metadata or {}).get("proactive_source"))
             except Exception as error:
                 logger.warning(f"Mentioned news not noted: {error}")
-
-        # 對話一輪後背景整理核心記憶（fire-and-forget，不阻塞使用者）。見 MEMORY_SYSTEM_DESIGN.md
-        # 長期記憶關閉時（long_term_memory_enabled=False）跳過整理，連背景 task 都不建。
-        # 節流：memory_consolidation_interval 控制每幾輪才整理一次（1=每輪、預設、行為不變；
-        # 3/5 給弱機/本地模型省一半以上「整理用」的 LLM 呼叫）。用 per-session 計數器，
-        # 只有 turn % interval == 0 那一輪才排整理 task。整段 fail-soft：計數器出錯絕不弄壞這輪對話。
-        try:
-            from ..memory_core import (
-                consolidate_core_memory,
-                resolve_consolidation_llm,
-                _clamp_interval,
-            )
-
-            _mem_on = getattr(
-                context.character_config, "long_term_memory_enabled", True
-            )
-            if (
-                _mem_on
-                and not is_proactive
-                # 她自己說過什麼也是引擎在記的 agent：主機這一套整理整個不用做。
-                and not hasattr(context.agent_engine, "self_memory")
-                and isinstance(input_text, str)
-                and input_text.strip()
-            ):
-                _conf_uid = context.character_config.conf_uid
-                _interval = _clamp_interval(
-                    getattr(
-                        context.character_config, "memory_consolidation_interval", 1
-                    )
-                )
-                _key = (str(_conf_uid), str(context.history_uid), str(client_uid))
-                _n = _bump_turn_count(_key)
-                if _n % _interval == 0:
-                    _base_url, _model, _api_key, _extra_body = (
-                        resolve_consolidation_llm(context.character_config)
-                    )
-                    _cap = getattr(
-                        context.character_config, "core_memory_max_chars", 1500
-                    )
-                    _t = asyncio.create_task(
-                        consolidate_core_memory(
-                            _conf_uid,
-                            context.history_uid,
-                            input_text,
-                            full_response,
-                            _base_url,
-                            _model,
-                            cap=_cap,
-                            api_key=_api_key,
-                            extra_body=_extra_body,
-                            # 記憶的每一條都要寫明主詞是使用者還是角色，所以
-                            # 抽取器需要知道角色叫什麼（見 build_consolidation_prompt）。
-                            character_name=getattr(
-                                context.character_config, "character_name", ""
-                            ),
-                            reply_language=_effective_output_language(context),
-                            protected_names=getattr(
-                                context.character_config, "protected_names", None
-                            ),
-                        )
-                    )
-                    # 保存 reference 避免 fire-and-forget task 被 GC（Python asyncio 已知坑）
-                    _BG_MEMORY_TASKS.add(_t)
-                    _t.add_done_callback(_BG_MEMORY_TASKS.discard)
-                else:
-                    logger.debug(
-                        f"[core_memory] consolidation skipped "
-                        f"(turn {_n}, every {_interval})"
-                    )
-        except Exception as _mem_e:
-            logger.warning(f"[core_memory] schedule failed: {_mem_e}")
 
         return full_response  # Return accumulated full_response
 
