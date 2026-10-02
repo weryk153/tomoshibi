@@ -81,3 +81,19 @@ class FileChatSource:
 
     async def close(self) -> None:
         self.connected = False
+
+
+def open_chat_source(url: str) -> ChatSource:
+    """直播分頁貼的網址 → 對應的聊天室。不認得就丟 ValueError。
+
+    file: 開頭是假聊天室（JSON Lines），給對照實驗用。
+    """
+    url = url.strip()
+    if url.startswith("file:"):
+        return FileChatSource(url.removeprefix("file:"))
+    from .youtube_chat import YouTubeChatSource, video_id_from_url
+
+    video_id = video_id_from_url(url)
+    if not video_id:
+        raise ValueError("not a YouTube live video URL")
+    return YouTubeChatSource(video_id)
