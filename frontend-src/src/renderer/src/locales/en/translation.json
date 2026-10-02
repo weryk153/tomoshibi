@@ -339,7 +339,8 @@
       "saved": "Saved “{{name}}”.",
       "deleted": "Deleted “{{name}}”.",
       "confirmDelete": "Delete “{{name}}”?",
-      "confirm": "Confirm"
+      "confirm": "Confirm",
+      "create": "Create"
     },
     "user": {
       "sectionTitle": "You (your name & avatar)",

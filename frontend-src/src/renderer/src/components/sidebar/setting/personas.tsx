@@ -8,6 +8,8 @@ import { useTranslation } from 'react-i18next';
 import { Button, TextInput } from '@/components/ui/tw/primitives';
 import { Field } from '@/components/ui/tw/primitives';
 import { toaster } from '@/components/ui/tw/toaster';
+import { SaveStatus } from '@/components/ui/tw/save-status';
+import { useAutosave } from '@/hooks/use-autosave';
 import { useWebSocket } from '@/context/websocket-context';
 import { useConfig } from '@/context/character-config-context';
 import { wsService } from '@/services/websocket-service';
@@ -87,34 +89,46 @@ function Personas(): JSX.Element {
     setFormError(null);
   }, []);
 
-  const save = useCallback(async () => {
+  // 新增：按「建立」。
+  const create = useCallback(async () => {
     setSaving(true);
     setFormError(null);
-    const result = mode === 'edit' && editingId
-      ? await updatePersona(baseUrl, editingId, {
-        name: draft.name,
-        prompt: draft.prompt,
-      })
-      : await createPersona(baseUrl, draft);
+    const result = await createPersona(baseUrl, draft);
     setSaving(false);
     if (!result.ok) {
       setFormError(result.error);
       return;
     }
     toaster.create({
-      title: t(mode === 'edit' ? 'settings.personas.saved' : 'settings.personas.created', {
-        name: draft.name,
-      }),
+      title: t('settings.personas.created', { name: draft.name }),
       type: 'success',
       duration: 2200,
     });
-    if (mode === 'edit' && editingId && activeId === editingId) {
-      setApplyingId(editingId);
-      sendMessage({ type: 'switch-persona', persona_id: editingId });
-    }
     closeForm();
     setRefreshTick((value) => value + 1);
-  }, [activeId, baseUrl, closeForm, draft, editingId, mode, sendMessage, t]);
+  }, [baseUrl, closeForm, draft, t]);
+
+  // 編輯：改了就存；正在用的人設存好就重新套用，她立刻換成新的說法。
+  const editSaver = useAutosave(async (edit: { id: string; name: string; prompt: string }) => {
+    const result = await updatePersona(baseUrl, edit.id, { name: edit.name, prompt: edit.prompt });
+    if (!result.ok) return { ok: false, error: result.error } as const;
+    if (activeId === edit.id) {
+      setApplyingId(edit.id);
+      sendMessage({ type: 'switch-persona', persona_id: edit.id });
+    }
+    setRefreshTick((value) => value + 1);
+    return { ok: true } as const;
+  });
+
+  const changeDraft = useCallback((patch: Partial<typeof draft>) => {
+    setDraft((current) => {
+      const next = { ...current, ...patch };
+      if (mode === 'edit' && editingId) {
+        editSaver.change({ id: editingId, name: next.name, prompt: next.prompt });
+      }
+      return next;
+    });
+  }, [editSaver, editingId, mode]);
 
   const apply = useCallback((personaId: string | null) => {
     setApplyingId(personaId);
@@ -146,10 +160,8 @@ function Personas(): JSX.Element {
           <TextInput
             value={draft.name}
             placeholder={t('settings.personas.namePlaceholder')}
-            onChange={(event) => setDraft((current) => ({
-              ...current,
-              name: event.target.value,
-            }))}
+            onChange={(event) => changeDraft({ name: event.target.value })}
+            onBlur={editSaver.flush}
           />
         </Field>
         <Field
@@ -160,10 +172,8 @@ function Personas(): JSX.Element {
             rows={12}
             value={draft.prompt}
             placeholder={t('settings.personas.promptPlaceholder')}
-            onChange={(event) => setDraft((current) => ({
-              ...current,
-              prompt: event.target.value,
-            }))}
+            onChange={(event) => changeDraft({ prompt: event.target.value })}
+            onBlur={editSaver.flush}
           />
         </Field>
         {mode === 'create' && (
@@ -182,13 +192,23 @@ function Personas(): JSX.Element {
           </Field>
         )}
         {formError && <Text color="red.300" fontSize="sm">{formError}</Text>}
+        {mode === 'edit' && <SaveStatus state={editSaver.state} />}
         <HStack>
-          <Button tone="blue" onClick={save} loading={saving}>
-            {t('common.save')}
-          </Button>
-          <Button variant="outline" onClick={closeForm} disabled={saving}>
-            {t('common.cancel')}
-          </Button>
+          {mode === 'create' ? (
+            <>
+              <Button tone="blue" onClick={create} loading={saving}>
+                {t('settings.personas.create')}
+              </Button>
+              <Button variant="outline" onClick={closeForm} disabled={saving}>
+                {t('common.cancel')}
+              </Button>
+            </>
+          ) : (
+            // 改了就存；這顆只是回到清單（關掉前把還沒送的那筆送出去）。
+            <Button variant="outline" onClick={() => { editSaver.flush(); closeForm(); }}>
+              {t('common.close')}
+            </Button>
+          )}
         </HStack>
       </Stack>
     );

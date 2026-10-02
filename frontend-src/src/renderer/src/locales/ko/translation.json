@@ -339,7 +339,8 @@
       "saved": "“{{name}}” 페르소나를 저장했어요.",
       "deleted": "“{{name}}” 페르소나를 삭제했어요.",
       "confirmDelete": "“{{name}}” 페르소나를 삭제할까요?",
-      "confirm": "확인"
+      "confirm": "확인",
+      "create": "만들기"
     },
     "user": {
       "sectionTitle": "나(내 이름과 아바타)",

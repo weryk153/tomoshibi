@@ -339,7 +339,8 @@
       "saved": "「{{name}}」を保存しました。",
       "deleted": "「{{name}}」を削除しました。",
       "confirmDelete": "「{{name}}」を削除しますか？",
-      "confirm": "確認"
+      "confirm": "確認",
+      "create": "作成"
     },
     "user": {
       "sectionTitle": "あなた（名前とアバター）",

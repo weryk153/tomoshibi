@@ -339,7 +339,8 @@
       "saved": "已儲存「{{name}}」。",
       "deleted": "已刪除「{{name}}」。",
       "confirmDelete": "確定刪除「{{name}}」？",
-      "confirm": "確定"
+      "confirm": "確定",
+      "create": "建立"
     },
     "user": {
       "sectionTitle": "你（我的暱稱與頭像）",
