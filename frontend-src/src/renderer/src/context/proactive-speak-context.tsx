@@ -4,6 +4,7 @@ import {
 import { useLocalStorage } from '@/hooks/utils/use-local-storage';
 import { useTriggerSpeak } from '@/hooks/utils/use-trigger-speak';
 import { useAiState, AiStateEnum } from '@/context/ai-state-context';
+import { IS_STAGE } from '@/services/stage-mode';
 
 interface ProactiveSpeakSettings {
   allowButtonTrigger: boolean;
@@ -51,7 +52,8 @@ export function ProactiveSpeakProvider({ children }: { children: ReactNode }) {
   const startIdleTimer = useCallback(() => {
     clearIdleTimer();
 
-    if (!settings.allowProactiveSpeak) return;
+    // 舞台頁什麼時候開口由直播模式決定，不跑自己的閒置計時器。
+    if (IS_STAGE || !settings.allowProactiveSpeak) return;
 
     idleStartTimeRef.current = Date.now();
     const idleSeconds = Math.max(30, Number(settings.idleSecondsToSpeak) || 30);

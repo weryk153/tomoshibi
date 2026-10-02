@@ -910,5 +910,10 @@
     "closeSubtitle": "자막 닫기",
     "minimize": "최소화",
     "close": "닫기"
+  },
+  "stream": {
+    "stageReplaced": "다른 무대 페이지가 이어받았습니다",
+    "privateChatPaused": "방송 중이라 개인 채팅이 일시 중지되었습니다",
+    "switchBlocked": "방송 중에는 캐릭터를 바꿀 수 없습니다"
   }
 }

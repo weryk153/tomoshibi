@@ -910,5 +910,10 @@
     "closeSubtitle": "关闭字幕框",
     "minimize": "最小化",
     "close": "关闭"
+  },
+  "stream": {
+    "stageReplaced": "另一个舞台页已经接手，这页不再播放",
+    "privateChatPaused": "直播中，私人聊天先暂停",
+    "switchBlocked": "直播中不能换角色，请先停止直播"
   }
 }

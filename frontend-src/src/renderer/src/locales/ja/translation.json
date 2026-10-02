@@ -910,5 +910,10 @@
     "closeSubtitle": "字幕を閉じる",
     "minimize": "最小化",
     "close": "閉じる"
+  },
+  "stream": {
+    "stageReplaced": "別のステージページに切り替わりました",
+    "privateChatPaused": "配信中のため個別チャットは一時停止中です",
+    "switchBlocked": "配信中はキャラクターを切り替えられません"
   }
 }

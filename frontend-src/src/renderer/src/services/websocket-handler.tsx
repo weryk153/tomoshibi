@@ -26,6 +26,8 @@ import { isStageEffectId } from '@/effects/stage-effect';
 import { useStagePerformance } from '@/context/stage-performance-context';
 import type { StagePerformanceTrigger } from '@/effects/stage-performance';
 import { shouldHonourStartMic } from '@/services/mic-mode';
+import { useStream } from '@/context/stream-context';
+import { IS_STAGE, withStageParam } from '@/services/stage-mode';
 
 function WebSocketHandler({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
@@ -55,6 +57,9 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
     micOn, autoStopMic, autoStartMicOn, autoStartMicOnConvEnd,
   };
   const { interrupt } = useInterrupt();
+  const { setLive: setStreamLive, setComment: setStreamComment, setStageReplaced } = useStream();
+  // 舞台頁連同一個端點但帶 stage=1；設定頁顯示與編輯的仍是使用者存的 wsUrl。
+  const connectUrl = IS_STAGE ? withStageParam(wsUrl) : wsUrl;
   const { setBrowserViewData } = useBrowser();
   const { playEffect } = useStageEffect();
   const { getPool, playTrigger } = useStagePerformance();
@@ -122,13 +127,15 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
           // 一直掛在畫面上，直到某一輪剛好覆蓋掉。轉場通知有自己的清除計時器，
           // 不歸這裡清——判定收在 subtitle-context 的 clearSpeechSubtitle。
           clearSpeechSubtitle();
+          // 她講完了，舞台頁上「正在回的留言」也收掉。
+          setStreamComment(null);
           resolve();
         }));
         break;
       default:
         console.warn('Unknown control command:', controlText);
     }
-  }, [setAiState, clearResponse, setForceNewMessage, startMic, stopMic]);
+  }, [setAiState, clearResponse, setForceNewMessage, startMic, stopMic, setStreamComment]);
 
   const handleWebSocketMessage = useCallback((message: MessageEvent) => {
     console.log('Received message from server:', message);
@@ -332,7 +339,7 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
         break;
       case 'error':
         toaster.create({
-          title: message.message,
+          title: message.text_key ? t(`stream.${message.text_key}`) : message.message,
           type: 'error',
           duration: 2000,
         });
@@ -368,6 +375,15 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
       case 'conversation-chain-end':
         handleControlMessage('conversation-chain-end');
         break;
+      case 'stream-comment':
+        setStreamComment(message.author ? { author: message.author, text: message.text ?? '' } : null);
+        break;
+      case 'stream-state':
+        setStreamLive(Boolean(message.live));
+        break;
+      case 'stage-replaced':
+        setStageReplaced(true);
+        break;
       case 'force-new-message':
         setForceNewMessage(true);
         break;
@@ -401,11 +417,11 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
       default:
         console.warn('Unknown message type:', message.type);
     }
-  }, [aiState, addAudioTask, appendHumanMessage, baseUrl, bgUrlContext, setAiState, setConfName, setConfUid, setConfigFiles, setCurrentHistoryUid, setHistoryList, setMessages, setModelInfo, setSubtitleText, clearSpeechSubtitle, startMic, stopMic, setSelfUid, setGroupMembers, setIsOwner, backendSynthComplete, setBackendSynthComplete, clearResponse, handleControlMessage, appendOrUpdateToolCallMessage, interrupt, setBrowserViewData, playEffect, getPool, playTrigger, t]);
+  }, [aiState, addAudioTask, appendHumanMessage, baseUrl, bgUrlContext, setAiState, setConfName, setConfUid, setConfigFiles, setCurrentHistoryUid, setHistoryList, setMessages, setModelInfo, setSubtitleText, clearSpeechSubtitle, startMic, stopMic, setSelfUid, setGroupMembers, setIsOwner, backendSynthComplete, setBackendSynthComplete, clearResponse, handleControlMessage, appendOrUpdateToolCallMessage, interrupt, setBrowserViewData, playEffect, getPool, playTrigger, t, setStreamLive, setStreamComment, setStageReplaced]);
 
   useEffect(() => {
-    wsService.connect(wsUrl);
-  }, [wsUrl]);
+    wsService.connect(connectUrl);
+  }, [connectUrl]);
 
   useEffect(() => {
     const stateSubscription = wsService.onStateChange(setWsState);
@@ -414,17 +430,17 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
       stateSubscription.unsubscribe();
       messageSubscription.unsubscribe();
     };
-  }, [wsUrl, handleWebSocketMessage]);
+  }, [connectUrl, handleWebSocketMessage]);
 
   const webSocketContextValue = useMemo(() => ({
     sendMessage: wsService.sendMessage.bind(wsService),
     wsState,
-    reconnect: () => wsService.connect(wsUrl),
+    reconnect: () => wsService.connect(connectUrl),
     wsUrl,
     setWsUrl,
     baseUrl,
     setBaseUrl,
-  }), [wsState, wsUrl, baseUrl]);
+  }), [wsState, wsUrl, connectUrl, baseUrl]);
 
   return (
     <WebSocketContext.Provider value={webSocketContextValue}>

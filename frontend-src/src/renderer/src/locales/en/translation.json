@@ -910,5 +910,10 @@
     "closeSubtitle": "Close subtitle",
     "minimize": "Minimize",
     "close": "Close"
+  },
+  "stream": {
+    "stageReplaced": "Another stage page took over; this one is idle",
+    "privateChatPaused": "Live stream in progress — private chat is paused",
+    "switchBlocked": "Stop the live stream before switching characters"
   }
 }

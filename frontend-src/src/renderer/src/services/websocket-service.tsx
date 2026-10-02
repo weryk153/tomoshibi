@@ -79,6 +79,9 @@ export interface MessageEvent {
   // full-text 的可翻譯代號。後端只會送英文字面值到 text，前端拿 text_key
   // 去翻；沒有這個欄位（舊後端）就用 text。
   text_key?: string;
+  // 直播：stream-comment 的觀眾名字；stream-state 的直播中與否。
+  author?: string;
+  live?: boolean;
   model_info?: ModelInfo;
   conf_name?: string;
   conf_uid?: string;

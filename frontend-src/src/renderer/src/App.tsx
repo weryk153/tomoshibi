@@ -34,6 +34,9 @@ import { BrowserProvider } from "./context/browser-context";
 import FirstRunWizard from "./components/llm/first-run-wizard";
 import "@chatscope/chat-ui-kit-styles/dist/default/styles.min.css";
 import Scene from "./components/canvas/scene";
+import StageView from "./components/canvas/stage-view";
+import { StreamProvider } from "./context/stream-context";
+import { IS_STAGE } from "./services/stage-mode";
 import WebSocketStatus from "./components/canvas/ws-status";
 import Subtitle from "./components/canvas/subtitle";
 import { ModeProvider, useMode } from "./context/mode-context";
@@ -65,6 +68,9 @@ function AppContent(): JSX.Element {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  // 舞台頁只要角色與字幕；所有 hook 都在上面呼叫過了，這裡提早回傳不違反 hooks 規則。
+  if (IS_STAGE) return <StageView />;
 
     
   document.documentElement.style.overflow = 'hidden';
@@ -209,13 +215,15 @@ function AppWithGlobalStyles(): JSX.Element {
                             <SubtitleProvider>
                               <VADProvider>
                                 <GroupProvider>
-                                  <BrowserProvider>
-                                    <WebSocketHandler>
-                                      <Toaster />
-                                      <FirstRunWizard />
-                                      <AppContent />
-                                    </WebSocketHandler>
-                                  </BrowserProvider>
+                                  <StreamProvider>
+                                    <BrowserProvider>
+                                      <WebSocketHandler>
+                                        <Toaster />
+                                        {!IS_STAGE && <FirstRunWizard />}
+                                        <AppContent />
+                                      </WebSocketHandler>
+                                    </BrowserProvider>
+                                  </StreamProvider>
                                 </GroupProvider>
                               </VADProvider>
                             </SubtitleProvider>
