@@ -15,11 +15,15 @@ import { Tabs as ArkTabs } from '@ark-ui/react';
 import { Drawer, DRAWER_PX } from '@/components/ui/tw/drawer';
 import { Button, cx } from '@/components/ui/tw/primitives';
 
-import General from './general';
+import StageDisplay from './stage-display';
+import SystemBasics from './system-basics';
+import ModelExtras from './model-extras';
+import EngineNumbers from './engine-numbers';
+import CanvasInteraction from './canvas-interaction';
+import StageEffects from './stage-effects';
 import Characters from './characters';
 import Personas from './personas';
 import LLM from './llm';
-import Live2D from './live2d';
 import ASR from './asr';
 import TTS from './tts';
 import Agent from './agent';
@@ -60,10 +64,10 @@ interface SettingsTab {
 // 再是舞台外觀、AI／語音，最後才是系統工具。桌面版由這個 group 生出左側導覽，
 // 手機版則隱藏群組標題、退回單列橫向分頁。
 const TABS: SettingsTab[] = [
-  { value: 'general', labelKey: 'settings.tabs.general', group: 'companion', render: ({ onCancel }) => <General onCancel={onCancel} /> },
+  { value: 'general', labelKey: 'settings.tabs.general', group: 'companion', render: ({ onCancel }) => <><SystemBasics onCancel={onCancel} /><StageDisplay /><ModelExtras /><EngineNumbers /></> },
   { value: 'characters', labelKey: 'settings.tabs.characters', group: 'companion', render: () => <Characters /> },
   { value: 'personas', labelKey: 'settings.tabs.personas', group: 'companion', render: () => <Personas /> },
-  { value: 'live2d', labelKey: 'settings.tabs.avatar', group: 'stage', render: () => <Live2D /> },
+  { value: 'live2d', labelKey: 'settings.tabs.avatar', group: 'stage', render: () => <><CanvasInteraction /><StageEffects /></> },
   { value: 'performances', labelKey: 'settings.tabs.performances', group: 'stage', render: () => <Performances /> },
   { value: 'scenes', labelKey: 'settings.tabs.scenes', group: 'stage', render: () => <Scenes /> },
   { value: 'stream', labelKey: 'settings.tabs.stream', group: 'stage', render: ({ active }) => <Stream active={active} /> },

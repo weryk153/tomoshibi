@@ -1,16 +1,9 @@
-/* eslint-disable react-hooks/rules-of-hooks */
-// 這個分頁分成三塊，每一塊都改了就存：
-// - 畫布互動設定（pointerInteractive／scrollToResize／lookAtPointer）：寫 localStorage，立刻生效。
-// - 舞台特效預覽與入場音樂：按下去就播、上傳就存。
-// - 動作與表情對應（MotionConfig／VrmMotionConfig）：寫 model_dict.json，停手就存。
-import {
-  Box, Button, Heading, Input, Stack, Text,
-} from '@chakra-ui/react';
+// 舞台頁的特效預覽與登場配樂。配樂跟著畫面上的角色（模型）存在瀏覽器裡；
+// 演出方案沒有指定配樂時，登場就用這一首。
+import { Box, Button, Input, Stack, Text } from '@chakra-ui/react';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { settingStyles } from './setting-styles';
-import { useLive2dSettings } from '@/hooks/sidebar/setting/use-live2d-settings';
-import { SwitchField } from './common';
+import { useLive2DConfig } from '@/context/live2d-config-context';
 import { useStageEffect } from '@/context/stage-effect-context';
 import { resolveStageEffectCharacterId } from '@/effects/stage-effect-bindings';
 import {
@@ -20,16 +13,11 @@ import {
   StageEffectMusicError,
 } from '@/effects/stage-effect-music';
 import { toaster } from '@/components/ui/tw/toaster';
-import MotionConfig from './motion-config';
-import VrmMotionConfig from './vrm-motion-config';
 
-function live2D(): JSX.Element {
+function StageEffects(): JSX.Element {
   const { t } = useTranslation();
   const { playEffect } = useStageEffect();
-  const {
-    modelInfo,
-    handleInputChange,
-  } = useLive2dSettings();
+  const { modelInfo } = useLive2DConfig();
   const characterId = resolveStageEffectCharacterId(modelInfo);
   const [musicFileName, setMusicFileName] = useState<string | null>(null);
   const [isSavingMusic, setIsSavingMusic] = useState(false);
@@ -97,40 +85,6 @@ function live2D(): JSX.Element {
   };
 
   return (
-    <Stack {...settingStyles.common.container}>
-      <Stack gap={2}>
-        <Heading size="sm">
-          {t('settings.live2d.previewSettingsSectionTitle')}
-          {' '}
-          <Text as="span" fontSize="xs" fontWeight="normal" color="whiteAlpha.600">
-            {t('settings.live2d.sharedBadge')}
-          </Text>
-        </Heading>
-        <Text fontSize="xs" color="whiteAlpha.600">{t('settings.live2d.previewSettingsSectionDesc')}</Text>
-
-        <SwitchField
-          label={t('settings.live2d.pointerInteractive')}
-          checked={modelInfo.pointerInteractive ?? false}
-          onChange={(checked) => handleInputChange('pointerInteractive', checked)}
-        />
-
-        <SwitchField
-          label={t('settings.live2d.scrollToResize')}
-          checked={modelInfo.scrollToResize ?? true}
-          onChange={(checked) => handleInputChange('scrollToResize', checked)}
-        />
-
-        {/* 「滑鼠互動」管的其實只有點擊播動作（use-live2d-model 的
-            allowTapMotion），跟視線跟隨無關——名字容易誤會，所以視線另外給一個
-            開關，而不是塞進同一個。 */}
-        <SwitchField
-          label={t('settings.live2d.lookAtPointer')}
-          help={t('settings.live2d.lookAtPointerDesc')}
-          checked={modelInfo.lookAtPointer ?? true}
-          onChange={(checked) => handleInputChange('lookAtPointer', checked)}
-        />
-      </Stack>
-
       <Box
         borderWidth="1px"
         borderColor="whiteAlpha.200"
@@ -205,23 +159,7 @@ function live2D(): JSX.Element {
           )}
         </Box>
       </Box>
-
-      {/* 這一塊是唯一真正依模型分歧的：Live2D 跟 VRM 的動作／表情編輯器版面
-          相同（都是關鍵字＋顯示名稱＋試播、即時存檔），但資料模型不同——
-          Live2D 是 (group, index)＋HitArea，VRM 只有 clip 檔名、沒有點擊區域，
-          所以是兩個各自獨立的元件，不共用同一份 UI 硬塞兩種形狀。上面兩塊
-          （畫布互動、特效演出）兩種模型都吃，所以標了「共用」——分頁名稱改成
-          中性的「角色外觀」之後，這個區分靠這幾個標籤說清楚。 */}
-      <Stack gap={2}>
-        <Heading size="sm">
-          {modelInfo?.type === 'vrm'
-            ? t('settings.live2d.vrmOnlySectionTitle')
-            : t('settings.live2d.live2dOnlySectionTitle')}
-        </Heading>
-        {modelInfo?.type === 'vrm' ? <VrmMotionConfig /> : <MotionConfig />}
-      </Stack>
-    </Stack>
   );
 }
 
-export default live2D;
+export default StageEffects;

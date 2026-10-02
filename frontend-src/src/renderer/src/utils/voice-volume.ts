@@ -1,6 +1,6 @@
 // 角色語音的播放音量（0.0–1.0）。
 //
-// 為什麼獨立成一個模組、而不是塞進 use-general-settings 的 settings 物件裡讓
+// 為什麼獨立成一個模組、而不是放進設定頁的 React state 讓
 // use-audio-task 從 context 讀：播放端是 handleAudioPlayback，它在
 // audioTaskQueue 裡以 promise 佇列的形式跑，閉包在任務排進佇列的當下就固定了。
 // 從 React state 讀會拿到「排進佇列時」的音量而不是「真的播出去時」的音量——

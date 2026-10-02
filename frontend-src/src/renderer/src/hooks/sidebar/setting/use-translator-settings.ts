@@ -34,9 +34,7 @@ export interface UseTranslatorSettingsResult {
 }
 
 // active：跟 asr.tsx／memory.tsx 同一種訊號，這個分頁被抽屜重新看見時要不要
-// 重抓一次現值。you.tsx 目前固定傳 true（跟 general.tsx 傳給 <You active />
-// 的方式一致），保留這個參數是為了跟其餘 use-*-settings hook 的介面對齊，
-// 不是這次任務用得到的行為。
+// 重抓一次現值。you.tsx 把「對話」分頁的 active 傳進來。
 export function useTranslatorSettings(
   baseUrl: string,
   active = true,

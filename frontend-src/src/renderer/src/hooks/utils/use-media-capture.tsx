@@ -6,11 +6,8 @@ import { useCamera } from '@/context/camera-context';
 import { useScreenCaptureContext } from '@/context/screen-capture-context';
 import { toaster } from "@/components/ui/tw/toaster";
 import {
-  IMAGE_COMPRESSION_QUALITY_KEY,
-  DEFAULT_IMAGE_COMPRESSION_QUALITY,
-  IMAGE_MAX_WIDTH_KEY,
-  DEFAULT_IMAGE_MAX_WIDTH,
-} from '@/hooks/sidebar/setting/use-general-settings';
+  IMAGE_COMPRESSION_QUALITY_KEY, IMAGE_MAX_WIDTH_KEY, loadImageQuality, loadImageMaxWidth,
+} from '@/utils/image-settings';
 
 // Add type definition for ImageCapture
 declare class ImageCapture {
@@ -30,27 +27,15 @@ export function useMediaCapture() {
   const { stream: cameraStream } = useCamera();
   const { stream: screenStream } = useScreenCaptureContext();
 
-  const getCompressionQuality = useCallback(() => {
-    const storedQuality = localStorage.getItem(IMAGE_COMPRESSION_QUALITY_KEY);
-    if (storedQuality) {
-      const quality = parseFloat(storedQuality);
-      if (!Number.isNaN(quality) && quality >= 0.1 && quality <= 1.0) {
-        return quality;
-      }
-    }
-    return DEFAULT_IMAGE_COMPRESSION_QUALITY;
-  }, []);
+  const getCompressionQuality = useCallback(
+    () => loadImageQuality(localStorage.getItem(IMAGE_COMPRESSION_QUALITY_KEY)),
+    [],
+  );
 
-  const getImageMaxWidth = useCallback(() => {
-    const storedMaxWidth = localStorage.getItem(IMAGE_MAX_WIDTH_KEY);
-    if (storedMaxWidth) {
-      const maxWidth = parseInt(storedMaxWidth, 10);
-      if (!Number.isNaN(maxWidth) && maxWidth >= 0) {
-        return maxWidth;
-      }
-    }
-    return DEFAULT_IMAGE_MAX_WIDTH;
-  }, []);
+  const getImageMaxWidth = useCallback(
+    () => loadImageMaxWidth(localStorage.getItem(IMAGE_MAX_WIDTH_KEY)),
+    [],
+  );
 
   const captureFrame = useCallback(async (stream: MediaStream | null, source: 'camera' | 'screen') => {
     if (!stream) {
