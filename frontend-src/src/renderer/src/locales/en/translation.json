@@ -218,7 +218,8 @@
       "cameraFailed": "The camera could not be started, so the background was not switched.",
       "connectionSection": "Connection",
       "connectionHelp": "These two take effect when you press Connect. Applying as you type would reconnect on every keystroke.",
-      "connect": "Connect"
+      "connect": "Connect",
+      "customBgUrlEmpty": "The URL can't be empty"
     },
     "characters": {
       "description": "Create, edit, and switch your companion characters — no YAML needed.",
@@ -350,7 +351,7 @@
       "avatarNotImage": "Please choose an image file.",
       "avatarTooLarge": "Image too large — please pick one under 512KB.",
       "avatarReadFailed": "Could not read the image. Please try again.",
-      "sectionNote": "Your name and avatar are stored locally and take effect right away. Reading language, global instructions and translation settings are written to the config file — restart the backend (or switch character again) for them to reach the current conversation."
+      "sectionNote": "Everything here saves as you change it. Changes that need a reload show up in the notice at the top of Settings."
     },
     "live2d": {
       "pointerInteractive": "Pointer Interactive",
@@ -617,7 +618,8 @@
       "testFail_unchanged": "Translation did not take effect — the text came back unchanged. Usually this means a reasoning model (the answer lands in reasoning_content while content stays empty) or a timeout. Neither is configurable from the UI yet; edit translator_config.llm in conf.yaml and add extra_body.reasoning_effort: none and timeout: 60.",
       "testFail_disabled": "Translation is currently off — nothing to test.",
       "testFail_config": "Could not read the configuration: {{error}}",
-      "testFail_error": "Test failed: {{error}}"
+      "testFail_error": "Test failed: {{error}}",
+      "endpointEmpty": "The address can't be empty"
     },
     "playerLanguage": {
       "label": "Reading / Player language",

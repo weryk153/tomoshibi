@@ -218,7 +218,8 @@
       "cameraFailed": "カメラを起動できなかったため、背景は切り替わりませんでした。",
       "connectionSection": "接続設定",
       "connectionHelp": "この2つは「接続」を押すと反映されます。入力のたびに適用すると、1文字ごとに再接続が走ってしまいます。",
-      "connect": "接続"
+      "connect": "接続",
+      "customBgUrlEmpty": "URL を空にはできません"
     },
     "characters": {
       "description": "コンパニオンのキャラクターを作成・編集・切り替えできます。YAMLを触る必要はありません。",
@@ -350,7 +351,7 @@
       "avatarNotImage": "画像ファイルを選んでください。",
       "avatarTooLarge": "画像が大きすぎます。512KB未満のものを選んでください。",
       "avatarReadFailed": "画像を読み込めませんでした。もう一度お試しください。",
-      "sectionNote": "ニックネームとアイコンは端末に保存され、すぐ反映されます。表示言語・全体指示・翻訳設定は設定ファイルに書き込まれるため、現在の会話に反映するにはバックエンドの再起動（またはキャラクターの切り替え直し）が必要です。"
+      "sectionNote": "ここの設定は変更するとすぐ保存されます。再読み込みが必要な変更は設定の一番上に表示されます。"
     },
     "live2d": {
       "pointerInteractive": "ポインター操作",
@@ -617,7 +618,8 @@
       "testFail_unchanged": "翻訳が効いていません——原文がそのまま返ってきました。多くは推論モデル（答えが reasoning_content に入り content が空）かタイムアウトです。どちらもまだ UI から設定できません。conf.yaml の translator_config.llm に extra_body.reasoning_effort: none と timeout: 60 を追加してください。",
       "testFail_disabled": "翻訳は現在オフです。テストするものがありません。",
       "testFail_config": "設定を読み込めません：{{error}}",
-      "testFail_error": "テスト失敗：{{error}}"
+      "testFail_error": "テスト失敗：{{error}}",
+      "endpointEmpty": "アドレスを空にはできません"
     },
     "playerLanguage": {
       "label": "読む言語／プレイヤー言語",

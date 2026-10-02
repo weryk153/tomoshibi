@@ -218,7 +218,8 @@
       "cameraFailed": "摄像头开启失败，所以背景没有切换。",
       "connectionSection": "连接设置",
       "connectionHelp": "这两个字段改完要按「连接」才生效——边打边应用的话，每输入一个字符就会重连一次。",
-      "connect": "连接"
+      "connect": "连接",
+      "customBgUrlEmpty": "网址不能为空"
     },
     "characters": {
       "description": "创建、编辑、切换你的陪伴角色，完全不用碰 YAML。",
@@ -350,7 +351,7 @@
       "avatarNotImage": "请选择图片文件。",
       "avatarTooLarge": "图片太大了，请选小于 512KB 的图片。",
       "avatarReadFailed": "读取图片失败，请再试一次。",
-      "sectionNote": "昵称与头像存在本机，改了立刻生效；阅读语言、全局指示与翻译设置写进配置文件，要重启后端（或重新切换一次角色）才会应用到当前对话。"
+      "sectionNote": "每一项都改了就保存。写进配置文件、要重新加载才生效的，会出现在设置最上面的提示。"
     },
     "live2d": {
       "pointerInteractive": "鼠标互动",
@@ -617,7 +618,8 @@
       "testFail_unchanged": "翻译没有生效——回来的跟原文一样。常见原因：选到的是推理模型（答案被放进 reasoning_content、content 是空的），或超过超时。目前 UI 还不能设置这两项，需要手动改 conf.yaml 的 translator_config.llm（加 extra_body.reasoning_effort: none 与 timeout: 60）。",
       "testFail_disabled": "翻译目前是关闭的，没有东西可以测。",
       "testFail_config": "配置读不起来：{{error}}",
-      "testFail_error": "测试失败：{{error}}"
+      "testFail_error": "测试失败：{{error}}",
+      "endpointEmpty": "地址不能为空"
     },
     "playerLanguage": {
       "label": "阅读／玩家语言",

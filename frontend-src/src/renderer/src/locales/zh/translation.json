@@ -218,7 +218,8 @@
       "cameraFailed": "攝影機開啟失敗，所以背景沒有切換。",
       "connectionSection": "連線設定",
       "connectionHelp": "這兩個欄位改完要按「連線」才生效——邊打邊套用的話，每輸入一個字元就會重連一次。",
-      "connect": "連線"
+      "connect": "連線",
+      "customBgUrlEmpty": "網址不能空白"
     },
     "characters": {
       "description": "建立、編輯、切換你的陪伴角色，完全不用碰 YAML。",
@@ -350,7 +351,7 @@
       "avatarNotImage": "請選擇圖片檔。",
       "avatarTooLarge": "圖片太大了，請選小於 512KB 的圖片。",
       "avatarReadFailed": "讀取圖片失敗，請再試一次。",
-      "sectionNote": "暱稱與頭像存在本機，改了立刻生效；閱讀語言、全域指示與翻譯設定寫進設定檔，要重啟後端（或重新切換一次角色）才會套用到目前的對話。"
+      "sectionNote": "每一項都改了就存。寫進設定檔、要重新載入才生效的，會出現在設定最上面的提示。"
     },
     "live2d": {
       "pointerInteractive": "滑鼠互動",
@@ -617,7 +618,8 @@
       "testFail_unchanged": "翻譯沒有生效——回來的跟原文一樣。常見原因：選到的是推理模型（答案被放進 reasoning_content、content 是空的），或超過逾時。目前 UI 還不能設定這兩項，需要手動改 conf.yaml 的 translator_config.llm（加 extra_body.reasoning_effort: none 與 timeout: 60）。",
       "testFail_disabled": "翻譯目前是關閉的，沒有東西可以測。",
       "testFail_config": "設定讀不起來：{{error}}",
-      "testFail_error": "測試失敗：{{error}}"
+      "testFail_error": "測試失敗：{{error}}",
+      "endpointEmpty": "位址不能空白"
     },
     "playerLanguage": {
       "label": "閱讀／玩家語言",

@@ -218,7 +218,8 @@
       "cameraFailed": "카메라를 시작하지 못해 배경이 전환되지 않았습니다.",
       "connectionSection": "연결 설정",
       "connectionHelp": "이 두 항목은 「연결」을 눌러야 반영돼요. 입력할 때마다 적용하면 글자마다 다시 연결돼요.",
-      "connect": "연결"
+      "connect": "연결",
+      "customBgUrlEmpty": "URL은 비워 둘 수 없습니다"
     },
     "characters": {
       "description": "YAML 없이 동반 캐릭터를 만들고, 편집하고, 전환하세요.",
@@ -350,7 +351,7 @@
       "avatarNotImage": "이미지 파일을 선택하세요.",
       "avatarTooLarge": "이미지가 너무 커요. 512KB 미만으로 선택하세요.",
       "avatarReadFailed": "이미지를 읽을 수 없어요. 다시 시도해 주세요.",
-      "sectionNote": "별명과 프로필 사진은 이 기기에 저장되고 바로 반영돼요. 읽기 언어, 전역 지시, 번역 설정은 설정 파일에 기록되므로 현재 대화에 반영하려면 백엔드를 다시 시작(또는 캐릭터를 다시 전환)해야 해요."
+      "sectionNote": "여기의 설정은 바꾸면 바로 저장됩니다. 다시 불러와야 적용되는 변경은 설정 맨 위에 표시됩니다."
     },
     "live2d": {
       "pointerInteractive": "포인터 상호작용",
@@ -617,7 +618,8 @@
       "testFail_unchanged": "번역이 적용되지 않았습니다 — 원문이 그대로 돌아왔습니다. 대개 추론 모델(답이 reasoning_content에 들어가고 content가 비어 있음)이거나 타임아웃입니다. 둘 다 아직 UI에서 설정할 수 없습니다. conf.yaml의 translator_config.llm에 extra_body.reasoning_effort: none과 timeout: 60을 추가하세요.",
       "testFail_disabled": "번역이 현재 꺼져 있어 테스트할 것이 없습니다.",
       "testFail_config": "설정을 읽을 수 없습니다: {{error}}",
-      "testFail_error": "테스트 실패: {{error}}"
+      "testFail_error": "테스트 실패: {{error}}",
+      "endpointEmpty": "주소는 비워 둘 수 없습니다"
     },
     "playerLanguage": {
       "label": "읽기 / 플레이어 언어",
