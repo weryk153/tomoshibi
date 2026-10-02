@@ -70,3 +70,20 @@ export async function deletePersona(
     };
   }
 }
+
+export const activePersonaBody = (
+  confUid: string,
+  personaId: string | null,
+): { conf_uid: string; persona_id: string | null } => ({ conf_uid: confUid, persona_id: personaId })
+
+// 替「不是正在用的」角色選人設版本：存起來，切換到她時生效。正在用的角色走
+// WebSocket 的 switch-persona（立刻換），不走這裡。
+export const setActivePersona = (
+  baseUrl: string,
+  confUid: string,
+  personaId: string | null,
+): Promise<ApiResult<{ ok: boolean; active_persona_id: string | null }>> => apiPut(
+  baseUrl,
+  '/api/personas/active',
+  activePersonaBody(confUid, personaId),
+)
