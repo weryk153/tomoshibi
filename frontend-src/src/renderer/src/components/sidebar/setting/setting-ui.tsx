@@ -35,6 +35,11 @@ import Performances from './performances';
 import Scenes from './scenes';
 import Stream from './stream';
 import { PendingBanner } from './pending-banner';
+import { useConfig } from '@/context/character-config-context';
+
+// 暫時頂著：人設與記憶分頁下一步併進角色頁。
+function ActivePersonas(): JSX.Element { const { confUid } = useConfig(); return <Personas confUid={confUid} isActive />; }
+function ActiveMemory(): JSX.Element { const { confUid } = useConfig(); return <Memory confUid={confUid} />; }
 
 interface SettingUIProps {
   open: boolean;
@@ -66,7 +71,7 @@ interface SettingsTab {
 const TABS: SettingsTab[] = [
   { value: 'general', labelKey: 'settings.tabs.general', group: 'companion', render: ({ onCancel }) => <><SystemBasics onCancel={onCancel} /><StageDisplay /><ModelExtras /><EngineNumbers /></> },
   { value: 'characters', labelKey: 'settings.tabs.characters', group: 'companion', render: () => <Characters /> },
-  { value: 'personas', labelKey: 'settings.tabs.personas', group: 'companion', render: () => <Personas /> },
+  { value: 'personas', labelKey: 'settings.tabs.personas', group: 'companion', render: () => <ActivePersonas /> },
   { value: 'live2d', labelKey: 'settings.tabs.avatar', group: 'stage', render: () => <><CanvasInteraction /><StageEffects /></> },
   { value: 'performances', labelKey: 'settings.tabs.performances', group: 'stage', render: () => <Performances /> },
   { value: 'scenes', labelKey: 'settings.tabs.scenes', group: 'stage', render: () => <Scenes /> },
@@ -75,7 +80,7 @@ const TABS: SettingsTab[] = [
   { value: 'asr', labelKey: 'settings.tabs.asr', group: 'intelligence', render: ({ active }) => <ASR active={active} /> },
   { value: 'tts', labelKey: 'settings.tabs.tts', group: 'intelligence', render: ({ active }) => <TTS active={active} /> },
   { value: 'agent', labelKey: 'settings.tabs.agent', group: 'intelligence', render: () => <Agent /> },
-  { value: 'memory', labelKey: 'settings.tabs.memory', group: 'intelligence', render: () => <Memory /> },
+  { value: 'memory', labelKey: 'settings.tabs.memory', group: 'intelligence', render: () => <ActiveMemory /> },
   { value: 'perf', labelKey: 'settings.tabs.perf', group: 'system', render: () => <Perf /> },
   { value: 'remoteAccess', labelKey: 'settings.remoteAccess.tab', group: 'system', render: ({ active }) => <RemoteAccess active={active} /> },
   { value: 'about', labelKey: 'settings.tabs.about', group: 'system', render: () => <About /> },

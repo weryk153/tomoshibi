@@ -12,13 +12,14 @@ import { SaveStatus } from '@/components/ui/tw/save-status';
 import { useAutosave } from '@/hooks/use-autosave';
 import { useStream } from '@/context/stream-context';
 import { useWebSocket } from '@/context/websocket-context';
-import { useConfig } from '@/context/character-config-context';
+import { personaApplyMode } from '@/utils/character-page';
 import { wsService } from '@/services/websocket-service';
 import { settingStyles } from './setting-styles';
 import {
   createPersona,
   deletePersona,
   fetchPersonas,
+  setActivePersona,
   updatePersona,
   type PersonaDraft,
   type PersonaRecord,
@@ -26,10 +27,16 @@ import {
 
 const EMPTY_DRAFT: PersonaDraft = { name: '', prompt: '', id: '' };
 
-function Personas(): JSX.Element {
+interface PersonasProps {
+  // 角色頁選中的那個角色。人設是共用的池子，每個角色各自記著用哪一個。
+  confUid: string
+  // 她是不是正在跟你說話的那個：是的話套用走 WebSocket、立刻換；不是的話只存。
+  isActive: boolean
+}
+
+function Personas({ confUid, isActive }: PersonasProps): JSX.Element {
   const { t } = useTranslation();
   const { baseUrl, sendMessage } = useWebSocket();
-  const { confUid } = useConfig();
   const [personas, setPersonas] = useState<PersonaRecord[] | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -45,6 +52,12 @@ function Personas(): JSX.Element {
   useEffect(() => {
     let cancelled = false;
     setLoadError(null);
+    // 換了角色：上一個角色開著的表單與刪除確認不能留著。
+    setMode('list');
+    setEditingId(null);
+    setDraft(EMPTY_DRAFT);
+    setFormError(null);
+    setPendingDelete(null);
     fetchPersonas(baseUrl, confUid).then((result) => {
       if (cancelled) return;
       if (result.ok) {
@@ -116,7 +129,7 @@ function Personas(): JSX.Element {
     const result = await updatePersona(baseUrl, edit.id, { name: edit.name, prompt: edit.prompt });
     if (!result.ok) return { ok: false, error: result.error } as const;
     // 直播中後端不准換人設（她正在對觀眾講話）：存了，但等直播結束再按「套用」。
-    if (activeId === edit.id && !streaming) {
+    if (isActive && activeId === edit.id && !streaming) {
       setApplyingId(edit.id);
       sendMessage({ type: 'switch-persona', persona_id: edit.id });
     }
@@ -132,10 +145,24 @@ function Personas(): JSX.Element {
     }
   }, [draft, editSaver, editingId, mode]);
 
-  const apply = useCallback((personaId: string | null) => {
+  const apply = useCallback(async (personaId: string | null) => {
+    if (personaApplyMode(isActive) === 'live') {
+      setApplyingId(personaId);
+      sendMessage({ type: 'switch-persona', persona_id: personaId });
+      return;
+    }
+    // 不是正在用的角色：存起來，切換到她時生效。不經過連線，所以不會動到
+    // 正在跟你說話的那一個。
     setApplyingId(personaId);
-    sendMessage({ type: 'switch-persona', persona_id: personaId });
-  }, [sendMessage]);
+    const result = await setActivePersona(baseUrl, confUid, personaId);
+    setApplyingId(undefined);
+    if (!result.ok) {
+      toaster.create({ title: result.error, type: 'error', duration: 3000 });
+      return;
+    }
+    toaster.create({ title: t('settings.characterPage.personaStored'), type: 'success', duration: 2200 });
+    setRefreshTick((value) => value + 1);
+  }, [baseUrl, confUid, isActive, sendMessage, t]);
 
   const remove = useCallback(async (persona: PersonaRecord) => {
     const result = await deletePersona(baseUrl, persona.id);
@@ -195,7 +222,7 @@ function Personas(): JSX.Element {
         )}
         {formError && <Text color="red.300" fontSize="sm">{formError}</Text>}
         {mode === 'edit' && <SaveStatus state={editSaver.state} />}
-        {mode === 'edit' && streaming && editingId === activeId && (
+        {mode === 'edit' && isActive && streaming && editingId === activeId && (
           <Text fontSize="xs" color="orange.300">{t('settings.personas.applyAfterStream')}</Text>
         )}
         <HStack>
