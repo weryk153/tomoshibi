@@ -340,6 +340,8 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
         }
         break;
       case 'error':
+        // 重新載入（或換角色）被拒時，畫面不能一直停在「載入中」。
+        setAiState((current: AiState) => (current === 'loading' ? 'idle' : current));
         toaster.create({
           // text_key 是完整的翻譯鍵（例如 stream.privateChatPaused）；沒有翻譯就顯示原文。
           title: message.text_key

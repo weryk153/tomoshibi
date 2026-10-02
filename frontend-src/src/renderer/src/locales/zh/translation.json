@@ -848,6 +848,23 @@
     "values": {
       "integerBetween": "請填 {{min}}～{{max}} 的整數",
       "numberBetween": "請填 {{min}}～{{max}} 的數字"
+    },
+    "pending": {
+      "count": "有 {{count}} 項變更還沒生效",
+      "reload": "重新載入",
+      "items": {
+        "playerLanguage": "你看的語言",
+        "playerPrompt": "關於你",
+        "tools": "網路搜尋等工具",
+        "translator": "翻譯方式",
+        "engine": "背景工作與放在心上的數量",
+        "asr": "語音辨識",
+        "tts": "語音合成服務",
+        "perfPreset": "效能模式",
+        "memory": "長期記憶開關",
+        "character": "正在用的角色",
+        "other": "其他設定"
+      }
     }
   },
   "footer": {

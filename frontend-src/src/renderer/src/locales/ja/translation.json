@@ -848,6 +848,23 @@
     "values": {
       "integerBetween": "{{min}}～{{max}} の整数を入力してください",
       "numberBetween": "{{min}}～{{max}} の数値を入力してください"
+    },
+    "pending": {
+      "count": "未反映の変更が {{count}} 件あります",
+      "reload": "再読み込み",
+      "items": {
+        "playerLanguage": "あなたの表示言語",
+        "playerPrompt": "あなたについて",
+        "tools": "ウェブ検索などのツール",
+        "translator": "翻訳方法",
+        "engine": "バックグラウンド処理と気にかける数",
+        "asr": "音声認識",
+        "tts": "音声合成サービス",
+        "perfPreset": "パフォーマンスモード",
+        "memory": "長期記憶のスイッチ",
+        "character": "使用中のキャラクター",
+        "other": "その他の設定"
+      }
     }
   },
   "footer": {

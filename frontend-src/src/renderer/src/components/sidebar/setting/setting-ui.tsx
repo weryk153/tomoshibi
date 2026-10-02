@@ -30,6 +30,7 @@ import About from './about';
 import Performances from './performances';
 import Scenes from './scenes';
 import Stream from './stream';
+import { PendingBanner } from './pending-banner';
 
 interface SettingUIProps {
   open: boolean;
@@ -124,6 +125,8 @@ function SettingUI({ open, onClose }: SettingUIProps): JSX.Element {
         </Button>
       )}
     >
+      {/* 要重新載入才生效的變更集中在這裡，不再每頁各寫一句「重啟後生效」。 */}
+      <PendingBanner active={open} />
       <ArkTabs.Root
         value={activeTab}
         onValueChange={(details) => setActiveTab(details.value)}

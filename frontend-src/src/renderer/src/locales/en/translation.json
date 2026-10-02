@@ -848,6 +848,23 @@
     "values": {
       "integerBetween": "Enter a whole number from {{min}} to {{max}}",
       "numberBetween": "Enter a number from {{min}} to {{max}}"
+    },
+    "pending": {
+      "count": "{{count}} change(s) not applied yet",
+      "reload": "Reload",
+      "items": {
+        "playerLanguage": "Your reading language",
+        "playerPrompt": "About you",
+        "tools": "Web search and other tools",
+        "translator": "Translation method",
+        "engine": "Background work and what she keeps in mind",
+        "asr": "Speech recognition",
+        "tts": "Speech synthesis service",
+        "perfPreset": "Performance mode",
+        "memory": "Long-term memory switch",
+        "character": "The active character",
+        "other": "Other settings"
+      }
     }
   },
   "footer": {
