@@ -4,15 +4,14 @@
 // 以前這一頁也能改引擎與參考音，寫的卻是底稿角色（conf.yaml），其他角色有自己
 // 的設定時完全沒作用，使用者以為改了「全部」。
 //
-// 這個分頁本身不接 onSave／onCancel（跟 about.tsx 一樣是無 props 的分頁），
-// 存檔即時發生、不受外層抽屜的 Save/Cancel 影響。
-import { useState, useEffect, useCallback } from 'react';
-import { Stack, Text, Heading, HStack } from '@chakra-ui/react';
+// 服務位址改了就存（停手或離開欄位）；要重新載入才生效，由抽屜頂端的提示處理。
+import { useState, useEffect, useRef } from 'react';
+import { Stack, Text, Heading } from '@chakra-ui/react';
 import { useTranslation } from 'react-i18next';
 import { settingStyles } from './setting-styles';
 import { InputField } from './common';
-import { Button } from '@/components/ui/tw/primitives';
-import { toaster } from '@/components/ui/tw/toaster';
+import { SaveStatus } from '@/components/ui/tw/save-status';
+import { useAutosave } from '@/hooks/use-autosave';
 import { useWebSocket } from '@/context/websocket-context';
 import { fetchPerf, setTtsServiceUrl } from '@/api/perf.ts';
 import GptSovitsInstall from '@/components/llm/gpt-sovits-install';
@@ -28,9 +27,9 @@ function TTS({ active = true }: TTSProps): JSX.Element {
   const { baseUrl } = useWebSocket();
 
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
+  const savedUrlRef = useRef('');
   const [draftUrl, setDraftUrl] = useState('');
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [saving, setSaving] = useState(false);
   const [refreshTick, setRefreshTick] = useState(0);
 
   useEffect(() => {
@@ -42,7 +41,9 @@ function TTS({ active = true }: TTSProps): JSX.Element {
       if (result.ok) {
         const url = result.data.gpt_sovits_api_url || '';
         setSavedUrl(url);
-        setDraftUrl(url);
+        // 切回分頁會重抓：使用者正在改（草稿跟上次存的不一樣）就不蓋掉。
+        setDraftUrl((draft) => (draft === '' || draft === savedUrlRef.current ? url : draft));
+        savedUrlRef.current = url;
         setLoadError(null);
       } else {
         setLoadError(result.error || t('settings.perf.loadError'));
@@ -54,31 +55,14 @@ function TTS({ active = true }: TTSProps): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseUrl, active, refreshTick]);
 
-  const handleSave = useCallback(async () => {
-    const url = draftUrl.trim();
-    if (!url) return;
-    setSaving(true);
-    const result = await setTtsServiceUrl(baseUrl, url);
-    setSaving(false);
-    if (result.ok) {
-      setSavedUrl(result.data.gpt_sovits_api_url);
-      setDraftUrl(result.data.gpt_sovits_api_url);
-      toaster.create({
-        title: t('settings.perf.saved'),
-        description: t('settings.perf.restartHint'),
-        type: 'success',
-        duration: 4000,
-      });
-    } else {
-      toaster.create({
-        title: result.error || t('settings.perf.saveFailed'),
-        type: 'error',
-        duration: 3000,
-      });
-    }
-  }, [baseUrl, draftUrl, t]);
+  const urlSaver = useAutosave(async (draft: string) => {
+    const result = await setTtsServiceUrl(baseUrl, draft.trim());
+    if (!result.ok) return { ok: false, error: result.error || t('settings.perf.saveFailed') } as const;
+    setSavedUrl(result.data.gpt_sovits_api_url);
+    savedUrlRef.current = result.data.gpt_sovits_api_url;
+    return { ok: true } as const;
+  }, { validate: (draft) => (draft.trim() ? null : t('settings.translator.endpointEmpty')) });
 
-  const unchanged = draftUrl.trim() === (savedUrl ?? '').trim();
 
   return (
     <Stack {...settingStyles.common.container} gap={2}>
@@ -96,21 +80,12 @@ function TTS({ active = true }: TTSProps): JSX.Element {
           <InputField
             label={t('settings.perf.gptSovitsApiUrlLabel')}
             value={draftUrl}
-            onChange={setDraftUrl}
+            onChange={(value) => { setDraftUrl(value); urlSaver.change(value); }}
+            onBlur={urlSaver.flush}
             placeholder="http://127.0.0.1:9880/tts"
             help={t('settings.perf.gptSovitsApiUrlHelp')}
           />
-          <HStack>
-            <Button
-              size="xs"
-              tone="blue"
-              onClick={handleSave}
-              loading={saving}
-              disabled={!draftUrl.trim() || unchanged}
-            >
-              {t('common.save')}
-            </Button>
-          </HStack>
+          <SaveStatus state={urlSaver.state} />
         </Stack>
       )}
     </Stack>
