@@ -173,16 +173,22 @@ function General({ onCancel }: GeneralProps): JSX.Element {
   };
 
   // 「每幾輪跑一次」與「放在心上幾個」：停手才存，打到一半的值不存也不彈回。
+  // 跟「後端最後一次確認存下的值」比，不跟畫面上一輪的 engine 比：上一筆剛存好、
+  // 接著排的那筆在畫面重畫前就會跑，用 state 比會把「改回原值」誤判成沒變。
+  const savedEngineRef = useRef<EngineSettings | null>(null);
+  savedEngineRef.current = savedEngineRef.current ?? engine;
   const everySaver = useAutosave(async (drafts: Record<EngineEvery, string>) => {
-    if (!engine) return { ok: true } as const;
+    const saved = savedEngineRef.current;
+    if (!saved) return { ok: true } as const;
     const changes: Partial<Record<EngineEvery, number>> = {};
     (Object.keys(drafts) as EngineEvery[]).forEach((key) => {
       const value = parseBoundedNumber(drafts[key], EVERY_BOUNDS);
-      if (value !== null && value !== engine[key]) changes[key] = value;
+      if (value !== null && value !== saved[key]) changes[key] = value;
     });
     if (Object.keys(changes).length === 0) return { ok: true } as const;
     const result = await saveEngineSettings(baseUrl, changes);
     if (!result.ok) return { ok: false, error: result.error } as const;
+    savedEngineRef.current = { ...saved, ...result.data };
     setEngine((current) => (current ? { ...current, ...result.data } : current));
     return { ok: true } as const;
   }, {

@@ -108,3 +108,66 @@ def test_a_successful_character_switch_clears_the_list():
     pending_changes.mark("character")
     asyncio.run(h._handle_config_switch(_Socket(), "me", {"file": "a.yaml"}))
     assert pending_changes.pending() == []
+
+
+def _put_client(tmp_path, monkeypatch, active):
+    import yaml
+
+    from src.open_llm_vtuber import character_route, conf_editor
+
+    monkeypatch.chdir(tmp_path)
+    base = {
+        "conf_uid": "base",
+        "conf_name": "底稿",
+        "persona_prompt": "你是底稿。\n",
+        "live2d_model_name": "mao_pro",
+    }
+    (tmp_path / "conf.yaml").write_text(
+        yaml.safe_dump({"character_config": base}, allow_unicode=True), "utf-8"
+    )
+    (tmp_path / "characters").mkdir()
+    (tmp_path / "characters" / "kurisu.yaml").write_text(
+        yaml.safe_dump(
+            {"character_config": {**base, "conf_uid": "kurisu", "conf_name": "紅莉栖"}},
+            allow_unicode=True,
+        ),
+        "utf-8",
+    )
+    for module in (conf_editor, character_route):
+        monkeypatch.setattr(module, "CONF_PATH", "conf.yaml", raising=False)
+    monkeypatch.setattr(character_route, "_rescan_skins", lambda: None)
+    monkeypatch.setattr(
+        character_route, "_load_model_dict", lambda: [{"name": "mao_pro"}]
+    )
+    monkeypatch.setattr(character_route, "_is_local_request", lambda r: True)
+    monkeypatch.setattr(
+        character_route, "get_active_character_filename", lambda: active
+    )
+    app = FastAPI()
+    app.include_router(character_route.init_character_route())
+    return TestClient(app)
+
+
+_EDIT = {
+    "conf_name": "新名字",
+    "persona_prompt": "改過了",
+    "live2d_model_name": "mao_pro",
+}
+
+
+@pytest.mark.parametrize(
+    "active,edited,expected",
+    [
+        ("kurisu.yaml", "kurisu.yaml", ["character"]),
+        ("other.yaml", "kurisu.yaml", []),
+        (None, "conf.yaml", ["character"]),  # 沒存過正在用的角色＝底稿角色
+        ("kurisu.yaml", "conf.yaml", []),
+    ],
+)
+def test_editing_a_whole_character_is_pending_only_when_she_is_active(
+    tmp_path, monkeypatch, active, edited, expected
+):
+    client = _put_client(tmp_path, monkeypatch, active)
+    response = client.put(f"/api/characters/{edited}", json=_EDIT)
+    assert response.status_code == 200, response.text
+    assert pending_changes.pending() == expected

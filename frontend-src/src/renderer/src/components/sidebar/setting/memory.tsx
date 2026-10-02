@@ -16,7 +16,7 @@
 // 不會打到未知角色或觸發 400——切換角色時 confUid 改變，下面的 effect 會重新
 // 載入。
 import {
-  useState, useEffect, useCallback,
+  useState, useEffect, useCallback, useRef,
 } from 'react';
 import {
   Stack, Text, Heading, HStack, Textarea, Collapsible, Box,
@@ -120,24 +120,41 @@ function Memory(): JSX.Element {
   // 長文字：離開欄位才存（不在停頓時存，不然改到一半就把記憶整份換掉）。每一筆帶著
   // 它屬於哪個角色，排隊中換了角色也不會存到別人身上。
   const BLUR_ONLY_MS = 60 * 60 * 1000;
-  const contentSaver = useAutosave(async (edit: { uid: string; draft: string; from: string | undefined }) => {
-    const result = await saveMemoryContent(baseUrl, edit.uid, edit.draft, edit.from);
+  // 存檔時才讀「現在存著的是哪一版」當起點（edited_from），不用排進去那一刻的：
+  // 上一筆剛存好、這一筆才送的話，起點要是剛存好的那一版，刪掉的行才不會被加回來。
+  const memoryRef = useRef(memory);
+  memoryRef.current = memory;
+  const selfDraftRef = useRef(selfDraft);
+  selfDraftRef.current = selfDraft;
+  // 起點只對同一個角色有意義：排隊中換了角色，就不帶起點（不拿別人的記憶當基準）。
+  const uidRef = useRef(confUid);
+  uidRef.current = confUid;
+  const startingPoint = (uid: string, pick: (m: NonNullable<typeof memory>) => string): string | undefined => (
+    uid === uidRef.current && memoryRef.current ? pick(memoryRef.current) : undefined
+  );
+  const contentSaver = useAutosave(async (edit: { uid: string; draft: string }) => {
+    const from = startingPoint(edit.uid, (m) => m.content);
+    const result = await saveMemoryContent(baseUrl, edit.uid, edit.draft, from);
     if (!result.ok) {
       return { ok: false, error: result.error || t('settings.memory.saveContentFailed') } as const;
     }
+    memoryRef.current = memoryRef.current ? { ...memoryRef.current, content: edit.draft } : memoryRef.current;
     setMemory((m) => (m ? { ...m, content: edit.draft } : m));
     return { ok: true } as const;
   }, { delayMs: BLUR_ONLY_MS });
 
-  const selfSaver = useAutosave(async (edit: { uid: string; draft: string; from: string | undefined }) => {
-    const result = await saveSelfMemoryContent(baseUrl, edit.uid, edit.draft, edit.from);
+  const selfSaver = useAutosave(async (edit: { uid: string; draft: string }) => {
+    const from = startingPoint(edit.uid, (m) => m.self_content);
+    const result = await saveSelfMemoryContent(baseUrl, edit.uid, edit.draft, from);
     if (!result.ok) {
       return { ok: false, error: result.error || t('settings.memory.saveContentFailed') } as const;
     }
     // 引擎有上限，存進去的不一定全部留下：顯示它實際記得的那一份。不然下次
     // 存檔時，被擠掉的那幾行會被當成新的又加回去。
     const stored = typeof result.data?.content === 'string' ? result.data.content : edit.draft;
-    setSelfDraft(stored);
+    memoryRef.current = memoryRef.current ? { ...memoryRef.current, self_content: stored } : memoryRef.current;
+    // 存檔途中又打了字就不蓋掉，下一次存檔會帶著新的字送出去。
+    if (selfDraftRef.current === edit.draft) setSelfDraft(stored);
     setMemory((m) => (m ? { ...m, self_content: stored } : m));
     return { ok: true } as const;
   }, { delayMs: BLUR_ONLY_MS });
@@ -233,7 +250,7 @@ function Memory(): JSX.Element {
                 value={selfDraft}
                 onChange={(e) => {
                   setSelfDraft(e.target.value);
-                  selfSaver.change({ uid: confUid, draft: e.target.value, from: memory?.self_content });
+                  selfSaver.change({ uid: confUid, draft: e.target.value });
                 }}
                 onBlur={selfSaver.flush}
                 placeholder={t('settings.memory.empty')}
@@ -285,7 +302,7 @@ function Memory(): JSX.Element {
                 value={contentDraft}
                 onChange={(e) => {
                   setContentDraft(e.target.value);
-                  contentSaver.change({ uid: confUid, draft: e.target.value, from: memory?.content });
+                  contentSaver.change({ uid: confUid, draft: e.target.value });
                 }}
                 onBlur={contentSaver.flush}
                 placeholder={t('settings.memory.empty')}

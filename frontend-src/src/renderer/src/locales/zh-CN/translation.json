@@ -849,7 +849,8 @@
         "memory": "长期记忆开关",
         "character": "正在用的角色",
         "other": "其他设置"
-      }
+      },
+      "liveBlocked": "直播中不能重新加载，直播结束后再按。"
     }
   },
   "footer": {

@@ -1,4 +1,8 @@
-// createAutosaver 的 React 包裝：元件卸載（關抽屜、切分頁）時把還沒送的那筆送出去。
+// createAutosaver 的 React 包裝。還沒送的那筆在三種時候立刻送：欄位失焦（呼叫端接
+// onBlur={flush}）、元件卸載、頁面要關掉或重新整理（pagehide）。
+//
+// 注意：設定抽屜關起來、切分頁時分頁內容不會卸載（Ark 的 Tabs 只有 lazyMount），
+// 計時器照常跑完、照常存；真正會丟資料的是關掉頁面，所以要聽 pagehide。
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AUTOSAVE_DELAY_MS, createAutosaver, type SaveResult, type SaveState,
@@ -23,7 +27,14 @@ export function useAutosave<T>(
     onState: setState,
   }), [delayMs]);
 
-  useEffect(() => () => { void saver.dispose(); }, [saver]);
+  useEffect(() => {
+    const onPageHide = (): void => { void saver.flush(); };
+    window.addEventListener('pagehide', onPageHide);
+    return () => {
+      window.removeEventListener('pagehide', onPageHide);
+      void saver.dispose();
+    };
+  }, [saver]);
 
   return {
     state,

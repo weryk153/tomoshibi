@@ -849,7 +849,8 @@
         "memory": "Long-term memory switch",
         "character": "The active character",
         "other": "Other settings"
-      }
+      },
+      "liveBlocked": "Can't reload during a live stream; reload after it ends."
     }
   },
   "footer": {

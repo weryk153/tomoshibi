@@ -444,6 +444,7 @@ function Performances(): JSX.Element {
                 />
                 <DraftNumberField
                   label={t('settings.performances.probability')}
+                integer
                   value={Math.round(draft.probability * 100)}
                   min={0}
                   max={100}
@@ -471,6 +472,7 @@ function Performances(): JSX.Element {
                 />
                 <DraftNumberField
                   label={t('settings.performances.musicVolume')}
+                integer
                   value={Math.round(draft.musicVolume * 100)}
                   min={0}
                   max={100}

@@ -125,14 +125,12 @@ function Personas(): JSX.Element {
   });
 
   const changeDraft = useCallback((patch: Partial<typeof draft>) => {
-    setDraft((current) => {
-      const next = { ...current, ...patch };
-      if (mode === 'edit' && editingId) {
-        editSaver.change({ id: editingId, name: next.name, prompt: next.prompt });
-      }
-      return next;
-    });
-  }, [editSaver, editingId, mode]);
+    const next = { ...draft, ...patch };
+    setDraft(next);
+    if (mode === 'edit' && editingId) {
+      editSaver.change({ id: editingId, name: next.name, prompt: next.prompt });
+    }
+  }, [draft, editSaver, editingId, mode]);
 
   const apply = useCallback((personaId: string | null) => {
     setApplyingId(personaId);

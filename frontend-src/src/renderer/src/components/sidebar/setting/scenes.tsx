@@ -249,20 +249,16 @@ function Scenes(): JSX.Element {
                 />
               </Field>
               {/* 有匯入檔案時不能換類型、改網址：那會把匯入的檔案刪掉。要換先按「移除檔案」。 */}
-              <Box
-                opacity={selected.assetKey ? 0.5 : 1}
-                pointerEvents={selected.assetKey ? "none" : "auto"}
-              >
-                <SelectField
-                  label={t("settings.scenes.type")}
-                  value={[selected.type]}
-                  onChange={(value) =>
-                    updateSelected({ type: (value[0] || "image") as SceneType })
-                  }
-                  collection={typeCollection}
-                  placeholder={t("settings.scenes.type")}
-                />
-              </Box>
+              <SelectField
+                label={t("settings.scenes.type")}
+                value={[selected.type]}
+                onChange={(value) =>
+                  updateSelected({ type: (value[0] || "image") as SceneType })
+                }
+                collection={typeCollection}
+                placeholder={t("settings.scenes.type")}
+                disabled={Boolean(selected.assetKey)}
+              />
               {selected.type !== "live2d" && (
                 <Field
                   label={t("settings.scenes.asset")}
@@ -373,6 +369,7 @@ function Scenes(): JSX.Element {
               )}
               <DraftNumberField
                 label={t("settings.scenes.opacity")}
+                integer
                 value={Math.round(selected.opacity * 100)}
                 min={10}
                 max={100}
@@ -448,6 +445,7 @@ function Scenes(): JSX.Element {
                   />
                   <DraftNumberField
                     label={t("settings.scenes.live2dParallax")}
+                integer
                     value={Math.round(selected.live2d.parallax * 100)}
                     min={0}
                     max={100}

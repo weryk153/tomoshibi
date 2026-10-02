@@ -305,8 +305,7 @@ function You({ active = true }: YouProps): JSX.Element {
     engineSaver.change(engine as TranslatorEngine);
   }, [engineSaver]);
 
-  // DeepLX 位址：文字輸入框，跟 asr.tsx 的憑證欄位同一種「不逐鍵送出、按鈕
-  // 才存」模式——網址打到一半按下 Enter 前的每個字元都送出去太吵。草稿只在
+  // DeepLX 位址：停手或離開欄位才存（不逐鍵送出）。草稿只在
   // 「使用者還沒開始編輯」時跟著後端值刷新（用 ref 記錄上一次同步進來的值，
   // 判斷草稿是否還等於它），理由跟 asr.tsx 的 azureRegion 同步邏輯一样，
   // 避免打字打到一半被背景刷新蓋掉。
