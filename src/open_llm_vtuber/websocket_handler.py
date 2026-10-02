@@ -162,6 +162,8 @@ class WebSocketHandler:
         self.current_conversation_tasks: Dict[str, Optional[asyncio.Task]] = {}
         self.default_context_cache = default_context_cache
         self.received_data_buffers: Dict[str, np.ndarray] = {}
+        # 直播控制器（server.py 建好後設定）。沒開直播功能時是 None。
+        self.stream = None
 
         # Message handlers mapping
         self._message_handlers = self._init_message_handlers()
@@ -193,8 +195,28 @@ class WebSocketHandler:
             "heartbeat": self._handle_heartbeat,
         }
 
+    def _is_stage(self, client_uid: str) -> bool:
+        # getattr：既有測試用 __new__ 建物件、沒跑 __init__，沒有 stream 屬性。
+        stream = getattr(self, "stream", None)
+        return stream is not None and stream.stage_uid == client_uid
+
+    def _streaming(self) -> bool:
+        stream = getattr(self, "stream", None)
+        return stream is not None and stream.live
+
+    async def broadcast_stream_state(self, live: bool) -> None:
+        """直播開始／停止時告訴每個一般連線（主視窗要停用輸入列）。"""
+        payload = json.dumps({"type": "stream-state", "live": live})
+        for uid, socket in list(self.client_connections.items()):
+            if self._is_stage(uid):
+                continue
+            try:
+                await socket.send_text(payload)
+            except Exception as e:
+                logger.debug(f"stream-state not delivered to {uid}: {e}")
+
     async def handle_new_connection(
-        self, websocket: WebSocket, client_uid: str
+        self, websocket: WebSocket, client_uid: str, stage: bool = False
     ) -> None:
         """
         Handle new WebSocket connection setup
@@ -216,7 +238,7 @@ class WebSocketHandler:
             )
 
             await self._send_initial_messages(
-                websocket, client_uid, session_service_context
+                websocket, client_uid, session_service_context, stage=stage
             )
 
             logger.info(f"Connection established for client {client_uid}")
@@ -247,6 +269,7 @@ class WebSocketHandler:
         websocket: WebSocket,
         client_uid: str,
         session_service_context: ServiceContext,
+        stage: bool = False,
     ):
         """Send initial connection messages to the client"""
         await websocket.send_text(
@@ -274,6 +297,17 @@ class WebSocketHandler:
         # Send initial group status
         await self.send_group_update(websocket, client_uid)
 
+        if stage:
+            # 舞台頁（OBS 擷取用）不屬於任何一段私人對話：不還原、不新建，也就不會
+            # 動到「上次聊到哪」。開播時直播流程會給它自己那段對話。
+            session_service_context.history_uid = ""
+            stream = getattr(self, "stream", None)
+            replaced = stream.attach_stage(client_uid) if stream else None
+            old_socket = self.client_connections.get(replaced) if replaced else None
+            if old_socket is not None:
+                await old_socket.send_text(json.dumps({"type": "stage-replaced"}))
+            return
+
         # Put the session back in the conversation the user was last having.
         # This must precede start-mic: without a history_uid nothing said next
         # would be recorded (see single_conversation.py's `if context.history_uid`).
@@ -283,6 +317,10 @@ class WebSocketHandler:
 
         # Start microphone
         await websocket.send_text(json.dumps({"type": "control", "text": "start-mic"}))
+
+        await websocket.send_text(
+            json.dumps({"type": "stream-state", "live": self._streaming()})
+        )
 
     async def _init_service_context(
         self, send_text: Callable, client_uid: str
@@ -436,6 +474,9 @@ class WebSocketHandler:
 
     async def handle_disconnect(self, client_uid: str) -> None:
         """Handle client disconnection"""
+        stream = getattr(self, "stream", None)
+        if stream is not None:
+            stream.detach_stage(client_uid)
         context = self.client_contexts.get(client_uid)
         group = self.chat_group_manager.get_client_group(client_uid)
         if group:
@@ -670,6 +711,8 @@ class WebSocketHandler:
         self, websocket: WebSocket, client_uid: str, data: dict
     ):
         """Handle fetching and setting specific chat history"""
+        if self._is_stage(client_uid):
+            return
         history_uid = data.get("history_uid")
         if not history_uid:
             return
@@ -690,6 +733,8 @@ class WebSocketHandler:
         self, websocket: WebSocket, client_uid: str, data: WSMessage
     ) -> None:
         """Handle creation of new chat history"""
+        if self._is_stage(client_uid):
+            return
         context = self.client_contexts[client_uid]
         clear_proactive_context(
             context.character_config.conf_uid,
@@ -787,6 +832,22 @@ class WebSocketHandler:
         self, websocket: WebSocket, client_uid: str, data: WSMessage
     ) -> None:
         """Handle triggers that start a conversation"""
+        # 舞台上的每一輪都由直播模式發起；舞台頁自己的觸發一律不理。
+        if self._is_stage(client_uid):
+            return
+        # 直播中角色大腦正在對觀眾講話：私人聊天先暫停，閒置計時器的觸發靜默略過。
+        if self._streaming():
+            if data.get("type") != "ai-speak-signal":
+                await websocket.send_text(
+                    json.dumps(
+                        {
+                            "type": "error",
+                            "message": "Live stream in progress — private chat is paused.",
+                            "text_key": "privateChatPaused",
+                        }
+                    )
+                )
+            return
         # 主動發言的計時器在前端，每個連線各有一個。兩台同時開著時兩邊都會送
         # ai-speak-signal，角色就各講各的——兩台看到的內容不一樣，而且兩句都被寫
         # 進同一段對話。只讓最近使用過的那台發動；它講的話會透過 history 推送
@@ -888,6 +949,17 @@ class WebSocketHandler:
         self, websocket: WebSocket, client_uid: str, data: dict
     ):
         """Handle switching to a different configuration"""
+        if self._streaming():
+            await websocket.send_text(
+                json.dumps(
+                    {
+                        "type": "error",
+                        "message": "Stop the live stream before switching characters.",
+                        "text_key": "switchBlocked",
+                    }
+                )
+            )
+            return
         config_file_name = data.get("file")
         if config_file_name:
             context = self.client_contexts[client_uid]
