@@ -135,26 +135,19 @@
   },
   "settings": {
     "tabs": {
-      "general": "一般",
       "characters": "キャラクター",
-      "personas": "ペルソナ",
       "llm": "LLM",
-      "live2d": "Live2D",
       "performances": "演出",
       "scenes": "シーン",
       "asr": "ASR",
       "tts": "TTS",
       "agent": "自発発話",
-      "memory": "メモリー",
       "perf": "パフォーマンス",
       "about": "について",
-      "avatar": "アバター",
-      "stream": "配信"
-    },
-    "groups": {
-      "companion": "コンパニオン",
+      "stream": "配信",
+      "conversation": "会話",
       "stage": "ステージ",
-      "intelligence": "音声と AI",
+      "models": "モデル",
       "system": "システム"
     },
     "restoreDefaults": "デフォルトに戻す",
@@ -710,7 +703,8 @@
       "gptSovitsLangYue": "広東語",
       "gptSovitsLangAuto": "自動検出",
       "credsUnchanged": "新しいキーの入力も他の変更もないため、保存は無効です——送信するものがありません。",
-      "presetCustom": "カスタム"
+      "presetCustom": "カスタム",
+      "engineNumbers": "バックグラウンド処理の頻度"
     },
     "topics": {
       "sectionTitle": "彼女が話す話題",
@@ -851,6 +845,26 @@
         "other": "その他の設定"
       },
       "liveBlocked": "配信中は再読み込みできません。配信終了後に押してください。"
+    },
+    "stage": {
+      "display": "字幕・音量・背景",
+      "canvas": "キャンバス操作"
+    },
+    "models": {
+      "extras": "バックグラウンド処理とツール"
+    },
+    "characterPage": {
+      "basic": "基本",
+      "personas": "ペルソナ",
+      "personasNote": "ペルソナは共通で、キャラクターごとに一つ選びます。使用中でないキャラクターは、切り替えたときに反映されます。",
+      "personaStored": "設定しました。切り替えたときに反映されます",
+      "appearance": "外見",
+      "sharedModelNote": "モーションと表情の対応はモデルの設定で、このモデルを使うすべてのキャラクターに適用されます。",
+      "voice": "声",
+      "engineParamsElsewhere": "このエンジンのパラメーターは conf.yaml で設定します。",
+      "language": "言語",
+      "memory": "記憶",
+      "memoryNeedsActive": "記憶は会話ごとのものです。切り替えると閲覧・編集できます。"
     }
   },
   "footer": {

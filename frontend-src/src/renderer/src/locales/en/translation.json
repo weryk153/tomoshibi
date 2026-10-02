@@ -135,26 +135,19 @@
   },
   "settings": {
     "tabs": {
-      "general": "General",
       "characters": "Characters",
-      "personas": "Personas",
       "llm": "LLM",
-      "live2d": "Live2D",
       "performances": "Performances",
       "scenes": "Scenes",
       "asr": "ASR",
       "tts": "TTS",
       "agent": "Proactive speech",
-      "memory": "Memory",
       "perf": "Performance",
       "about": "About",
-      "avatar": "Avatar",
-      "stream": "Stream"
-    },
-    "groups": {
-      "companion": "Companion",
+      "stream": "Stream",
+      "conversation": "Conversation",
       "stage": "Stage",
-      "intelligence": "Voice & AI",
+      "models": "Models",
       "system": "System"
     },
     "restoreDefaults": "Restore defaults",
@@ -710,7 +703,8 @@
       "gptSovitsLangYue": "Cantonese",
       "gptSovitsLangAuto": "Auto-detect",
       "credsUnchanged": "No new key entered and nothing else changed, so Save is greyed out — there is nothing to submit.",
-      "presetCustom": "Custom"
+      "presetCustom": "Custom",
+      "engineNumbers": "Background task frequency"
     },
     "topics": {
       "sectionTitle": "What she talks about",
@@ -851,6 +845,26 @@
         "other": "Other settings"
       },
       "liveBlocked": "Can't reload during a live stream; reload after it ends."
+    },
+    "stage": {
+      "display": "Subtitles, volume & background",
+      "canvas": "Canvas interaction"
+    },
+    "models": {
+      "extras": "Background tasks & tools"
+    },
+    "characterPage": {
+      "basic": "Basics",
+      "personas": "Persona versions",
+      "personasNote": "Personas are shared; each character picks one. For a character not in use, the choice takes effect when you switch to her.",
+      "personaStored": "Saved — takes effect when you switch to her",
+      "appearance": "Appearance",
+      "sharedModelNote": "Motion and expression mappings belong to the model: every character using it gets them.",
+      "voice": "Voice",
+      "engineParamsElsewhere": "This engine's parameters are set in conf.yaml.",
+      "language": "Language",
+      "memory": "Memory",
+      "memoryNeedsActive": "Memories belong to a conversation — switch to her to view or edit them."
     }
   },
   "footer": {

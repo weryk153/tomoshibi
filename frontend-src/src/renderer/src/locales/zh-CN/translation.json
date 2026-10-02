@@ -135,26 +135,19 @@
   },
   "settings": {
     "tabs": {
-      "general": "常规",
       "characters": "角色",
-      "personas": "人设",
       "llm": "语言模型",
-      "live2d": "Live2D",
       "performances": "演出",
       "scenes": "场景",
       "asr": "语音识别",
       "tts": "语音合成",
       "agent": "主动发言",
-      "memory": "记忆",
       "perf": "性能",
       "about": "关于",
-      "avatar": "角色外观",
-      "stream": "直播"
-    },
-    "groups": {
-      "companion": "陪伴设置",
-      "stage": "舞台外观",
-      "intelligence": "语音与 AI",
+      "stream": "直播",
+      "conversation": "对话",
+      "stage": "舞台",
+      "models": "模型",
       "system": "系统"
     },
     "restoreDefaults": "恢复默认值",
@@ -710,7 +703,8 @@
       "gptSovitsLangYue": "粤语",
       "gptSovitsLangAuto": "自动检测",
       "credsUnchanged": "没有输入新的密钥、其他栏位也没有变更，所以保存是暗的、没有东西可以送出。",
-      "presetCustom": "自定义"
+      "presetCustom": "自定义",
+      "engineNumbers": "后台工作频率"
     },
     "topics": {
       "sectionTitle": "她主动聊什么",
@@ -851,6 +845,26 @@
         "other": "其他设置"
       },
       "liveBlocked": "直播中不能重新加载，直播结束后再按。"
+    },
+    "stage": {
+      "display": "字幕、音量与背景",
+      "canvas": "画布互动"
+    },
+    "models": {
+      "extras": "后台工作与工具"
+    },
+    "characterPage": {
+      "basic": "基本",
+      "personas": "人设版本",
+      "personasNote": "人设是共用的；每个角色各自选一个。不是正在用的角色，选了会在切换到她时生效。",
+      "personaStored": "已设置，切换到她时生效",
+      "appearance": "外观",
+      "sharedModelNote": "动作与表情对应是这个模型的设置，使用这个模型的角色都会套用。",
+      "voice": "声音",
+      "engineParamsElsewhere": "这个引擎的参数在 conf.yaml 里设置。",
+      "language": "语言",
+      "memory": "记忆",
+      "memoryNeedsActive": "记忆属于一段对话；切换到她之后才能看、改她的记忆。"
     }
   },
   "footer": {

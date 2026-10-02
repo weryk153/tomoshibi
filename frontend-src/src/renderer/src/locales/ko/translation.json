@@ -135,26 +135,19 @@
   },
   "settings": {
     "tabs": {
-      "general": "일반",
       "characters": "캐릭터",
-      "personas": "페르소나",
       "llm": "LLM",
-      "live2d": "Live2D",
       "performances": "연출",
       "scenes": "장면",
       "asr": "ASR",
       "tts": "TTS",
       "agent": "선제 발화",
-      "memory": "기억",
       "perf": "성능",
       "about": "정보",
-      "avatar": "아바타",
-      "stream": "방송"
-    },
-    "groups": {
-      "companion": "컴패니언",
+      "stream": "방송",
+      "conversation": "대화",
       "stage": "스테이지",
-      "intelligence": "음성 및 AI",
+      "models": "모델",
       "system": "시스템"
     },
     "restoreDefaults": "기본값으로 복원",
@@ -710,7 +703,8 @@
       "gptSovitsLangYue": "광둥어",
       "gptSovitsLangAuto": "자동 감지",
       "credsUnchanged": "새 키를 입력하지 않았고 다른 변경도 없어 저장이 비활성화되어 있습니다 — 제출할 것이 없습니다.",
-      "presetCustom": "사용자 지정"
+      "presetCustom": "사용자 지정",
+      "engineNumbers": "백그라운드 작업 빈도"
     },
     "topics": {
       "sectionTitle": "그녀가 이야기하는 주제",
@@ -851,6 +845,26 @@
         "other": "기타 설정"
       },
       "liveBlocked": "방송 중에는 다시 불러올 수 없습니다. 방송이 끝난 뒤 누르세요."
+    },
+    "stage": {
+      "display": "자막, 음량, 배경",
+      "canvas": "캔버스 상호작용"
+    },
+    "models": {
+      "extras": "백그라운드 작업 및 도구"
+    },
+    "characterPage": {
+      "basic": "기본",
+      "personas": "페르소나 버전",
+      "personasNote": "페르소나는 공용이며 캐릭터마다 하나를 고릅니다. 사용 중이 아닌 캐릭터는 전환할 때 적용됩니다.",
+      "personaStored": "저장했습니다. 전환할 때 적용됩니다",
+      "appearance": "외형",
+      "sharedModelNote": "동작과 표정 매핑은 모델 설정이며, 이 모델을 쓰는 모든 캐릭터에 적용됩니다.",
+      "voice": "목소리",
+      "engineParamsElsewhere": "이 엔진의 매개변수는 conf.yaml에서 설정합니다.",
+      "language": "언어",
+      "memory": "기억",
+      "memoryNeedsActive": "기억은 대화에 속합니다. 전환하면 보고 고칠 수 있습니다."
     }
   },
   "footer": {

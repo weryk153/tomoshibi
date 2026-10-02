@@ -1,45 +1,44 @@
 // 設定抽屜的殼：Ark Dialog（透過 ui/tw/drawer）+ Ark Tabs + Tailwind。
 //
-// 分頁清單改成資料驅動。原本 14 個 Trigger 與 14 個 Content 各自手寫，兩份清單
-// 要靠人工維持同步——加一個分頁要改兩個地方、順序也得自己對齊，而漏掉時不會有
-// 任何錯誤，只是那個分頁點不到或點了空白。現在兩者都從 TABS 生出來。
+// 七個分頁（規格 docs/superpowers/specs/2026-10-01-settings-redesign-design.md
+// 「分頁」一節）：角色、對話、舞台、直播、模型、效能、系統。跟角色走的設定只在
+// 角色頁；其他分頁只放跟角色無關的，每一頁由幾個各管一件事的元件疊成，用
+// SettingSection 分區。順序與標籤在 settings-tabs.ts（可測），內容在這裡。
 //
-// lazyMount：分頁內容第一次被切到才掛載。Chakra 的 Tabs 是一開啟抽屜就把 14 個
-// 分頁全部掛載，所以任何一個分頁在渲染時丟例外，整個抽屜就是一片黑——這正是
-// __APP_VERSION__ 那次事故的放大機制（見 build-defines.ts）。掛載過就留著
-// （沒有 unmountOnExit），切回去時狀態還在。
+// lazyMount：分頁內容第一次被切到才掛載。一開啟抽屜就把所有分頁全部掛載的話，
+// 任何一個分頁在渲染時丟例外，整個抽屜就是一片黑——這正是 __APP_VERSION__
+// 那次事故的放大機制（見 build-defines.ts）。掛載過就留著（沒有
+// unmountOnExit），切回去時狀態還在。
 
 import { useState, useMemo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tabs as ArkTabs } from '@ark-ui/react';
+import { Stack } from '@chakra-ui/react';
+import type { TFunction } from 'i18next';
 import { Drawer, DRAWER_PX } from '@/components/ui/tw/drawer';
 import { Button, cx } from '@/components/ui/tw/primitives';
 
-import StageDisplay from './stage-display';
-import SystemBasics from './system-basics';
-import ModelExtras from './model-extras';
-import EngineNumbers from './engine-numbers';
-import CanvasInteraction from './canvas-interaction';
-import StageEffects from './stage-effects';
 import Characters from './characters';
-import Personas from './personas';
 import LLM from './llm';
 import ASR from './asr';
 import TTS from './tts';
 import Agent from './agent';
-import Memory from './memory';
+import You from './you';
 import Perf from './perf';
 import RemoteAccess from './remote-access';
 import About from './about';
 import Performances from './performances';
 import Scenes from './scenes';
 import Stream from './stream';
+import StageDisplay from './stage-display';
+import SystemBasics from './system-basics';
+import ModelExtras from './model-extras';
+import EngineNumbers from './engine-numbers';
+import CanvasInteraction from './canvas-interaction';
+import StageEffects from './stage-effects';
+import { SettingSection } from './setting-section';
 import { PendingBanner } from './pending-banner';
-import { useConfig } from '@/context/character-config-context';
-
-// 暫時頂著：人設與記憶分頁下一步併進角色頁。
-function ActivePersonas(): JSX.Element { const { confUid } = useConfig(); return <Personas confUid={confUid} isActive />; }
-function ActiveMemory(): JSX.Element { const { confUid } = useConfig(); return <Memory confUid={confUid} />; }
+import { SETTINGS_TABS, DEFAULT_SETTINGS_TAB, type SettingsTabId } from './settings-tabs';
 
 interface SettingUIProps {
   open: boolean;
@@ -49,49 +48,61 @@ interface SettingUIProps {
 
 /** 每個分頁的 render 拿得到的東西。
  *
- * onCancel 現在只剩「一般」分頁在用，而且只管連線位址那一小塊草稿——其餘所有
- * 控制項都是改了就生效，沒有草稿可還原。 */
+ * onCancel 只剩系統頁的連線位址在用——其餘所有控制項都是改了就生效，沒有草稿
+ * 可還原。active 給要在「被看見時」重抓現值的元件。 */
 interface TabRenderArgs {
   onCancel: (handler: () => void) => () => void;
   active: boolean;
+  t: TFunction;
 }
 
-type TabGroup = 'companion' | 'stage' | 'intelligence' | 'system';
-
-interface SettingsTab {
-  value: string;
-  labelKey: string;
-  group: TabGroup;
-  render: (a: TabRenderArgs) => JSX.Element;
-}
-
-// 14 個入口不再排成一堵三列文字牆。順序按使用者心智模型分組：先是陪伴角色，
-// 再是舞台外觀、AI／語音，最後才是系統工具。桌面版由這個 group 生出左側導覽，
-// 手機版則隱藏群組標題、退回單列橫向分頁。
-const TABS: SettingsTab[] = [
-  { value: 'general', labelKey: 'settings.tabs.general', group: 'companion', render: ({ onCancel }) => <><SystemBasics onCancel={onCancel} /><StageDisplay /><ModelExtras /><EngineNumbers /></> },
-  { value: 'characters', labelKey: 'settings.tabs.characters', group: 'companion', render: () => <Characters /> },
-  { value: 'personas', labelKey: 'settings.tabs.personas', group: 'companion', render: () => <ActivePersonas /> },
-  { value: 'live2d', labelKey: 'settings.tabs.avatar', group: 'stage', render: () => <><CanvasInteraction /><StageEffects /></> },
-  { value: 'performances', labelKey: 'settings.tabs.performances', group: 'stage', render: () => <Performances /> },
-  { value: 'scenes', labelKey: 'settings.tabs.scenes', group: 'stage', render: () => <Scenes /> },
-  { value: 'stream', labelKey: 'settings.tabs.stream', group: 'stage', render: ({ active }) => <Stream active={active} /> },
-  { value: 'llm', labelKey: 'settings.tabs.llm', group: 'intelligence', render: () => <LLM /> },
-  { value: 'asr', labelKey: 'settings.tabs.asr', group: 'intelligence', render: ({ active }) => <ASR active={active} /> },
-  { value: 'tts', labelKey: 'settings.tabs.tts', group: 'intelligence', render: ({ active }) => <TTS active={active} /> },
-  { value: 'agent', labelKey: 'settings.tabs.agent', group: 'intelligence', render: () => <Agent /> },
-  { value: 'memory', labelKey: 'settings.tabs.memory', group: 'intelligence', render: () => <ActiveMemory /> },
-  { value: 'perf', labelKey: 'settings.tabs.perf', group: 'system', render: () => <Perf /> },
-  { value: 'remoteAccess', labelKey: 'settings.remoteAccess.tab', group: 'system', render: ({ active }) => <RemoteAccess active={active} /> },
-  { value: 'about', labelKey: 'settings.tabs.about', group: 'system', render: () => <About /> },
-];
-
-const GROUPS: TabGroup[] = ['companion', 'stage', 'intelligence', 'system'];
+// 自己有標題的元件（場景、演出、語音合成、遠端連線、關於……）不再給區塊標題，
+// 免得同一個字出現兩次。
+const RENDERS: Record<SettingsTabId, (a: TabRenderArgs) => JSX.Element> = {
+  character: () => <Characters />,
+  conversation: ({ active, t }) => (
+    <Stack gap={6}>
+      <SettingSection title={t('settings.tabs.agent')}><Agent /></SettingSection>
+      <SettingSection><You active={active} /></SettingSection>
+    </Stack>
+  ),
+  stage: ({ t }) => (
+    <Stack gap={6}>
+      <SettingSection title={t('settings.stage.display')}><StageDisplay /></SettingSection>
+      <SettingSection><Scenes /></SettingSection>
+      <SettingSection><Performances /></SettingSection>
+      <SettingSection><StageEffects /></SettingSection>
+      <SettingSection title={t('settings.stage.canvas')}><CanvasInteraction /></SettingSection>
+    </Stack>
+  ),
+  stream: ({ active }) => <Stream active={active} />,
+  models: ({ active, t }) => (
+    <Stack gap={6}>
+      <SettingSection title={t('settings.tabs.llm')}><LLM /></SettingSection>
+      <SettingSection title={t('settings.models.extras')}><ModelExtras /></SettingSection>
+      <SettingSection title={t('settings.tabs.asr')}><ASR active={active} /></SettingSection>
+      <SettingSection><TTS active={active} /></SettingSection>
+    </Stack>
+  ),
+  perf: ({ t }) => (
+    <Stack gap={6}>
+      <SettingSection><Perf /></SettingSection>
+      <SettingSection title={t('settings.perf.engineNumbers')}><EngineNumbers /></SettingSection>
+    </Stack>
+  ),
+  system: ({ onCancel, active }) => (
+    <Stack gap={6}>
+      <SettingSection><SystemBasics onCancel={onCancel} /></SettingSection>
+      <SettingSection><RemoteAccess active={active} /></SettingSection>
+      <SettingSection><About /></SettingSection>
+    </Stack>
+  ),
+};
 
 function SettingUI({ open, onClose }: SettingUIProps): JSX.Element {
   const { t } = useTranslation();
   const [cancelHandlers, setCancelHandlers] = useState<(() => void)[]>([]);
-  const [activeTab, setActiveTab] = useState('general');
+  const [activeTab, setActiveTab] = useState<SettingsTabId>(DEFAULT_SETTINGS_TAB);
 
   const handleCancelCallback = useCallback((handler: () => void) => {
     setCancelHandlers((prev) => [...prev, handler]);
@@ -106,16 +117,16 @@ function SettingUI({ open, onClose }: SettingUIProps): JSX.Element {
   }, [cancelHandlers, onClose]);
 
   const contents = useMemo(
-    () => TABS.map((tab) => (
+    () => SETTINGS_TABS.map((tab) => (
       <ArkTabs.Content
-        key={tab.value}
-        value={tab.value}
+        key={tab.id}
+        value={tab.id}
         className={cx('py-4 outline-none', DRAWER_PX)}
       >
-        {tab.render({ onCancel: handleCancelCallback, active: activeTab === tab.value })}
+        {RENDERS[tab.id]({ onCancel: handleCancelCallback, active: activeTab === tab.id, t })}
       </ArkTabs.Content>
     )),
-    [handleCancelCallback, activeTab],
+    [handleCancelCallback, activeTab, t],
   );
 
   return (
@@ -138,7 +149,7 @@ function SettingUI({ open, onClose }: SettingUIProps): JSX.Element {
       <PendingBanner active={open} />
       <ArkTabs.Root
         value={activeTab}
-        onValueChange={(details) => setActiveTab(details.value)}
+        onValueChange={(details) => setActiveTab(details.value as SettingsTabId)}
         lazyMount
         className="flex min-h-0 flex-1 flex-col sm:flex-row"
       >
@@ -149,27 +160,20 @@ function SettingUI({ open, onClose }: SettingUIProps): JSX.Element {
           )}
           aria-label={t('common.settings')}
         >
-          {GROUPS.map((group) => (
-            <div key={group} className="contents sm:block">
-              <span className="mb-1 mt-3 hidden px-2 text-[11px] font-semibold uppercase tracking-wider text-walpha-400 sm:block">
-                {t(`settings.groups.${group}`)}
-              </span>
-              {TABS.filter((tab) => tab.group === group).map((tab) => (
-                <ArkTabs.Trigger
-                  key={tab.value}
-                  value={tab.value}
-                  className={cx(
-                    'shrink-0 cursor-pointer rounded-md px-3 py-2 text-left text-sm outline-none transition-colors',
-                    'text-walpha-600 hover:bg-walpha-100 hover:text-white',
-                    'data-[selected]:bg-blue-500/15 data-[selected]:font-semibold data-[selected]:text-blue-200',
-                    'focus-visible:ring-2 focus-visible:ring-blue-500/40',
-                    'sm:w-full',
-                  )}
-                >
-                  {t(tab.labelKey)}
-                </ArkTabs.Trigger>
-              ))}
-            </div>
+          {SETTINGS_TABS.map((tab) => (
+            <ArkTabs.Trigger
+              key={tab.id}
+              value={tab.id}
+              className={cx(
+                'shrink-0 cursor-pointer rounded-md px-3 py-2 text-left text-sm outline-none transition-colors',
+                'text-walpha-600 hover:bg-walpha-100 hover:text-white',
+                'data-[selected]:bg-blue-500/15 data-[selected]:font-semibold data-[selected]:text-blue-200',
+                'focus-visible:ring-2 focus-visible:ring-blue-500/40',
+                'sm:w-full',
+              )}
+            >
+              {t(tab.labelKey)}
+            </ArkTabs.Trigger>
           ))}
         </ArkTabs.List>
         {/* 捲動發生在這一層，不是整個抽屜——分頁列要固定在上方。 */}
