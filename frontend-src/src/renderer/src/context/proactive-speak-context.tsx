@@ -4,6 +4,8 @@ import {
 import { useLocalStorage } from '@/hooks/utils/use-local-storage';
 import { useTriggerSpeak } from '@/hooks/utils/use-trigger-speak';
 import { useAiState, AiStateEnum } from '@/context/ai-state-context';
+import { IS_STAGE } from '@/services/stage-mode';
+import { useStream } from '@/context/stream-context';
 
 interface ProactiveSpeakSettings {
   allowButtonTrigger: boolean;
@@ -35,6 +37,7 @@ export function ProactiveSpeakProvider({ children }: { children: ReactNode }) {
   );
 
   const { aiState } = useAiState();
+  const { live } = useStream();
   const { sendTriggerSignal } = useTriggerSpeak();
 
   const idleTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -51,7 +54,9 @@ export function ProactiveSpeakProvider({ children }: { children: ReactNode }) {
   const startIdleTimer = useCallback(() => {
     clearIdleTimer();
 
-    if (!settings.allowProactiveSpeak) return;
+    // 舞台頁什麼時候開口由直播模式決定，不跑自己的閒置計時器；直播中主視窗也不跑
+    // （觸發會被後端擋掉，但擷取畫面這一步照樣會做）。
+    if (IS_STAGE || live || !settings.allowProactiveSpeak) return;
 
     idleStartTimeRef.current = Date.now();
     const idleSeconds = Math.max(30, Number(settings.idleSecondsToSpeak) || 30);
@@ -59,7 +64,7 @@ export function ProactiveSpeakProvider({ children }: { children: ReactNode }) {
       const actualIdleTime = (Date.now() - idleStartTimeRef.current!) / 1000;
       sendTriggerSignal(actualIdleTime);
     }, idleSeconds * 1000);
-  }, [settings.allowProactiveSpeak, settings.idleSecondsToSpeak, sendTriggerSignal, clearIdleTimer]);
+  }, [settings.allowProactiveSpeak, settings.idleSecondsToSpeak, sendTriggerSignal, clearIdleTimer, live]);
 
   useEffect(() => {
     if (aiState === AiStateEnum.IDLE) {

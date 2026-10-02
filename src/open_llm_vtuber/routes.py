@@ -40,9 +40,11 @@ def init_client_ws_route(
         """WebSocket endpoint for client connections"""
         await websocket.accept()
         client_uid = str(uuid4())
+        # 舞台頁（?stage=1）連的是同一個端點，只是帶參數；它不還原私人對話。
+        stage = websocket.query_params.get("stage") == "1"
 
         try:
-            await ws_handler.handle_new_connection(websocket, client_uid)
+            await ws_handler.handle_new_connection(websocket, client_uid, stage=stage)
             await ws_handler.handle_websocket_communication(websocket, client_uid)
         except WebSocketDisconnect:
             await ws_handler.handle_disconnect(client_uid)

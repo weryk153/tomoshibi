@@ -29,6 +29,7 @@ import RemoteAccess from './remote-access';
 import About from './about';
 import Performances from './performances';
 import Scenes from './scenes';
+import Stream from './stream';
 
 interface SettingUIProps {
   open: boolean;
@@ -64,6 +65,7 @@ const TABS: SettingsTab[] = [
   { value: 'live2d', labelKey: 'settings.tabs.avatar', group: 'stage', render: () => <Live2D /> },
   { value: 'performances', labelKey: 'settings.tabs.performances', group: 'stage', render: () => <Performances /> },
   { value: 'scenes', labelKey: 'settings.tabs.scenes', group: 'stage', render: () => <Scenes /> },
+  { value: 'stream', labelKey: 'settings.tabs.stream', group: 'stage', render: ({ active }) => <Stream active={active} /> },
   { value: 'llm', labelKey: 'settings.tabs.llm', group: 'intelligence', render: () => <LLM /> },
   { value: 'asr', labelKey: 'settings.tabs.asr', group: 'intelligence', render: ({ active }) => <ASR active={active} /> },
   { value: 'tts', labelKey: 'settings.tabs.tts', group: 'intelligence', render: ({ active }) => <TTS active={active} /> },

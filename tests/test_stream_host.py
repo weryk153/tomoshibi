@@ -1,0 +1,258 @@
+"""直播的一輪怎麼交給現有的對話流程。"""
+
+import asyncio
+import json
+from types import SimpleNamespace
+
+import pytest
+
+from src.open_llm_vtuber import active_history_store
+from src.open_llm_vtuber.conversations.conversation_handler import PROACTIVE_TEXT
+from src.open_llm_vtuber.stream.chat_source import ChatMessage
+from src.open_llm_vtuber.stream.host import WebSocketStreamHost
+
+
+class FakeSocket:
+    def __init__(self):
+        self.sent = []
+
+    async def send_text(self, payload):
+        self.sent.append(json.loads(payload))
+
+
+def context():
+    return SimpleNamespace(
+        history_uid="",
+        character_config=SimpleNamespace(
+            conf_uid="frieren", character_name="芙莉蓮", conf_name="frieren"
+        ),
+        system_config=SimpleNamespace(tool_prompts={}),
+    )
+
+
+def setup(process):
+    ws = SimpleNamespace(
+        client_contexts={"stage": context()},
+        client_connections={"stage": FakeSocket()},
+        current_conversation_tasks={},
+    )
+    host = WebSocketStreamHost(ws, process=process)
+    host.controller = SimpleNamespace(stage_uid="stage")
+    return ws, host
+
+
+@pytest.fixture(autouse=True)
+def _tmp(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+
+def comment(text="今天好冷"):
+    return ChatMessage(id="1", author="小明", text=text, timestamp=0.0)
+
+
+def test_a_comment_turn():
+    calls = []
+
+    async def process(**kwargs):
+        calls.append(kwargs)
+        return "好冷喔"
+
+    ws, host = setup(process)
+    result = asyncio.run(host.turn_runner("stream-1")(comment()))
+
+    assert result == "ok"
+    (call,) = calls
+    assert call["user_input"] == "小明：今天好冷"
+    assert call["client_uid"] == "stage"
+    assert call["metadata"] == {
+        "stream": True,
+        "stream_comment": {"author": "小明", "text": "今天好冷"},
+    }
+    assert ws.client_contexts["stage"].history_uid == "stream-1"
+    assert ws.client_connections["stage"].sent == [
+        {"type": "stream-comment", "author": "小明", "text": "今天好冷"}
+    ]
+
+
+def test_a_quiet_turn():
+    calls = []
+
+    async def process(**kwargs):
+        calls.append(kwargs)
+        return "大家好"
+
+    ws, host = setup(process)
+    assert asyncio.run(host.turn_runner("stream-1")(None)) == "ok"
+    assert calls[0]["user_input"] == PROACTIVE_TEXT
+    assert calls[0]["metadata"]["stream"] is True
+    assert calls[0]["metadata"]["proactive_speak"] is True
+    assert ws.client_connections["stage"].sent[0] == {
+        "type": "stream-comment",
+        "author": "",
+        "text": "",
+    }
+
+
+def test_empty_reply_or_exception_is_a_failure():
+    async def empty(**kwargs):
+        return ""
+
+    async def boom(**kwargs):
+        raise RuntimeError("llm down")
+
+    assert asyncio.run(setup(empty)[1].turn_runner("s")(comment())) == "failed"
+    assert asyncio.run(setup(boom)[1].turn_runner("s")(comment())) == "failed"
+
+
+def test_stage_gone_or_turn_cancelled_by_disconnect_is_interrupted():
+    async def slow(**kwargs):
+        await asyncio.Event().wait()
+
+    ws, host = setup(slow)
+
+    async def disconnect_midway():
+        run = asyncio.create_task(host.turn_runner("s")(comment()))
+        while "stage" not in ws.current_conversation_tasks:
+            await asyncio.sleep(0)
+        ws.current_conversation_tasks["stage"].cancel()
+        return await run
+
+    assert asyncio.run(disconnect_midway()) == "interrupted"
+    host.controller = SimpleNamespace(stage_uid=None)
+    assert asyncio.run(host.turn_runner("s")(comment())) == "interrupted"
+
+
+def test_stopping_cancels_the_turn_too():
+    async def slow(**kwargs):
+        await asyncio.Event().wait()
+
+    ws, host = setup(slow)
+
+    async def stop_midway():
+        run = asyncio.create_task(host.turn_runner("s")(comment()))
+        while "stage" not in ws.current_conversation_tasks:
+            await asyncio.sleep(0)
+        run.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await run
+        await asyncio.sleep(0)
+        return ws.current_conversation_tasks["stage"].cancelled()
+
+    assert asyncio.run(stop_midway()) is True
+
+
+def test_a_stream_history_does_not_move_the_private_resume_point():
+    ws, host = setup(None)
+    active_history_store.set_active_history_uid("frieren", "private-1")
+    history_uid = host.new_stream_history("stage")
+    assert history_uid
+    assert active_history_store.get_active_history_uid("frieren") == "private-1"
+    assert host.character_names("stage") == ("芙莉蓮", "frieren")
+
+
+def test_preparing_the_stage_switches_it_to_the_current_character(monkeypatch):
+    """OBS 一直開著、你在主視窗換了角色再開播：直播要用現在選的角色。"""
+    from src.open_llm_vtuber.stream import host as host_module
+
+    loaded, announced = [], []
+    ws, host = setup(None)
+    stage = ws.client_contexts["stage"]
+    stage.active_config_file = "kurisu.yaml"
+
+    async def load_character_config(name):
+        loaded.append(name)
+        stage.active_config_file = name
+
+    async def send_model_and_conf(socket):
+        announced.append(socket)
+
+    stage.load_character_config = load_character_config
+    stage._send_model_and_conf = send_model_and_conf
+    monkeypatch.setattr(
+        host_module, "get_active_character_filename", lambda: "char_frieren.yaml"
+    )
+
+    asyncio.run(host.prepare_stage("stage"))
+    asyncio.run(host.prepare_stage("stage"))
+
+    assert loaded == ["char_frieren.yaml"]
+    assert announced == [ws.client_connections["stage"]]
+
+
+def test_an_empty_quiet_turn_is_not_a_failure():
+    """冷場那輪的句子可能全被主機擋掉（講錯畫面來源之類）；那不是模型壞了。"""
+
+    async def empty(**kwargs):
+        return ""
+
+    assert asyncio.run(setup(empty)[1].turn_runner("s")(None)) == "ok"
+    assert asyncio.run(setup(empty)[1].turn_runner("s")(comment())) == "failed"
+
+
+def test_a_cut_off_turn_tells_the_agent():
+    """停播或舞台斷線時她沒講完：跟私人聊天被打斷一樣告訴 agent。"""
+
+    async def slow(**kwargs):
+        await asyncio.Event().wait()
+
+    ws, host = setup(slow)
+    told = []
+    ws.client_contexts["stage"].agent_engine = SimpleNamespace(
+        handle_interrupt=told.append
+    )
+
+    async def disconnect_midway():
+        run = asyncio.create_task(host.turn_runner("s")(comment()))
+        while "stage" not in ws.current_conversation_tasks:
+            await asyncio.sleep(0)
+        ws.current_conversation_tasks["stage"].cancel()
+        return await run
+
+    assert asyncio.run(disconnect_midway()) == "interrupted"
+    assert told == [""]
+
+
+def test_preparing_the_stage_waits_for_a_private_turn_in_flight():
+    ws, host = setup(None)
+    ws.client_contexts["stage"].active_config_file = "same.yaml"
+
+    async def scenario():
+        async def private_turn():
+            await asyncio.sleep(0.05)
+
+        ws.current_conversation_tasks["me"] = asyncio.create_task(private_turn())
+        await host.prepare_stage("stage")
+        return ws.current_conversation_tasks["me"].done()
+
+    from src.open_llm_vtuber.stream import host as host_module
+
+    original = host_module.get_active_character_filename
+    host_module.get_active_character_filename = lambda: "same.yaml"
+    try:
+        assert asyncio.run(scenario()) is True
+    finally:
+        host_module.get_active_character_filename = original
+
+
+@pytest.mark.parametrize(
+    "kind,expected",
+    [
+        ("paid", "大方（Super Chat）：生日快樂！"),
+        ("member", "大方（會員）：生日快樂！"),
+        ("text", "大方：生日快樂！"),
+    ],
+)
+def test_super_chat_and_members_are_marked_for_her(kind, expected):
+    """她要知道哪則是付費留言才會道謝；留言本身看不出來。"""
+    calls = []
+
+    async def process(**kwargs):
+        calls.append(kwargs)
+        return "謝謝"
+
+    ws, host = setup(process)
+    message = ChatMessage(
+        id="1", author="大方", text="生日快樂！", timestamp=0.0, kind=kind
+    )
+    asyncio.run(host.turn_runner("s")(message))
+    assert calls[0]["user_input"] == expected

@@ -26,6 +26,8 @@ import { isStageEffectId } from '@/effects/stage-effect';
 import { useStagePerformance } from '@/context/stage-performance-context';
 import type { StagePerformanceTrigger } from '@/effects/stage-performance';
 import { shouldHonourStartMic } from '@/services/mic-mode';
+import { useStream } from '@/context/stream-context';
+import { IS_STAGE, withStageParam } from '@/services/stage-mode';
 
 function WebSocketHandler({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
@@ -55,6 +57,9 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
     micOn, autoStopMic, autoStartMicOn, autoStartMicOnConvEnd,
   };
   const { interrupt } = useInterrupt();
+  const { setLive: setStreamLive, setComment: setStreamComment, setStageReplaced } = useStream();
+  // 舞台頁連同一個端點但帶 stage=1；設定頁顯示與編輯的仍是使用者存的 wsUrl。
+  const connectUrl = IS_STAGE ? withStageParam(wsUrl) : wsUrl;
   const { setBrowserViewData } = useBrowser();
   const { playEffect } = useStageEffect();
   const { getPool, playTrigger } = useStagePerformance();
@@ -122,13 +127,15 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
           // 一直掛在畫面上，直到某一輪剛好覆蓋掉。轉場通知有自己的清除計時器，
           // 不歸這裡清——判定收在 subtitle-context 的 clearSpeechSubtitle。
           clearSpeechSubtitle();
+          // 她講完了，舞台頁上「正在回的留言」也收掉。
+          setStreamComment(null);
           resolve();
         }));
         break;
       default:
         console.warn('Unknown control command:', controlText);
     }
-  }, [setAiState, clearResponse, setForceNewMessage, startMic, stopMic]);
+  }, [setAiState, clearResponse, setForceNewMessage, startMic, stopMic, setStreamComment]);
 
   const handleWebSocketMessage = useCallback((message: MessageEvent) => {
     console.log('Received message from server:', message);
@@ -162,6 +169,8 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
         setAiState('idle');
         break;
       case 'full-text':
+        // 舞台頁的字幕在直播畫面上：連線、思考中這類狀態通知不放上去。
+        if (IS_STAGE) break;
         if (message.text || message.text_key) {
           // 後端只送英文字面值（"Thinking..."、"Connection established"），照
           // 原樣顯示的話中文介面上會冒出英文。text_key 是可翻譯的穩定代號；
@@ -332,7 +341,10 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
         break;
       case 'error':
         toaster.create({
-          title: message.message,
+          // text_key 是完整的翻譯鍵（例如 stream.privateChatPaused）；沒有翻譯就顯示原文。
+          title: message.text_key
+            ? t(message.text_key, { defaultValue: message.message || '' })
+            : message.message,
           type: 'error',
           duration: 2000,
         });
@@ -368,12 +380,23 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
       case 'conversation-chain-end':
         handleControlMessage('conversation-chain-end');
         break;
+      case 'stream-comment':
+        setStreamComment(message.author ? { author: message.author, text: message.text ?? '' } : null);
+        break;
+      case 'stream-state':
+        setStreamLive(Boolean(message.live));
+        break;
+      case 'stage-replaced':
+        setStageReplaced(true);
+        break;
       case 'force-new-message':
         setForceNewMessage(true);
         break;
       case 'interrupt-signal':
         // Handle forwarded interrupt
         interrupt(false); // do not send interrupt signal to server
+        // 停播時舞台上講到一半的那句也收掉。
+        if (IS_STAGE) clearSpeechSubtitle();
         break;
       case 'tool_call_status':
         if (message.tool_id && message.tool_name && message.status) {
@@ -401,11 +424,11 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
       default:
         console.warn('Unknown message type:', message.type);
     }
-  }, [aiState, addAudioTask, appendHumanMessage, baseUrl, bgUrlContext, setAiState, setConfName, setConfUid, setConfigFiles, setCurrentHistoryUid, setHistoryList, setMessages, setModelInfo, setSubtitleText, clearSpeechSubtitle, startMic, stopMic, setSelfUid, setGroupMembers, setIsOwner, backendSynthComplete, setBackendSynthComplete, clearResponse, handleControlMessage, appendOrUpdateToolCallMessage, interrupt, setBrowserViewData, playEffect, getPool, playTrigger, t]);
+  }, [aiState, addAudioTask, appendHumanMessage, baseUrl, bgUrlContext, setAiState, setConfName, setConfUid, setConfigFiles, setCurrentHistoryUid, setHistoryList, setMessages, setModelInfo, setSubtitleText, clearSpeechSubtitle, startMic, stopMic, setSelfUid, setGroupMembers, setIsOwner, backendSynthComplete, setBackendSynthComplete, clearResponse, handleControlMessage, appendOrUpdateToolCallMessage, interrupt, setBrowserViewData, playEffect, getPool, playTrigger, t, setStreamLive, setStreamComment, setStageReplaced]);
 
   useEffect(() => {
-    wsService.connect(wsUrl);
-  }, [wsUrl]);
+    wsService.connect(connectUrl);
+  }, [connectUrl]);
 
   useEffect(() => {
     const stateSubscription = wsService.onStateChange(setWsState);
@@ -414,17 +437,17 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
       stateSubscription.unsubscribe();
       messageSubscription.unsubscribe();
     };
-  }, [wsUrl, handleWebSocketMessage]);
+  }, [connectUrl, handleWebSocketMessage]);
 
   const webSocketContextValue = useMemo(() => ({
     sendMessage: wsService.sendMessage.bind(wsService),
     wsState,
-    reconnect: () => wsService.connect(wsUrl),
+    reconnect: () => wsService.connect(connectUrl),
     wsUrl,
     setWsUrl,
     baseUrl,
     setBaseUrl,
-  }), [wsState, wsUrl, baseUrl]);
+  }), [wsState, wsUrl, connectUrl, baseUrl]);
 
   return (
     <WebSocketContext.Provider value={webSocketContextValue}>

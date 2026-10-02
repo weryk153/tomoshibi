@@ -28,6 +28,9 @@ from .voice_route import init_voice_route
 from .memory_route import init_memory_route
 from .perf_route import init_perf_route
 from .gpt_sovits_route import init_gpt_sovits_route
+from .stream.controller import StreamController
+from .stream.host import WebSocketStreamHost
+from .stream_route import init_stream_route
 from . import gpt_sovits_service
 from .topics_route import (
     init_topics_route,
@@ -146,6 +149,17 @@ class WebSocketServer:
         self.app.include_router(init_perf_route())  # 引擎與硬體
         self.app.include_router(init_topics_route())  # 主動話題
         self.app.include_router(init_gpt_sovits_route())  # 一鍵安裝本機語音
+
+        # 直播模式：控制器透過 host 用 ws_handler 的連線跑每一輪。
+        stream_host = WebSocketStreamHost(ws_handler)
+        self.stream_controller = StreamController(stream_host)
+        stream_host.controller = self.stream_controller
+        ws_handler.stream = self.stream_controller
+        self.app.include_router(init_stream_route(self.stream_controller))
+
+        @self.app.on_event("shutdown")
+        async def _stop_stream():  # noqa: D401
+            await self.stream_controller.stop()
 
         # Live2D 的動作與點擊區設定。多帶兩個參數是為了「存檔後立刻生效」：
         # PUT 成功時可以就地更新每一個正在顯示這個模型的連線，不必重啟或切角色。

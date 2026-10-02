@@ -1,10 +1,11 @@
 # config_manager/main.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Dict, ClassVar
 
 from .system import SystemConfig
 from .character import CharacterConfig
 from .live import LiveConfig
+from .stream import StreamConfig
 from .i18n import I18nMixin, Description
 
 
@@ -16,6 +17,15 @@ class Config(I18nMixin, BaseModel):
     system_config: SystemConfig = Field(default=None, alias="system_config")
     character_config: CharacterConfig = Field(..., alias="character_config")
     live_config: LiveConfig = Field(default=LiveConfig(), alias="live_config")
+    stream_config: StreamConfig = Field(
+        default_factory=StreamConfig, alias="stream_config"
+    )
+
+    @field_validator("stream_config", mode="before")
+    @classmethod
+    def _lenient_stream_config(cls, value):
+        # 直播設定寫錯不該讓整個程式開不起來。
+        return StreamConfig.lenient(value)
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "system_config": Description(
@@ -26,5 +36,8 @@ class Config(I18nMixin, BaseModel):
         ),
         "live_config": Description(
             en="Live streaming platform integration settings", zh="直播平台集成设置"
+        ),
+        "stream_config": Description(
+            en="YouTube stream mode settings", zh="YouTube 直播模式設定"
         ),
     }

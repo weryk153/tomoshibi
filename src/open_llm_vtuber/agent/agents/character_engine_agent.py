@@ -30,6 +30,7 @@ from loguru import logger
 from ...chat_history_manager import get_history
 from ...config_manager import TTSPreprocessorConfig
 from ...conversation_quality import (
+    STREAM_FACT,
     build_turn_guidance,
     deduplicate_response_text,
     normalize_output_language_variant,
@@ -293,6 +294,10 @@ class CharacterEngineAgent(AgentInterface):
         text = "\n".join(parts).strip()
 
         notes.append(build_turn_guidance(text, is_proactive=proactive))
+        # 直播：她知道對面是一群觀眾。"- " 開頭的是她知道的事，引擎只在這場直播的
+        # 對話裡寫一次，不是每一輪都提醒（每輪照送，主機不送了引擎才會收回）。
+        if metadata.get("stream"):
+            notes.append(STREAM_FACT)
         # 她主動說的話已經留在對話裡（remember_remark），不再以一次性的備註帶過去：
         # 那樣她會把引號裡的話照唸一遍。
         notes.append(self._group_note)

@@ -540,3 +540,20 @@ live_config:
     room_ids: [1991478060]
     # SESSDATA cookie value (optional, for authenticated requests)
     sessdata: ""
+
+# YouTube stream mode (the Stream tab in Settings edits this block)
+stream_config:
+  # Last YouTube live video URL used
+  youtube_url: ''
+  # Comments containing any of these words are skipped
+  blocklist: []
+  # Seconds without an answerable comment before she speaks up
+  quiet_seconds: 30
+  # Longer comments are skipped
+  max_comment_chars: 100
+  # Queued comments older than this many seconds are dropped
+  comment_max_age_seconds: 60
+  # Do not answer the same viewer again within this many seconds
+  same_viewer_cooldown_seconds: 120
+  # Pause after this many failed turns in a row
+  failure_limit: 3
