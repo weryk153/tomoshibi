@@ -528,3 +528,20 @@ live_config:
     room_ids: [1991478060]
     # SESSDATA cookie值（可选，用于认证请求，可以查看发送弹幕用户名）
     sessdata: ""
+
+# YouTube 直播模式（设置页「直播」分页会改这里）
+stream_config:
+  # 上次用的直播网址
+  youtube_url: ''
+  # 留言含有这些字就略过
+  blocklist: []
+  # 多久没有能回的留言就主动开口（秒）
+  quiet_seconds: 30
+  # 超过这个字数的留言略过
+  max_comment_chars: 100
+  # 排队超过这个秒数的留言丢掉
+  comment_max_age_seconds: 60
+  # 同一个观众多久内不连续回（秒）
+  same_viewer_cooldown_seconds: 120
+  # 连续失败几轮就暂停
+  failure_limit: 3
