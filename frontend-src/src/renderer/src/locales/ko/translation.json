@@ -844,6 +844,10 @@
         "bad_url": "방송 영상 URL이 아닙니다",
         "no_history": "방송용 대화 기록을 만들 수 없습니다"
       }
+    },
+    "values": {
+      "integerBetween": "{{min}}~{{max}} 사이의 정수를 입력하세요",
+      "numberBetween": "{{min}}~{{max}} 사이의 숫자를 입력하세요"
     }
   },
   "footer": {

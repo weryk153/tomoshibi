@@ -844,6 +844,10 @@
         "bad_url": "That is not a live video URL",
         "no_history": "Could not create the stream conversation"
       }
+    },
+    "values": {
+      "integerBetween": "Enter a whole number from {{min}} to {{max}}",
+      "numberBetween": "Enter a number from {{min}} to {{max}}"
     }
   },
   "footer": {

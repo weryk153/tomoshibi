@@ -844,6 +844,10 @@
         "bad_url": "配信動画の URL ではありません",
         "no_history": "配信用の会話記録を作成できません"
       }
+    },
+    "values": {
+      "integerBetween": "{{min}}～{{max}} の整数を入力してください",
+      "numberBetween": "{{min}}～{{max}} の数値を入力してください"
     }
   },
   "footer": {
