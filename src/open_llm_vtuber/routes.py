@@ -12,6 +12,7 @@ from .service_context import ServiceContext
 from .websocket_handler import WebSocketHandler
 from .proxy_handler import ProxyHandler
 from .live2d_discovery import is_discoverable_live2d_dir
+from .origin_guard import websocket_origin_ok
 
 
 def init_client_ws_route(
@@ -38,6 +39,8 @@ def init_client_ws_route(
     @router.websocket("/client-ws")
     async def websocket_endpoint(websocket: WebSocket):
         """WebSocket endpoint for client connections"""
+        if not await websocket_origin_ok(websocket):
+            return
         await websocket.accept()
         client_uid = str(uuid4())
         # 舞台頁（?stage=1）連的是同一個端點，只是帶參數；它不還原私人對話。
@@ -72,6 +75,8 @@ def init_proxy_route(server_url: str) -> APIRouter:
     @router.websocket("/proxy-ws")
     async def proxy_endpoint(websocket: WebSocket):
         """WebSocket endpoint for proxy connections"""
+        if not await websocket_origin_ok(websocket):
+            return
         try:
             await proxy_handler.handle_client_connection(websocket)
         except Exception as e:
@@ -225,6 +230,8 @@ def init_webtool_routes(default_context_cache: ServiceContext) -> APIRouter:
     @router.websocket("/tts-ws")
     async def tts_endpoint(websocket: WebSocket):
         """WebSocket endpoint for TTS generation"""
+        if not await websocket_origin_ok(websocket):
+            return
         await websocket.accept()
         logger.info("TTS WebSocket connection established")
 

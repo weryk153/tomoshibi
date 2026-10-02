@@ -1,5 +1,6 @@
 /* eslint-disable no-shadow */
-import { app, ipcMain, globalShortcut, desktopCapturer } from "electron";
+import { app, ipcMain, globalShortcut, desktopCapturer, session } from "electron";
+import { appOriginFor } from "./app-origin";
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { electronApp, optimizer } from "@electron-toolkit/utils";
@@ -199,6 +200,16 @@ app.whenReady().then(async () => {
 
   app.on("browser-window-created", (_, window) => {
     optimizer.watchWindowShortcuts(window);
+  });
+
+  // 我們自己的頁面（file://）送給後端的請求，Origin 改成後端自己的位址，後端才
+  // 認得出是 app 自己的頁面（見 app-origin.ts、後端 origin_guard.py）。
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    const headers = details.requestHeaders;
+    const key = Object.keys(headers).find((name) => name.toLowerCase() === 'origin');
+    const origin = appOriginFor(key ? headers[key] : undefined, details.url);
+    if (key && origin) headers[key] = origin;
+    callback({ requestHeaders: headers });
   });
 
   app.on('web-contents-created', (_, contents) => {
