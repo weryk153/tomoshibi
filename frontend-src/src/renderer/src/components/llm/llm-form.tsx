@@ -32,6 +32,7 @@ import {
   type DetectResponse,
   type DetectedModel,
   type OllamaPullEvent,
+  needsKeyAgain,
 } from '@/api/llm-config.ts';
 
 const OLLAMA_DOWNLOAD_URL = 'https://ollama.com/download';
@@ -64,12 +65,10 @@ interface OllamaModelsResponse {
 
 type OllamaProbeStatus = 'idle' | 'loading' | 'unavailable' | 'empty' | 'ready';
 
-// 金鑰欄位留空、但後端已經存有一把金鑰時，使用者可能以為「留空 = 沿用舊金鑰」
-// ——設定裡其他遮罩欄位（例如 groq/azure 的 API key）確實是這樣運作的。但這裡
-// api_key_masked 只是遮罩字串（例如 "sk-x****"），前端拿不到明文可以重送，
-// 後端存檔又要求 api_key 非空，所以「沿用」技術上做不到：必須擋下送出，
-// 請使用者重新貼上一次。文案走 t('setup.keyRequiredAgain')／
-// t('setup.keyAlreadySetPlaceholder')——五語言都已補齊，見 locales/*/translation.json。
+// 金鑰欄位留空、後端已經存有一把金鑰時：網址沒變就沿用那把（只換模型不用重貼，
+// 見 llm_config_route._saved_key_for）。網址換了後端會拒絕——舊金鑰不能送到
+// 使用者剛填的別的主機——這時才請使用者重貼，文案走 t('setup.keyRequiredAgain')
+// （判斷在 api/llm-config.ts 的 needsKeyAgain）。
 
 // 左邊一條色條 + 一句話的提示框。原本只給「思考模式」那句警告用（叫
 // ReasoningModelWarning），偵測流程套用成功後要顯示 note（例如「已為你關閉
@@ -420,11 +419,6 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
   const handleSubmit = useCallback(async () => {
     setSaveError(null);
 
-    if ((mode === 'apikey' || mode === 'custom') && apiKey.trim() === '' && hasExistingKey) {
-      setSaveError(t('setup.keyRequiredAgain'));
-      return;
-    }
-
     const state: LlmFormState = {
       mode,
       provider,
@@ -443,6 +437,10 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
     }
     // 後端的錯誤訊息已去除金鑰且是人類可讀的（例如 "Missing API key."），
     // 直接顯示比翻成通用的 testFailed 更有用；只有 error 為空時才退回它。
+    if (needsKeyAgain(result.error, apiKey, hasExistingKey)) {
+      setSaveError(t('setup.keyRequiredAgain'));
+      return;
+    }
     setSaveError(result.error || t('setup.testFailed'));
   }, [mode, provider, apiKey, model, customUrl, hasExistingKey, backendBaseUrl, onSaved, t]);
 

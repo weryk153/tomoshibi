@@ -55,7 +55,7 @@
     "providerLabel": "供应商",
     "apiKeyLabel": "API 密钥",
     "apiKeyHelp": "密钥只会粘贴给你本机的应用程序并直接发往供应商，保存在这台电脑的 conf.yaml，之后不会再完整显示。",
-    "keyRequiredAgain": "已存有密钥，但无法沿用——请重新粘贴密钥才能保存。",
+    "keyRequiredAgain": "服务网址换了，旧密钥不会发到新网址——请重新粘贴密钥。",
     "keyAlreadySetPlaceholder": "已设置，重新粘贴以更改",
     "modelLabel": "模型",
     "modelHelp": "留空就用默认值（{{example}}）。",

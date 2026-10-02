@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildSavePayload, type LlmFormState } from './llm-config.ts'
+import { buildSavePayload, type LlmFormState, needsKeyAgain } from './llm-config.ts'
 
 const base: LlmFormState = {
   mode: 'apikey', provider: 'openai', apiKey: '', model: '', baseUrl: '',
@@ -46,4 +46,12 @@ test('warn only when the switch is on and the model has no tools', async () => {
   assert.equal(shouldWarnNoTools(false, false), false)
   assert.equal(shouldWarnNoTools(true, true), false)
   assert.equal(shouldWarnNoTools(null, true), false)
+})
+
+test('金鑰欄留空、網址換了被後端拒絕時，才請使用者重貼金鑰', () => {
+  // 只換模型時後端會沿用存著的金鑰，前端不再先擋。
+  assert.equal(needsKeyAgain('Missing API key.', '', true), true)
+  assert.equal(needsKeyAgain('Missing API key.', 'sk-new', true), false)
+  assert.equal(needsKeyAgain('Missing API key.', '', false), false)
+  assert.equal(needsKeyAgain('401 unauthorized', '', true), false)
 })

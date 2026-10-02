@@ -55,7 +55,7 @@
     "providerLabel": "プロバイダー",
     "apiKeyLabel": "APIキー",
     "apiKeyHelp": "キーはあなたのローカルアプリにのみ貼り付けられ、そのままプロバイダーへ送信されます。このパソコンのconf.yamlに保存され、二度と全文表示されることはありません。",
-    "keyRequiredAgain": "キーは保存済みですが、そのまま使うことはできません。もう一度貼り付けてください。",
+    "keyRequiredAgain": "サービスの URL が変わったため、保存済みのキーは新しい URL には送りません。キーを貼り直してください。",
     "keyAlreadySetPlaceholder": "設定済み — 変更するには貼り付け",
     "modelLabel": "モデル",
     "modelHelp": "空欄にするとデフォルト（{{example}}）を使います。",
