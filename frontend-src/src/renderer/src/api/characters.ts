@@ -158,7 +158,8 @@ export const updateCharacter = (
 export const createCharacter = (
   baseUrl: string,
   body: CharacterCreate,
-): Promise<ApiResult<unknown>> => apiPost<unknown>(baseUrl, '/api/characters', body)
+): Promise<ApiResult<{ ok: boolean; filename: string }>> =>
+  apiPost<{ ok: boolean; filename: string }>(baseUrl, '/api/characters', body)
 
 // 前端頭像大小上限。刻意比後端的 AVATAR_MAX_BYTES（character_route.py，4 MB）更
 // 嚴格——頭像顯示很小，512KB 已經綽綽有餘。這是刻意的兩層限制，不是 bug，
