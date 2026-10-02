@@ -20,11 +20,6 @@ export interface DisplayText {
   avatar: string;
 }
 
-interface BackgroundFile {
-  name: string;
-  url: string;
-}
-
 export interface AudioPayload {
   type: 'audio';
   audio?: string;
@@ -73,7 +68,8 @@ export interface MessageEvent {
   audio?: string;
   volumes?: number[];
   slice_length?: number;
-  files?: BackgroundFile[];
+  // background-files：伺服器 backgrounds/ 底下的檔名（scan_bg_directory 送字串陣列）。
+  files?: string[];
   actions?: Actions;
   text?: string;
   // full-text 的可翻譯代號。後端只會送英文字面值到 text，前端拿 text_key

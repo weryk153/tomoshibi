@@ -7,12 +7,14 @@ import {
   useRef,
   useState,
 } from "react";
+import i18n from "i18next";
+import { useWebSocket } from "./websocket-context";
 import {
   cloneScenePreset,
   createScenePreset,
-  createEmptySceneStore,
   getScenePresets,
   normalizeSceneStore,
+  resolveSceneUrl,
   ScenePerformanceBinding,
   ScenePreset,
   SceneStore,
@@ -51,15 +53,29 @@ interface SceneContextValue {
 
 const SceneContext = createContext<SceneContextValue | null>(null);
 
+// STORAGE_KEY 名字帶 v1 但不改：改了等於丟掉所有人的場景。裡面存的版本號才是
+// 第幾版（見 scenes/scene.ts 的 normalizeSceneStore）。
 function loadStore(): SceneStore {
+  const defaultName = i18n.t("settings.scenes.defaultBackground");
+  let legacyBackgroundUrl: string | null = null;
+  try {
+    // 一般頁以前把背景存在這裡（useLocalStorage 存的是 JSON 字串）。第一次載入
+    // 第 2 版時轉成「背景」場景。
+    const legacy = window.localStorage.getItem("backgroundUrl");
+    const parsed: unknown = legacy ? JSON.parse(legacy) : null;
+    legacyBackgroundUrl = typeof parsed === "string" ? parsed : null;
+  } catch {
+    legacyBackgroundUrl = null;
+  }
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY);
-    return saved
-      ? normalizeSceneStore(JSON.parse(saved))
-      : createEmptySceneStore();
+    return normalizeSceneStore(saved ? JSON.parse(saved) : null, {
+      legacyBackgroundUrl,
+      defaultName,
+    });
   } catch (error) {
     console.warn("[Scene] Could not read saved scene configuration:", error);
-    return createEmptySceneStore();
+    return normalizeSceneStore(null, { legacyBackgroundUrl, defaultName });
   }
 }
 
@@ -87,6 +103,7 @@ export function SceneProvider({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
+  const { baseUrl } = useWebSocket();
   const [store, setStore] = useState<SceneStore>(loadStore);
   const [temporarySceneId, setTemporarySceneId] = useState<string | null>(null);
   const [resolvedSourceUrl, setResolvedSourceUrl] = useState("");
@@ -102,7 +119,7 @@ export function SceneProvider({
     let alive = true;
     let objectUrl: string | null = null;
     if (!activeScene.assetKey) {
-      setResolvedSourceUrl(activeScene.sourceUrl);
+      setResolvedSourceUrl(resolveSceneUrl(activeScene.sourceUrl, baseUrl));
       return () => undefined;
     }
     setResolvedSourceUrl("");
@@ -119,7 +136,7 @@ export function SceneProvider({
       alive = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [activeScene.assetKey, activeScene.assetVersion, activeScene.sourceUrl]);
+  }, [activeScene.assetKey, activeScene.assetVersion, activeScene.sourceUrl, baseUrl]);
 
   useEffect(
     () => () => {
@@ -234,7 +251,7 @@ export function SceneProvider({
   const importSceneAsset = useCallback(
     async (sceneId: string, file: File): Promise<SceneAssetError | null> => {
       const scene = scenes.find((candidate) => candidate.id === sceneId);
-      if (!scene || scene.builtin) return "unsupported";
+      if (!scene) return "unsupported";
       const assetKey = `scene::${sceneId}`;
       const invalid = await saveSceneAsset(assetKey, file, scene.type);
       if (invalid) return invalid;

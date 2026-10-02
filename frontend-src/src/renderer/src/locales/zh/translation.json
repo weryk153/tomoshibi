@@ -164,7 +164,6 @@
         "clean": "清爽淺色",
         "cute": "粉嫩可愛"
       },
-      "useCameraBackground": "使用攝像頭背景",
       "showSubtitle": "顯示字幕",
       "voiceVolume": "語音音量（%）",
       "voiceVolumeHelp": "她說話的音量。超過 100% 會真的放大訊號（GPT-SoVITS 的輸出本來就很小聲），後面串了限幅器所以不會破音。不影響配樂，也不影響嘴型——嘴型走的是另一條管線，音量調到 0 嘴還是會動。",
@@ -185,16 +184,6 @@
       "engineBackgroundUrl": "背景工作的端點",
       "engineBackgroundModel": "背景工作的模型",
       "engineBackgroundInvalid": "沒有存：端點要是 http:// 或 https:// 開頭的網址，兩欄都不能有引號或換行。",
-      "backgroundImage": "背景圖片",
-      "customBgUrlPlaceholder": "輸入圖片網址",
-      "bgUpload": "上傳圖片",
-      "bgUploadLabel": "上傳背景",
-      "bgUploadHelp": "從你的電腦選一張圖，會存到伺服器並加進上面的清單。",
-      "bgUploaded": "背景已上傳並套用。",
-      "bgUploadFailed": "背景上傳失敗，請再試一次。",
-      "bgNotImage": "請選擇圖片檔。",
-      "bgTooLarge": "圖片太大 — 請選 12MB 以下的。",
-      "customBgUrl": "或輸入自訂背景網址",
       "wsUrl": "WebSocket 位址",
       "baseUrl": "伺服器位址",
       "imageCompressionQuality": "圖片壓縮品質",
@@ -209,8 +198,7 @@
       "cameraFailed": "攝影機開啟失敗，所以背景沒有切換。",
       "connectionSection": "連線設定",
       "connectionHelp": "這兩個欄位改完要按「連線」才生效——邊打邊套用的話，每輸入一個字元就會重連一次。",
-      "connect": "連線",
-      "customBgUrlEmpty": "網址不能空白"
+      "connect": "連線"
     },
     "characters": {
       "description": "建立、編輯、切換你的陪伴角色，完全不用碰 YAML。",
@@ -505,8 +493,6 @@
       "add3d": "新增 3D 場景",
       "active": "使用中",
       "use": "套用",
-      "currentBackground": "目前背景",
-      "currentBackgroundHelp": "沿用「常規」分頁設定的背景圖片或攝影機畫面。",
       "name": "場景名稱",
       "type": "場景種類",
       "asset": "本機素材",
@@ -542,7 +528,8 @@
         "image": "2D 圖片",
         "video": "2D 影片",
         "live2d": "2D Live2D 模型",
-        "model3d": "3D 場景"
+        "model3d": "3D 場景",
+        "camera": "攝影機"
       },
       "fits": {
         "cover": "填滿並裁切",
@@ -556,7 +543,12 @@
       },
       "usingImportedFile": "目前用匯入的檔案；要改用網址或換類型，先移除檔案",
       "removeFile": "移除檔案",
-      "removeFileConfirm": "確定移除匯入的檔案？"
+      "removeFileConfirm": "確定移除匯入的檔案？",
+      "defaultBackground": "背景",
+      "addCamera": "新增攝影機",
+      "cameraHelp": "背景是你的攝影機畫面（左右鏡像）。用這個場景時才會開攝影機。",
+      "serverBackground": "內建背景",
+      "serverBackgroundPlaceholder": "選一張伺服器上的背景圖"
     },
     "asr": {
       "micModeLabel": "麥克風模式",
@@ -854,7 +846,7 @@
       "restartCommand": "要重新啟動後端才會生效：在執行後端的終端機按 Ctrl+C，再執行 uv run run_server.py。"
     },
     "stage": {
-      "display": "字幕、音量與背景",
+      "display": "字幕與音量",
       "canvas": "畫布互動"
     },
     "models": {

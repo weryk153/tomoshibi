@@ -164,7 +164,6 @@
         "clean": "Clean",
         "cute": "Cute"
       },
-      "useCameraBackground": "Use Camera Background",
       "showSubtitle": "Show Subtitle",
       "voiceVolume": "Voice volume (%)",
       "voiceVolumeHelp": "Playback volume for the character's voice. Above 100% amplifies the signal (GPT-SoVITS output is very quiet); a limiter prevents clipping. Does not affect background music or lip sync.",
@@ -185,16 +184,6 @@
       "engineBackgroundUrl": "Background endpoint",
       "engineBackgroundModel": "Background model",
       "engineBackgroundInvalid": "Not saved: the endpoint must be a URL starting with http:// or https://, and neither field may contain quotes or line breaks.",
-      "backgroundImage": "Background Image",
-      "customBgUrlPlaceholder": "Enter image URL",
-      "bgUpload": "Upload image",
-      "bgUploadLabel": "Upload a background",
-      "bgUploadHelp": "Add an image from your computer; it's saved on the server and added to the list above.",
-      "bgUploaded": "Background uploaded and applied.",
-      "bgUploadFailed": "Could not upload the background. Please try again.",
-      "bgNotImage": "Please choose an image file.",
-      "bgTooLarge": "Image too large — please pick one under 12MB.",
-      "customBgUrl": "Or enter a custom background URL",
       "wsUrl": "WebSocket URL",
       "baseUrl": "Base URL",
       "imageCompressionQuality": "Image Compression Quality",
@@ -209,8 +198,7 @@
       "cameraFailed": "The camera could not be started, so the background was not switched.",
       "connectionSection": "Connection",
       "connectionHelp": "These two take effect when you press Connect. Applying as you type would reconnect on every keystroke.",
-      "connect": "Connect",
-      "customBgUrlEmpty": "The URL can't be empty"
+      "connect": "Connect"
     },
     "characters": {
       "description": "Create, edit, and switch your companion characters — no YAML needed.",
@@ -505,8 +493,6 @@
       "add3d": "Add 3D scene",
       "active": "Active",
       "use": "Use",
-      "currentBackground": "Current background",
-      "currentBackgroundHelp": "Uses the background image or camera selected on the General tab.",
       "name": "Scene name",
       "type": "Scene type",
       "asset": "Local asset",
@@ -542,7 +528,8 @@
         "image": "2D image",
         "video": "2D video",
         "live2d": "2D Live2D model",
-        "model3d": "3D scene"
+        "model3d": "3D scene",
+        "camera": "Camera"
       },
       "fits": {
         "cover": "Fill and crop",
@@ -556,7 +543,12 @@
       },
       "usingImportedFile": "Using the imported file. Remove it first to use a URL or change the type",
       "removeFile": "Remove file",
-      "removeFileConfirm": "Remove the imported file?"
+      "removeFileConfirm": "Remove the imported file?",
+      "defaultBackground": "Background",
+      "addCamera": "Add camera",
+      "cameraHelp": "The background is your camera feed (mirrored). The camera turns on only while this scene is in use.",
+      "serverBackground": "Built-in background",
+      "serverBackgroundPlaceholder": "Pick a background from the server"
     },
     "asr": {
       "micModeLabel": "Microphone mode",
@@ -854,7 +846,7 @@
       "restartCommand": "Takes effect after a backend restart: press Ctrl+C in the terminal running it, then run uv run run_server.py."
     },
     "stage": {
-      "display": "Subtitles, volume & background",
+      "display": "Subtitles & volume",
       "canvas": "Canvas interaction"
     },
     "models": {
