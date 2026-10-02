@@ -1,19 +1,10 @@
-// 遠端連線分頁的唯讀端點包裝。後端見
-// src/open_llm_vtuber/character_route.py 的 GET /api/network-info
-// （_collect_network_urls，L755-791）。
+// 遠端連線的端點包裝。GET /api/network-info 讀現況；POST /api/network/host 改
+// 綁定位址（要重啟後端才生效，由設定抽屜頂端的提示處理）。後端見
+// src/open_llm_vtuber/network_route.py。
 //
-// 這個端點刻意沒有對應的寫入端點——conf.yaml 的 system_config.host 只能手動
-// 編輯，Tailscale Serve 也只能照著外部教學設定（見 remote-access.tsx 檔頭的
-// 說明）。所以這裡只有一個 fetch 函式，沒有 set*／save* 之類的函式，跟
-// api/perf.ts、api/topics.ts 裡「讀寫成對」的慣例不同——是後端本身就沒有寫入
-// 端點，不是這裡漏包一半。
-//
-// 跟其他 api/*.ts（characters.ts／memory.ts／perf.ts／topics.ts）同一套慣例：
-// 一律回傳 ApiResult<T>，把「成功／失敗」交給呼叫端用 if (!res.ok) 判斷，不
-// throw。內部直接把 apiGet 的回傳值原樣交出去，共用 http.ts 那一套 base URL
-// 串接、逾時、與「網路失敗 vs. 非 2xx 回應」錯誤正規化邏輯——這裡不重做一次。
+// 跟其他 api/*.ts 同一套慣例：一律回傳 ApiResult<T>，不 throw。
 
-import { apiGet, type ApiResult } from './http.ts'
+import { apiGet, apiPost, type ApiResult } from './http.ts'
 
 export interface NetworkUrl {
   type: 'lan' | 'tailscale'
@@ -26,7 +17,10 @@ export interface NetworkInfo {
   port: number | null
   scheme: 'http' | 'https'
   https_url: string | null
+  // 這次啟動實際綁的位址只聽本機：網址連不上。
   localhost_only: boolean
+  // conf.yaml 的設定（設定頁的「允許區網連線」）。重啟前可以跟 localhost_only 對不上。
+  allow_other_devices: boolean
   mic_needs_https: boolean
 }
 
@@ -70,3 +64,11 @@ export const pickPrimaryUrl = (info: NetworkInfo): string | null => {
 // 網址，教學就沒必要再出現。
 export const shouldWarnMicNeedsHttps = (info: NetworkInfo): boolean =>
   info.mic_needs_https && !info.https_url
+
+export const hostBody = (allow: boolean): { allow_other_devices: boolean } => ({ allow_other_devices: allow })
+
+export const setAllowOtherDevices = (
+  baseUrl: string,
+  allow: boolean,
+): Promise<ApiResult<{ ok: boolean; restart_required: boolean }>> =>
+  apiPost<{ ok: boolean; restart_required: boolean }>(baseUrl, '/api/network/host', hostBody(allow))

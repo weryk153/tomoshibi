@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  pickPrimaryUrl, shouldWarnMicNeedsHttps, type NetworkInfo,
+  hostBody, pickPrimaryUrl, shouldWarnMicNeedsHttps, type NetworkInfo,
 } from './network.ts'
 
 // 共用的最小骨架，每個測試只覆寫要測的欄位，其餘保持「無網址、無 https、
@@ -12,6 +12,7 @@ const base: NetworkInfo = {
   scheme: 'http',
   https_url: null,
   localhost_only: true,
+  allow_other_devices: false,
   mic_needs_https: true,
 }
 
@@ -72,4 +73,9 @@ test('目前已經是 https 就不用提醒', () => {
   assert.equal(shouldWarnMicNeedsHttps({
     ...base, mic_needs_https: false, https_url: null,
   }), false)
+})
+
+test('the LAN switch sends exactly the field the backend reads', () => {
+  assert.deepEqual(hostBody(true), { allow_other_devices: true })
+  assert.deepEqual(hostBody(false), { allow_other_devices: false })
 })
