@@ -735,7 +735,7 @@
     },
     "topics": {
       "sectionTitle": "What she talks about",
-      "sectionNote": "Changes in this section take effect and save immediately.",
+      "sectionNote": "Changes here save right away and are used the next time she speaks up.",
       "sectionDesc": "Set the topics she brings up when she speaks proactively while idle. Just list topics; the toggle below decides whether she speaks from her own knowledge or fetches the latest news.",
       "listLabel": "Proactive topics",
       "listHelp": "List topics you'd like her to bring up; she'll naturally pick one each time.",

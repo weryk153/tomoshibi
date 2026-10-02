@@ -1,6 +1,6 @@
 // 直播分頁：貼直播網址、黑名單、冷場秒數，開始／停止，看狀態。
 //
-// 改了就存：文字停手 800ms 才送（不在打字途中改值）。狀態每 2 秒拉一次，只在這個
+// 改了就存：文字停手 0.8 秒或離開欄位才送（useAutosave），欄位下方看得到存了沒。狀態每 2 秒拉一次，只在這個
 // 分頁看得到時拉。舞台頁網址照目前的後端位址組出來，貼到 OBS 的瀏覽器來源。
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -9,34 +9,25 @@ import { settingStyles } from './setting-styles';
 import { InputField, TextareaField } from './common';
 import { Button, TextInput } from '@/components/ui/tw/primitives';
 import { toaster } from '@/components/ui/tw/toaster';
+import { SaveStatus } from '@/components/ui/tw/save-status';
+import { useAutosave } from '@/hooks/use-autosave';
+import { boundsMessage } from '@/utils/setting-values';
 import { useWebSocket } from '@/context/websocket-context';
 import {
   blocklistFromText, blocklistToText, fetchStream, parseQuietSeconds, saveStreamSettings,
   startBlockedKey, startStream, stopStream, type StreamSettings, type StreamStatus,
 } from '@/api/stream.ts';
 
-const SAVE_DELAY_MS = 800;
 const POLL_MS = 2000;
 
 interface StreamProps {
   active?: boolean;
 }
 
-// 值停止變動 SAVE_DELAY_MS 之後才存；載入完成前不存（enabled=false）。
-function useDelayedSave(save: () => void, value: string, enabled: boolean): void {
-  const saveRef = useRef(save);
-  saveRef.current = save;
-  useEffect(() => {
-    if (!enabled) return undefined;
-    const timer = setTimeout(() => saveRef.current(), SAVE_DELAY_MS);
-    return () => clearTimeout(timer);
-  }, [value, enabled]);
-}
-
 function Stream({ active = true }: StreamProps): JSX.Element {
   const { t } = useTranslation();
   const { baseUrl } = useWebSocket();
-  const [saved, setSaved] = useState<StreamSettings | null>(null);
+  const [, setSaved] = useState<StreamSettings | null>(null);
   const [status, setStatus] = useState<StreamStatus | null>(null);
   const [url, setUrl] = useState('');
   const [blocklist, setBlocklist] = useState('');
@@ -67,27 +58,24 @@ function Stream({ active = true }: StreamProps): JSX.Element {
 
   const save = useCallback(async (changes: Partial<StreamSettings>) => {
     const result = await saveStreamSettings(baseUrl, changes);
-    if (result.ok) {
-      setSaved(result.data.settings);
-    } else {
-      toaster.create({
-        title: t('settings.stream.saveFailed'), description: result.error, type: 'error', duration: 3000,
-      });
-    }
-  }, [baseUrl, t]);
+    if (!result.ok) return { ok: false, error: result.error } as const;
+    setSaved(result.data.settings);
+    return { ok: true } as const;
+  }, [baseUrl]);
 
-  const ready = saved !== null;
-  useDelayedSave(() => {
-    if (saved && url.trim() !== saved.youtube_url) save({ youtube_url: url.trim() });
-  }, url, ready);
-  useDelayedSave(() => {
-    const words = blocklistFromText(blocklist);
-    if (saved && words.join('\n') !== saved.blocklist.join('\n')) save({ blocklist: words });
-  }, blocklist, ready);
-  useDelayedSave(() => {
-    const seconds = parseQuietSeconds(quiet);
-    if (saved && seconds !== null && seconds !== saved.quiet_seconds) save({ quiet_seconds: seconds });
-  }, quiet, ready);
+  const urlSaver = useAutosave((text: string) => save({ youtube_url: text.trim() }));
+  const blocklistSaver = useAutosave((text: string) => save({ blocklist: blocklistFromText(text) }));
+  const QUIET_BOUNDS = { min: 5, max: 3600, integer: true };
+  const quietSaver = useAutosave(
+    (text: string) => save({ quiet_seconds: parseQuietSeconds(text) as number }),
+    {
+      validate: (text) => {
+        if (parseQuietSeconds(text) !== null) return null;
+        const message = boundsMessage(QUIET_BOUNDS);
+        return t(message.key, message.params);
+      },
+    },
+  );
 
   const toggle = useCallback(async () => {
     if (!status) return;
@@ -122,25 +110,31 @@ function Stream({ active = true }: StreamProps): JSX.Element {
       <InputField
         label={t('settings.stream.urlLabel')}
         value={url}
-        onChange={setUrl}
+        onChange={(value) => { setUrl(value); urlSaver.change(value); }}
+        onBlur={urlSaver.flush}
         placeholder="https://www.youtube.com/watch?v=..."
         help={t('settings.stream.urlHelp')}
         disabled={status?.live}
       />
+      <SaveStatus state={urlSaver.state} />
       <TextareaField
         label={t('settings.stream.blocklistLabel')}
         value={blocklist}
-        onChange={setBlocklist}
+        onChange={(value) => { setBlocklist(value); blocklistSaver.change(value); }}
+        onBlur={blocklistSaver.flush}
         rows={4}
         help={t('settings.stream.blocklistHelp')}
       />
+      <SaveStatus state={blocklistSaver.state} />
       <InputField
         label={t('settings.stream.quietLabel')}
         value={quiet}
-        onChange={setQuiet}
+        onChange={(value) => { setQuiet(value); quietSaver.change(value); }}
+        onBlur={quietSaver.flush}
         type="number"
         help={t('settings.stream.quietHelp')}
       />
+      <SaveStatus state={quietSaver.state} />
 
       <HStack>
         <Button

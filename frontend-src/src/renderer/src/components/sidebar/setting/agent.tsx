@@ -7,15 +7,17 @@ import { formatDistanceToNow } from 'date-fns';
 import { settingStyles } from './setting-styles';
 import { Button } from '@/components/ui/tw/primitives';
 import { toaster } from '@/components/ui/tw/toaster';
+import { SaveStatus } from '@/components/ui/tw/save-status';
+import { DraftNumberField } from '@/components/ui/tw/draft-number-field';
+import { useAutosave } from '@/hooks/use-autosave';
 import { useWebSocket } from '@/context/websocket-context';
 import { useAgentSettings } from '@/hooks/sidebar/setting/use-agent-settings';
 import {
-  SwitchField, NumberField, InputField, } from './common';
+  SwitchField, InputField, } from './common';
 import {
   fetchTopics,
   saveTopics,
   refreshNews,
-  clampIntervalHours,
   normalizeTopics,
   MAX_TOPICS,
   INTERVAL_HOURS_MIN,
@@ -49,8 +51,6 @@ function Agent(): JSX.Element {
   const [newTopicDraft, setNewTopicDraft] = useState('');
   const [savingTopics, setSavingTopics] = useState(false);
 
-  const [intervalDraft, setIntervalDraft] = useState(String(INTERVAL_HOURS_MIN));
-  const [savingInterval, setSavingInterval] = useState(false);
 
   const [refreshing, setRefreshing] = useState(false);
 
@@ -62,7 +62,6 @@ function Agent(): JSX.Element {
       if (cancelled) return;
       if (result.ok) {
         setTopics(result.data);
-        setIntervalDraft(String(result.data.news.interval_hours));
       } else {
         setLoadError(result.error || t('settings.topics.loadError'));
       }
@@ -132,24 +131,15 @@ function Agent(): JSX.Element {
     }
   }, [baseUrl, topics, t]);
 
-  // 更新間隔：連續數字輸入，跟 perf.tsx 的自訂秒數草稿一樣，要有自己的儲存
-  // 按鈕才送出，不要每敲一下數字就打一次 API。
-  const handleIntervalSave = useCallback(async () => {
-    const hours = clampIntervalHours(Number(intervalDraft));
-    setIntervalDraft(String(hours));
-    setSavingInterval(true);
+  // 更新間隔：欄位停手才交出合法的值，交出來就存。
+  const intervalSaver = useAutosave(async (hours: number) => {
     const result = await saveTopics(baseUrl, { news: { interval_hours: hours } });
-    setSavingInterval(false);
-    if (result.ok) {
-      setTopics((prev) => (prev ? { ...prev, news: result.data.news } : prev));
-    } else {
-      toaster.create({
-        title: result.error || t('settings.topics.saveFailed'),
-        type: 'error',
-        duration: 3000,
-      });
+    if (!result.ok) {
+      return { ok: false, error: result.error || t('settings.topics.saveFailed') } as const;
     }
-  }, [baseUrl, intervalDraft, t]);
+    setTopics((prev) => (prev ? { ...prev, news: result.data.news } : prev));
+    return { ok: true } as const;
+  }, { delayMs: 0 });
 
   // 立即抓取：三種結果不可混為一談（見任務簡報）——news_ok===true 才是
   // refreshDone；news_ok===false 但請求本身成功是 refreshFellBack（後端抓不到
@@ -185,13 +175,7 @@ function Agent(): JSX.Element {
 
   return (
     <Stack {...settingStyles.common.container}>
-      {/* Apply/Revert 管的三顆開關／欄位：自己的 gap=2 小群組、自己的
-          TabActions，跟下面主動話題那個群組用外層 gap=8 隔開——這是 asr.tsx
-          區分「上半部 Apply/Revert 治理」與「下半部即時存檔」兩個區塊的同一種
-          手法（兩個各自緊湊的 Stack 當外層鬆散 gap 的手足），不是新發明的樣式。
-          TabActions 原本放在檔案最底部、topics 區塊之後，畫面上看起來像在管
-          topics；use-agent-settings.ts 的 handleCancel 其實只碰這三個欄位，
-          所以搬到這裡讓「按鈕管什麼」跟畫面位置對得起來。 */}
+      {/* 主動發言：切了、停手就存（localStorage），立刻生效。 */}
       <Stack gap={2}>
         <SwitchField
           label={t('settings.agent.allowProactiveSpeak')}
@@ -200,13 +184,13 @@ function Agent(): JSX.Element {
         />
 
         {settings.allowProactiveSpeak && (
-          <NumberField
+          <DraftNumberField
             label={t('settings.agent.idleSecondsToSpeak')}
             value={settings.idleSecondsToSpeak}
             onChange={(value) => handleIdleSecondsChange(Number(value))}
             min={30}
-            step={0.1}
-            allowMouseWheel
+            max={3600}
+            step={1}
           />
         )}
 
@@ -217,10 +201,7 @@ function Agent(): JSX.Element {
         />
       </Stack>
 
-      {/* 主動話題：後端狀態、即時存檔，走自己的按鈕與狀態提示，不掛進上面的
-          TabActions——sectionNote 是常駐文字（不是 toast），跟 asr.tsx 的
-          asrEngineSectionNote 同一個作用：讓「這塊歸誰管、還原鍵救不救得到」
-          隨時看得到，不用等使用者手滑按了還原才發現話題沒被復原。 */}
+      {/* 主動話題：改了就存到後端，下一次主動開口就用新的。 */}
       <Stack gap={2}>
         <Heading size="sm">{t('settings.topics.sectionTitle')}</Heading>
         <Text fontSize="xs" color="blue.300">{t('settings.topics.sectionNote')}</Text>
@@ -313,24 +294,18 @@ function Agent(): JSX.Element {
 
             {topics.news.enabled && (
               <Stack gap={2}>
-                <NumberField
+                <DraftNumberField
                   label={t('settings.topics.intervalHours')}
-                  value={intervalDraft}
-                  onChange={setIntervalDraft}
+                  value={topics.news.interval_hours}
+                  onChange={(value) => intervalSaver.change(Number(value))}
                   min={INTERVAL_HOURS_MIN}
                   max={INTERVAL_HOURS_MAX}
                   step={1}
+                  integer
                 />
+                <SaveStatus state={intervalSaver.state} />
                 <Text fontSize="xs" color="whiteAlpha.600">{t('settings.topics.intervalHoursHelp')}</Text>
                 <HStack>
-                  <Button
-                    size="xs"
-                    tone="blue"
-                    onClick={handleIntervalSave}
-                    loading={savingInterval}
-                  >
-                    {t('common.save')}
-                  </Button>
                   <Button
                     size="xs"
                     variant="outline"
