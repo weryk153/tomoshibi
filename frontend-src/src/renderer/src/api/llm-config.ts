@@ -7,6 +7,18 @@ import { apiGet, apiPost, postNdjsonStream, type ApiResult } from './http.ts'
 
 export type LlmMode = 'apikey' | 'ollama' | 'custom'
 export type ApiKeyProvider = 'openai' | 'claude' | 'gemini'
+// 語言模型頁的來源，四選一：local 是偵測這台電腦上的模型（LM Studio／Ollama），
+// 其他三個對應手動填的表單（LlmMode）。
+export type LlmSource = LlmMode | 'local'
+
+// 真正在用的那一塊（後端 llm_config_route.active_llm）。
+export interface ActiveLlm {
+  provider: string
+  source: LlmSource | 'other'
+  api_provider: ApiKeyProvider | null
+  model: string
+  base_url: string
+}
 
 export interface LlmConfigRead {
   provider: string
@@ -20,6 +32,7 @@ export interface LlmConfigRead {
   api_key_masked: string
   has_real_key: boolean
   is_configured: boolean
+  active?: ActiveLlm
 }
 
 export interface LlmSaveResult {
@@ -184,4 +197,35 @@ export const installOllama = (
 // "Missing API key."（舊金鑰不能送到別的主機）。只有這種情況要請使用者重貼。
 export function needsKeyAgain(error: string, apiKey: string, hasExistingKey: boolean): boolean {
   return hasExistingKey && apiKey.trim() === '' && error === 'Missing API key.'
+}
+
+// 打開語言模型頁時停在正在用的那個來源；還沒設定（首次精靈）就先偵測本機模型。
+export function initialSource(active: ActiveLlm | undefined, configured: boolean): LlmSource {
+  if (!active || !configured) return 'local'
+  return active.source === 'other' ? 'apikey' : active.source
+}
+
+const API_PROVIDER_NAMES: Record<ApiKeyProvider, string> = {
+  openai: 'OpenAI',
+  claude: 'Claude',
+  gemini: 'Gemini',
+}
+
+// 「目前使用：<模型>（<在哪裡>）」的「在哪裡」：本機兩種用翻譯，其他直接寫名字。
+export function activeWhere(active: ActiveLlm): { key: string; name?: string } {
+  if (active.source === 'local') return { key: 'setup.whereLmStudio' }
+  if (active.source === 'ollama') return { key: 'setup.whereOllama' }
+  if (active.source === 'apikey' && active.api_provider) {
+    return { key: 'setup.whereNamed', name: API_PROVIDER_NAMES[active.api_provider] }
+  }
+  if (active.source === 'custom') {
+    let name = active.base_url
+    try {
+      name = new URL(active.base_url).host
+    } catch {
+      // 寫壞的網址就照原樣顯示
+    }
+    return { key: 'setup.whereNamed', name }
+  }
+  return { key: 'setup.whereNamed', name: active.provider }
 }

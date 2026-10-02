@@ -1,6 +1,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { buildSavePayload, type LlmFormState, needsKeyAgain } from './llm-config.ts'
+import {
+  activeWhere, buildSavePayload, initialSource, needsKeyAgain, type ActiveLlm, type LlmFormState,
+} from './llm-config.ts'
 
 const base: LlmFormState = {
   mode: 'apikey', provider: 'openai', apiKey: '', model: '', baseUrl: '',
@@ -54,4 +56,32 @@ test('金鑰欄留空、網址換了被後端拒絕時，才請使用者重貼�
   assert.equal(needsKeyAgain('Missing API key.', 'sk-new', true), false)
   assert.equal(needsKeyAgain('Missing API key.', '', false), false)
   assert.equal(needsKeyAgain('401 unauthorized', '', true), false)
+})
+
+const active = (source: ActiveLlm['source'], extra: Partial<ActiveLlm> = {}): ActiveLlm => ({
+  provider: 'openai_compatible_llm', source, api_provider: null, model: 'm', base_url: '', ...extra,
+})
+
+test('打開語言模型頁時，停在正在用的那個來源', () => {
+  assert.equal(initialSource(active('local'), true), 'local')
+  assert.equal(initialSource(active('ollama'), true), 'ollama')
+  assert.equal(initialSource(active('apikey', { api_provider: 'claude' }), true), 'apikey')
+  assert.equal(initialSource(active('custom'), true), 'custom')
+  // 手改設定檔選了別的供應商：沒有對應的表單，停在 API 金鑰。
+  assert.equal(initialSource(active('other'), true), 'apikey')
+  // 還沒設定（首次精靈）：先偵測這台電腦上的模型。
+  assert.equal(initialSource(active('custom'), false), 'local')
+  assert.equal(initialSource(undefined, true), 'local')
+})
+
+test('「目前使用」寫得出它在哪裡', () => {
+  assert.deepEqual(activeWhere(active('local')), { key: 'setup.whereLmStudio' })
+  assert.deepEqual(activeWhere(active('ollama')), { key: 'setup.whereOllama' })
+  assert.deepEqual(activeWhere(active('apikey', { api_provider: 'gemini' })), { key: 'setup.whereNamed', name: 'Gemini' })
+  assert.deepEqual(
+    activeWhere(active('custom', { base_url: 'https://openrouter.ai/api/v1' })),
+    { key: 'setup.whereNamed', name: 'openrouter.ai' },
+  )
+  assert.deepEqual(activeWhere(active('custom', { base_url: 'not a url' })), { key: 'setup.whereNamed', name: 'not a url' })
+  assert.deepEqual(activeWhere(active('other', { provider: 'claude_llm' })), { key: 'setup.whereNamed', name: 'claude_llm' })
 })

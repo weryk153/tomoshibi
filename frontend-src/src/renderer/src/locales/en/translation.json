@@ -112,7 +112,13 @@
     "voiceFailed": "Install failed: {{error}}",
     "voiceRetry": "Try again",
     "voiceHelp": "The default voice comes from the Tsukuyomi-chan Corpus (CV: Rei Yumesaki). You can switch to another reference clip in voice settings.",
-    "modelHasNoTools": "This model can't use tools, so web search and the time tool won't work with it. The tools switch is unchanged."
+    "modelHasNoTools": "This model can't use tools, so web search and the time tool won't work with it. The tools switch is unchanged.",
+    "tabLocal": "Models on this computer",
+    "currentlyUsing": "Currently using: {{model}} ({{where}})",
+    "notConfiguredYet": "No language model set up yet",
+    "whereLmStudio": "local LM Studio",
+    "whereOllama": "local Ollama",
+    "whereNamed": "{{name}}"
   },
   "effects": {
     "characterEntrance": {

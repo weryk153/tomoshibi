@@ -112,7 +112,13 @@
     "voiceFailed": "安裝失敗：{{error}}",
     "voiceRetry": "再試一次",
     "voiceHelp": "預設聲音來自つくよみちゃんコーパス（CV.夢前黎）。之後可以在語音設定換成別的參考音。",
-    "modelHasNoTools": "這顆模型不支援工具，網路搜尋與時間工具在它身上不會動。工具開關沒有改。"
+    "modelHasNoTools": "這顆模型不支援工具，網路搜尋與時間工具在它身上不會動。工具開關沒有改。",
+    "tabLocal": "這台電腦上的模型",
+    "currentlyUsing": "目前使用：{{model}}（{{where}}）",
+    "notConfiguredYet": "還沒設定語言模型",
+    "whereLmStudio": "本機 LM Studio",
+    "whereOllama": "本機 Ollama",
+    "whereNamed": "{{name}}"
   },
   "effects": {
     "characterEntrance": {

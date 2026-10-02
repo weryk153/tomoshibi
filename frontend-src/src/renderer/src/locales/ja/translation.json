@@ -112,7 +112,13 @@
     "voiceFailed": "インストールに失敗しました：{{error}}",
     "voiceRetry": "もう一度試す",
     "voiceHelp": "既定の声はつくよみちゃんコーパス（CV.夢前黎）です。音声設定で別の参照音声に変更できます。",
-    "modelHasNoTools": "このモデルはツールを使えないため、ウェブ検索と時刻ツールは動きません。ツールのスイッチは変更していません。"
+    "modelHasNoTools": "このモデルはツールを使えないため、ウェブ検索と時刻ツールは動きません。ツールのスイッチは変更していません。",
+    "tabLocal": "このパソコンのモデル",
+    "currentlyUsing": "使用中：{{model}}（{{where}}）",
+    "notConfiguredYet": "言語モデルがまだ設定されていません",
+    "whereLmStudio": "ローカルの LM Studio",
+    "whereOllama": "ローカルの Ollama",
+    "whereNamed": "{{name}}"
   },
   "effects": {
     "characterEntrance": {

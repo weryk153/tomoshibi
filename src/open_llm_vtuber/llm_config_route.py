@@ -133,6 +133,51 @@ def _get_llm_provider(data: Any) -> Optional[str]:
     return conversation_block(agent_settings).get("llm_provider")
 
 
+def _same_url(a: str, b: str) -> bool:
+    return a.strip().rstrip("/").lower() == b.strip().rstrip("/").lower()
+
+
+def active_llm(data: Any) -> dict:
+    """llm_provider 真正指向的那一塊：來源、模型、網址。
+
+    語言模型頁最上面那行「目前使用」讀這個。以前那一頁不管用的是哪一塊都顯示
+    openai_compatible_llm 的值——偵測套用了本機 9B，下面還寫著 OpenRouter 的
+    Gemma，看不出到底在用什麼。
+
+    source：local（LM Studio）、ollama、apikey（OpenAI／Claude／Gemini 的官方端點）、
+    custom（其他 OpenAI 相容端點，例如 OpenRouter）、other（手改設定檔選的其他供應商）。
+    """
+    provider = str(_get_llm_provider(data) or "openai_compatible_llm")
+    try:
+        block = data["character_config"]["agent_config"]["llm_configs"][provider] or {}
+    except (KeyError, TypeError):
+        block = {}
+    model = str(block.get("model") or "")
+    base_url = str(block.get("base_url") or "")
+    api_provider = None
+    if provider == "lmstudio_llm":
+        source = "local"
+    elif provider == "ollama_llm":
+        source = "ollama"
+    elif provider == "openai_compatible_llm":
+        source = "custom"
+        for name, default_url in PROVIDER_DEFAULT_BASE_URL.items():
+            if base_url and _same_url(base_url, default_url):
+                source, api_provider = (
+                    ("ollama", None) if name == "ollama" else ("apikey", name)
+                )
+                break
+    else:
+        source = "other"
+    return {
+        "provider": provider,
+        "source": source,
+        "api_provider": api_provider,
+        "model": model,
+        "base_url": base_url,
+    }
+
+
 def _get_system_host(data: Any) -> Optional[str]:
     try:
         return str(data["system_config"]["host"])
@@ -572,6 +617,8 @@ def init_llm_config_route() -> APIRouter:
                 "api_key_masked": _mask_key(block.get("llm_api_key")),
                 "has_real_key": _has_real_key(block),
                 "is_configured": configured,
+                # 真正在用的那一塊（上面幾個欄位固定是 openai_compatible_llm 的）。
+                "active": active_llm(data),
             }
         )
 
