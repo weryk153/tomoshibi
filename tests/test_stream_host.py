@@ -232,3 +232,27 @@ def test_preparing_the_stage_waits_for_a_private_turn_in_flight():
         assert asyncio.run(scenario()) is True
     finally:
         host_module.get_active_character_filename = original
+
+
+@pytest.mark.parametrize(
+    "kind,expected",
+    [
+        ("paid", "大方（Super Chat）：生日快樂！"),
+        ("member", "大方（會員）：生日快樂！"),
+        ("text", "大方：生日快樂！"),
+    ],
+)
+def test_super_chat_and_members_are_marked_for_her(kind, expected):
+    """她要知道哪則是付費留言才會道謝；留言本身看不出來。"""
+    calls = []
+
+    async def process(**kwargs):
+        calls.append(kwargs)
+        return "謝謝"
+
+    ws, host = setup(process)
+    message = ChatMessage(
+        id="1", author="大方", text="生日快樂！", timestamp=0.0, kind=kind
+    )
+    asyncio.run(host.turn_runner("s")(message))
+    assert calls[0]["user_input"] == expected

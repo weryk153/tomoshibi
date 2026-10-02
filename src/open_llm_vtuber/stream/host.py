@@ -25,6 +25,8 @@ from .session import TurnResult
 
 
 PRIVATE_TURN_WAIT_SECONDS = 60.0
+# 付費留言、會員留言在名字後面標出來：她要知道才會道謝，留言本身看不出來。
+_KIND_MARKS = {"paid": "（Super Chat）", "member": "（會員）"}
 
 
 class WebSocketStreamHost:
@@ -91,7 +93,8 @@ class WebSocketStreamHost:
                     "stream": True,
                     "stream_comment": {"author": comment.author, "text": comment.text},
                 }
-                user_input = f"{comment.author}：{comment.text}"
+                mark = _KIND_MARKS.get(comment.kind, "")
+                user_input = f"{comment.author}{mark}：{comment.text}"
                 shown = {
                     "type": "stream-comment",
                     "author": comment.author,
