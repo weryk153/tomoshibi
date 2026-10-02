@@ -9,7 +9,10 @@
     "applied": "已应用",
     "applyFailed": "应用失败，请再试一次。",
     "unsavedChanges": "有未应用的更改",
-    "revert": "还原"
+    "revert": "还原",
+    "saving": "保存中…",
+    "savedShort": "已保存",
+    "saveFailed": "保存失败：{{error}}"
   },
   "setup": {
     "detectTitle": "检测这台电脑上的模型",

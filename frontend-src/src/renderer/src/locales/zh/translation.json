@@ -9,7 +9,10 @@
     "applied": "已套用",
     "applyFailed": "套用失敗，請再試一次。",
     "unsavedChanges": "有未套用的變更",
-    "revert": "還原"
+    "revert": "還原",
+    "saving": "儲存中…",
+    "savedShort": "已儲存",
+    "saveFailed": "存不進去：{{error}}"
   },
   "setup": {
     "detectTitle": "偵測這台電腦上的模型",

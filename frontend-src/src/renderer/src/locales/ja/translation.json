@@ -9,7 +9,10 @@
     "applied": "適用しました",
     "applyFailed": "適用できませんでした。もう一度お試しください。",
     "unsavedChanges": "未適用の変更があります",
-    "revert": "元に戻す"
+    "revert": "元に戻す",
+    "saving": "保存中…",
+    "savedShort": "保存しました",
+    "saveFailed": "保存できません：{{error}}"
   },
   "setup": {
     "detectTitle": "このパソコン上のモデルを検出",

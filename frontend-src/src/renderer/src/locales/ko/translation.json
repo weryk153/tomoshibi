@@ -9,7 +9,10 @@
     "applied": "적용했어요",
     "applyFailed": "적용하지 못했어요. 다시 시도해 주세요.",
     "unsavedChanges": "적용하지 않은 변경 사항이 있어요",
-    "revert": "되돌리기"
+    "revert": "되돌리기",
+    "saving": "저장 중…",
+    "savedShort": "저장됨",
+    "saveFailed": "저장하지 못했습니다: {{error}}"
   },
   "setup": {
     "detectTitle": "이 컴퓨터에서 모델 감지",

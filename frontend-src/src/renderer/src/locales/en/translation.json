@@ -9,7 +9,10 @@
     "applied": "Applied",
     "applyFailed": "Could not apply. Please try again.",
     "unsavedChanges": "Unapplied changes",
-    "revert": "Revert"
+    "revert": "Revert",
+    "saving": "Saving…",
+    "savedShort": "Saved",
+    "saveFailed": "Couldn't save: {{error}}"
   },
   "setup": {
     "detectTitle": "Detect models on this computer",
