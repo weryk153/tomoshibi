@@ -28,6 +28,54 @@ from ..proactive_context import (
 PROACTIVE_TEXT = "（主動開口）"
 
 
+def proactive_turn_metadata(
+    context: ServiceContext, client_uid: str, image_sources: list = ()
+) -> dict:
+    """主動開口那一輪的 metadata：私人聊天的閒置計時器與直播冷場共用。
+
+    主動開口這一輪不進對話紀錄；她說出口的那句由 single_conversation 交給引擎記。
+    """
+    material: list[str] = []
+    instruction = ""
+    source = ""
+    try:
+        prompt_name = "proactive_speak_prompt"
+        prompt_file = context.system_config.tool_prompts.get(prompt_name)
+        if prompt_file == prompt_name:
+            # 照目前的話題設定組，不直接讀提示檔：檔案只在存設定、抓新聞時
+            # 重寫，新聞關掉或放了好幾天之後裡面還是舊的——她曾經在 40 天後
+            # 每次開口都在講當時的颱風。沒存過設定的人也由它給預設提示。
+            source = current_proactive_prompt()
+        elif prompt_file:
+            try:
+                source = prompt_loader.load_util(prompt_file)
+            except FileNotFoundError:
+                source = default_proactive_prompt()
+        if source:
+            material = proactive_material(source)
+            instruction = proactive_instruction(source)
+    except Exception as e:
+        logger.error(f"Error loading proactive speak prompt: {e}")
+
+    proactive_uid = proactive_context_uid(context.history_uid, client_uid)
+    return {
+        "proactive_speak": True,
+        "skip_memory": True,
+        "skip_history": True,
+        "proactive_forbid_question": should_force_statement(
+            context.character_config.conf_uid,
+            proactive_uid,
+        ),
+        "proactive_image_sources": list(image_sources),
+        # 引擎決定講什麼，主機只給素材（話題、新聞）與規矩。
+        "proactive_material": material,
+        "proactive_instruction": instruction,
+        # 她開口之後，拿來找出她提到了哪則新聞（news_topics.note_mentioned）。
+        "proactive_source": source,
+        "proactive_context_uid": proactive_uid,
+    }
+
+
 async def handle_conversation_trigger(
     msg_type: str,
     data: dict,
@@ -43,7 +91,6 @@ async def handle_conversation_trigger(
 ) -> None:
     """Handle triggers that start a conversation"""
     metadata = None
-    proactive_uid = proactive_context_uid(context.history_uid, client_uid)
     images_for_generation = data.get("images")
 
     if msg_type == "ai-speak-signal":
@@ -51,46 +98,8 @@ async def handle_conversation_trigger(
         image_sources = [
             image.get("source") for image in raw_images or [] if isinstance(image, dict)
         ]
-        material: list[str] = []
-        instruction = ""
-        source = ""
-        try:
-            prompt_name = "proactive_speak_prompt"
-            prompt_file = context.system_config.tool_prompts.get(prompt_name)
-            if prompt_file == prompt_name:
-                # 照目前的話題設定組，不直接讀提示檔：檔案只在存設定、抓新聞時
-                # 重寫，新聞關掉或放了好幾天之後裡面還是舊的——她曾經在 40 天後
-                # 每次開口都在講當時的颱風。沒存過設定的人也由它給預設提示。
-                source = current_proactive_prompt()
-            elif prompt_file:
-                try:
-                    source = prompt_loader.load_util(prompt_file)
-                except FileNotFoundError:
-                    source = default_proactive_prompt()
-            if source:
-                material = proactive_material(source)
-                instruction = proactive_instruction(source)
-        except Exception as e:
-            logger.error(f"Error loading proactive speak prompt: {e}")
+        metadata = proactive_turn_metadata(context, client_uid, image_sources)
         user_input = PROACTIVE_TEXT
-
-        # 主動開口這一輪不進對話紀錄；她說出口的那句由 single_conversation 交給引擎記。
-        metadata = {
-            "proactive_speak": True,
-            "skip_memory": True,
-            "skip_history": True,
-            "proactive_forbid_question": should_force_statement(
-                context.character_config.conf_uid,
-                proactive_uid,
-            ),
-            "proactive_image_sources": image_sources,
-            # 引擎決定講什麼，主機只給素材（話題、新聞）與規矩。
-            "proactive_material": material,
-            "proactive_instruction": instruction,
-            # 她開口之後，拿來找出她提到了哪則新聞（news_topics.note_mentioned）。
-            "proactive_source": source,
-            "proactive_context_uid": proactive_uid,
-        }
 
         await websocket.send_text(
             json.dumps(
