@@ -47,13 +47,6 @@ async def handle_conversation_trigger(
     images_for_generation = data.get("images")
 
     if msg_type == "ai-speak-signal":
-        # 睡眠勿擾：晚安之後到下一句真人發話之間，不主動搭話（見 sleep_mode.py）
-        from ..sleep_mode import is_sleeping
-
-        if is_sleeping(context.character_config.conf_uid):
-            logger.info("[sleep_mode] proactive speak suppressed（晚安之後）")
-            return
-
         raw_images = data.get("images")
         image_sources = [
             image.get("source") for image in raw_images or [] if isinstance(image, dict)

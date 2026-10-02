@@ -168,13 +168,6 @@ async def process_single_conversation(
         if images:
             logger.info(f"With {len(images)} images")
 
-        # 睡眠勿擾：晚安→她不再主動開口，下一句真的話就喚醒。規則整條在
-        # sleep_mode 模組裡；只餵真人發話——主動觸發的提示不是使用者在講話。
-        if not is_proactive and isinstance(input_text, str):
-            from ..sleep_mode import note_user_message
-
-            note_user_message(context.character_config.conf_uid, input_text)
-
         try:
             # agent.chat yields Union[SentenceOutput, Dict[str, Any]]
             agent_output_stream = context.agent_engine.chat(batch_input)
