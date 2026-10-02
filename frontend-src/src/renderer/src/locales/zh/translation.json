@@ -9,7 +9,10 @@
     "applied": "已套用",
     "applyFailed": "套用失敗，請再試一次。",
     "unsavedChanges": "有未套用的變更",
-    "revert": "還原"
+    "revert": "還原",
+    "saving": "儲存中…",
+    "savedShort": "已儲存",
+    "saveFailed": "存不進去：{{error}}"
   },
   "setup": {
     "detectTitle": "偵測這台電腦上的模型",
@@ -176,8 +179,6 @@
       "enableVisualInputHelp": "讓你能給 AI 看鏡頭或螢幕畫面。需搭配支援視覺的模型（GPT-4o / Claude / Gemini / Ollama 視覺版）；純文字模型（如預設 minimax-m3:cloud）看不了圖。",
       "enableMcpp": "啟用網路搜尋／工具（實驗）",
       "enableMcppHelp": "讓 AI 能使用網路搜尋等工具。並非每個模型都支援——需要支援工具呼叫（function calling）的模型，例如 GPT-4o / Claude / Gemini 或夠強的本地版本。小型本地模型通常做不到，會直接忽略。",
-      "mcppSaved": "已儲存網路搜尋／工具設定。需重新啟動後端才會生效。",
-      "engineSaved": "已儲存引擎設定。需重新啟動後端才會生效。",
       "engineEveryHelp": "每幾輪跑一次背景工作；0 代表關掉。每一項都是多一次模型呼叫，機器慢的話把數字調大。",
       "engine_emotion_every": "情緒　每",
       "engine_memory_every": "記憶　每",
@@ -215,7 +216,8 @@
       "cameraFailed": "攝影機開啟失敗，所以背景沒有切換。",
       "connectionSection": "連線設定",
       "connectionHelp": "這兩個欄位改完要按「連線」才生效——邊打邊套用的話，每輸入一個字元就會重連一次。",
-      "connect": "連線"
+      "connect": "連線",
+      "customBgUrlEmpty": "網址不能空白"
     },
     "characters": {
       "description": "建立、編輯、切換你的陪伴角色，完全不用碰 YAML。",
@@ -268,7 +270,6 @@
       "preview": "試聽",
       "previewing": "播放中…",
       "previewFailed": "無法試聽這個聲音（可能是網路或地區限制）。",
-      "appliedHint": "已套用到目前使用中的角色。",
       "confirm": "確定",
       "aiName": "AI 顯示名稱",
       "aiNameHelp": "聊天紀錄裡 AI 那側顯示的名字。留空＝沿用上面的角色名稱。",
@@ -307,7 +308,6 @@
       "refAudioInherit": "跟底稿角色一樣",
       "translateSubtitle": "字幕翻成你看的語言",
       "translateSubtitleHelp": "把她說的話翻成你看的語言（在「你」設定）顯示在字幕上。她說的、記得的仍然是她自己的語言。",
-      "reloadToApply": "重新載入設定（或再切換一次角色）後生效。",
       "actionsEnabled": "可以寫動作描寫",
       "actionsEnabledHelp": "讓她在台詞裡搭配一句星號包起來的動作，例如「*把視線移開*」，只顯示在字幕上、不會唸出來。關掉時完全不跟她提動作，感情只用停頓與選詞表現。"
     },
@@ -335,7 +335,9 @@
       "saved": "已儲存「{{name}}」。",
       "deleted": "已刪除「{{name}}」。",
       "confirmDelete": "確定刪除「{{name}}」？",
-      "confirm": "確定"
+      "confirm": "確定",
+      "create": "建立",
+      "applyAfterStream": "直播中：改了會存，但要等直播結束再按一次「套用」她才會換上。"
     },
     "user": {
       "sectionTitle": "你（我的暱稱與頭像）",
@@ -347,7 +349,7 @@
       "avatarNotImage": "請選擇圖片檔。",
       "avatarTooLarge": "圖片太大了，請選小於 512KB 的圖片。",
       "avatarReadFailed": "讀取圖片失敗，請再試一次。",
-      "sectionNote": "暱稱與頭像存在本機，改了立刻生效；閱讀語言、全域指示與翻譯設定寫進設定檔，要重啟後端（或重新切換一次角色）才會套用到目前的對話。"
+      "sectionNote": "每一項都改了就存。寫進設定檔、要重新載入才生效的，會出現在設定最上面的提示。"
     },
     "live2d": {
       "pointerInteractive": "滑鼠互動",
@@ -371,9 +373,9 @@
         "saveFailed": "無法儲存這個音檔。"
       },
       "previewSettingsSectionTitle": "畫布互動設定",
-      "previewSettingsSectionDesc": "這三個開關改了就立刻生效，跟這個分頁其他設定一樣。Live2D 與 VRM 角色都適用。",
+      "previewSettingsSectionDesc": "這三個開關改了就立刻生效。Live2D 與 VRM 角色都適用。",
       "motionConfigSectionTitle": "動作清單",
-      "motionConfigSectionNote": "這個區塊直接寫入 model_dict.json，跟抽屜的套用／還原是兩回事。修改不會自動存檔，要按最下面的「儲存」才會生效。",
+      "motionConfigSectionNote": "改了就存，套用到用這個模型的所有角色。",
       "vrmNoIdle": "沒有 motions/idle.vrma，改用程序式微擺",
       "vrmOrphanWarningItem": "「{{keyword}}」→ {{clip}}",
       "vrmOrphanUnknownClip": "不明動作",
@@ -402,7 +404,6 @@
       "orphanWarningTitle": "以下關鍵字指向的動作已經不存在：",
       "orphanWarningItem": "「{{keyword}}」→ 群組 {{group}}、索引 {{index}}",
       "orphanClearButton": "清除這些失效的關鍵字",
-      "motionConfigSaved": "動作設定已儲存",
       "motionConfigSaveFailed": "動作設定儲存失敗",
       "expressionSectionTitle": "表情與情緒關鍵字",
       "expressionSectionNote": "情緒關鍵字就是角色在回覆裡寫 [關鍵字] 時會套上的那張臉。留空代表這個表情不給角色用。井號後面是表情在 model3.json 裡的索引——換過模型檔就要重新確認對應還正不正確。",
@@ -423,7 +424,8 @@
       "tapAreaIndexRandom": "（群組內隨機）",
       "sharedBadge": "（Live2D 與 VRM 共用）",
       "live2dOnlySectionTitle": "動作與表情對應（Live2D 專屬）",
-      "vrmOnlySectionTitle": "動作與表情對應（VRM 專屬）"
+      "vrmOnlySectionTitle": "動作與表情對應（VRM 專屬）",
+      "motionConfigFixErrors": "有欄位不合法，改好才會存"
     },
     "performances": {
       "title": "演出方案管理",
@@ -442,7 +444,6 @@
       "edit": "編輯",
       "duplicateToEdit": "複製後調整",
       "builtinReadonly": "內建方案保持唯讀；複製後即可修改細節。",
-      "saved": "演出方案已儲存",
       "name": "方案名稱",
       "presetDescription": "方案描述",
       "effect": "舞台效果",
@@ -558,7 +559,10 @@
         "unsupported": "檔案格式與場景種類不符。",
         "tooLarge": "素材太大：圖片上限 24MB、影片 250MB、3D 場景 120MB。",
         "saveFailed": "無法儲存這個場景素材。"
-      }
+      },
+      "usingImportedFile": "目前用匯入的檔案；要改用網址或換類型，先移除檔案",
+      "removeFile": "移除檔案",
+      "removeFileConfirm": "確定移除匯入的檔案？"
     },
     "asr": {
       "micModeLabel": "麥克風模式",
@@ -605,8 +609,6 @@
       "engineDeeplxHelp": "快（每句不到 1 秒），但需要你自己在本機跑一個 DeepLX 服務（:1188）。沒有跑就會翻譯失敗。",
       "deeplxEndpoint": "DeepLX 位址",
       "deeplxEndpointHelp": "DeepLX 服務的網址，預設 http://localhost:1188/v2/translate。",
-      "saved": "已儲存發聲與翻譯設定。",
-      "restartHint": "設定已存，重啟後（或重新切換一次角色）才會生效。",
       "saveFailed": "儲存失敗，請再試一次。",
       "loadError": "無法從後端載入翻譯設定。",
       "testButton": "測試翻譯",
@@ -614,7 +616,8 @@
       "testFail_unchanged": "翻譯沒有生效——回來的跟原文一樣。常見原因：選到的是推理模型（答案被放進 reasoning_content、content 是空的），或超過逾時。目前 UI 還不能設定這兩項，需要手動改 conf.yaml 的 translator_config.llm（加 extra_body.reasoning_effort: none 與 timeout: 60）。",
       "testFail_disabled": "翻譯目前是關閉的，沒有東西可以測。",
       "testFail_config": "設定讀不起來：{{error}}",
-      "testFail_error": "測試失敗：{{error}}"
+      "testFail_error": "測試失敗：{{error}}",
+      "endpointEmpty": "位址不能空白"
     },
     "playerLanguage": {
       "label": "閱讀／玩家語言",
@@ -624,7 +627,6 @@
       "optJa": "日文",
       "optKo": "韓文",
       "optZhCn": "簡體中文",
-      "saved": "已儲存閱讀語言。需重新啟動後端才會生效。",
       "saveFailed": "無法儲存閱讀語言。",
       "loadError": "無法從後端載入閱讀語言。"
     },
@@ -632,8 +634,6 @@
       "label": "關於你（全域指示）",
       "help": "套用到所有角色的全域指示——告訴每個角色該怎麼稱呼你、怎麼對待你（你的名字、你是誰、你想要的語氣）。它會和每個角色自己的人設一起作用。",
       "placeholder": "例如：叫我 Hiro，我是獨立遊戲開發者，語氣輕鬆一點。",
-      "save": "儲存",
-      "saved": "已儲存你的指示。需重新啟動後端才會生效。",
       "saveFailed": "無法儲存指示。",
       "loadError": "無法從後端載入你的指示。"
     },
@@ -647,8 +647,6 @@
       "toggleHelp": "關閉後引擎不再記住新的對話、也不會把記憶帶進對話（重新啟動後端後生效）。已存的記憶內容會保留（除非你按下面的清除）。",
       "selfLabel": "她自己",
       "selfHelp": "所有對話共用，直播時也會帶著。她的喜好、看法、來歷、自己的計畫放這裡；跟你之間的事不會進來。觀眾教了她什麼奇怪的東西，直接在這裡刪掉。",
-      "selfSave": "儲存她自己的記憶",
-      "selfSaveConfirm": "這會整份取代她自己的記憶，不是合併。確定要繼續嗎？",
       "selfClear": "清除她自己的記憶",
       "selfClearConfirm": "確定要清除她自己的記憶嗎？所有對話都會受影響，此動作無法復原。",
       "selfCleared": "已清除她自己的記憶。",
@@ -660,22 +658,15 @@
       "clearConfirm": "確定要清除這個角色的長期記憶嗎？此動作無法復原（聊天紀錄不受影響）。",
       "cleared": "已清除這個角色的記憶。",
       "clearFailed": "清除失敗，請再試一次。",
-      "saved": "已更新記憶設定。",
-      "restartHint": "已存。已注入到目前對話的記憶要重啟（或重新切換一次角色）才會完全移除。",
       "saveFailed": "儲存失敗，請再試一次。",
-      "save": "儲存記憶",
       "saveContentFailed": "儲存記憶內容失敗，請再試一次。",
       "editHint": "你可以直接修改這段內容，改完按「儲存記憶」。已注入到目前對話的記憶要重啟（或重新切換一次角色）才會完全生效。超過上限會照存，下次整理時自動精簡。",
       "loadError": "無法從後端載入記憶設定。",
       "advancedToggle": "進階（手動編輯）",
-      "saveConfirm": "這會整份取代目前的記憶內容，不是合併。確定要繼續嗎？",
-      "restartHintSetting": "已存。這個設定要重啟後端（或重新切換一次角色）才會套用到目前的對話。",
       "charCountNoCap": "{{count}} 字"
     },
     "perf": {
       "description": "依你的機器選模式：弱機或共用電腦選輕量，強機選高效能。改的只有引擎的背景工作。",
-      "restartHint": "已存。換引擎/效能設定需重啟（或重新切換一次角色）才會生效。",
-      "saved": "已儲存。",
       "saveFailed": "儲存失敗，請再試一次。",
       "loadError": "無法從後端載入效能設定。",
       "loading": "載入中…",
@@ -689,8 +680,6 @@
       "presetLightDesc": "引擎背景工作較少（情緒 2、記憶 3、目標 8、反思 12 輪一次）；放在心上的目標 2 個、想法 1 個。",
       "presetStandardDesc": "引擎背景工作用預設頻率（情緒每輪、記憶 2、目標 4、反思 6）；放在心上的目標 3 個、想法 2 個。",
       "presetHighDesc": "引擎背景工作較勤（記憶每輪、目標 3、反思 4）；放在心上的目標 4 個、想法 3 個。",
-      "applying": "套用中…",
-      "applied": "已套用「{{name}}」效能模式。",
       "applyFailed": "套用失敗，部分設定可能未寫入，請再試一次。",
       "asrSectionTitle": "語音辨識引擎（ASR）",
       "asrEngineLabel": "辨識引擎",
@@ -725,7 +714,7 @@
     },
     "topics": {
       "sectionTitle": "她主動聊什麼",
-      "sectionNote": "這個區塊的變更會直接生效、立刻存檔。",
+      "sectionNote": "這裡改了就存，下一次她主動開口就用新的。",
       "sectionDesc": "設定她在空閒時主動開口會聊的主題。列一份主題清單就好，下面的開關決定她是憑自己的知識聊、還是去抓最新新聞來聊。",
       "listLabel": "主動話題",
       "listHelp": "列一些你希望她主動聊起的主題，她每次會自然挑一個聊。",
@@ -764,7 +753,6 @@
       "currentEndpoint": "連線位址：{{url}}",
       "currentKey": "金鑰：{{masked}}",
       "none": "（未設定）",
-      "restartHint": "更換 LLM 需重新啟動 App 才會生效。",
       "apiKeyHelpWithCurrent": "目前金鑰：{{masked}}（基於安全不會完整顯示）。要更換請貼上新的金鑰；不變則維持現狀。"
     },
     "remoteAccess": {
@@ -841,6 +829,28 @@
         "bad_url": "這不是直播影片的網址",
         "no_history": "沒辦法建立直播用的對話紀錄"
       }
+    },
+    "values": {
+      "integerBetween": "請填 {{min}}～{{max}} 的整數",
+      "numberBetween": "請填 {{min}}～{{max}} 的數字"
+    },
+    "pending": {
+      "count": "有 {{count}} 項變更還沒生效",
+      "reload": "重新載入",
+      "items": {
+        "playerLanguage": "你看的語言",
+        "playerPrompt": "關於你",
+        "tools": "網路搜尋等工具",
+        "translator": "翻譯方式",
+        "engine": "背景工作與放在心上的數量",
+        "asr": "語音辨識",
+        "tts": "語音合成服務",
+        "perfPreset": "效能模式",
+        "memory": "長期記憶開關",
+        "character": "正在用的角色",
+        "other": "其他設定"
+      },
+      "liveBlocked": "直播中不能重新載入，直播結束後再按。"
     }
   },
   "footer": {

@@ -6,28 +6,14 @@
 // 所以畫面上刻意分成兩個獨立區塊、各自一個 Heading，把「這是本機瀏覽器設定」
 // 跟「這是後端辨識引擎」講清楚，不然搬家等於把同一個混淆換個地方重演一次。
 //
-// 三種存檔機制在這個分頁裡共存，各自有訊號告訴使用者屬於哪一種：
-//
-// 1. 麥克風／VAD（上半部）：分頁自己的套用／還原按鈕（見下面的 ），
-//    按下「套用」才會寫進 localStorage；「還原」把草稿還原成原值。ASRProps
-//    只保留 onCancel——外層抽屜開合時仍會呼叫它把草稿還原，但儲存已經不再
-//    由抽屜驅動。這個區塊自己的按鈕就放在這個小節結尾，緊接在 VAD 欄位
-//    之後、引擎選擇區塊之前。
-// 2. 引擎下拉選單（下半部）：只有 sherpa_onnx_asr／faster_whisper 兩個不需要
-//    憑證的選項才會「切換當下」即時打 API（跟其他即時存檔的下拉選單
-//    同一種模式）。
-// 3. 需要憑證的雲端引擎（groq_whisper_asr／azure_asr）：選了不會立刻送出，
-//    只是记成本機草稿（pendingEngine），必须連同憑證一起按下面的「儲存」
-//    才會真的寫進 conf.yaml——原因見 handleEngineChange 旁的說明：如果選了
-//    就送，conf.yaml 的 asr_model 可能指到一個因為沒憑證而起不來的引擎，
-//    跟這次任務要對 faster_whisper 誠實揭露的「靜默 fallback」是同一種問題，
-//    不能在這裡重演。
-//
-// 下半部整個區塊在 Heading 底下有一段常駐文字（asrEngineSectionNote）講「這裡
-// 自己存檔、不受下面 Save/Cancel 影響」；還沒送出的雲端引擎選擇會顯示
-// asrEnginePendingNotice（「尚未儲存，仍在用 X」）——這兩段都是常駐文字，不是
-// 會消失的 toast，因為「這格到底歸誰管」跟「現在到底存了沒」都是使用者需要
-// 隨時看得到、而不是操作當下才看得到一次的資訊。
+// 存法：
+// 1. 麥克風模式與三個進階開關：切了就寫 localStorage，立刻生效。
+// 2. VAD 數值：停手 0.8 秒或離開欄位才套用（套用會重開麥克風，不能每打一個字就重開），
+//    打到一半的值不套用。
+// 3. 辨識引擎：不需要金鑰的（sherpa_onnx／faster_whisper）選了就存；需要金鑰的
+//    （groq／azure）先當草稿，連同金鑰按「儲存」才寫進 conf.yaml——沒有金鑰就切過去，
+//    引擎會起不來、下次重開靜默退回 sherpa。寫進 conf.yaml 的要重新載入才生效，由
+//    設定抽屜頂端的提示處理。
 import {
   useState, useEffect, useCallback, useMemo,
 } from 'react';
@@ -50,9 +36,11 @@ import {
   resolveMicMode, micModeState, type NamedMicMode,
 } from '@/services/mic-mode';
 import {
-  SwitchField, NumberField, SelectField, InputField, } from './common';
+  SwitchField, SelectField, InputField, } from './common';
 import { Button } from '@/components/ui/tw/primitives';
-import { toaster } from '@/components/ui/tw/toaster';
+import { SaveStatus } from '@/components/ui/tw/save-status';
+import { DraftNumberField } from '@/components/ui/tw/draft-number-field';
+import type { SaveState } from '@/utils/autosave';
 import { useWebSocket } from '@/context/websocket-context';
 import {
   fetchPerf,
@@ -154,7 +142,6 @@ function ASR({active = true}: ASRProps): JSX.Element {
   // ---- 後端辨識引擎（本任務新增）----
   const [perf, setPerf] = useState<PerfState | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [engineSaving, setEngineSaving] = useState(false);
 
   // 選了 groq/azure 但還沒連同憑證送出時的本機草稿——不是 null 就代表「畫面
   // 上選的引擎」跟「conf.yaml 現在真正生效的引擎」（perf.asr_model）不一致，
@@ -245,6 +232,8 @@ function ASR({active = true}: ASRProps): JSX.Element {
   // perf.asr_model——這樣選了 groq 之後憑證欄位要立刻出現讓使用者輸入，不用
   // 等存檔成功才看得到。
   const displayedEngine = pendingEngine ?? perf?.asr_model ?? '';
+  const [engineState, setEngineState] = useState<SaveState>({ phase: 'idle' });
+  const [credsState, setCredsState] = useState<SaveState>({ phase: 'idle' });
 
   const currentEngineLabel = useMemo(() => {
     if (!perf) return '';
@@ -294,23 +283,13 @@ function ASR({active = true}: ASRProps): JSX.Element {
     }
 
     setPendingEngine(null);
-    setEngineSaving(true);
+    setEngineState({ phase: 'saving' });
     const result = await setAsrModel(baseUrl, model);
-    setEngineSaving(false);
     if (result.ok) {
       applySaveResult(result.data);
-      toaster.create({
-        title: t('settings.perf.saved'),
-        description: t('settings.perf.restartHint'),
-        type: 'success',
-        duration: 4000,
-      });
+      setEngineState({ phase: 'saved' });
     } else {
-      toaster.create({
-        title: result.error || t('settings.perf.saveFailed'),
-        type: 'error',
-        duration: 3000,
-      });
+      setEngineState({ phase: 'error', message: result.error || t('settings.perf.saveFailed') });
     }
   }, [baseUrl, perf, applySaveResult, t]);
 
@@ -352,6 +331,7 @@ function ASR({active = true}: ASRProps): JSX.Element {
     if (Object.keys(payload).length === 0) return;
 
     setSavingCreds(true);
+    setCredsState({ phase: 'saving' });
     const result = await setAsrCredentials(baseUrl, payload);
     setSavingCreds(false);
     if (result.ok) {
@@ -362,18 +342,9 @@ function ASR({active = true}: ASRProps): JSX.Element {
       // 也讓「有沒有真的存到」這件事有個看得出來的畫面變化。
       setGroqApiKey('');
       setAzureApiKey('');
-      toaster.create({
-        title: t('settings.perf.saved'),
-        description: t('settings.perf.restartHint'),
-        type: 'success',
-        duration: 4000,
-      });
+      setCredsState({ phase: 'saved' });
     } else {
-      toaster.create({
-        title: result.error || t('settings.perf.saveFailed'),
-        type: 'error',
-        duration: 3000,
-      });
+      setCredsState({ phase: 'error', message: result.error || t('settings.perf.saveFailed') });
     }
   }, [baseUrl, perf, pendingEngine, groqApiKey, azureApiKey, azureRegion, applySaveResult, t]);
 
@@ -482,28 +453,28 @@ function ASR({active = true}: ASRProps): JSX.Element {
           </Collapsible.Content>
         </Collapsible.Root>
 
-        <NumberField
+        <DraftNumberField
           label={t('settings.asr.positiveSpeechThreshold')}
           help={t('settings.asr.positiveSpeechThresholdDesc')}
-          value={localSettings.positiveSpeechThreshold}
+          value={Number(localSettings.positiveSpeechThreshold) || 0}
           onChange={(value) => handleInputChange('positiveSpeechThreshold', value)}
           min={1}
           max={100}
         />
 
-        <NumberField
+        <DraftNumberField
           label={t('settings.asr.negativeSpeechThreshold')}
           help={t('settings.asr.negativeSpeechThresholdDesc')}
-          value={localSettings.negativeSpeechThreshold}
+          value={Number(localSettings.negativeSpeechThreshold) || 0}
           onChange={(value) => handleInputChange('negativeSpeechThreshold', value)}
           min={0}
           max={100}
         />
 
-        <NumberField
+        <DraftNumberField
           label={t('settings.asr.redemptionFrames')}
           help={t('settings.asr.redemptionFramesDesc')}
-          value={localSettings.redemptionFrames}
+          value={Number(localSettings.redemptionFrames) || 0}
           onChange={(value) => handleInputChange('redemptionFrames', value)}
           min={1}
           max={100}
@@ -517,9 +488,6 @@ function ASR({active = true}: ASRProps): JSX.Element {
       {/* 後端辨識引擎：見檔頭說明，三種存檔機制之二／之三都在這裡。 */}
       <Stack gap={2}>
         <Heading size="sm">{t('settings.perf.asrSectionTitle')}</Heading>
-        {/* 常駐提示（不是 toast）：這個區塊自己存檔，不受外層抽屜 Save/Cancel
-            影響——分頁裡同時存在三種存檔機制，光靠操作當下彈出的 toast 不夠，
-            使用者需要隨時能看到「這格歸誰管」。 */}
         <Text fontSize="xs" color="blue.300">{t('settings.perf.asrEngineSectionNote')}</Text>
         <Text fontSize="xs" color="whiteAlpha.600">{t('settings.perf.asrEngineHelp')}</Text>
 
@@ -540,9 +508,7 @@ function ASR({active = true}: ASRProps): JSX.Element {
               collection={engineCollection}
               placeholder={t('settings.perf.asrEnginePlaceholder')}
             />
-            {engineSaving && (
-              <Text fontSize="xs" color="whiteAlpha.600">{t('settings.perf.applying')}</Text>
-            )}
+            <SaveStatus state={engineState} />
             {/* 常駐提示：選了 groq/azure 但還沒按下面的儲存——畫面上的選擇跟
                 conf.yaml 現在真正生效的引擎不一樣，這件事必須隨時可見，不能只
                 靠使用者自己記得。 */}
@@ -584,6 +550,7 @@ function ASR({active = true}: ASRProps): JSX.Element {
                 >
                   {t('common.save')}
                 </Button>
+                <SaveStatus state={credsState} />
               </Stack>
             )}
 
@@ -628,6 +595,7 @@ function ASR({active = true}: ASRProps): JSX.Element {
                 >
                   {t('common.save')}
                 </Button>
+                <SaveStatus state={credsState} />
               </Stack>
             )}
           </>

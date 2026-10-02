@@ -9,7 +9,10 @@
     "applied": "適用しました",
     "applyFailed": "適用できませんでした。もう一度お試しください。",
     "unsavedChanges": "未適用の変更があります",
-    "revert": "元に戻す"
+    "revert": "元に戻す",
+    "saving": "保存中…",
+    "savedShort": "保存しました",
+    "saveFailed": "保存できません：{{error}}"
   },
   "setup": {
     "detectTitle": "このパソコン上のモデルを検出",
@@ -176,8 +179,6 @@
       "enableVisualInputHelp": "カメラや画面をAIに見せられるようにします。視覚対応モデル（GPT-4o / Claude / Gemini / Ollamaの視覚対応ビルド）が必要です。テキスト専用モデル（デフォルトのminimax-m3:cloudなど）は画像を見られません。",
       "enableMcpp": "ウェブ検索／ツールを有効化（実験的）",
       "enableMcppHelp": "AIがウェブ検索などのツールを使えるようにします。すべてのモデルが対応しているわけではありません。ツール呼び出し（関数呼び出し）に対応したモデル（GPT-4o / Claude / Gemini や能力のあるローカルビルドなど）が必要です。小さなローカルモデルは多くの場合使えず、単に無視します。",
-      "mcppSaved": "ウェブ検索／ツールの設定を保存しました。バックエンドを再起動すると反映されます。",
-      "engineSaved": "エンジンの設定を保存しました。バックエンドを再起動すると反映されます。",
       "engineEveryHelp": "バックグラウンド処理を何ターンごとに行うか。0 で無効。どれもモデル呼び出しが一回増えるので、遅いマシンでは数を大きくしてください。",
       "engine_emotion_every": "気分　毎",
       "engine_memory_every": "記憶　毎",
@@ -215,7 +216,8 @@
       "cameraFailed": "カメラを起動できなかったため、背景は切り替わりませんでした。",
       "connectionSection": "接続設定",
       "connectionHelp": "この2つは「接続」を押すと反映されます。入力のたびに適用すると、1文字ごとに再接続が走ってしまいます。",
-      "connect": "接続"
+      "connect": "接続",
+      "customBgUrlEmpty": "URL を空にはできません"
     },
     "characters": {
       "description": "コンパニオンのキャラクターを作成・編集・切り替えできます。YAMLを触る必要はありません。",
@@ -268,7 +270,6 @@
       "preview": "プレビュー",
       "previewing": "再生中…",
       "previewFailed": "この音声をプレビューできませんでした（ネットワークまたは地域制限の可能性があります）。",
-      "appliedHint": "使用中のキャラクターに反映しました。",
       "confirm": "OK",
       "aiName": "AIの表示名",
       "aiNameHelp": "チャットのAI側に表示される名前です。空欄にすると、上のキャラクター名を使います。",
@@ -307,7 +308,6 @@
       "refAudioInherit": "ベースキャラクターと同じ",
       "translateSubtitle": "字幕をあなたの読む言語に翻訳",
       "translateSubtitleHelp": "彼女のセリフを、あなたの読む言語（「あなた」で設定）に翻訳して表示します。話す内容と記憶は彼女の言語のままです。",
-      "reloadToApply": "設定を再読み込みする（またはもう一度切り替える）と反映されます。",
       "actionsEnabled": "動作描写を書いてよい",
       "actionsEnabledHelp": "*目をそらす* のように、星印で囲んだ短い動作を一つ添えられます。字幕に出るだけで読み上げられません。オフのときは動作について一切伝えないので、間と言葉選びだけで表現します。"
     },
@@ -335,7 +335,9 @@
       "saved": "「{{name}}」を保存しました。",
       "deleted": "「{{name}}」を削除しました。",
       "confirmDelete": "「{{name}}」を削除しますか？",
-      "confirm": "確認"
+      "confirm": "確認",
+      "create": "作成",
+      "applyAfterStream": "配信中：変更は保存されますが、配信終了後に「適用」を押すと反映されます。"
     },
     "user": {
       "sectionTitle": "あなた（名前とアバター）",
@@ -347,7 +349,7 @@
       "avatarNotImage": "画像ファイルを選んでください。",
       "avatarTooLarge": "画像が大きすぎます。512KB未満のものを選んでください。",
       "avatarReadFailed": "画像を読み込めませんでした。もう一度お試しください。",
-      "sectionNote": "ニックネームとアイコンは端末に保存され、すぐ反映されます。表示言語・全体指示・翻訳設定は設定ファイルに書き込まれるため、現在の会話に反映するにはバックエンドの再起動（またはキャラクターの切り替え直し）が必要です。"
+      "sectionNote": "ここの設定は変更するとすぐ保存されます。再読み込みが必要な変更は設定の一番上に表示されます。"
     },
     "live2d": {
       "pointerInteractive": "ポインター操作",
@@ -371,9 +373,9 @@
         "saveFailed": "この音声ファイルを保存できませんでした。"
       },
       "previewSettingsSectionTitle": "キャンバス操作の設定",
-      "previewSettingsSectionDesc": "この3つのスイッチは、このタブの他の設定と同じくすぐに反映されます。Live2D と VRM のどちらのキャラクターにも適用されます。",
+      "previewSettingsSectionDesc": "この3つのスイッチは切り替えるとすぐ反映されます。Live2D と VRM の両方のキャラクターに適用されます。",
       "motionConfigSectionTitle": "モーション一覧",
-      "motionConfigSectionNote": "このセクションは model_dict.json に直接書き込み、ドロワーの適用／取り消しとは別です。変更は自動保存されません。下の「保存」を押してください。",
+      "motionConfigSectionNote": "変更するとすぐ保存され、このモデルを使うすべてのキャラクターに適用されます。",
       "vrmNoIdle": "motions/idle.vrma がないため、プロシージャルな揺れを使用します",
       "vrmOrphanWarningItem": "「{{keyword}}」→ {{clip}}",
       "vrmOrphanUnknownClip": "不明なモーション",
@@ -402,7 +404,6 @@
       "orphanWarningTitle": "以下のキーワードは、もう存在しないモーションを指しています：",
       "orphanWarningItem": "「{{keyword}}」→ グループ {{group}}、インデックス {{index}}",
       "orphanClearButton": "これらの無効なキーワードを消去",
-      "motionConfigSaved": "モーション設定を保存しました",
       "motionConfigSaveFailed": "モーション設定の保存に失敗しました",
       "expressionSectionTitle": "表情と感情キーワード",
       "expressionSectionNote": "感情キーワードは、キャラクターが返答に [キーワード] と書いたときに適用される顔です。空欄にするとその表情は使われません。# のあとの数字は model3.json 内のインデックスで、モデルファイルを差し替えたら対応を確認し直してください。",
@@ -423,7 +424,8 @@
       "tapAreaIndexRandom": "（グループ内でランダム）",
       "sharedBadge": "（Live2D と VRM で共通）",
       "live2dOnlySectionTitle": "モーションと表情の対応（Live2D 専用）",
-      "vrmOnlySectionTitle": "モーションと表情の対応（VRM 専用）"
+      "vrmOnlySectionTitle": "モーションと表情の対応（VRM 専用）",
+      "motionConfigFixErrors": "不正な欄があります。直すと保存されます"
     },
     "performances": {
       "title": "演出プリセット管理",
@@ -442,7 +444,6 @@
       "edit": "編集",
       "duplicateToEdit": "複製して編集",
       "builtinReadonly": "内蔵演出は読み取り専用です。複製すると調整できます。",
-      "saved": "演出を保存しました",
       "name": "演出名",
       "presetDescription": "説明",
       "effect": "舞台エフェクト",
@@ -558,7 +559,10 @@
         "unsupported": "ファイル形式がシーン種類と一致しません。",
         "tooLarge": "素材が大きすぎます。画像24MB、動画250MB、3Dシーン120MBまでです。",
         "saveFailed": "このシーン素材を保存できませんでした。"
-      }
+      },
+      "usingImportedFile": "インポートしたファイルを使っています。URL や種類を変えるには先にファイルを削除してください",
+      "removeFile": "ファイルを削除",
+      "removeFileConfirm": "インポートしたファイルを削除しますか？"
     },
     "asr": {
       "micModeLabel": "マイクのモード",
@@ -605,8 +609,6 @@
       "engineDeeplxHelp": "高速（1文1秒未満）ですが、ローカルでDeepLXサービス（:1188）を自分で動かす必要があります。起動していないと翻訳に失敗します。",
       "deeplxEndpoint": "DeepLXエンドポイント",
       "deeplxEndpointHelp": "DeepLXサービスのURLです。デフォルトはhttp://localhost:1188/v2/translate。",
-      "saved": "音声と翻訳の設定を保存しました。",
-      "restartHint": "保存しました。再起動後（またはキャラクターを一度切り替えたあと）に反映されます。",
       "saveFailed": "保存に失敗しました。もう一度お試しください。",
       "loadError": "バックエンドから翻訳設定を読み込めませんでした。",
       "testButton": "翻訳をテスト",
@@ -614,7 +616,8 @@
       "testFail_unchanged": "翻訳が効いていません——原文がそのまま返ってきました。多くは推論モデル（答えが reasoning_content に入り content が空）かタイムアウトです。どちらもまだ UI から設定できません。conf.yaml の translator_config.llm に extra_body.reasoning_effort: none と timeout: 60 を追加してください。",
       "testFail_disabled": "翻訳は現在オフです。テストするものがありません。",
       "testFail_config": "設定を読み込めません：{{error}}",
-      "testFail_error": "テスト失敗：{{error}}"
+      "testFail_error": "テスト失敗：{{error}}",
+      "endpointEmpty": "アドレスを空にはできません"
     },
     "playerLanguage": {
       "label": "読む言語／プレイヤー言語",
@@ -624,7 +627,6 @@
       "optJa": "日本語",
       "optKo": "韓国語",
       "optZhCn": "簡体字中国語",
-      "saved": "読む言語を保存しました。バックエンドを再起動すると反映されます。",
       "saveFailed": "読む言語を保存できませんでした。",
       "loadError": "バックエンドから読む言語を読み込めませんでした。"
     },
@@ -632,8 +634,6 @@
       "label": "あなたについて（全体への指示）",
       "help": "すべてのキャラクターに適用される全体指示です。各コンパニオンにあなたの呼び方や接し方（名前・どんな人か・希望するトーン）を伝えます。各キャラクター自身のペルソナと併せて働きます。",
       "placeholder": "例：私をHiroと呼んでください。インディーゲーム開発者なので、口調はカジュアルでお願いします。",
-      "save": "保存",
-      "saved": "指示を保存しました。バックエンドを再起動すると反映されます。",
       "saveFailed": "指示を保存できませんでした。",
       "loadError": "バックエンドから指示を読み込めませんでした。"
     },
@@ -647,8 +647,6 @@
       "toggleHelp": "オフにすると、エンジンは新しい会話を覚えず、記憶も会話に持ち込みません（バックエンドの再起動後に反映）。保存済みの記憶は、下でクリアしない限り残ります。",
       "selfLabel": "彼女自身のこと",
       "selfHelp": "すべての会話で共有され、配信中も持ち歩きます。好み・考え・来歴・彼女自身の予定はここに。あなたとの間の出来事は入りません。視聴者に変なことを教えられたら、ここで直接消してください。",
-      "selfSave": "彼女自身の記憶を保存",
-      "selfSaveConfirm": "彼女自身の記憶を丸ごと置き換えます（マージではありません）。続けますか？",
       "selfClear": "彼女自身の記憶を消去",
       "selfClearConfirm": "彼女自身の記憶を消去しますか？すべての会話に影響し、元に戻せません。",
       "selfCleared": "彼女自身の記憶を消去しました。",
@@ -660,22 +658,15 @@
       "clearConfirm": "このキャラクターの長期メモリーをクリアしますか？この操作は元に戻せません（チャット履歴には影響しません）。",
       "cleared": "このキャラクターのメモリーをクリアしました。",
       "clearFailed": "クリアに失敗しました。もう一度お試しください。",
-      "saved": "メモリー設定を更新しました。",
-      "restartHint": "保存しました。現在の会話にすでに注入されているメモリーは、再起動後（またはキャラクターを一度切り替えたあと）に完全に取り除かれます。",
       "saveFailed": "保存に失敗しました。もう一度お試しください。",
-      "save": "メモリーを保存",
       "saveContentFailed": "メモリー内容を保存できませんでした。もう一度お試しください。",
       "editHint": "このテキストは直接編集でき、編集後に「メモリーを保存」を押してください。現在の会話にすでに注入されているメモリーは、再起動後（またはキャラクターを一度切り替えたあと）に完全に反映されます。上限を超えた分はそのまま保存され、次の整理時に切り詰められます。",
       "loadError": "バックエンドからメモリー設定を読み込めませんでした。",
       "advancedToggle": "詳細（手動編集）",
-      "saveConfirm": "現在のメモリー内容を丸ごと置き換えます（統合ではありません）。続けますか？",
-      "restartHintSetting": "保存しました。この設定が現在の会話に反映されるのは、バックエンド再起動（またはキャラクター再選択）後です。",
       "charCountNoCap": "{{count}} 文字"
     },
     "perf": {
       "description": "このマシンに合わせてモードを選びます：非力な・共用のパソコンなら軽量、強いマシンなら高性能。変わるのはエンジンのバックグラウンド処理だけです。",
-      "restartHint": "保存しました。エンジン／パフォーマンスの変更は、再起動後（またはキャラクターを一度切り替えたあと）に反映されます。",
-      "saved": "保存しました。",
       "saveFailed": "保存に失敗しました。もう一度お試しください。",
       "loadError": "バックエンドからパフォーマンス設定を読み込めませんでした。",
       "loading": "読み込み中…",
@@ -689,8 +680,6 @@
       "presetLightDesc": "エンジンのバックグラウンド処理を少なめに（気分 2、記憶 3、目標 8、内省 12 ターンごと）。心に留める目標 2、考え 1。",
       "presetStandardDesc": "エンジンのバックグラウンド処理は既定の頻度（気分 毎ターン、記憶 2、目標 4、内省 6）。心に留める目標 3、考え 2。",
       "presetHighDesc": "エンジンのバックグラウンド処理を多めに（記憶 毎ターン、目標 3、内省 4）。心に留める目標 4、考え 3。",
-      "applying": "適用中…",
-      "applied": "「{{name}}」パフォーマンスモードを適用しました。",
       "applyFailed": "適用に失敗しました。一部の設定が書き込まれていない可能性があります。もう一度お試しください。",
       "asrSectionTitle": "音声認識エンジン（ASR）",
       "asrEngineLabel": "認識エンジン",
@@ -725,7 +714,7 @@
     },
     "topics": {
       "sectionTitle": "彼女が話す話題",
-      "sectionNote": "このセクションの変更はすぐ反映され、その場で保存されます。",
+      "sectionNote": "ここの変更はすぐ保存され、次に彼女から話しかけるときに使われます。",
       "sectionDesc": "アイドル中に彼女が自分から話しかけるときの話題を設定します。話題を並べるだけでOKです。下のスイッチで、彼女が自分の知識で話すか、最新ニュースを取得して話すかが決まります。",
       "listLabel": "自発的な話題",
       "listHelp": "彼女に話してほしい話題を並べてください。毎回そこから自然に1つ選びます。",
@@ -764,7 +753,6 @@
       "currentEndpoint": "エンドポイント：{{url}}",
       "currentKey": "キー：{{masked}}",
       "none": "（未設定）",
-      "restartHint": "LLMの変更を反映するには、Appの再起動が必要です。",
       "apiKeyHelpWithCurrent": "現在のキー：{{masked}}（セキュリティのため全文は表示されません）。変更するには新しいキーを貼り付けてください。空欄にすると現在のものを維持します。"
     },
     "remoteAccess": {
@@ -841,6 +829,28 @@
         "bad_url": "配信動画の URL ではありません",
         "no_history": "配信用の会話記録を作成できません"
       }
+    },
+    "values": {
+      "integerBetween": "{{min}}～{{max}} の整数を入力してください",
+      "numberBetween": "{{min}}～{{max}} の数値を入力してください"
+    },
+    "pending": {
+      "count": "未反映の変更が {{count}} 件あります",
+      "reload": "再読み込み",
+      "items": {
+        "playerLanguage": "あなたの表示言語",
+        "playerPrompt": "あなたについて",
+        "tools": "ウェブ検索などのツール",
+        "translator": "翻訳方法",
+        "engine": "バックグラウンド処理と気にかける数",
+        "asr": "音声認識",
+        "tts": "音声合成サービス",
+        "perfPreset": "パフォーマンスモード",
+        "memory": "長期記憶のスイッチ",
+        "character": "使用中のキャラクター",
+        "other": "その他の設定"
+      },
+      "liveBlocked": "配信中は再読み込みできません。配信終了後に押してください。"
     }
   },
   "footer": {

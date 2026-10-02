@@ -9,7 +9,10 @@
     "applied": "Applied",
     "applyFailed": "Could not apply. Please try again.",
     "unsavedChanges": "Unapplied changes",
-    "revert": "Revert"
+    "revert": "Revert",
+    "saving": "Saving…",
+    "savedShort": "Saved",
+    "saveFailed": "Couldn't save: {{error}}"
   },
   "setup": {
     "detectTitle": "Detect models on this computer",
@@ -176,8 +179,6 @@
       "enableVisualInputHelp": "Lets you show the AI your camera or screen. Requires a vision-capable model (GPT-4o / Claude / Gemini / Ollama vision builds); text-only models (like the default minimax-m3:cloud) can't see images.",
       "enableMcpp": "Enable web search / tools (experimental)",
       "enableMcppHelp": "Lets the AI use tools like web search. NOT every model supports this — it needs a model with tool-calling (function calling), e.g. GPT-4o / Claude / Gemini or a capable local build. Small local models often can't and will simply ignore it.",
-      "mcppSaved": "Web search / tools setting saved. It takes effect after you restart the backend.",
-      "engineSaved": "Engine setting saved. It takes effect after you restart the backend.",
       "engineEveryHelp": "Run each background job every N turns; 0 turns it off. Every job is an extra model call, so raise these on a slow machine.",
       "engine_emotion_every": "Mood every",
       "engine_memory_every": "Memory every",
@@ -215,7 +216,8 @@
       "cameraFailed": "The camera could not be started, so the background was not switched.",
       "connectionSection": "Connection",
       "connectionHelp": "These two take effect when you press Connect. Applying as you type would reconnect on every keystroke.",
-      "connect": "Connect"
+      "connect": "Connect",
+      "customBgUrlEmpty": "The URL can't be empty"
     },
     "characters": {
       "description": "Create, edit, and switch your companion characters — no YAML needed.",
@@ -268,7 +270,6 @@
       "preview": "Preview",
       "previewing": "Playing…",
       "previewFailed": "Could not preview this voice (network or region block).",
-      "appliedHint": "Applied to the active character.",
       "confirm": "OK",
       "aiName": "AI display name",
       "aiNameHelp": "The name shown on the AI side of the chat. Leave empty to reuse the character name above.",
@@ -307,7 +308,6 @@
       "refAudioInherit": "Same as the base character",
       "translateSubtitle": "Translate subtitles into the language you read",
       "translateSubtitleHelp": "Shows her lines translated into the language you read (set under You). What she says and remembers stays in her own language.",
-      "reloadToApply": "Reload the settings (or switch to her again) for this to take effect.",
       "actionsEnabled": "May add an action",
       "actionsEnabledHelp": "Lets her add one short action between asterisks, e.g. *looks away*. It shows in the subtitle and is not spoken. Off: actions are never mentioned to her, so she speaks with pauses and word choice only."
     },
@@ -335,7 +335,9 @@
       "saved": "Saved “{{name}}”.",
       "deleted": "Deleted “{{name}}”.",
       "confirmDelete": "Delete “{{name}}”?",
-      "confirm": "Confirm"
+      "confirm": "Confirm",
+      "create": "Create",
+      "applyAfterStream": "Live: changes are saved, but press Apply after the stream ends for her to use them."
     },
     "user": {
       "sectionTitle": "You (your name & avatar)",
@@ -347,7 +349,7 @@
       "avatarNotImage": "Please choose an image file.",
       "avatarTooLarge": "Image too large — please pick one under 512KB.",
       "avatarReadFailed": "Could not read the image. Please try again.",
-      "sectionNote": "Your name and avatar are stored locally and take effect right away. Reading language, global instructions and translation settings are written to the config file — restart the backend (or switch character again) for them to reach the current conversation."
+      "sectionNote": "Everything here saves as you change it. Changes that need a reload show up in the notice at the top of Settings."
     },
     "live2d": {
       "pointerInteractive": "Pointer Interactive",
@@ -371,9 +373,9 @@
         "saveFailed": "Could not save this audio file."
       },
       "previewSettingsSectionTitle": "Canvas interaction",
-      "previewSettingsSectionDesc": "These three switches take effect immediately, like everything else on this tab. They apply to both Live2D and VRM characters.",
+      "previewSettingsSectionDesc": "These three switches take effect as soon as you change them. They apply to both Live2D and VRM characters.",
       "motionConfigSectionTitle": "Motion list",
-      "motionConfigSectionNote": "This section writes directly to model_dict.json and is separate from the drawer's Apply/Revert. Changes are not saved automatically — press Save at the bottom.",
+      "motionConfigSectionNote": "Saves as you change it, for every character that uses this model.",
       "vrmNoIdle": "No motions/idle.vrma — using procedural sway",
       "vrmOrphanWarningItem": "“{{keyword}}” → {{clip}}",
       "vrmOrphanUnknownClip": "unknown clip",
@@ -402,7 +404,6 @@
       "orphanWarningTitle": "These keywords point to motions that no longer exist:",
       "orphanWarningItem": "“{{keyword}}” → group {{group}}, index {{index}}",
       "orphanClearButton": "Clear these broken keywords",
-      "motionConfigSaved": "Motion settings saved",
       "motionConfigSaveFailed": "Could not save motion settings",
       "expressionSectionTitle": "Expressions & emotion keywords",
       "expressionSectionNote": "The emotion keyword is the face applied when the character writes [keyword] in a reply. Leave it blank to keep that expression out of the character’s reach. The number after # is the expression’s index in model3.json — recheck these after swapping the model file.",
@@ -423,7 +424,8 @@
       "tapAreaIndexRandom": "(random within group)",
       "sharedBadge": "(shared by Live2D and VRM)",
       "live2dOnlySectionTitle": "Motion and expression mapping (Live2D only)",
-      "vrmOnlySectionTitle": "Motion and expression mapping (VRM only)"
+      "vrmOnlySectionTitle": "Motion and expression mapping (VRM only)",
+      "motionConfigFixErrors": "Some fields are invalid; fix them to save"
     },
     "performances": {
       "title": "Performance Manager",
@@ -442,7 +444,6 @@
       "edit": "Edit",
       "duplicateToEdit": "Duplicate to edit",
       "builtinReadonly": "Built-in performances stay read-only. Duplicate one to customize it.",
-      "saved": "Performance saved",
       "name": "Performance name",
       "presetDescription": "Description",
       "effect": "Stage effect",
@@ -558,7 +559,10 @@
         "unsupported": "The file format does not match the scene type.",
         "tooLarge": "The asset is too large: 24MB for images, 250MB for videos, and 120MB for 3D scenes.",
         "saveFailed": "Could not save this scene asset."
-      }
+      },
+      "usingImportedFile": "Using the imported file. Remove it first to use a URL or change the type",
+      "removeFile": "Remove file",
+      "removeFileConfirm": "Remove the imported file?"
     },
     "asr": {
       "micModeLabel": "Microphone mode",
@@ -605,8 +609,6 @@
       "engineDeeplxHelp": "Fast (<1s per sentence), but you must run a local DeepLX service yourself (:1188). Translation fails if it isn't running.",
       "deeplxEndpoint": "DeepLX endpoint",
       "deeplxEndpointHelp": "URL of the DeepLX service. Default http://localhost:1188/v2/translate.",
-      "saved": "Voice & translation settings saved.",
-      "restartHint": "Saved. Takes effect after a restart (or after switching the character once).",
       "saveFailed": "Save failed. Please try again.",
       "loadError": "Could not load translator settings from the backend.",
       "testButton": "Test translation",
@@ -614,7 +616,8 @@
       "testFail_unchanged": "Translation did not take effect — the text came back unchanged. Usually this means a reasoning model (the answer lands in reasoning_content while content stays empty) or a timeout. Neither is configurable from the UI yet; edit translator_config.llm in conf.yaml and add extra_body.reasoning_effort: none and timeout: 60.",
       "testFail_disabled": "Translation is currently off — nothing to test.",
       "testFail_config": "Could not read the configuration: {{error}}",
-      "testFail_error": "Test failed: {{error}}"
+      "testFail_error": "Test failed: {{error}}",
+      "endpointEmpty": "The address can't be empty"
     },
     "playerLanguage": {
       "label": "Reading / Player language",
@@ -624,7 +627,6 @@
       "optJa": "Japanese",
       "optKo": "Korean",
       "optZhCn": "Simplified Chinese",
-      "saved": "Reading language saved. It takes effect after you restart the backend.",
       "saveFailed": "Could not save the reading language.",
       "loadError": "Could not load the reading language from the backend."
     },
@@ -632,8 +634,6 @@
       "label": "About you (global directive)",
       "help": "A global instruction applied to ALL characters — tells every character how to address and treat you (your name, who you are, the tone you want). It works alongside each character's own persona.",
       "placeholder": "e.g. Call me Hiro. I'm an indie game developer — keep the tone casual and relaxed.",
-      "save": "Save",
-      "saved": "Saved your directive. It takes effect after you restart the backend.",
       "saveFailed": "Could not save the directive.",
       "loadError": "Could not load your directive from the backend."
     },
@@ -647,8 +647,6 @@
       "toggleHelp": "When off, the engine stops remembering new conversation and stops bringing memories into the conversation (after the backend restarts). Stored memories are kept unless you clear them below.",
       "selfLabel": "About herself",
       "selfHelp": "Shared across every conversation, including live streams. Her tastes, opinions, background and her own plans live here; things between the two of you never do. If viewers teach her something odd, delete it right here.",
-      "selfSave": "Save her self-memory",
-      "selfSaveConfirm": "This replaces her entire self-memory — not a merge. Continue?",
       "selfClear": "Clear her self-memory",
       "selfClearConfirm": "Clear her self-memory? Every conversation is affected and this cannot be undone.",
       "selfCleared": "Her self-memory has been cleared.",
@@ -660,22 +658,15 @@
       "clearConfirm": "Clear this character's long-term memory? This cannot be undone (chat history is not affected).",
       "cleared": "Cleared this character's memory.",
       "clearFailed": "Clear failed. Please try again.",
-      "saved": "Memory setting updated.",
-      "restartHint": "Saved. Memory already injected into the current conversation is fully removed after a restart (or switching the character once).",
       "saveFailed": "Save failed. Please try again.",
-      "save": "Save memory",
       "saveContentFailed": "Could not save memory content. Please try again.",
       "editHint": "You can edit this text directly, then press \"Save memory\". Memory already injected into the current conversation fully applies after a restart (or switching the character once). Over-cap text is stored as-is and trimmed on the next consolidation.",
       "loadError": "Could not load memory settings from the backend.",
       "advancedToggle": "Advanced (manual edit)",
-      "saveConfirm": "This replaces the entire memory text — not a merge. Continue?",
-      "restartHintSetting": "Saved. This setting only reaches the live conversation after a backend restart (or re-selecting the character).",
       "charCountNoCap": "{{count}} characters"
     },
     "perf": {
       "description": "Pick a mode for this machine: Light on a weak or shared computer, High on a strong one. It changes only the engine's background work.",
-      "restartHint": "Saved. Engine/performance changes take effect after a restart (or switching the character once).",
-      "saved": "Saved.",
       "saveFailed": "Save failed. Please try again.",
       "loadError": "Could not load performance settings from the backend.",
       "loading": "Loading…",
@@ -689,8 +680,6 @@
       "presetLightDesc": "Engine background work less often (mood 2, memory 3, goals 8, reflection 12 turns); she keeps 2 goals and 1 thought in mind.",
       "presetStandardDesc": "Engine background work at its defaults (mood every turn, memory 2, goals 4, reflection 6); she keeps 3 goals and 2 thoughts in mind.",
       "presetHighDesc": "Engine background work more often (memory every turn, goals 3, reflection 4); she keeps 4 goals and 3 thoughts in mind.",
-      "applying": "Applying…",
-      "applied": "Applied the “{{name}}” performance mode.",
       "applyFailed": "Apply failed — some settings may not have been written. Please try again.",
       "asrSectionTitle": "Speech recognition engine (ASR)",
       "asrEngineLabel": "Recognition engine",
@@ -725,7 +714,7 @@
     },
     "topics": {
       "sectionTitle": "What she talks about",
-      "sectionNote": "Changes in this section take effect and save immediately.",
+      "sectionNote": "Changes here save right away and are used the next time she speaks up.",
       "sectionDesc": "Set the topics she brings up when she speaks proactively while idle. Just list topics; the toggle below decides whether she speaks from her own knowledge or fetches the latest news.",
       "listLabel": "Proactive topics",
       "listHelp": "List topics you'd like her to bring up; she'll naturally pick one each time.",
@@ -764,7 +753,6 @@
       "currentEndpoint": "Endpoint: {{url}}",
       "currentKey": "Key: {{masked}}",
       "none": "(not set)",
-      "restartHint": "Changing the LLM requires restarting the App to take effect.",
       "apiKeyHelpWithCurrent": "Current key: {{masked}} (never shown in full for security). To change it, paste a new key; leave blank to keep the current one."
     },
     "remoteAccess": {
@@ -841,6 +829,28 @@
         "bad_url": "That is not a live video URL",
         "no_history": "Could not create the stream conversation"
       }
+    },
+    "values": {
+      "integerBetween": "Enter a whole number from {{min}} to {{max}}",
+      "numberBetween": "Enter a number from {{min}} to {{max}}"
+    },
+    "pending": {
+      "count": "{{count}} change(s) not applied yet",
+      "reload": "Reload",
+      "items": {
+        "playerLanguage": "Your reading language",
+        "playerPrompt": "About you",
+        "tools": "Web search and other tools",
+        "translator": "Translation method",
+        "engine": "Background work and what she keeps in mind",
+        "asr": "Speech recognition",
+        "tts": "Speech synthesis service",
+        "perfPreset": "Performance mode",
+        "memory": "Long-term memory switch",
+        "character": "The active character",
+        "other": "Other settings"
+      },
+      "liveBlocked": "Can't reload during a live stream; reload after it ends."
     }
   },
   "footer": {

@@ -26,6 +26,7 @@ from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse
 from loguru import logger
 
+from . import pending_changes
 from . import character_settings
 
 from .api_guard import (
@@ -373,6 +374,7 @@ def init_memory_route(client_contexts: dict) -> APIRouter:
             return bad
 
         logger.info(f"[memory] toggle saved (conf_uid={conf_uid}, enabled={enabled})")
+        pending_changes.mark("memory")
         return JSONResponse(
             {
                 "ok": True,

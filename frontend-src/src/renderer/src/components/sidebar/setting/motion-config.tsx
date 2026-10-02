@@ -2,12 +2,8 @@
 // （不是 model_dict.json 手寫出來的那份），播放確認長什麼樣子，再指定
 // 觸發用的關鍵字與顯示名稱。
 //
-// 這個區塊是後端狀態（寫 model_dict.json），刻意不接進 live2d.tsx 既有的
-// TabActions（Apply/Revert）——那一對按鈕governs的是 pointerInteractive／
-// scrollToResize 兩個畫布互動設定，走抽屜關閉時的還原機制；這裡寫的是
-// model_dict.json，語意完全不同。2e 子專案整批就是在消滅「一顆按鈕看起來
-// 管全部、其實只管一半」的混淆，不能在這裡重演。分界用常駐文字
-// （motionConfigSectionNote）講清楚，不是操作完才彈一次的 toast。
+// 這個區塊寫 model_dict.json（這個模型的設定，用同一個模型的角色共用），改了就存：
+// 停手 0.8 秒或離開欄位就送，有不合法的欄位就不送並說明原因。
 //
 // 存檔的形狀：PUT 端點整份取代 motionMap／tapMotions（見
 // live2d_config_route.py write_model_config 的 docstring），所以每次存檔
@@ -19,23 +15,26 @@
 // orphan_keywords（motionMap 指向的 (group,index) 已經不存在於目前的
 // model3.json）不可能被合法送回——_validate_motion_map 會直接拒絕任何指向
 // 不存在動作的目標，回 400。所以這裡的「清除失效的關鍵字」其實就是呼叫
-// 同一個 handleSave：因為 buildMotionMap 本來就只從 config.motions 重建，
+// 同一個 saveConfig：因為 buildMotionMap 本來就只從 config.motions 重建，
 // orphan 從來不會被包進去，這個按鈕只是把「存檔會順便丟掉它們」這件事對
 // 使用者講清楚，而不是另外一個獨立的清除 API（沒有這種 API）。
 //
 // 點擊區域指派（3a-2 Task 5）：讓 tapMotions 能指到單一動作，不再只能指到
 // 一整個群組再隨機——mao_pro 六個可用動作全在同一個無名群組，改版前點頭跟
 // 點身體是同一種隨機結果。畫面上每個 HitArea 一組候選清單（動作＋權重），
-// 跟上面的關鍵字／顯示名稱共用同一個 handleSave／PUT，兩者本來就是同一份
+// 跟上面的關鍵字／顯示名稱共用同一個 saveConfig／PUT，兩者本來就是同一份
 // model_dict.json 的兩個欄位。
 import {
-  useState, useEffect, useMemo, useCallback,
+  useState, useEffect, useMemo, useCallback, useRef,
 } from 'react';
 import { Stack, Box, Text, Heading, HStack } from '@chakra-ui/react';
 import { createListCollection } from '@ark-ui/react/collection';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/tw/primitives';
-import { toaster } from '@/components/ui/tw/toaster';
+import { SaveStatus } from '@/components/ui/tw/save-status';
+import { useAutosave } from '@/hooks/use-autosave';
+import { parseBoundedNumber } from '@/utils/setting-values';
+import { anyInvalidWeightDraft, removeWeightDraft } from '@/utils/weight-drafts';
 import { useWebSocket } from '@/context/websocket-context';
 import { useLive2DConfig } from '@/context/live2d-config-context';
 // 表情的「回到原樣」沿用 app 自己那條路（解除目前表情，不是套一個中性表情
@@ -90,7 +89,8 @@ function MotionConfig(): JSX.Element {
   // 保留，不能因為畫面沒顯示就悄悄弄丟。
   const [extraMappings, setExtraMappings] = useState<Record<string, MotionMapping[]>>({});
   const [orphans, setOrphans] = useState<OrphanKeyword[]>([]);
-  const [saving, setSaving] = useState(false);
+  // 點擊權重的文字草稿：打到一半（空、「1.」）不寫進權重，也不彈回舊值。
+  const [weightTexts, setWeightTexts] = useState<Record<string, string>>({});
 
   // 點擊區域指派：hitAreaId -> 目前指派的候選清單（畫面上的即時編輯狀態，
   // 存檔前都只改這裡，不動 config.tap_motions）。初始值是這次 GET 到的
@@ -294,6 +294,7 @@ function MotionConfig(): JSX.Element {
   }, []);
 
   const removeTapMotionCandidate = useCallback((hitAreaId: string, entryIndex: number) => {
+    setWeightTexts((prev) => removeWeightDraft(prev, hitAreaId, entryIndex));
     setTapMotionEdits((prev) => ({
       ...prev,
       [hitAreaId]: (prev[hitAreaId] ?? []).filter((_, i) => i !== entryIndex),
@@ -309,14 +310,12 @@ function MotionConfig(): JSX.Element {
     }));
   }, []);
 
-  const handleSave = useCallback(async () => {
-    if (!config || !modelName || hasAnyError) return;
-    setSaving(true);
+  const saveConfig = useCallback(async () => {
+    if (!config || !modelName) return { ok: true } as const;
     const motionMap = buildMotionMap();
     const result = await saveModelConfig(
       baseUrl, modelName, motionMap, tapMotionEdits, buildEmotionMap(),
     );
-    setSaving(false);
     if (result.ok) {
       // orphan_keywords 從來不會被 buildMotionMap 包進去，所以這次存檔已經
       // 把它們從 model_dict.json 移除了——畫面上的清單要跟著清空。
@@ -340,19 +339,35 @@ function MotionConfig(): JSX.Element {
           tapMotions: tapMotionEdits,
         });
       }
-      toaster.create({
-        title: t('settings.live2d.motionConfigSaved'),
-        type: 'success',
-        duration: 3000,
-      });
-    } else {
-      toaster.create({
-        title: result.error || t('settings.live2d.motionConfigSaveFailed'),
-        type: 'error',
-        duration: 4000,
-      });
+      return { ok: true } as const;
     }
-  }, [config, modelName, hasAnyError, buildMotionMap, buildEmotionMap, baseUrl, live2DConfig, t, tapMotionEdits]);
+    return { ok: false, error: result.error || t('settings.live2d.motionConfigSaveFailed') } as const;
+  }, [config, modelName, buildMotionMap, buildEmotionMap, baseUrl, live2DConfig, t, tapMotionEdits]);
+
+  const baselineRef = useRef<string | null>(null);
+  const weightInvalid = anyInvalidWeightDraft(weightTexts, tapMotionEdits);
+  const motionSaver = useAutosave(async (snapshot: string) => {
+    void snapshot;
+    return saveConfig();
+  }, {
+    validate: () => (hasAnyError || weightInvalid ? t('settings.live2d.motionConfigFixErrors') : null),
+  });
+
+  // 載入後的第一份是基準；之後任何一欄改了就排一次存檔。
+  useEffect(() => {
+    baselineRef.current = null;
+    setWeightTexts({});
+  }, [modelName]);
+  useEffect(() => {
+    if (!config) return;
+    const snapshot = JSON.stringify([rows, extraMappings, tapMotionEdits, expressionRows, extraEmotionKeywords, weightTexts]);
+    if (baselineRef.current === null) {
+      baselineRef.current = snapshot;
+      return;
+    }
+    motionSaver.change(snapshot);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config, rows, extraMappings, tapMotionEdits, expressionRows, extraEmotionKeywords, weightTexts]);
 
   // 「選一個動作加入點擊區域」下拉選單共用同一份清單，來源是 Task 1 列舉出
   // 來的 config.motions（模型真實擁有的每個動作），不是 model_dict.json
@@ -369,9 +384,8 @@ function MotionConfig(): JSX.Element {
   return (
     <Stack gap={2}>
       <Heading size="sm">{t('settings.live2d.motionConfigSectionTitle')}</Heading>
-      {/* 常駐文字，不是 toast：這個區塊自己存檔，不受上面 TabActions 的
-          Apply/Revert 影響，這件事必須隨時可見。 */}
       <Text fontSize="xs" color="blue.300">{t('settings.live2d.motionConfigSectionNote')}</Text>
+      <SaveStatus state={motionSaver.state} />
 
       {!modelName && (
         <Text fontSize="sm" color="whiteAlpha.700">{t('settings.live2d.motionConfigNoModel')}</Text>
@@ -408,12 +422,10 @@ function MotionConfig(): JSX.Element {
             tone="orange"
             variant="outline"
             className="mt-2"
-            onClick={handleSave}
-            loading={saving}
-            // handleSave 的第一行就是 `if (... || hasAnyError) return`，不一起
-            // 停用的話這顆鍵看起來可按、按下去靜默什麼都不做，使用者完全不知道
-            // 是因為下面某一列有錯。跟最下面那顆主儲存鍵同一個條件。
-            disabled={hasAnyError}
+            // 存一次就會把孤兒對應從 model_dict.json 拿掉（它們不在送出的 motionMap 裡）。
+            onClick={() => { motionSaver.change(`clear-orphans-${Date.now()}`); motionSaver.flush(); }}
+            loading={motionSaver.state.phase === 'saving'}
+            disabled={hasAnyError || weightInvalid}
           >
             {t('settings.live2d.orphanClearButton')}
           </Button>
@@ -605,8 +617,13 @@ function MotionConfig(): JSX.Element {
                       <Box w="90px">
                         <NumberField
                           label={t('settings.live2d.tapAreaWeightLabel')}
-                          value={entry.weight}
-                          onChange={(value) => updateTapMotionWeight(area.id, entryIndex, Number(value) || 0)}
+                          value={weightTexts[`${area.id}#${entryIndex}`] ?? String(entry.weight)}
+                          onChange={(value) => {
+                            setWeightTexts((prev) => ({ ...prev, [`${area.id}#${entryIndex}`]: value }));
+                            const weight = parseBoundedNumber(value, { min: 0 });
+                            if (weight !== null) updateTapMotionWeight(area.id, entryIndex, weight);
+                          }}
+                          onBlur={motionSaver.flush}
                           min={0}
                           step={1}
                         />
@@ -655,18 +672,6 @@ function MotionConfig(): JSX.Element {
         </Stack>
       )}
 
-      {config && (
-        <Button
-          size="sm"
-          tone="blue"
-          className="self-start"
-          onClick={handleSave}
-          loading={saving}
-          disabled={hasAnyError}
-        >
-          {t('common.save')}
-        </Button>
-      )}
     </Stack>
   );
 }

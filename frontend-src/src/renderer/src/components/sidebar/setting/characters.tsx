@@ -30,6 +30,8 @@ import { toaster } from '@/components/ui/tw/toaster';
 import { useWebSocket } from '@/context/websocket-context';
 import { useConfig } from '@/context/character-config-context';
 import { useSwitchCharacter } from '@/hooks/utils/use-switch-character';
+import { useAutosave } from '@/hooks/use-autosave';
+import { SaveStatus } from '@/components/ui/tw/save-status';
 import {
   SelectField, InputField, TextareaField, Field, Button, SwitchField,
 } from './common';
@@ -157,7 +159,8 @@ function Characters(): JSX.Element {
 
   const [selectedFilename, setSelectedFilename] = useState<string | null>(null);
   const [draft, setDraft] = useState<EditDraft | null>(null);
-  const [saving, setSaving] = useState(false);
+  const baselineRef = useRef<CharacterRecord | null>(null);
+  const loadedDraftRef = useRef<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -407,27 +410,25 @@ function Characters(): JSX.Element {
 
   // 這個角色自己的開關（字幕翻成你看的語言、可以寫動作描寫）：改了就存，不跟整份
   // 表單一起存。
-  const handleToggle = useCallback(async (
+  // 翻字幕、動作描寫：切了就存。正在用的角色要重新載入才生效，由抽屜頂端的提示處理。
+  const toggleSaver = useAutosave(async (change: {
+    filename: string; name: 'translate_subtitle' | 'actions_enabled'; checked: boolean;
+  }) => {
+    const result = await saveCharacterSettings(baseUrl, change.filename, { [change.name]: change.checked });
+    if (!result.ok) return { ok: false, error: result.error } as const;
+    setCharacters((list) => (list ?? []).map((c) => (
+      c.filename === change.filename ? { ...c, [change.name]: result.data.settings[change.name] } : c
+    )));
+    return { ok: true } as const;
+  }, { delayMs: 0 });
+
+  const handleToggle = useCallback((
     name: 'translate_subtitle' | 'actions_enabled',
     checked: boolean,
   ) => {
     if (!selectedRecord) return;
-    const { filename } = selectedRecord;
-    const result = await saveCharacterSettings(baseUrl, filename, { [name]: checked });
-    if (result.ok) {
-      setCharacters((list) => (list ?? []).map((c) => (
-        c.filename === filename ? { ...c, [name]: result.data.settings[name] } : c
-      )));
-      toaster.create({
-        title: t('settings.characters.saved', { name: selectedRecord.conf_name ?? filename }),
-        description: t('settings.characters.reloadToApply'),
-        type: 'success',
-        duration: 4000,
-      });
-    } else {
-      toaster.create({ title: result.error, type: 'error', duration: 3000 });
-    }
-  }, [baseUrl, selectedRecord, t]);
+    toggleSaver.change({ filename: selectedRecord.filename, name, checked });
+  }, [selectedRecord, toggleSaver]);
 
   const openEdit = useCallback((record: CharacterRecord) => {
     // 遞增世代號：任何還在飛的頭像上傳（不論屬於哪個表單）從這一刻起都是舊世代，
@@ -461,6 +462,9 @@ function Characters(): JSX.Element {
     setPreviewError(null);
     setAvatarUploadError(null);
     setAvatarUploading(false);
+    // 自動存檔比對的基準：每次存成功就往前推，所以把欄位改回原值也會被存。
+    baselineRef.current = record;
+    loadedDraftRef.current = null;
   }, []);
 
   const closeEdit = useCallback(() => {
@@ -512,24 +516,15 @@ function Characters(): JSX.Element {
     setAvatarUploading(false);
   }, []);
 
-  const handleSave = useCallback(async () => {
-    if (!selectedRecord || !draft) return;
+  // 每一筆存檔帶著它屬於哪個角色（排隊中換了角色，也不會存到別人的檔案）。
+  const saveDraft = useCallback(async (
+    { draft, baseline }: { draft: EditDraft; baseline: CharacterRecord },
+  ) => {
+    // 同一個角色就比對最新的基準（上一筆剛存好的值），不然把欄位改回去會被當成沒改。
+    const selectedRecord = baselineRef.current?.filename === baseline.filename
+      ? baselineRef.current
+      : baseline;
 
-    if (!draft.conf_name.trim()) {
-      setSaveError(t('settings.characters.errNameRequired'));
-      return;
-    }
-    if (!draft.persona_prompt.trim()) {
-      setSaveError(t('settings.characters.errPersonaRequired'));
-      return;
-    }
-    if (!draft.live2d_model_name.trim()) {
-      setSaveError(t('settings.characters.errSkinRequired'));
-      return;
-    }
-
-    setSaving(true);
-    setSaveError(null);
     // draft.voice 是畫面用的哨兵值，送出前換回後端認得的空字串（= 沿用預設聲音）。
     // 只列四個必填欄位，不用 ...draft 展開——draft 這個 EditDraft 還帶著
     // character_name/avatar/reply_language/voice_lang 這些選填欄位的「畫面現
@@ -597,25 +592,38 @@ function Characters(): JSX.Element {
     }
     const body = buildCharacterUpdate(selectedRecord, edits, optional);
     const result = await updateCharacter(baseUrl, selectedRecord.filename, body);
-    setSaving(false);
-
-    if (result.ok) {
-      const wasActive = selectedRecord.conf_name === confName;
-      toaster.create({
-        title: t('settings.characters.saved', { name: draft.conf_name }),
-        description: wasActive ? t('settings.characters.appliedHint') : undefined,
-        type: 'success',
-        duration: 2500,
-      });
-      setRefreshTick((n) => n + 1);
-      closeEdit();
-      if (wasActive) {
-        switchCharacter(selectedRecord.filename, true);
-      }
-    } else {
-      setSaveError(result.error || t('settings.characters.errSaveFailed'));
+    if (!result.ok) {
+      return { ok: false, error: result.error || t('settings.characters.errSaveFailed') } as const;
     }
-  }, [selectedRecord, draft, baseUrl, t, closeEdit, confName, switchCharacter]);
+    // 存下去的就是新的基準；清單重抓一次，名字之類的改動清單上也看得到。
+    if (baselineRef.current?.filename === selectedRecord.filename) {
+      baselineRef.current = { ...baselineRef.current, ...edits, ...optional };
+    }
+    setRefreshTick((n) => n + 1);
+    return { ok: true } as const;
+  }, [baseUrl, t]);
+
+  const charSaver = useAutosave(saveDraft, {
+    validate: ({ draft: d }: { draft: EditDraft; baseline: CharacterRecord }) => {
+      if (!d.conf_name.trim()) return t('settings.characters.errNameRequired');
+      if (!d.persona_prompt.trim()) return t('settings.characters.errPersonaRequired');
+      if (!d.live2d_model_name.trim()) return t('settings.characters.errSkinRequired');
+      return null;
+    },
+  });
+
+  // 表單任何一欄改了就排一次存檔（存檔器只送最後那份）；剛打開表單時填進來的
+  // 那一份不算。不跟「存過的值」比：改了又改回去，最後那份一樣要存。
+  useEffect(() => {
+    if (!draft) return;
+    if (loadedDraftRef.current === null) {
+      loadedDraftRef.current = 'loaded';
+      return;
+    }
+    if (!baselineRef.current) return;
+    charSaver.change({ draft, baseline: baselineRef.current });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft]);
 
   // 三個必填欄位（conf_name/persona_prompt/live2d_model_name）刻意不在前端擋——
   // POST /api/characters 本來就會各自回帶訊息的 400，且皮膚是否已註冊也只有
@@ -1100,6 +1108,7 @@ function Characters(): JSX.Element {
     return (
       <Stack {...settingStyles.common.container} maxW="none">
         <Heading size="sm">{t('settings.characters.editTitle')}</Heading>
+        <SaveStatus state={charSaver.state} />
 
         {selectedRecord.is_base && (
           <Text fontSize="xs" color="yellow.300">
@@ -1214,6 +1223,7 @@ function Characters(): JSX.Element {
             help={t('settings.characters.actionsEnabledHelp')}
           />
         )}
+        <SaveStatus state={toggleSaver.state} />
 
         {ttsModels.length > 0 && (
           <Stack gap={2}>
@@ -1356,17 +1366,14 @@ function Characters(): JSX.Element {
         )}
 
         <HStack>
+          {/* 改了就存；這顆只是回到清單（關掉前把還沒送的那筆送出去）。 */}
+          {/* 有欄位不合法時那份還沒存：關掉就會丟掉其他欄位的修改，先擋住。 */}
           <Button
-            tone="blue"
-            onClick={handleSave}
-            loading={saving}
-            loadingText={t('settings.characters.saving')}
-            disabled={saving || avatarUploading}
+            variant="outline"
+            disabled={charSaver.state.phase === 'invalid'}
+            onClick={() => { charSaver.flush(); closeEdit(); }}
           >
-            {t('settings.characters.save')}
-          </Button>
-          <Button variant="outline" onClick={closeEdit} disabled={saving}>
-            {t('common.cancel')}
+            {t('common.close')}
           </Button>
         </HStack>
       </Stack>

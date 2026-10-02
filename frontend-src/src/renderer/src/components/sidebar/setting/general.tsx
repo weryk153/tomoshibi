@@ -14,6 +14,9 @@ import { SelectField, SwitchField, InputField, SliderField, NumberField, TabActi
 import { Button } from "@/components/ui/tw/primitives";
 import { Field } from '@/components/ui/tw/primitives';
 import { toaster } from "@/components/ui/tw/toaster";
+import { SaveStatus } from "@/components/ui/tw/save-status";
+import { useAutosave } from "@/hooks/use-autosave";
+import { boundsMessage, parseBoundedNumber, type Bounds } from "@/utils/setting-values";
 import {
   fetchUseMcpp, setUseMcpp, fetchEngineSettings, saveEngineSettings,
   type EngineSettings, type EngineEvery,
@@ -88,15 +91,14 @@ function General({ onCancel }: GeneralProps): JSX.Element {
   }, [i18n.language, settings.language]);
 
   const [customBgDraft, setCustomBgDraft] = useState(settings.customBgUrl);
+  // 背景選取的世代計數器（說明見下面 handleBackgroundFile 上方）。
+  const bgSelectionSessionRef = useRef(0);
 
-  // MCP 開關（工具／網路搜尋）：直接讀寫 conf.yaml，跟這個分頁其餘欄位的
-  // 草稿制的 TabActions 套用／還原跟這個完全是兩回事——conf.yaml 只在後端啟動時
-  // 讀取一次（見 api/agent-config.ts 檔頭），所以這裡切換就立刻送出，不受
-  // 下面的套用／還原影響，也不能被它們還原掉。
+  // MCP 開關（工具／網路搜尋）：改了就存到 conf.yaml；要重新載入才生效，由抽屜
+  // 頂端的提示處理。存失敗就退回原值。
   const [mcpEnabled, setMcpEnabled] = useState(false);
   const [mcpLoading, setMcpLoading] = useState(true);
-  const [mcpSaving, setMcpSaving] = useState(false);
-  const [mcpError, setMcpError] = useState<string | null>(null);
+  const [mcpLoadError, setMcpLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -107,7 +109,7 @@ function General({ onCancel }: GeneralProps): JSX.Element {
       if (result.ok) {
         setMcpEnabled(result.data);
       } else {
-        setMcpError(result.error);
+        setMcpLoadError(result.error);
       }
     })();
     return (): void => {
@@ -115,33 +117,22 @@ function General({ onCancel }: GeneralProps): JSX.Element {
     };
   }, [baseUrl]);
 
-  const handleMcpToggle = useCallback(async (checked: boolean) => {
-    const previous = mcpEnabled;
-    setMcpEnabled(checked);
-    setMcpSaving(true);
-    setMcpError(null);
+  const mcpSaver = useAutosave(async (checked: boolean) => {
     const result = await setUseMcpp(baseUrl, checked);
-    setMcpSaving(false);
     if (result.ok) {
       setMcpEnabled(result.data.use_mcpp);
-      toaster.create({
-        title: t("settings.general.mcppSaved"),
-        type: "success",
-        duration: 3000,
-      });
-    } else {
-      // 失敗就退回原值，不留一個「畫面上開著、conf.yaml 其實沒存到」的假象。
-      setMcpEnabled(previous);
-      setMcpError(result.error);
+      return { ok: true } as const;
     }
-  }, [baseUrl, mcpEnabled, t]);
+    // 失敗就退回原值，不留一個「畫面上開著、conf.yaml 其實沒存到」的假象。
+    setMcpEnabled(!checked);
+    return { ok: false, error: result.error } as const;
+  }, { delayMs: 0 });
 
   // 引擎驅動對話：開關與「每幾輪跑一次」的幾個數字，同樣直接寫 conf.yaml、
   // 存了要重啟。引擎裝不起來時開關是灰的，reason 說明為什麼。數字改了不是
   // 每敲一個字就寫一次檔——停手半秒再送。
   const [engine, setEngine] = useState<EngineSettings | null>(null);
   const [engineError, setEngineError] = useState<string | null>(null);
-  const [engineSaving, setEngineSaving] = useState(false);
   const [everyDrafts, setEveryDrafts] = useState<Record<EngineEvery, string> | null>(null);
   // 背景工作另外用的模型：兩欄一起套用，填一半的話後端不會用。
   const [backgroundDraft, setBackgroundDraft] = useState<{ url: string; model: string } | null>(null);
@@ -175,63 +166,95 @@ function General({ onCancel }: GeneralProps): JSX.Element {
     };
   }, [baseUrl]);
 
-  const handleBackgroundApply = useCallback(async () => {
-    if (!backgroundDraft) return;
-    const url = backgroundDraft.url.trim();
-    const model = backgroundDraft.model.trim();
-    setEngineSaving(true);
-    setEngineError(null);
+  const EVERY_BOUNDS: Bounds = { min: 0, max: 99, integer: true };
+  const boundsText = (bounds: Bounds): string => {
+    const message = boundsMessage(bounds);
+    return t(message.key, message.params);
+  };
+
+  // 「每幾輪跑一次」與「放在心上幾個」：停手才存，打到一半的值不存也不彈回。
+  // 跟「後端最後一次確認存下的值」比，不跟畫面上一輪的 engine 比：上一筆剛存好、
+  // 接著排的那筆在畫面重畫前就會跑，用 state 比會把「改回原值」誤判成沒變。
+  const savedEngineRef = useRef<EngineSettings | null>(null);
+  savedEngineRef.current = savedEngineRef.current ?? engine;
+  const everySaver = useAutosave(async (drafts: Record<EngineEvery, string>) => {
+    const saved = savedEngineRef.current;
+    if (!saved) return { ok: true } as const;
+    const changes: Partial<Record<EngineEvery, number>> = {};
+    (Object.keys(drafts) as EngineEvery[]).forEach((key) => {
+      const value = parseBoundedNumber(drafts[key], EVERY_BOUNDS);
+      if (value !== null && value !== saved[key]) changes[key] = value;
+    });
+    if (Object.keys(changes).length === 0) return { ok: true } as const;
+    const result = await saveEngineSettings(baseUrl, changes);
+    if (!result.ok) return { ok: false, error: result.error } as const;
+    savedEngineRef.current = { ...saved, ...result.data };
+    setEngine((current) => (current ? { ...current, ...result.data } : current));
+    return { ok: true } as const;
+  }, {
+    validate: (drafts) => (
+      (Object.values(drafts) as string[]).some((v) => parseBoundedNumber(v, EVERY_BOUNDS) === null)
+        ? boundsText(EVERY_BOUNDS)
+        : null
+    ),
+  });
+
+  const changeEvery = (key: EngineEvery, value: string): void => {
+    if (!everyDrafts) return;
+    const next = { ...everyDrafts, [key]: value };
+    setEveryDrafts(next);
+    everySaver.change(next);
+  };
+
+  // 背景工作另外用的模型：兩欄一起存，填一半的話後端不會用。
+  const backgroundSaver = useAutosave(async (draft: { url: string; model: string }) => {
+    const url = draft.url.trim();
+    const model = draft.model.trim();
     const result = await saveEngineSettings(baseUrl, {
       background_base_url: url,
       background_model: model,
     });
-    setEngineSaving(false);
-    if (!result.ok) {
-      setEngineError(result.error);
-      return;
-    }
+    if (!result.ok) return { ok: false, error: result.error } as const;
     setEngine((current) => (current ? { ...current, ...result.data } : current));
     // 後端不寫它認為會弄壞設定檔的值（不是 http 網址、含引號或換行）。
     if (result.data.background_base_url !== url || result.data.background_model !== model) {
-      setEngineError(t("settings.general.engineBackgroundInvalid"));
-      return;
+      return { ok: false, error: t("settings.general.engineBackgroundInvalid") } as const;
     }
-    toaster.create({
-      title: t("settings.general.engineSaved"),
-      type: "success",
-      duration: 3000,
-    });
-  }, [backgroundDraft, baseUrl, t]);
+    return { ok: true } as const;
+  });
 
-  useEffect(() => {
-    if (!engine || !everyDrafts) return undefined;
-    const changes: Partial<Record<EngineEvery, number>> = {};
-    (Object.keys(everyDrafts) as EngineEvery[]).forEach((key) => {
-      const value = Number.parseInt(everyDrafts[key], 10);
-      if (Number.isFinite(value) && value !== engine[key]) changes[key] = value;
-    });
-    if (Object.keys(changes).length === 0) return undefined;
-    const timer = window.setTimeout(async () => {
-      setEngineSaving(true);
-      const result = await saveEngineSettings(baseUrl, changes);
-      setEngineSaving(false);
-      if (result.ok) {
-        setEngine((current) => (current ? { ...current, ...result.data } : current));
-        setEngineError(null);
-        toaster.create({
-          title: t("settings.general.engineSaved"),
-          type: "success",
-          duration: 3000,
-        });
-      } else {
-        setEngineError(result.error);
-      }
-    }, 500);
-    return (): void => window.clearTimeout(timer);
-  }, [baseUrl, engine, everyDrafts, t]);
+  const changeBackground = (field: 'url' | 'model', value: string): void => {
+    if (!backgroundDraft) return;
+    const next = { ...backgroundDraft, [field]: value };
+    setBackgroundDraft(next);
+    backgroundSaver.change(next);
+  };
+
+  // 自訂背景網址：停手就套用，空白不存。
+  const customBgSaver = useAutosave(async (url: string) => {
+    if (url.trim() === settings.customBgUrl) return { ok: true } as const;
+    bgSelectionSessionRef.current += 1;
+    handleSettingChange("selectedBgUrl", []);
+    handleSettingChange("customBgUrl", url.trim());
+    return { ok: true } as const;
+  }, { validate: (url) => (url.trim() ? null : t("settings.general.customBgUrlEmpty")) });
+
+  // 圖片壓縮品質、最大寬度：欄位保留使用者打的字，合法才存。
+  const QUALITY_BOUNDS: Bounds = { min: 0.1, max: 1 };
+  const WIDTH_BOUNDS: Bounds = { min: 0, integer: true };
+  const [qualityText, setQualityText] = useState(String(settings.imageCompressionQuality));
+  const [widthText, setWidthText] = useState(String(settings.imageMaxWidth));
+  const qualitySaver = useAutosave(async (text: string) => {
+    handleSettingChange("imageCompressionQuality", parseBoundedNumber(text, QUALITY_BOUNDS) as number);
+    return { ok: true } as const;
+  }, { validate: (text) => (parseBoundedNumber(text, QUALITY_BOUNDS) === null ? boundsText(QUALITY_BOUNDS) : null) });
+  const widthSaver = useAutosave(async (text: string) => {
+    handleSettingChange("imageMaxWidth", parseBoundedNumber(text, WIDTH_BOUNDS) as number);
+    return { ok: true } as const;
+  }, { validate: (text) => (parseBoundedNumber(text, WIDTH_BOUNDS) === null ? boundsText(WIDTH_BOUNDS) : null) });
 
   // 背景圖片上傳：POST /api/background 把檔案寫進磁碟，同樣是立刻生效、
-  // 不可還原，不受下面的套用／還原影響。
+  // 不可還原。
   const [bgUploading, setBgUploading] = useState(false);
   const [bgUploadError, setBgUploadError] = useState<string | null>(null);
   const bgFileInputRef = useRef<HTMLInputElement | null>(null);
@@ -242,7 +265,6 @@ function General({ onCancel }: GeneralProps): JSX.Element {
   // 新檔案蓋回目前選取。這裡只有一個「目前選取」而不是多個表單，用遞增計數
   // 比對「上傳開始時」跟「上傳完成時」是否還是同一次選取意圖；不一致就只更新
   // 背景清單，不動使用者已經換過的選取。
-  const bgSelectionSessionRef = useRef(0);
 
   const handleBackgroundFile = useCallback(async (file: File) => {
     setBgUploadError(null);
@@ -353,29 +375,19 @@ function General({ onCancel }: GeneralProps): JSX.Element {
             />
           </Box>
 
-          <Stack gap={2}>
+          <Stack gap={1}>
             <InputField
               label={t("settings.general.customBgUrl")}
               value={customBgDraft}
-              onChange={setCustomBgDraft}
+              onChange={(value) => {
+                setCustomBgDraft(value);
+                // 每次都排：打了又改回原值時，存檔器才會送最後那個（而不是中間打的字）。
+                customBgSaver.change(value);
+              }}
+              onBlur={customBgSaver.flush}
               placeholder={t("settings.general.customBgUrlPlaceholder")}
             />
-            <Button
-              size="xs"
-              tone="blue"
-              className="self-start"
-              disabled={
-                !customBgDraft.trim()
-                || customBgDraft.trim() === settings.customBgUrl
-              }
-              onClick={() => {
-                bgSelectionSessionRef.current += 1;
-                handleSettingChange("selectedBgUrl", []);
-                handleSettingChange("customBgUrl", customBgDraft.trim());
-              }}
-            >
-              {t("common.apply")}
-            </Button>
+            <SaveStatus state={customBgSaver.state} />
           </Stack>
         </>
       )}
@@ -419,59 +431,41 @@ function General({ onCancel }: GeneralProps): JSX.Element {
 
       <InputField
         label={t("settings.general.imageCompressionQuality")}
-        value={settings.imageCompressionQuality.toString()}
-        onChange={(value) => {
-          const quality = parseFloat(value as string);
-          if (!Number.isNaN(quality) && quality >= 0.1 && quality <= 1.0) {
-            handleSettingChange("imageCompressionQuality", quality);
-          } else if (value === "") {
-            handleSettingChange("imageCompressionQuality", settings.imageCompressionQuality);
-          }
-        }}
+        value={qualityText}
+        onChange={(value) => { setQualityText(value); qualitySaver.change(value); }}
+        onBlur={qualitySaver.flush}
         help={t("settings.general.imageCompressionQualityHelp")}
       />
+      <SaveStatus state={qualitySaver.state} />
 
       <InputField
         label={t("settings.general.imageMaxWidth")}
-        value={settings.imageMaxWidth.toString()}
-        onChange={(value) => {
-          const maxWidth = parseInt(value as string, 10);
-          if (!Number.isNaN(maxWidth) && maxWidth >= 0) {
-            handleSettingChange("imageMaxWidth", maxWidth);
-          } else if (value === "") {
-            handleSettingChange("imageMaxWidth", settings.imageMaxWidth);
-          }
-        }}
+        value={widthText}
+        onChange={(value) => { setWidthText(value); widthSaver.change(value); }}
+        onBlur={widthSaver.flush}
         help={t("settings.general.imageMaxWidthHelp")}
       />
+      <SaveStatus state={widthSaver.state} />
 
 
 
-      {/* Task 4「關於你」：暱稱／頭像／玩家語言／全域指示／角色發聲語言，一律
-          即時存檔或寫 localStorage，不受上面的 TabActions 管——理由跟緊接在後
-          的 MCP／背景上傳區塊一樣，詳見 you.tsx 檔頭註解。刻意排在 TabActions
-          之後、緊鄰 MCP 區塊，讓「套用／還原管到這裡為止，下面都即時生效」
-          從畫面順序上就讀得出來，不是只能靠說明文字。General 本身沒有從
-          setting-ui.tsx 拿到 activeTab 訊號（不像 asr.tsx／memory.tsx 那樣接了
-          active prop），這裡固定傳 true，效果等同 You 自己的預設值，只是寫明
-          而非留給隱式預設生效。 */}
+      {/* 「關於你」：每一項都改了就存，見 you.tsx 檔頭。 */}
       <You active />
 
-      {/* 立即生效區塊：MCP 開關寫 conf.yaml、背景上傳寫磁碟，兩者都不可還原，
-          跟上面的草稿制套用／還原是兩種不同的存檔機制，故意用邊框跟上面
-          隔開，不接進上面的 TabActions。 */}
+      {/* 工具開關、背景工作、背景上傳：改了就存；寫進 conf.yaml 的要重新載入才生效，由抽屜頂端的提示處理。 */}
       <Stack gap={2} pt={3} borderTopWidth="1px" borderColor="whiteAlpha.200">
         <SwitchField
           label={t("settings.general.enableMcpp")}
           checked={mcpEnabled}
-          onChange={handleMcpToggle}
-          disabled={mcpLoading || mcpSaving}
+          onChange={(checked) => { setMcpEnabled(checked); mcpSaver.change(checked); }}
+          disabled={mcpLoading || mcpSaver.state.phase === 'saving'}
         />
+        <SaveStatus state={mcpSaver.state} />
         <Text fontSize="xs" color="whiteAlpha.600">
           {t("settings.general.enableMcppHelp")}
         </Text>
-        {mcpError && (
-          <Text fontSize="xs" color="red.300">{mcpError}</Text>
+        {mcpLoadError && (
+          <Text fontSize="xs" color="red.300">{mcpLoadError}</Text>
         )}
 
         {engine && !engine.available && (
@@ -490,7 +484,8 @@ function General({ onCancel }: GeneralProps): JSX.Element {
                 min={0}
                 max={99}
                 step={1}
-                onChange={(value) => setEveryDrafts((current) => (current ? { ...current, [key]: value } : current))}
+                onChange={(value) => changeEvery(key, value)}
+                onBlur={everySaver.flush}
               />
             ))}
             <Text fontSize="xs" color="whiteAlpha.600">
@@ -504,9 +499,11 @@ function General({ onCancel }: GeneralProps): JSX.Element {
                 min={0}
                 max={99}
                 step={1}
-                onChange={(value) => setEveryDrafts((current) => (current ? { ...current, [key]: value } : current))}
+                onChange={(value) => changeEvery(key, value)}
+                onBlur={everySaver.flush}
               />
             ))}
+            <SaveStatus state={everySaver.state} />
             {backgroundDraft && (
               <Stack gap={1}>
                 <Text fontSize="xs" color="whiteAlpha.600">
@@ -515,28 +512,18 @@ function General({ onCancel }: GeneralProps): JSX.Element {
                 <InputField
                   label={t("settings.general.engineBackgroundUrl")}
                   value={backgroundDraft.url}
-                  onChange={(value) => setBackgroundDraft((current) => (current ? { ...current, url: value } : current))}
+                  onChange={(value) => changeBackground('url', value)}
+                  onBlur={backgroundSaver.flush}
                   placeholder="http://127.0.0.1:1235/v1"
                 />
                 <InputField
                   label={t("settings.general.engineBackgroundModel")}
                   value={backgroundDraft.model}
-                  onChange={(value) => setBackgroundDraft((current) => (current ? { ...current, model: value } : current))}
+                  onChange={(value) => changeBackground('model', value)}
+                  onBlur={backgroundSaver.flush}
                   placeholder="qwen/qwen3.5-9b"
                 />
-                <Button
-                  size="xs"
-                  tone="blue"
-                  className="self-start"
-                  disabled={
-                    engineSaving
-                    || (backgroundDraft.url.trim() === engine.background_base_url
-                      && backgroundDraft.model.trim() === engine.background_model)
-                  }
-                  onClick={handleBackgroundApply}
-                >
-                  {t("common.apply")}
-                </Button>
+                <SaveStatus state={backgroundSaver.state} />
               </Stack>
             )}
           </Stack>

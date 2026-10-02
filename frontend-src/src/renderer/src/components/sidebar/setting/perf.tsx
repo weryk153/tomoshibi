@@ -15,7 +15,8 @@ import { Stack, Text, Heading, Box } from '@chakra-ui/react';
 import { createListCollection } from '@ark-ui/react/collection';
 import { useTranslation } from 'react-i18next';
 import { settingStyles } from './setting-styles';
-import { toaster } from '@/components/ui/tw/toaster';
+import { SaveStatus } from '@/components/ui/tw/save-status';
+import type { SaveState } from '@/utils/autosave';
 import { useWebSocket } from '@/context/websocket-context';
 import { SelectField } from './common';
 import {
@@ -53,6 +54,7 @@ function Perf(): JSX.Element {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshTick, setRefreshTick] = useState(0);
   const [applyingPreset, setApplyingPreset] = useState(false);
+  const [presetState, setPresetState] = useState<SaveState>({ phase: 'idle' });
 
   // 載入現值。refreshTick 讓套用 preset 成功後重新拉一次，顯示的模式才會跟著變。
   useEffect(() => {
@@ -90,23 +92,15 @@ function Perf(): JSX.Element {
     const name = value[0];
     if (!name || name === PRESET_CUSTOM || name === current) return;
     setApplyingPreset(true);
+    setPresetState({ phase: 'saving' });
     const result = await applyPreset(baseUrl, name);
     setApplyingPreset(false);
     if (result.ok) {
-      const key = presetNameKey(name);
-      toaster.create({
-        title: t('settings.perf.applied', { name: key ? t(key) : name }),
-        description: t('settings.perf.restartHint'),
-        type: 'success',
-        duration: 4000,
-      });
+      // 要重新載入才生效，由抽屜頂端的提示處理。
+      setPresetState({ phase: 'saved' });
       setRefreshTick((n) => n + 1);
     } else {
-      toaster.create({
-        title: result.error || t('settings.perf.applyFailed'),
-        type: 'error',
-        duration: 3000,
-      });
+      setPresetState({ phase: 'error', message: result.error || t('settings.perf.applyFailed') });
     }
   }, [baseUrl, current, t]);
 
@@ -143,6 +137,7 @@ function Perf(): JSX.Element {
             placeholder={t('settings.perf.presetPlaceholder')}
           />
         </Box>
+        <SaveStatus state={presetState} />
         <Text fontSize="xs" color="whiteAlpha.600">{t('settings.perf.presetHelp')}</Text>
         {currentDescKey && (
           <Text fontSize="xs" color="whiteAlpha.700">{t(currentDescKey)}</Text>

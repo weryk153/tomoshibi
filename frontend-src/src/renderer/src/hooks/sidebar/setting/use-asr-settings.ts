@@ -27,16 +27,12 @@ export const useASRSettings = () => {
     setLocalAutoStartMicOnConvEnd(autoStartMicOnConvEnd);
   }, [autoStopMic, autoStartMicOn, autoStartMicOnConvEnd]);
 
+  // 欄位（DraftNumberField）停手才交出合法的值：套用會重開麥克風，不能每打一個字
+  // 就重開，也不能存進空字串。
   const handleInputChange = (key: keyof VADSettings, value: number | string): void => {
-    if (value === '' || value === '-') {
-      localSettingsRef.current = { ...localSettingsRef.current, [key]: value };
-    } else {
-      const parsed = Number(value);
-      // eslint-disable-next-line no-restricted-globals
-      if (!isNaN(parsed)) {
-        localSettingsRef.current = { ...localSettingsRef.current, [key]: parsed };
-      }
-    }
+    const parsed = Number(value);
+    if (value === '' || !Number.isFinite(parsed)) return;
+    localSettingsRef.current = { ...localSettingsRef.current, [key]: parsed };
     updateSettings(localSettingsRef.current);
     forceUpdate();
   };

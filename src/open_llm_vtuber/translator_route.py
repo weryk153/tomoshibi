@@ -34,6 +34,7 @@ from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse
 from loguru import logger
 
+from . import pending_changes
 from .config_manager.agent import conversation_block
 
 from .api_guard import (
@@ -402,6 +403,7 @@ def init_translator_route() -> APIRouter:
             )
 
         logger.info(f"[translator] saved (engine={engine})")
+        pending_changes.mark("translator")
         return JSONResponse(
             {
                 "ok": True,

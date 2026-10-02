@@ -17,6 +17,7 @@ from fastapi import APIRouter, Request
 from loguru import logger
 from starlette.responses import JSONResponse
 
+from . import pending_changes
 from .api_guard import (
     forbidden as _forbidden,
     is_trusted_request as _is_local_request,
@@ -197,6 +198,7 @@ def init_engine_config_route() -> APIRouter:
                 content={"ok": False, "error": "Could not write config file."},
             )
         logger.info(f"[engine-config] saved {sorted(changes)}")
+        pending_changes.mark("engine")
         return JSONResponse({"ok": True, **settings, "restart_required": True})
 
     return router

@@ -87,6 +87,7 @@ interface InputFieldProps {
   help?: ReactNode;
   type?: string;
   disabled?: boolean;
+  onBlur?: () => void;
 }
 
 // 沒有標籤的裸輸入框，給「標籤由外層 Field 提供」的呼叫端用。
@@ -100,7 +101,7 @@ TextInput.displayName = 'TextInput';
 
 export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
   ({
-    label, value, onChange, placeholder, help, type = 'text', disabled,
+    label, value, onChange, placeholder, help, type = 'text', disabled, onBlur,
   }, ref) => (
     <Field label={label} help={help}>
       <input
@@ -111,6 +112,7 @@ export const InputField = forwardRef<HTMLInputElement, InputFieldProps>(
         placeholder={placeholder}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
+        onBlur={onBlur}
       />
     </Field>
   ),
@@ -331,10 +333,11 @@ interface TextareaFieldProps {
   help?: ReactNode;
   rows?: number;
   disabled?: boolean;
+  onBlur?: () => void;
 }
 
 export function TextareaField({
-  label, value, onChange, placeholder, help, rows = 6, disabled,
+  label, value, onChange, placeholder, help, rows = 6, disabled, onBlur,
 }: TextareaFieldProps): JSX.Element {
   const field = (
     <textarea
@@ -344,6 +347,7 @@ export function TextareaField({
       placeholder={placeholder}
       disabled={disabled}
       onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
     />
   );
   if (label === undefined) return field;
@@ -399,10 +403,11 @@ interface NumberFieldProps {
   step?: number;
   allowMouseWheel?: boolean;
   help?: ReactNode;
+  onBlur?: () => void;
 }
 
 export function NumberField({
-  label, value, onChange, min, max, step, allowMouseWheel, help,
+  label, value, onChange, min, max, step, allowMouseWheel, help, onBlur,
 }: NumberFieldProps): JSX.Element {
   return (
     <ArkNumberInput.Root
@@ -423,7 +428,7 @@ export function NumberField({
         {help && <HelpIcon content={help} />}
       </ArkNumberInput.Label>
       <div className="relative flex-1">
-        <ArkNumberInput.Input className={cx(CONTROL, 'pr-7')} />
+        <ArkNumberInput.Input className={cx(CONTROL, 'pr-7')} onBlur={onBlur} />
         {/* 增減鈕疊在輸入框右側。Chakra 版靠 recipe 排版，這裡直接絕對定位——
             兩顆各佔一半高度，維持跟輸入框同高。 */}
         <ArkNumberInput.Control className="absolute right-0 top-0 flex h-full w-6 flex-col">

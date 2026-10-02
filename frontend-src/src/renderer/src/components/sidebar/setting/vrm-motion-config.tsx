@@ -31,6 +31,8 @@ import { Stack, Box, Text, Heading, HStack } from '@chakra-ui/react';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/tw/primitives';
 import { toaster } from '@/components/ui/tw/toaster';
+import { SaveStatus } from '@/components/ui/tw/save-status';
+import { useAutosave } from '@/hooks/use-autosave';
 import { useWebSocket } from '@/context/websocket-context';
 import { useLive2DConfig } from '@/context/live2d-config-context';
 import { getActiveRenderer } from '@/avatar/character-renderer';
@@ -75,7 +77,6 @@ function VrmMotionConfig(): JSX.Element {
   // preset 當時讀到的完整關鍵字清單。
   const [hiddenEmotionKeywords, setHiddenEmotionKeywords] = useState<Record<string, string[]>>({});
 
-  const [saving, setSaving] = useState(false);
   // 存檔是非同步的（http.ts 的 timeout 是 15 秒），回來時使用者可能已經在角色
   // 分頁換掉模型了。載入 effect 有 cancelled flag，存檔這邊原本什麼都沒有——
   // A 的 PUT 回來會把 B 的失效關鍵字警告清掉（但 B 的檔案沒動），並拿 A 的
@@ -236,16 +237,14 @@ function VrmMotionConfig(): JSX.Element {
       || presets.some((expression) => expressionRowError(expression.name) !== null);
   }, [config, presets, rowError, expressionRowError]);
 
-  const handleSave = useCallback(async () => {
-    if (!config || !modelName || hasAnyError) return;
-    setSaving(true);
+  const saveConfig = useCallback(async () => {
+    if (!config || !modelName) return { ok: true } as const;
     const { motionMap, emotionMap } = buildVrmPayload(
       config.clips, rows, extraMappings, presets, expressionRows, extraEmotionKeywords,
       hiddenEmotionKeywords,
     );
     const savedModel = modelName;
     const result = await saveVrmModelConfig(baseUrl, modelName, motionMap, emotionMap);
-    setSaving(false);
     // 存檔本身成功與否照常回報（那是真的發生過的事），但只有在畫面還停在同一個
     // 模型時才把結果套回 state／renderer。
     const stillCurrent = currentModelRef.current === savedModel;
@@ -269,28 +268,45 @@ function VrmMotionConfig(): JSX.Element {
         const clipsToPreload = [...new Set(Object.values(motionMap).map((target) => target.clip))];
         void Promise.allSettled(clipsToPreload.map((clip) => renderer?.ensureMotionLoaded?.(clip)));
       }
-      toaster.create({
-        title: t('settings.live2d.motionConfigSaved'),
-        type: 'success',
-        duration: 3000,
-      });
-    } else {
-      toaster.create({
-        title: result.error || t('settings.live2d.motionConfigSaveFailed'),
-        type: 'error',
-        duration: 4000,
-      });
+      return { ok: true } as const;
     }
+    return { ok: false, error: result.error || t('settings.live2d.motionConfigSaveFailed') } as const;
   }, [
-    config, modelName, hasAnyError, rows, extraMappings, presets,
+    config, modelName, rows, extraMappings, presets,
     expressionRows, extraEmotionKeywords, hiddenEmotionKeywords, baseUrl, t,
   ]);
+
+  // 改了就存（停手 0.8 秒）；有不合法的列就不送並說明原因。
+  const motionSaver = useAutosave(async (snapshot: string) => {
+    void snapshot;
+    return saveConfig();
+  }, {
+    validate: () => (hasAnyError ? t('settings.live2d.motionConfigFixErrors') : null),
+  });
+
+  // 載入後的第一份不算；之後任何一欄改了就排一次存檔（存檔器只送最後那份）。
+  const loadedRef = useRef(false);
+  useEffect(() => {
+    loadedRef.current = false;
+  }, [modelName]);
+  useEffect(() => {
+    if (!config) return;
+    if (!loadedRef.current) {
+      loadedRef.current = true;
+      return;
+    }
+    motionSaver.change(JSON.stringify([
+      rows, extraMappings, expressionRows, extraEmotionKeywords, hiddenEmotionKeywords,
+    ]));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config, rows, extraMappings, expressionRows, extraEmotionKeywords, hiddenEmotionKeywords]);
 
   return (
     <Stack gap={2}>
       <Heading size="sm">{t('settings.live2d.motionConfigSectionTitle')}</Heading>
       <Text fontSize="xs" color="blue.300">{t('settings.live2d.motionConfigSectionNote')}</Text>
       <Text fontSize="xs" color="whiteAlpha.600">{t('settings.live2d.vrmMotionSectionNote')}</Text>
+      <SaveStatus state={motionSaver.state} />
 
       {!modelName && (
         <Text fontSize="sm" color="whiteAlpha.700">{t('settings.live2d.motionConfigNoModel')}</Text>
@@ -335,11 +351,9 @@ function VrmMotionConfig(): JSX.Element {
             tone="orange"
             variant="outline"
             className="mt-2"
-            onClick={handleSave}
-            loading={saving}
-            // handleSave 的第一行就是 `if (... || hasAnyError) return`，不一起
-            // 停用的話這顆鍵看起來可按、按下去靜默什麼都不做，使用者完全不知道
-            // 是因為下面某一列關鍵字重複。跟最下面那顆主儲存鍵同一個條件。
+            // 存一次就會把孤兒對應從 model_dict.json 拿掉（它們不在送出的 payload 裡）。
+            onClick={() => { motionSaver.change(`clear-orphans-${Date.now()}`); motionSaver.flush(); }}
+            loading={motionSaver.state.phase === 'saving'}
             disabled={hasAnyError}
           >
             {t('settings.live2d.orphanClearButton')}
@@ -482,18 +496,6 @@ function VrmMotionConfig(): JSX.Element {
         </Stack>
       )}
 
-      {config && (
-        <Button
-          size="sm"
-          tone="blue"
-          className="self-start"
-          onClick={handleSave}
-          loading={saving}
-          disabled={hasAnyError}
-        >
-          {t('common.save')}
-        </Button>
-      )}
     </Stack>
   );
 }

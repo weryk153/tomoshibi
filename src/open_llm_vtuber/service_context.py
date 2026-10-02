@@ -1063,7 +1063,7 @@ class ServiceContext:
             )
         )
 
-    async def handle_config_reload(self, websocket: WebSocket) -> None:
+    async def handle_config_reload(self, websocket: WebSocket) -> bool:
         """用磁碟上的設定重新載入目前的角色，不換角色。
 
         跟 handle_config_switch 差在回給前端的是 config-reloaded 而不是
@@ -1078,6 +1078,7 @@ class ServiceContext:
                 json.dumps({"type": "config-reloaded", "file": file_name})
             )
             logger.info(f"Configuration reloaded from {file_name}")
+            return True
         except Exception as e:
             logger.error(f"Error reloading configuration: {e}")
             await websocket.send_text(
@@ -1088,12 +1089,13 @@ class ServiceContext:
                     }
                 )
             )
+            return False
 
     async def handle_config_switch(
         self,
         websocket: WebSocket,
         config_file_name: str,
-    ) -> None:
+    ) -> bool:
         """Switch character, persist the selection, and notify the client."""
         try:
             await self.load_character_config(config_file_name)
@@ -1128,6 +1130,7 @@ class ServiceContext:
             )
 
             logger.info(f"Configuration switched to {config_file_name}")
+            return True
         except Exception as e:
             logger.error(f"Error switching configuration: {e}")
             logger.debug(self)

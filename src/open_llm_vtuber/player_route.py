@@ -25,6 +25,7 @@ from fastapi import APIRouter, Request
 from loguru import logger
 from starlette.responses import JSONResponse
 
+from . import pending_changes
 from .conf_editor import (
     block_extent,
     read_conf_lines,
@@ -103,7 +104,9 @@ async def _parse_body(
     return body, None
 
 
-async def _save(fn, value, *, what: str, payload: dict) -> JSONResponse:
+async def _save(
+    fn, value, *, what: str, payload: dict, pending_key: str
+) -> JSONResponse:
     """統一的寫入路徑：丟到執行緒、失敗回 500、成功回帶 restart_required 的結果。
 
     這三個設定都在 server 啟動時被烤進 system prompt，所以存檔是即時的、生效要
@@ -118,6 +121,7 @@ async def _save(fn, value, *, what: str, payload: dict) -> JSONResponse:
             content={"ok": False, "error": "Could not write config file."},
         )
     logger.info(f"[player] {what} saved")
+    pending_changes.mark(pending_key)
     return JSONResponse({"ok": True, **payload, "restart_required": True})
 
 
@@ -147,6 +151,7 @@ def init_player_route() -> APIRouter:
             language,
             what="player-language",
             payload={"language": language},
+            pending_key="playerLanguage",
         )
 
     @router.get("/api/player-language")
@@ -185,6 +190,7 @@ def init_player_route() -> APIRouter:
             prompt,
             what="player-prompt",
             payload={"prompt": prompt},
+            pending_key="playerPrompt",
         )
 
     @router.get("/api/agent-config/use-mcpp")
@@ -217,6 +223,7 @@ def init_player_route() -> APIRouter:
             enabled,
             what="use-mcpp",
             payload={"use_mcpp": enabled},
+            pending_key="tools",
         )
 
     return router

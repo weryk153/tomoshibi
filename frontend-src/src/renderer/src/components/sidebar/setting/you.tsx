@@ -5,18 +5,9 @@
 // 理由見 general.tsx 內嵌處的註解：這幾組設定自成一個主題（「關於你」而不是
 // 「關於 app」），general.tsx 加完 Task 3 的即時存檔區塊後已經接近可審查上限。
 //
-// 這裡的一切都不受 general.tsx 的 TabActions（套用／還原）管：暱稱／頭像
-// 即時寫 localStorage，玩家語言／全域指示／翻譯設定個別即時打 API（各自有
-// 自己的存檔語意——下拉選單選了就送、指示要按 save），角色發聲語言純唯讀
-// 顯示。跟 general.tsx 裡的 MCP／背景上傳區塊同一種道理，渲染順序上也刻意
-// 排在 TabActions 之後、緊接在那個區塊旁邊，讀下來才會是「套用／還原管的到
-// 此為止，下面全部即時生效」，而不是原本（Task 4 剛做完時）那樣把 You 擺在
-// TabActions 正上方——那樣讀起來像是「按鈕管到這裡為止」，其實 You 完全不
-// 歸它管。除了排版順序，也比照 MCP／背景上傳區塊的處理方式：獨立邊框分隔＋
-// 常駐（非 hover-only）的說明文字（settings.user.sectionNote），不讓使用者
-// 以為這裡也受套用／還原控制——2e 那個子專案就是為了消滅「按鈕看起來管、
-// 其實不管」的 UI 才存在的。sectionNote 涵蓋整個 You 元件，Step 5 不需要
-// 另外重複一段——它跟 Step 2／3 一樣，已經在 sectionNote 的管轄範圍內。
+// 這裡每一項都改了就存：暱稱／頭像寫 localStorage，玩家語言、全域指示、翻譯
+// 設定打 API（文字等停手或離開欄位才存）。寫進 conf.yaml 的要重新載入才生效，
+// 由設定抽屜頂端的「還沒生效」提示統一處理，這裡不再各自跳「重啟後生效」。
 //
 // Step 5 刻意放在 Step 4（角色發聲語言，唯讀）之後：翻譯功能的 autoHint
 // 講「發聲語言由角色的聲音決定」，講的正是 Step 4 顯示的那個值——這裡不重複
@@ -34,7 +25,8 @@ import { useTranslation } from 'react-i18next';
 import { settingStyles } from './setting-styles';
 import { Button } from '@/components/ui/tw/primitives';
 import { Field } from '@/components/ui/tw/primitives';
-import { toaster } from '@/components/ui/tw/toaster';
+import { SaveStatus } from '@/components/ui/tw/save-status';
+import { useAutosave } from '@/hooks/use-autosave';
 import { useWebSocket } from '@/context/websocket-context';
 import { useConfig } from '@/context/character-config-context';
 import { useLocalStorage } from '@/hooks/utils/use-local-storage';
@@ -134,7 +126,8 @@ function You({ active = true }: YouProps): JSX.Element {
     }),
   }), [playerLang, t]);
   const [languageLoadError, setLanguageLoadError] = useState<string | null>(null);
-  const [languageSaving, setLanguageSaving] = useState(false);
+  // 後端最後一次確認存下的值；存失敗時退回它。
+  const savedLangRef = useRef('');
 
   // 翻譯連線測試。結果留在畫面上直到下次測試，不用 toast——使用者需要一邊看著
   // 結果一邊調整上面的設定，會自己消失的提示在這裡幫不上忙。
@@ -162,6 +155,7 @@ function You({ active = true }: YouProps): JSX.Element {
       if (cancelled) return;
       if (result.ok) {
         setPlayerLangState(result.data);
+        savedLangRef.current = result.data;
       } else {
         setLanguageLoadError(result.error || t('settings.playerLanguage.loadError'));
       }
@@ -171,35 +165,23 @@ function You({ active = true }: YouProps): JSX.Element {
     };
   }, [baseUrl, active, t]);
 
-  const handleLanguageChange = useCallback(async (value: string[]) => {
-    const next = value[0] ?? '';
-    const previous = playerLang;
-    setPlayerLangState(next);
-    setLanguageSaving(true);
+  // 選了就存；失敗退回原值，不留一個「畫面上選了、conf.yaml 其實沒存到」的假象。
+  const languageSaver = useAutosave(async (next: string) => {
     const result = await setPlayerLanguage(baseUrl, next);
-    setLanguageSaving(false);
     if (result.ok) {
       setPlayerLangState(result.data.language);
-      // restart_required 從後端回來永遠是 true（conf.yaml 只在啟動時讀一次）。
-      // 曾經借用 settings.perf.restartHint 當 description，但那把鍵的文案講的
-      // 是「換引擎/效能設定」，主詞跟這裡的閱讀語言完全對不上；改成
-      // playerLanguage.saved 自己把「已存＋需重啟」講完一句，不用 description，
-      // 跟 general.tsx 的 mcppSaved toast 同一種形狀。
-      toaster.create({
-        title: t('settings.playerLanguage.saved'),
-        type: 'success',
-        duration: 4000,
-      });
-    } else {
-      // 失敗就退回原值，不留一個「畫面上選了、conf.yaml 其實沒存到」的假象。
-      setPlayerLangState(previous);
-      toaster.create({
-        title: result.error || t('settings.playerLanguage.saveFailed'),
-        type: 'error',
-        duration: 3000,
-      });
+      savedLangRef.current = result.data.language;
+      return { ok: true } as const;
     }
-  }, [baseUrl, playerLang, t]);
+    setPlayerLangState(savedLangRef.current);
+    return { ok: false, error: result.error || t('settings.playerLanguage.saveFailed') } as const;
+  }, { delayMs: 0 });
+
+  const handleLanguageChange = useCallback((value: string[]) => {
+    const next = value[0] ?? '';
+    setPlayerLangState(next);
+    languageSaver.change(next);
+  }, [languageSaver]);
 
   // ---- Step 3：全域指示（playerPrompt）----
   // 草稿式：改了不會自動送出，要按 save。送出前 setPlayerPrompt 內部已經先過
@@ -209,7 +191,6 @@ function You({ active = true }: YouProps): JSX.Element {
   const [promptDraft, setPromptDraft] = useState('');
   const [promptLoaded, setPromptLoaded] = useState(false);
   const [promptLoadError, setPromptLoadError] = useState<string | null>(null);
-  const [promptSaving, setPromptSaving] = useState(false);
 
   useEffect(() => {
     if (!active) return undefined;
@@ -230,28 +211,18 @@ function You({ active = true }: YouProps): JSX.Element {
     };
   }, [baseUrl, active, t]);
 
-  const handlePromptSave = useCallback(async () => {
-    setPromptSaving(true);
-    const result = await setPlayerPrompt(baseUrl, promptDraft);
-    setPromptSaving(false);
-    if (result.ok) {
-      setPromptDraft(result.data.prompt);
-      // 同上：playerPrompt.saved 自己把「已存＋需重啟」講完一句，不再借用
-      // settings.perf.restartHint（那把鍵的主詞是「引擎/效能設定」，跟全域
-      // 指示無關）。
-      toaster.create({
-        title: t('settings.playerPrompt.saved'),
-        type: 'success',
-        duration: 4000,
-      });
-    } else {
-      toaster.create({
-        title: result.error || t('settings.playerPrompt.saveFailed'),
-        type: 'error',
-        duration: 3000,
-      });
+  // 停手或離開欄位才存。存好後把欄位換成後端實際存下的字串（換行會被壓成一行）
+  // ——但只在使用者送出之後沒再改的情況下，不蓋掉正在打的字。
+  const promptDraftRef = useRef(promptDraft);
+  promptDraftRef.current = promptDraft;
+  const promptSaver = useAutosave(async (draft: string) => {
+    const result = await setPlayerPrompt(baseUrl, draft);
+    if (!result.ok) {
+      return { ok: false, error: result.error || t('settings.playerPrompt.saveFailed') } as const;
     }
-  }, [baseUrl, promptDraft, t]);
+    if (promptDraftRef.current === draft) setPromptDraft(result.data.prompt);
+    return { ok: true } as const;
+  });
 
   // ---- Step 4：角色發聲語言（唯讀）----
   // 沿用 characters.tsx 同一個端點（GET /api/characters，api/characters.ts 的
@@ -321,28 +292,20 @@ function You({ active = true }: YouProps): JSX.Element {
   // 讓 saveEngine 用目前已知的值原樣回填（見 use-translator-settings.ts 的
   // save() 呼叫 buildTranslatorSavePayload 的說明），不因為切換引擎就意外
   // 改動它。
-  const handleEngineChange = useCallback(async (value: string[]) => {
+  const engineSaver = useAutosave(async (engine: TranslatorEngine) => {
+    const result = await saveEngine(engine);
+    return result.ok
+      ? { ok: true } as const
+      : { ok: false, error: result.error || t('settings.translator.saveFailed') } as const;
+  }, { delayMs: 0 });
+
+  const handleEngineChange = useCallback((value: string[]) => {
     const engine = value[0];
     if (!engine || (engine !== 'llm' && engine !== 'deeplx')) return;
-    const result = await saveEngine(engine as TranslatorEngine);
-    if (result.ok) {
-      toaster.create({
-        title: t('settings.translator.saved'),
-        description: t('settings.translator.restartHint'),
-        type: 'success',
-        duration: 4000,
-      });
-    } else {
-      toaster.create({
-        title: result.error || t('settings.translator.saveFailed'),
-        type: 'error',
-        duration: 3000,
-      });
-    }
-  }, [saveEngine, t]);
+    engineSaver.change(engine as TranslatorEngine);
+  }, [engineSaver]);
 
-  // DeepLX 位址：文字輸入框，跟 asr.tsx 的憑證欄位同一種「不逐鍵送出、按鈕
-  // 才存」模式——網址打到一半按下 Enter 前的每個字元都送出去太吵。草稿只在
+  // DeepLX 位址：停手或離開欄位才存（不逐鍵送出）。草稿只在
   // 「使用者還沒開始編輯」時跟著後端值刷新（用 ref 記錄上一次同步進來的值，
   // 判斷草稿是否還等於它），理由跟 asr.tsx 的 azureRegion 同步邏輯一样，
   // 避免打字打到一半被背景刷新蓋掉。
@@ -361,26 +324,15 @@ function You({ active = true }: YouProps): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [translatorConfig?.deeplx_endpoint]);
 
-  const handleSaveDeeplxEndpoint = useCallback(async () => {
-    const endpoint = deeplxEndpointDraft.trim();
-    if (!endpoint || !translatorConfig) return;
+  const deeplxSaver = useAutosave(async (draft: string) => {
+    const endpoint = draft.trim();
     const result = await saveEngine('deeplx', endpoint);
-    if (result.ok) {
-      deeplxEndpointSyncedRef.current = endpoint;
-      toaster.create({
-        title: t('settings.translator.saved'),
-        description: t('settings.translator.restartHint'),
-        type: 'success',
-        duration: 4000,
-      });
-    } else {
-      toaster.create({
-        title: result.error || t('settings.translator.saveFailed'),
-        type: 'error',
-        duration: 3000,
-      });
+    if (!result.ok) {
+      return { ok: false, error: result.error || t('settings.translator.saveFailed') } as const;
     }
-  }, [deeplxEndpointDraft, translatorConfig, saveEngine, t]);
+    deeplxEndpointSyncedRef.current = endpoint;
+    return { ok: true } as const;
+  }, { validate: (draft) => (draft.trim() ? null : t('settings.translator.endpointEmpty')) });
 
   return (
     <Stack gap={4} pt={3} borderTopWidth="1px" borderColor="whiteAlpha.200">
@@ -453,7 +405,10 @@ function You({ active = true }: YouProps): JSX.Element {
       {/* 存檔這段 await 期間鎖住下拉選單，避免使用者連續切換造成請求互相
           競速——跟 general.tsx 的背景圖片上傳同一種做法（bgUploading 時
           opacity+pointerEvents 鎖住）。 */}
-      <Box opacity={languageSaving ? 0.5 : 1} pointerEvents={languageSaving ? 'none' : 'auto'}>
+      <Box
+        opacity={languageSaver.state.phase === 'saving' ? 0.5 : 1}
+        pointerEvents={languageSaver.state.phase === 'saving' ? 'none' : 'auto'}
+      >
         <SelectField
           label={t('settings.playerLanguage.label')}
           value={playerLang ? [playerLang] : []}
@@ -462,6 +417,7 @@ function You({ active = true }: YouProps): JSX.Element {
           placeholder={t('settings.playerLanguage.label')}
         />
       </Box>
+      <SaveStatus state={languageSaver.state} />
       <Text fontSize="xs" color="whiteAlpha.600">{t('settings.playerLanguage.help')}</Text>
       {languageLoadError && (
         <Text fontSize="xs" color="red.300">{languageLoadError}</Text>
@@ -473,7 +429,8 @@ function You({ active = true }: YouProps): JSX.Element {
         <Textarea
           rows={4}
           value={promptDraft}
-          onChange={(e) => setPromptDraft(e.target.value)}
+          onChange={(e) => { setPromptDraft(e.target.value); promptSaver.change(e.target.value); }}
+          onBlur={promptSaver.flush}
           placeholder={t('settings.playerPrompt.placeholder')}
           disabled={!promptLoaded}
         />
@@ -482,17 +439,7 @@ function You({ active = true }: YouProps): JSX.Element {
       {promptLoadError && (
         <Text fontSize="xs" color="red.300">{promptLoadError}</Text>
       )}
-      <HStack>
-        <Button
-          size="xs"
-          tone="blue"
-          onClick={handlePromptSave}
-          loading={promptSaving}
-          disabled={!promptLoaded || promptSaving}
-        >
-          {t('settings.playerPrompt.save')}
-        </Button>
-      </HStack>
+      <SaveStatus state={promptSaver.state} />
 
       {/* Step 4：唯讀，沒有存檔動作。voiceLangText 在 pending／fetch 失敗時是
           null，這裡就整段不畫，不留一句沒查到東西卻語氣篤定的假宣稱。 */}
@@ -519,6 +466,7 @@ function You({ active = true }: YouProps): JSX.Element {
         {translatorConfig && (
           <>
             <Box opacity={engineSaving ? 0.5 : 1} pointerEvents={engineSaving ? 'none' : 'auto'}>
+              <SaveStatus state={engineSaver.state} />
               <SelectField
                 label={t('settings.translator.engine')}
                 value={[translatorConfig.engine]}
@@ -538,20 +486,11 @@ function You({ active = true }: YouProps): JSX.Element {
                 <InputField
                   label={t('settings.translator.deeplxEndpoint')}
                   value={deeplxEndpointDraft}
-                  onChange={setDeeplxEndpointDraft}
+                  onChange={(value) => { setDeeplxEndpointDraft(value); deeplxSaver.change(value); }}
+                  onBlur={deeplxSaver.flush}
                   help={t('settings.translator.deeplxEndpointHelp')}
                 />
-                <HStack>
-                  <Button
-                    size="xs"
-                    tone="blue"
-                    onClick={handleSaveDeeplxEndpoint}
-                    loading={engineSaving}
-                    disabled={!deeplxEndpointDraft.trim() || engineSaving}
-                  >
-                    {t('common.save')}
-                  </Button>
-                </HStack>
+                <SaveStatus state={deeplxSaver.state} />
               </Stack>
             )}
 

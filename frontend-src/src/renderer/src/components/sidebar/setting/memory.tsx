@@ -16,7 +16,7 @@
 // 不會打到未知角色或觸發 400——切換角色時 confUid 改變，下面的 effect 會重新
 // 載入。
 import {
-  useState, useEffect, useCallback,
+  useState, useEffect, useCallback, useRef,
 } from 'react';
 import {
   Stack, Text, Heading, HStack, Textarea, Collapsible, Box,
@@ -26,6 +26,8 @@ import { HiChevronDown, HiChevronRight } from 'react-icons/hi';
 import { settingStyles } from './setting-styles';
 import { Button } from '@/components/ui/tw/primitives';
 import { toaster } from '@/components/ui/tw/toaster';
+import { SaveStatus } from '@/components/ui/tw/save-status';
+import { useAutosave } from '@/hooks/use-autosave';
 import { useWebSocket } from '@/context/websocket-context';
 import { useConfig } from '@/context/character-config-context';
 import { SwitchField } from './common';
@@ -56,16 +58,10 @@ function Memory(): JSX.Element {
   // 空白或半載入的表單按下存檔，把使用者的記憶整份清空。
   const [contentDraft, setContentDraft] = useState('');
   const [contentLoaded, setContentLoaded] = useState(false);
-  const [savingContent, setSavingContent] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
-  const [pendingSaveContent, setPendingSaveContent] = useState(false);
 
   // 她自己的記憶：角色層、所有對話共用。跟 contentDraft 同一套保護——POST 是整份
   // 取代，載入前不准存。
   const [selfDraft, setSelfDraft] = useState('');
-  const [savingSelf, setSavingSelf] = useState(false);
-  const [saveSelfError, setSaveSelfError] = useState<string | null>(null);
-  const [pendingSaveSelf, setPendingSaveSelf] = useState(false);
   const [pendingClearSelf, setPendingClearSelf] = useState(false);
   const [clearingSelf, setClearingSelf] = useState(false);
 
@@ -92,9 +88,7 @@ function Memory(): JSX.Element {
     let cancelled = false;
     setLoadError(null);
     setContentLoaded(false);
-    setPendingSaveContent(false);
     setPendingClear(false);
-    setPendingSaveSelf(false);
     setPendingClearSelf(false);
     (async () => {
       const result = await fetchMemory(baseUrl, confUid);
@@ -113,52 +107,57 @@ function Memory(): JSX.Element {
     };
   }, [baseUrl, confUid, refreshTick]);
 
-  const handleToggle = useCallback(async (checked: boolean) => {
-    const result = await setMemoryEnabled(baseUrl, confUid, checked);
-    if (result.ok) {
-      setMemory((m) => (m ? { ...m, enabled: checked } : m));
-      toaster.create({
-        title: t('settings.memory.saved'),
-        description: t('settings.memory.restartHintSetting'),
-        type: 'success',
-        duration: 5000,
-      });
-    } else {
-      toaster.create({
-        title: result.error || t('settings.memory.saveFailed'),
-        type: 'error',
-        duration: 3000,
-      });
+  // 長期記憶開關：切了就存到這個角色的檔案；要重新載入才生效，由抽屜頂端的提示處理。
+  const toggleSaver = useAutosave(async (change: { uid: string; checked: boolean }) => {
+    const result = await setMemoryEnabled(baseUrl, change.uid, change.checked);
+    if (!result.ok) {
+      return { ok: false, error: result.error || t('settings.memory.saveFailed') } as const;
     }
-  }, [baseUrl, confUid, t]);
+    setMemory((m) => (m ? { ...m, enabled: change.checked } : m));
+    return { ok: true } as const;
+  }, { delayMs: 0 });
 
-  // 破壞性操作 1／3：POST /api/memory 是整份取代，不是合併。contentLoaded 已
-  // 在 UI 層擋住「現值還沒載入完成就存檔」，這裡再擋一次做為最後防線。真正的
-  // 確認步驟是 pendingSaveContent：按第一次「儲存記憶」只會顯示確認區塊，要再
-  // 按一次才會真的送出。
-  const handleContentSave = useCallback(async () => {
-    if (!contentLoaded) return;
-    setSavingContent(true);
-    setSaveError(null);
-    // memory.content 是這次編輯的起點：載入時放進 textarea 的那一版，存檔成功後
-    // 換成剛存的，所以它跟 textarea 一致。
-    const result = await saveMemoryContent(
-      baseUrl, confUid, contentDraft, memory?.content,
-    );
-    setSavingContent(false);
-    setPendingSaveContent(false);
-    if (result.ok) {
-      setMemory((m) => (m ? { ...m, content: contentDraft } : m));
-      toaster.create({
-        title: t('settings.memory.saved'),
-        description: t('settings.memory.restartHint'),
-        type: 'success',
-        duration: 4000,
-      });
-    } else {
-      setSaveError(result.error || t('settings.memory.saveContentFailed'));
+  // 長文字：離開欄位才存（不在停頓時存，不然改到一半就把記憶整份換掉）。每一筆帶著
+  // 它屬於哪個角色，排隊中換了角色也不會存到別人身上。
+  const BLUR_ONLY_MS = 60 * 60 * 1000;
+  // 存檔時才讀「現在存著的是哪一版」當起點（edited_from），不用排進去那一刻的：
+  // 上一筆剛存好、這一筆才送的話，起點要是剛存好的那一版，刪掉的行才不會被加回來。
+  const memoryRef = useRef(memory);
+  memoryRef.current = memory;
+  const selfDraftRef = useRef(selfDraft);
+  selfDraftRef.current = selfDraft;
+  // 起點只對同一個角色有意義：排隊中換了角色，就不帶起點（不拿別人的記憶當基準）。
+  const uidRef = useRef(confUid);
+  uidRef.current = confUid;
+  const startingPoint = (uid: string, pick: (m: NonNullable<typeof memory>) => string): string | undefined => (
+    uid === uidRef.current && memoryRef.current ? pick(memoryRef.current) : undefined
+  );
+  const contentSaver = useAutosave(async (edit: { uid: string; draft: string }) => {
+    const from = startingPoint(edit.uid, (m) => m.content);
+    const result = await saveMemoryContent(baseUrl, edit.uid, edit.draft, from);
+    if (!result.ok) {
+      return { ok: false, error: result.error || t('settings.memory.saveContentFailed') } as const;
     }
-  }, [baseUrl, confUid, contentDraft, contentLoaded, memory?.content, t]);
+    memoryRef.current = memoryRef.current ? { ...memoryRef.current, content: edit.draft } : memoryRef.current;
+    setMemory((m) => (m ? { ...m, content: edit.draft } : m));
+    return { ok: true } as const;
+  }, { delayMs: BLUR_ONLY_MS });
+
+  const selfSaver = useAutosave(async (edit: { uid: string; draft: string }) => {
+    const from = startingPoint(edit.uid, (m) => m.self_content);
+    const result = await saveSelfMemoryContent(baseUrl, edit.uid, edit.draft, from);
+    if (!result.ok) {
+      return { ok: false, error: result.error || t('settings.memory.saveContentFailed') } as const;
+    }
+    // 引擎有上限，存進去的不一定全部留下：顯示它實際記得的那一份。不然下次
+    // 存檔時，被擠掉的那幾行會被當成新的又加回去。
+    const stored = typeof result.data?.content === 'string' ? result.data.content : edit.draft;
+    memoryRef.current = memoryRef.current ? { ...memoryRef.current, self_content: stored } : memoryRef.current;
+    // 存檔途中又打了字就不蓋掉，下一次存檔會帶著新的字送出去。
+    if (selfDraftRef.current === edit.draft) setSelfDraft(stored);
+    setMemory((m) => (m ? { ...m, self_content: stored } : m));
+    return { ok: true } as const;
+  }, { delayMs: BLUR_ONLY_MS });
 
   // 破壞性操作 2／3：POST /api/memory/clear。pendingClear 就是確認步驟——先顯示
   // 確認區塊，使用者再按一次紅色按鈕才真的清空。
@@ -179,32 +178,6 @@ function Memory(): JSX.Element {
       });
     }
   }, [baseUrl, confUid, t]);
-
-  const handleSelfSave = useCallback(async () => {
-    if (!contentLoaded) return;
-    setSavingSelf(true);
-    setSaveSelfError(null);
-    const result = await saveSelfMemoryContent(
-      baseUrl, confUid, selfDraft, memory?.self_content,
-    );
-    setSavingSelf(false);
-    setPendingSaveSelf(false);
-    if (result.ok) {
-      // 引擎有上限，存進去的不一定全部留下：顯示它實際記得的那一份。不然下次
-      // 存檔時，被擠掉的那幾行會被當成新的又加回去。
-      const stored = typeof result.data?.content === 'string' ? result.data.content : selfDraft;
-      setSelfDraft(stored);
-      setMemory((m) => (m ? { ...m, self_content: stored } : m));
-      toaster.create({
-        title: t('settings.memory.saved'),
-        description: t('settings.memory.restartHint'),
-        type: 'success',
-        duration: 4000,
-      });
-    } else {
-      setSaveSelfError(result.error || t('settings.memory.saveContentFailed'));
-    }
-  }, [baseUrl, confUid, selfDraft, contentLoaded, memory?.self_content, t]);
 
   const handleSelfClear = useCallback(async () => {
     setClearingSelf(true);
@@ -249,9 +222,10 @@ function Memory(): JSX.Element {
       <SwitchField
         label={t('settings.memory.toggle')}
         checked={memory.enabled}
-        onChange={handleToggle}
+        onChange={(checked) => toggleSaver.change({ uid: confUid, checked })}
         help={t('settings.memory.toggleHelp')}
       />
+      <SaveStatus state={toggleSaver.state} />
 
       {/* 進階：收在展開區——手動編輯她自己的記憶與這段對話的記憶，不該是打開
           分頁第一眼看到的東西。 */}
@@ -274,21 +248,20 @@ function Memory(): JSX.Element {
               <Textarea
                 rows={5}
                 value={selfDraft}
-                onChange={(e) => setSelfDraft(e.target.value)}
+                onChange={(e) => {
+                  setSelfDraft(e.target.value);
+                  selfSaver.change({ uid: confUid, draft: e.target.value });
+                }}
+                onBlur={selfSaver.flush}
                 placeholder={t('settings.memory.empty')}
                 disabled={!contentLoaded}
               />
               <Text fontSize="xs" color="whiteAlpha.600">
                 {t('settings.memory.charCountNoCap', { count: selfDraft.length })}
               </Text>
-              {saveSelfError && (
-                <Text fontSize="xs" color="red.300">{saveSelfError}</Text>
-              )}
-              {!pendingSaveSelf ? (
+              <SaveStatus state={selfSaver.state} />
+              {!pendingClearSelf && (
                 <HStack>
-                  <Button size="xs" tone="blue" disabled={!contentLoaded} onClick={() => setPendingSaveSelf(true)}>
-                    {t('settings.memory.selfSave')}
-                  </Button>
                   {/* contentLoaded 同時是「畫面上這份內容真的屬於現在這個
                       confUid」的旗標。切換角色時上面那個 effect 先把它設回
                       false，重抓完成才設回 true——中間這段時間畫面還是 A 的
@@ -304,18 +277,6 @@ function Memory(): JSX.Element {
                     {t('settings.memory.selfClear')}
                   </Button>
                 </HStack>
-              ) : (
-                <Box p={2} borderWidth="1px" borderColor="orange.700" borderRadius="sm">
-                  <Text fontSize="xs">{t('settings.memory.selfSaveConfirm')}</Text>
-                  <HStack mt={2}>
-                    <Button size="xs" tone="blue" onClick={handleSelfSave} loading={savingSelf}>
-                      {t('settings.characters.confirm')}
-                    </Button>
-                    <Button size="xs" variant="ghost" onClick={() => setPendingSaveSelf(false)} disabled={savingSelf}>
-                      {t('common.cancel')}
-                    </Button>
-                  </HStack>
-                </Box>
               )}
               {pendingClearSelf && (
                 <Box p={2} borderWidth="1px" borderColor="red.700" borderRadius="sm">
@@ -339,7 +300,11 @@ function Memory(): JSX.Element {
               <Textarea
                 rows={8}
                 value={contentDraft}
-                onChange={(e) => setContentDraft(e.target.value)}
+                onChange={(e) => {
+                  setContentDraft(e.target.value);
+                  contentSaver.change({ uid: confUid, draft: e.target.value });
+                }}
+                onBlur={contentSaver.flush}
                 placeholder={t('settings.memory.empty')}
                 disabled={!contentLoaded}
               />
@@ -347,43 +312,7 @@ function Memory(): JSX.Element {
                 {t('settings.memory.charCountNoCap', { count: contentDraft.length })}
               </Text>
               <Text fontSize="xs" color="whiteAlpha.500">{t('settings.memory.editHint')}</Text>
-              {saveError && (
-                <Text fontSize="xs" color="red.300">{saveError}</Text>
-              )}
-              {!pendingSaveContent ? (
-                <HStack>
-                  <Button
-                    size="xs"
-                    tone="blue"
-                    disabled={!contentLoaded}
-                    onClick={() => setPendingSaveContent(true)}
-                  >
-                    {t('settings.memory.save')}
-                  </Button>
-                </HStack>
-              ) : (
-                <Box p={2} borderWidth="1px" borderColor="orange.700" borderRadius="sm">
-                  <Text fontSize="xs">{t('settings.memory.saveConfirm')}</Text>
-                  <HStack mt={2}>
-                    <Button
-                      size="xs"
-                      tone="blue"
-                      onClick={handleContentSave}
-                      loading={savingContent}
-                    >
-                      {t('settings.characters.confirm')}
-                    </Button>
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      onClick={() => setPendingSaveContent(false)}
-                      disabled={savingContent}
-                    >
-                      {t('common.cancel')}
-                    </Button>
-                  </HStack>
-                </Box>
-              )}
+              <SaveStatus state={contentSaver.state} />
             </Stack>
 
             {/* 清除記憶 */}

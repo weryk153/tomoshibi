@@ -22,7 +22,8 @@ import {
   SceneType,
 } from "@/scenes/scene";
 import type { SceneAssetError } from "@/scenes/scene-asset";
-import { NumberField, SelectField, SwitchField } from "./common";
+import { SelectField, SwitchField } from "./common";
+import { DraftNumberField } from "@/components/ui/tw/draft-number-field";
 import { settingStyles } from "./setting-styles";
 
 function sceneAccept(type: SceneType): string {
@@ -45,6 +46,7 @@ function Scenes(): JSX.Element {
   } = useScene();
   const [selectedId, setSelectedId] = useState(activeScene.id);
   const [pendingDelete, setPendingDelete] = useState(false);
+  const [pendingRemoveFile, setPendingRemoveFile] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [installedLive2DModels, setInstalledLive2DModels] = useState<
     { name: string; url: string }[]
@@ -61,7 +63,7 @@ function Scenes(): JSX.Element {
     }
   }, [scenes, selectedId]);
 
-  useEffect(() => setPendingDelete(false), [selectedId]);
+  useEffect(() => { setPendingDelete(false); setPendingRemoveFile(false); }, [selectedId]);
 
   useEffect(() => {
     let alive = true;
@@ -246,19 +248,16 @@ function Scenes(): JSX.Element {
                   }
                 />
               </Field>
+              {/* 有匯入檔案時不能換類型、改網址：那會把匯入的檔案刪掉。要換先按「移除檔案」。 */}
               <SelectField
                 label={t("settings.scenes.type")}
                 value={[selected.type]}
                 onChange={(value) =>
-                  updateSelected({
-                    type: (value[0] || "image") as SceneType,
-                    assetKey: undefined,
-                    assetFileName: undefined,
-                    assetVersion: undefined,
-                  })
+                  updateSelected({ type: (value[0] || "image") as SceneType })
                 }
                 collection={typeCollection}
                 placeholder={t("settings.scenes.type")}
+                disabled={Boolean(selected.assetKey)}
               />
               {selected.type !== "live2d" && (
                 <Field
@@ -280,9 +279,40 @@ function Scenes(): JSX.Element {
                     }}
                   />
                   {selected.assetFileName && (
-                    <Text mt="1" fontSize="xs" color="cyan.300">
-                      {selected.assetFileName}
-                    </Text>
+                    <HStack mt="1" gap={2} flexWrap="wrap">
+                      <Text fontSize="xs" color="cyan.300">
+                        {selected.assetFileName}
+                      </Text>
+                      {pendingRemoveFile ? (
+                        <>
+                          <Text fontSize="xs" color="red.300">
+                            {t("settings.scenes.removeFileConfirm")}
+                          </Text>
+                          <Button
+                            size="xs"
+                            colorPalette="red"
+                            onClick={() => {
+                              // 只有這條路會刪掉匯入的檔案（scene-context 的 updateScene）。
+                              updateSelected({
+                                assetKey: undefined,
+                                assetFileName: undefined,
+                                assetVersion: undefined,
+                              });
+                              setPendingRemoveFile(false);
+                            }}
+                          >
+                            {t("settings.scenes.removeFile")}
+                          </Button>
+                          <Button size="xs" variant="ghost" onClick={() => setPendingRemoveFile(false)}>
+                            {t("common.cancel")}
+                          </Button>
+                        </>
+                      ) : (
+                        <Button size="xs" variant="outline" onClick={() => setPendingRemoveFile(true)}>
+                          {t("settings.scenes.removeFile")}
+                        </Button>
+                      )}
+                    </HStack>
                   )}
                 </Field>
               )}
@@ -297,14 +327,7 @@ function Scenes(): JSX.Element {
                         ? [selected.sourceUrl]
                         : []
                     }
-                    onChange={(value) =>
-                      updateSelected({
-                        sourceUrl: value[0] || "",
-                        assetKey: undefined,
-                        assetFileName: undefined,
-                        assetVersion: undefined,
-                      })
-                    }
+                    onChange={(value) => updateSelected({ sourceUrl: value[0] || "" })}
                     collection={installedLive2DCollection}
                     placeholder={t("settings.scenes.selectLive2d")}
                   />
@@ -322,15 +345,14 @@ function Scenes(): JSX.Element {
                 <TextInput
                   placeholder={t("settings.scenes.sourceUrlPlaceholder")}
                   value={selected.sourceUrl}
-                  onChange={(event) =>
-                    updateSelected({
-                      sourceUrl: event.target.value,
-                      assetKey: undefined,
-                      assetFileName: undefined,
-                      assetVersion: undefined,
-                    })
-                  }
+                  disabled={Boolean(selected.assetKey)}
+                  onChange={(event) => updateSelected({ sourceUrl: event.target.value })}
                 />
+                {selected.assetKey && (
+                  <Text mt="1" fontSize="xs" color="orange.300">
+                    {t("settings.scenes.usingImportedFile")}
+                  </Text>
+                )}
               </Field>
               {selected.type !== "model3d" && selected.type !== "live2d" && (
                 <SelectField
@@ -345,8 +367,9 @@ function Scenes(): JSX.Element {
                   placeholder={t("settings.scenes.fit")}
                 />
               )}
-              <NumberField
+              <DraftNumberField
                 label={t("settings.scenes.opacity")}
+                integer
                 value={Math.round(selected.opacity * 100)}
                 min={10}
                 max={100}
@@ -355,7 +378,7 @@ function Scenes(): JSX.Element {
                   updateSelected({ opacity: Number(value) / 100 })
                 }
               />
-              <NumberField
+              <DraftNumberField
                 label={t("settings.scenes.transition")}
                 value={selected.transitionMs}
                 min={0}
@@ -381,7 +404,7 @@ function Scenes(): JSX.Element {
               )}
               {selected.type === "live2d" && (
                 <>
-                  <NumberField
+                  <DraftNumberField
                     label={t("settings.scenes.live2dScale")}
                     value={selected.live2d.scale}
                     min={0.05}
@@ -396,7 +419,7 @@ function Scenes(): JSX.Element {
                       })
                     }
                   />
-                  <NumberField
+                  <DraftNumberField
                     label={t("settings.scenes.live2dX")}
                     value={selected.live2d.x}
                     min={-5}
@@ -408,7 +431,7 @@ function Scenes(): JSX.Element {
                       })
                     }
                   />
-                  <NumberField
+                  <DraftNumberField
                     label={t("settings.scenes.live2dY")}
                     value={selected.live2d.y}
                     min={-5}
@@ -420,8 +443,9 @@ function Scenes(): JSX.Element {
                       })
                     }
                   />
-                  <NumberField
+                  <DraftNumberField
                     label={t("settings.scenes.live2dParallax")}
+                integer
                     value={Math.round(selected.live2d.parallax * 100)}
                     min={0}
                     max={100}
@@ -453,7 +477,7 @@ function Scenes(): JSX.Element {
                       }
                     />
                   </Field>
-                  <NumberField
+                  <DraftNumberField
                     label={t("settings.scenes.cameraFov")}
                     value={selected.model.cameraFov}
                     min={10}
@@ -466,7 +490,7 @@ function Scenes(): JSX.Element {
                     }
                   />
                   {(["x", "y", "z"] as const).map((axis, index) => (
-                    <NumberField
+                    <DraftNumberField
                       key={`camera-${axis}`}
                       label={t("settings.scenes.cameraPosition", {
                         axis: axis.toUpperCase(),
@@ -487,7 +511,7 @@ function Scenes(): JSX.Element {
                     />
                   ))}
                   {(["x", "y", "z"] as const).map((axis, index) => (
-                    <NumberField
+                    <DraftNumberField
                       key={`target-${axis}`}
                       label={t("settings.scenes.cameraTarget", {
                         axis: axis.toUpperCase(),
@@ -507,7 +531,7 @@ function Scenes(): JSX.Element {
                       }}
                     />
                   ))}
-                  <NumberField
+                  <DraftNumberField
                     label={t("settings.scenes.ambientLight")}
                     value={selected.model.ambientIntensity}
                     min={0}
@@ -522,7 +546,7 @@ function Scenes(): JSX.Element {
                       })
                     }
                   />
-                  <NumberField
+                  <DraftNumberField
                     label={t("settings.scenes.directionalLight")}
                     value={selected.model.directionalIntensity}
                     min={0}
@@ -546,7 +570,7 @@ function Scenes(): JSX.Element {
                       })
                     }
                   />
-                  <NumberField
+                  <DraftNumberField
                     label={t("settings.scenes.rotationSpeed")}
                     value={selected.model.rotationSpeed}
                     min={-3}
