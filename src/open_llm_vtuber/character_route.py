@@ -335,6 +335,7 @@ def _read_character_fields(path: str, *, is_base: bool) -> Optional[dict]:
             )
         ),
         "long_term_memory_enabled": bool(cc.get("long_term_memory_enabled", True)),
+        "actions_enabled": bool(cc.get("actions_enabled", False)),
     }
 
 
@@ -1046,7 +1047,7 @@ def init_character_route() -> APIRouter:
         unknown = set(body) - set(character_settings.TOGGLES)
         if unknown or not all(isinstance(v, bool) for v in body.values()):
             return _bad_request(
-                "Only translate_subtitle and long_term_memory_enabled, as true/false."
+                "Only translate_subtitle, long_term_memory_enabled and actions_enabled, as true/false."
             )
         try:
             await asyncio.to_thread(character_settings.write, filename, body)

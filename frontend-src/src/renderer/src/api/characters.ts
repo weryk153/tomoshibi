@@ -12,6 +12,7 @@ export interface CharacterRecord {
   // saveCharacterSettings，不走整份表單的 updateCharacter。
   translate_subtitle?: boolean
   long_term_memory_enabled?: boolean
+  actions_enabled?: boolean
   slug: string
   is_base: boolean
   conf_name: string | null
@@ -222,6 +223,8 @@ export async function uploadAvatar(
 export interface CharacterToggles {
   translate_subtitle: boolean
   long_term_memory_enabled: boolean
+  // 可不可以在台詞裡搭配一句星號動作。關著時提示裡完全不提動作。
+  actions_enabled: boolean
 }
 
 export function characterSettingsPath(filename: string): string {

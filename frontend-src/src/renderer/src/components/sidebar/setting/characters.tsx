@@ -405,16 +405,18 @@ function Characters(): JSX.Element {
     [characters, selectedFilename],
   );
 
-  // 字幕翻成你看的語言：這個角色自己的開關，改了就存（不跟整份表單一起存）。
-  const handleSubtitleToggle = useCallback(async (checked: boolean) => {
+  // 這個角色自己的開關（字幕翻成你看的語言、可以寫動作描寫）：改了就存，不跟整份
+  // 表單一起存。
+  const handleToggle = useCallback(async (
+    name: 'translate_subtitle' | 'actions_enabled',
+    checked: boolean,
+  ) => {
     if (!selectedRecord) return;
     const { filename } = selectedRecord;
-    const result = await saveCharacterSettings(baseUrl, filename, { translate_subtitle: checked });
+    const result = await saveCharacterSettings(baseUrl, filename, { [name]: checked });
     if (result.ok) {
       setCharacters((list) => (list ?? []).map((c) => (
-        c.filename === filename
-          ? { ...c, translate_subtitle: result.data.settings.translate_subtitle }
-          : c
+        c.filename === filename ? { ...c, [name]: result.data.settings[name] } : c
       )));
       toaster.create({
         title: t('settings.characters.saved', { name: selectedRecord.conf_name ?? filename }),
@@ -1200,8 +1202,16 @@ function Characters(): JSX.Element {
           <SwitchField
             label={t('settings.characters.translateSubtitle')}
             checked={Boolean(selectedRecord.translate_subtitle)}
-            onChange={handleSubtitleToggle}
+            onChange={(checked) => handleToggle('translate_subtitle', checked)}
             help={t('settings.characters.translateSubtitleHelp')}
+          />
+        )}
+        {selectedRecord && (
+          <SwitchField
+            label={t('settings.characters.actionsEnabled')}
+            checked={Boolean(selectedRecord.actions_enabled)}
+            onChange={(checked) => handleToggle('actions_enabled', checked)}
+            help={t('settings.characters.actionsEnabledHelp')}
           />
         )}
 

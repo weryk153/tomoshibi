@@ -300,7 +300,9 @@
       "refAudioInherit": "跟底稿角色一樣",
       "translateSubtitle": "字幕翻成你看的語言",
       "translateSubtitleHelp": "把她說的話翻成你看的語言（在「你」設定）顯示在字幕上。她說的、記得的仍然是她自己的語言。",
-      "reloadToApply": "重新載入設定（或再切換一次角色）後生效。"
+      "reloadToApply": "重新載入設定（或再切換一次角色）後生效。",
+      "actionsEnabled": "可以寫動作描寫",
+      "actionsEnabledHelp": "讓她在台詞裡搭配一句星號包起來的動作，例如「*把視線移開*」，只顯示在字幕上、不會唸出來。關掉時完全不跟她提動作，感情只用停頓與選詞表現。"
     },
     "personas": {
       "description": "建立與切換獨立人設，不必複製角色。",

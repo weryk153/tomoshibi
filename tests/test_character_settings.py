@@ -96,6 +96,7 @@ def test_settings_endpoint_reads_and_writes(tmp_path, monkeypatch):
     assert got["settings"] == {
         "translate_subtitle": False,
         "long_term_memory_enabled": True,
+        "actions_enabled": False,
     }
     saved = http.post(
         "/api/characters/kurisu.yaml/settings", json={"translate_subtitle": True}
@@ -159,3 +160,18 @@ def test_writing_the_base_character_changes_only_its_own_lines(tmp_path, monkeyp
     assert (
         character_settings.effective("conf.yaml")["long_term_memory_enabled"] is False
     )
+
+
+def test_the_action_switch_is_a_character_setting(tmp_path, monkeypatch):
+    http = client(tmp_path, monkeypatch)
+    assert (
+        http.get("/api/characters/kurisu.yaml/settings").json()["settings"][
+            "actions_enabled"
+        ]
+        is False
+    )
+    saved = http.post(
+        "/api/characters/kurisu.yaml/settings", json={"actions_enabled": True}
+    ).json()
+    assert saved["settings"]["actions_enabled"] is True
+    assert character_settings.effective("kurisu.yaml")["actions_enabled"] is True

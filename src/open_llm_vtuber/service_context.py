@@ -863,15 +863,24 @@ class ServiceContext:
         target_character = character_config or self.character_config
 
         # 共用的說話規則放最前面：放在後段時模型不太照做（見 SPEECH_RULES 的說明）。
-        from .conversation_quality import SPEECH_RULES
+        # 動作格式只給「可以寫動作描寫」的角色（見 ACTION_RULES 的說明）。
+        from .conversation_quality import ACTION_RULES, SPEECH_RULES
 
-        persona_prompt = f"{SPEECH_RULES}\n\n{persona_prompt}"
+        actions_enabled = bool(getattr(target_character, "actions_enabled", False))
+        rules = SPEECH_RULES
+        if actions_enabled:
+            rules = f"{rules}\n\n{ACTION_RULES}"
+        persona_prompt = f"{rules}\n\n{persona_prompt}"
 
         for prompt_name, prompt_file in self.system_config.tool_prompts.items():
             if (
                 prompt_name == "group_conversation_prompt"
                 or prompt_name == "proactive_speak_prompt"
             ):
+                continue
+
+            # think_tag 提示在教角色寫動作；不寫動作的角色不附，免得被勾起來。
+            if prompt_name == "think_tag_prompt" and not actions_enabled:
                 continue
 
             # 模型載入失敗時 init_live2d 會留下 None 並「繼續跑」，這三份 prompt

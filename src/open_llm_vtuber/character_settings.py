@@ -26,11 +26,13 @@ OWNED: dict[str, tuple[str, ...]] = {
         "translate_subtitle",
     ),
     "long_term_memory_enabled": ("long_term_memory_enabled",),
+    "actions_enabled": ("actions_enabled",),
 }
-TOGGLES = ("translate_subtitle", "long_term_memory_enabled")
+TOGGLES = ("translate_subtitle", "long_term_memory_enabled", "actions_enabled")
 DEFAULTS: dict[str, Any] = {
     "translate_subtitle": False,
     "long_term_memory_enabled": True,
+    "actions_enabled": False,
 }
 
 
