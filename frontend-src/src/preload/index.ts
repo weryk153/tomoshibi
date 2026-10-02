@@ -71,6 +71,7 @@ const api = {
     'background-preferences:set',
     { backgroundUrl },
   ),
+  restartBackend: () => ipcRenderer.invoke('backend:restart'),
 };
 
 if (process.contextIsolated) {

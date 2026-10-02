@@ -20,6 +20,7 @@ declare global {
       updateConfigFiles: (files: any[]) => void
       getBackgroundPreferences: () => Promise<{ backgroundUrl: string } | null>
       setBackgroundPreferences: (backgroundUrl: string) => Promise<void>
+      restartBackend: () => Promise<{ ok: boolean; reason?: 'not-managed' | 'failed' }>
     }
   }
 }

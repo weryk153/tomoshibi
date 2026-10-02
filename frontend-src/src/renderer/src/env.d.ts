@@ -5,6 +5,7 @@ interface Window {
     onModeChanged: (callback: (mode: string) => void) => void
     getBackgroundPreferences?: () => Promise<{ backgroundUrl: string } | null>
     setBackgroundPreferences?: (backgroundUrl: string) => Promise<void>
+    restartBackend?: () => Promise<{ ok: boolean; reason?: 'not-managed' | 'failed' }>
   }
   TomoshibiEffects?: {
     play: (
