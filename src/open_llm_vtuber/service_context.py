@@ -862,6 +862,11 @@ class ServiceContext:
         logger.debug(f"constructing persona_prompt: '''{persona_prompt}'''")
         target_character = character_config or self.character_config
 
+        # 共用的說話規則放最前面：放在後段時模型不太照做（見 SPEECH_RULES 的說明）。
+        from .conversation_quality import SPEECH_RULES
+
+        persona_prompt = f"{SPEECH_RULES}\n\n{persona_prompt}"
+
         for prompt_name, prompt_file in self.system_config.tool_prompts.items():
             if (
                 prompt_name == "group_conversation_prompt"
