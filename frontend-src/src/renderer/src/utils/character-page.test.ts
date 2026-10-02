@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   isActiveCharacter, skinTypeOf, isLoadedModel, voiceFieldGroups, nextSelection, personaApplyMode,
+  characterDraftProblem,
 } from './character-page.ts'
 
 const records = [
@@ -59,4 +60,12 @@ test('a just-created character is selected once the refreshed list has her, not 
   assert.equal(nextSelection(records, null, 'frieren', 'new.yaml'), null)
   const refreshed = [...records, { filename: 'new.yaml', conf_uid: 'new' }]
   assert.equal(nextSelection(refreshed, null, 'frieren', 'new.yaml'), 'new.yaml')
+})
+
+test('a draft missing a required field is caught before switching away, without waiting for the autosave timer', () => {
+  const ok = { conf_name: '小燈', persona_prompt: '她很直接。', live2d_model_name: 'Frieren' }
+  assert.equal(characterDraftProblem(ok), null)
+  assert.equal(characterDraftProblem({ ...ok, conf_name: '  ' }), 'settings.characters.errNameRequired')
+  assert.equal(characterDraftProblem({ ...ok, persona_prompt: '' }), 'settings.characters.errPersonaRequired')
+  assert.equal(characterDraftProblem({ ...ok, live2d_model_name: '' }), 'settings.characters.errSkinRequired')
 })

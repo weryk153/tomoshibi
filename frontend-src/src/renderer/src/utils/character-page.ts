@@ -48,3 +48,14 @@ export const nextSelection = (
 // 正在用的角色：經 WebSocket 立刻換，她馬上用新的說法。其他角色：存起來，
 // 切換到她時才生效。
 export const personaApplyMode = (isActive: boolean): 'live' | 'stored' => (isActive ? 'live' : 'stored')
+
+// 角色表單三個必填欄位。換選角色、開新增表單前就地檢查目前的草稿，不等存檔器的
+// 計時器——停手 0.8 秒內就點走的話，存檔器的狀態還沒變成「不合法」。
+export const characterDraftProblem = (draft: {
+  conf_name: string; persona_prompt: string; live2d_model_name: string
+}): string | null => {
+  if (!draft.conf_name.trim()) return 'settings.characters.errNameRequired'
+  if (!draft.persona_prompt.trim()) return 'settings.characters.errPersonaRequired'
+  if (!draft.live2d_model_name.trim()) return 'settings.characters.errSkinRequired'
+  return null
+}

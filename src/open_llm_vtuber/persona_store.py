@@ -80,6 +80,9 @@ def _validate_fields(name: Any, prompt: Any) -> tuple[str, str]:
     return clean_name, clean_prompt
 
 
+RESERVED_IDS = frozenset({"active"})
+
+
 def _unique_id(requested: Any, name: str, existing: set[str]) -> str:
     raw = str(requested or "").strip()
     if raw and not PERSONA_ID_RE.fullmatch(raw):
@@ -87,6 +90,9 @@ def _unique_id(requested: Any, name: str, existing: set[str]) -> str:
             "Persona ID must contain only lowercase letters, numbers, _ or -."
         )
     base = raw or _slugify(name) or f"persona_{uuid.uuid4().hex[:8]}"
+    # active 是「替角色選人設」的路由（PUT /api/personas/active），人設不能用這個 id，
+    # 不然就再也編輯不到它。
+    existing = existing | RESERVED_IDS
     if base not in existing:
         return base
     for index in range(2, 1000):

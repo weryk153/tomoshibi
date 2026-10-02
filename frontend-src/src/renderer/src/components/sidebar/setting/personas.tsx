@@ -49,15 +49,19 @@ function Personas({ confUid, isActive }: PersonasProps): JSX.Element {
   const [applyingId, setApplyingId] = useState<string | null | undefined>(undefined);
   const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
+  // 換了角色：上一個角色開著的表單與刪除確認不能留著。只看 confUid——存檔後
+  // 重抓清單（refreshTick）時不能收，不然每存一次表單就自己關掉。
   useEffect(() => {
-    let cancelled = false;
-    setLoadError(null);
-    // 換了角色：上一個角色開著的表單與刪除確認不能留著。
     setMode('list');
     setEditingId(null);
     setDraft(EMPTY_DRAFT);
     setFormError(null);
     setPendingDelete(null);
+  }, [confUid]);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoadError(null);
     fetchPersonas(baseUrl, confUid).then((result) => {
       if (cancelled) return;
       if (result.ok) {

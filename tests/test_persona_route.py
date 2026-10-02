@@ -60,3 +60,19 @@ def test_unknown_persona_and_missing_character_are_refused(tmp_path, monkeypatch
     assert unknown.status_code == 404
     assert blank.status_code == 400
     assert persona_store.get_active_persona_id("himmel") is None
+
+
+def test_a_persona_never_gets_the_id_the_choose_route_uses(tmp_path, monkeypatch):
+    # PUT /api/personas/active 是「替角色選人設」；人設的 id 若是 active，就再也
+    # 編輯不到它（PUT /api/personas/active 會被選人設的路由接走）。
+    client = _client(tmp_path, monkeypatch)
+    by_name = persona_store.create_persona("Active", "名字剛好是 active。")
+    by_id = persona_store.create_persona("另一個", "直接要 active 當 id。", "active")
+
+    assert by_name["id"] != "active"
+    assert by_id["id"] != "active"
+    response = client.put(
+        f"/api/personas/{by_name['id']}", json={"name": "改名", "prompt": "改了。"}
+    )
+    assert response.status_code == 200
+

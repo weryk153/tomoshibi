@@ -113,3 +113,18 @@ test('a save that throws is reported, not left as an unhandled rejection', async
   await saver.flush()
   assert.deepEqual(states.at(-1), { phase: 'error', message: 'network down' })
 })
+
+test('awaiting flush during an in-flight save ends only after the queued value is sent', async () => {
+  // 角色頁換選角色前 await 這個：存檔器只有一格，沒等完就換的話，新角色的第一個
+  // 字會把舊角色排著的那筆擠掉。
+  const h = harness()
+  h.saver.change('A1'); h.tick()          // A1 送出中
+  h.saver.change('A2')                    // A2 排隊
+  let done = false
+  const flushed = h.saver.flush().then(() => { done = true })
+  await new Promise((resolve) => setTimeout(resolve, 0))
+  assert.equal(done, false)
+  await h.finish()
+  await flushed
+  assert.deepEqual(h.saved, ['A1', 'A2'])
+})

@@ -31,7 +31,8 @@ import { useWebSocket } from '@/context/websocket-context';
 import { useConfig } from '@/context/character-config-context';
 import { useLive2DConfig } from '@/context/live2d-config-context';
 import {
-  isActiveCharacter, isLoadedModel, nextSelection, skinTypeOf, voiceFieldGroups, type SkinOption,
+  characterDraftProblem, isActiveCharacter, isLoadedModel, nextSelection, skinTypeOf, voiceFieldGroups,
+  type SkinOption,
 } from '@/utils/character-page';
 import Personas from './personas';
 import Memory from './memory';
@@ -615,10 +616,8 @@ function Characters(): JSX.Element {
 
   const charSaver = useAutosave(saveDraft, {
     validate: ({ draft: d }: { draft: EditDraft; baseline: CharacterRecord }) => {
-      if (!d.conf_name.trim()) return t('settings.characters.errNameRequired');
-      if (!d.persona_prompt.trim()) return t('settings.characters.errPersonaRequired');
-      if (!d.live2d_model_name.trim()) return t('settings.characters.errSkinRequired');
-      return null;
+      const problem = characterDraftProblem(d);
+      return problem ? t(problem) : null;
     },
   });
 
@@ -849,16 +848,28 @@ function Characters(): JSX.Element {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [characters, confUid, showCreateForm]);
 
-  // 換選別的角色前先把還沒送的那筆送出去。有欄位不合法時那份還沒存，換走就會丟掉
-  // 其他欄位的修改，所以先擋住（頂端的存檔狀態會說哪一欄不行）。
-  const selectCharacter = useCallback((record: CharacterRecord) => {
+  // 換走（選別的角色、開新增表單）之前，先把這個角色還沒送的那筆送完。
+  // - 有欄位不合法時那份存不了，換走就會丟掉其他欄位的修改：留在原地，flush 讓頂端
+  //   的存檔狀態說哪一欄不行。就地檢查草稿，不看存檔器的狀態——停手 0.8 秒內就點
+  //   走的話，它還沒變成「不合法」。
+  // - 要等送完（await）才換：存檔器只有一格，換過去之後新角色的第一個字會把還沒
+  //   送出的舊角色那筆擠掉。
+  const leaveCurrent = useCallback(async (): Promise<boolean> => {
+    if (draft && characterDraftProblem(draft)) {
+      await charSaver.flush();
+      return false;
+    }
+    await charSaver.flush();
+    return true;
+  }, [charSaver, draft]);
+
+  const selectCharacter = useCallback(async (record: CharacterRecord) => {
     if (record.filename === selectedFilename && !showCreateForm) return;
-    if (charSaver.state.phase === 'invalid') return;
-    charSaver.flush();
+    if (!showCreateForm && !(await leaveCurrent())) return;
     waitingForRef.current = null;
     if (showCreateForm) closeCreateForm();
     openEdit(record);
-  }, [charSaver, closeCreateForm, openEdit, selectedFilename, showCreateForm]);
+  }, [closeCreateForm, leaveCurrent, openEdit, selectedFilename, showCreateForm]);
 
   if (characters === null) {
     return (
@@ -1319,10 +1330,21 @@ function Characters(): JSX.Element {
               VRM 的資料形狀不同（(group, index)＋HitArea vs. clip 檔名），所以是
               兩個各自獨立的編輯器。 */}
           <Text fontSize="xs" color="whiteAlpha.600">{t('settings.characterPage.sharedModelNote')}</Text>
+          {/* key 用模型名：換了模型（換選角色或改上面的選單）就換一個編輯器，舊的
+              卸載時把還沒送的修改存進它自己的模型。不換的話，排隊中的修改會在新模型
+              還沒載入時被當成「沒東西要存」丟掉。 */}
           {skinTypeOf(skins, edit.live2d_model_name) === 'vrm' ? (
-            <VrmMotionConfig modelName={edit.live2d_model_name || undefined} isLoaded={modelLoaded} />
+            <VrmMotionConfig
+              key={edit.live2d_model_name}
+              modelName={edit.live2d_model_name || undefined}
+              isLoaded={modelLoaded}
+            />
           ) : (
-            <MotionConfig modelName={edit.live2d_model_name || undefined} isLoaded={modelLoaded} />
+            <MotionConfig
+              key={edit.live2d_model_name}
+              modelName={edit.live2d_model_name || undefined}
+              isLoaded={modelLoaded}
+            />
           )}
         </SettingSection>
 
@@ -1517,10 +1539,9 @@ function Characters(): JSX.Element {
         activeConfUid={confUid}
         creating={showCreateForm}
         onSelect={selectCharacter}
-        onCreate={() => {
-          // 同換選角色：先把還沒送的那筆送出去；不合法時擋住。
-          if (charSaver.state.phase === 'invalid') return;
-          charSaver.flush();
+        onCreate={async () => {
+          // 同換選角色：先把還沒送的那筆送完；不合法時留在原地。
+          if (!(await leaveCurrent())) return;
           openCreate();
         }}
         onRefresh={() => setRefreshTick((n) => n + 1)}
