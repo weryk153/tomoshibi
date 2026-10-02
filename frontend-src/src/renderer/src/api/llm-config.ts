@@ -179,3 +179,9 @@ export const installOllama = (
   failed: '安裝失敗。',
   incomplete: '安裝未完成就中斷了，請再試一次。',
 })
+
+// 金鑰欄留空時，後端在網址沒變的情況下沿用存著的金鑰；網址換了才會回
+// "Missing API key."（舊金鑰不能送到別的主機）。只有這種情況要請使用者重貼。
+export function needsKeyAgain(error: string, apiKey: string, hasExistingKey: boolean): boolean {
+  return hasExistingKey && apiKey.trim() === '' && error === 'Missing API key.'
+}

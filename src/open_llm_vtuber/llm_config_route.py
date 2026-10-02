@@ -501,6 +501,20 @@ def _write_openai_block(base_url: str, model: str, api_key: str) -> None:
 # --- 端點 ------------------------------------------------------------------- #
 
 
+def _saved_key_for(base_url: str) -> str:
+    """存著的金鑰，只在網址跟存著的一樣時給；其他情況回空字串。"""
+    try:
+        block = _get_openai_block(_load_conf())
+    except Exception:
+        return ""
+    if block is None or not _has_real_key(block):
+        return ""
+    saved_url = str(block.get("base_url") or "").strip().rstrip("/")
+    if not saved_url or saved_url != base_url.strip().rstrip("/"):
+        return ""
+    return str(block.get("llm_api_key"))
+
+
 def _bad(message: str) -> JSONResponse:
     return JSONResponse(status_code=400, content={"ok": False, "error": message})
 
@@ -588,6 +602,10 @@ def init_llm_config_route() -> APIRouter:
         # 本機 Ollama 不需要金鑰，但下游的 client 要求非空，所以填一個公認的佔位值。
         if provider == "ollama" and not api_key:
             api_key = "ollama"
+        # 只換模型時不用重貼：金鑰欄留空、網址跟存著的一樣，就沿用已經存的那把。
+        # 網址變了就不沿用——舊金鑰不能送到使用者剛填的別的主機去。
+        if not api_key and base_url:
+            api_key = _saved_key_for(str(base_url))
 
         for value, message in (
             (base_url, "Missing base_url."),

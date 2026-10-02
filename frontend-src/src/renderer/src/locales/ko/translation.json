@@ -55,7 +55,7 @@
     "providerLabel": "제공업체",
     "apiKeyLabel": "API 키",
     "apiKeyHelp": "키는 로컬 앱에만 붙여넣어지며 제공업체로 바로 전송돼요. 이 컴퓨터의 conf.yaml에 저장되고, 이후로는 전체가 다시 표시되지 않아요.",
-    "keyRequiredAgain": "키가 이미 저장되어 있지만 그대로 사용할 수는 없습니다. 다시 붙여넣어 주세요.",
+    "keyRequiredAgain": "서비스 주소가 바뀌어 저장된 키를 새 주소로 보내지 않습니다. 키를 다시 붙여넣으세요.",
     "keyAlreadySetPlaceholder": "설정됨 — 변경하려면 붙여넣기",
     "modelLabel": "모델",
     "modelHelp": "비워 두면 기본값({{example}})을 사용해요.",

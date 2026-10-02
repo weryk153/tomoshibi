@@ -55,7 +55,7 @@
     "providerLabel": "Provider",
     "apiKeyLabel": "API key",
     "apiKeyHelp": "Pasted only to your local app and sent straight to the provider. It is stored in conf.yaml on this computer and never shown again in full.",
-    "keyRequiredAgain": "A key is already saved, but it can't be reused — paste it again to save.",
+    "keyRequiredAgain": "The service address changed; the saved key won’t be sent to a new address — paste the key again.",
     "keyAlreadySetPlaceholder": "Already set — paste to change",
     "modelLabel": "Model",
     "modelHelp": "Leave blank to use the default ({{example}}).",
