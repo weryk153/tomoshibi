@@ -21,7 +21,6 @@ import { splitKeywords } from '@/utils/setting-values';
 import { settingStyles } from './setting-styles';
 import { useStagePerformance } from '@/context/stage-performance-context';
 import { useScene } from '@/context/scene-context';
-import { CURRENT_BACKGROUND_SCENE_ID } from '@/scenes/scene';
 import {
   cloneStagePerformancePreset,
   isStagePerformanceCompatible,
@@ -160,9 +159,7 @@ function Performances(): JSX.Element {
       { value: 'none', label: t('settings.performances.noScene') },
       ...scenes.map((scene) => ({
         value: scene.id,
-        label: scene.id === CURRENT_BACKGROUND_SCENE_ID
-          ? t('settings.scenes.currentBackground')
-          : scene.name,
+        label: scene.name,
       })),
     ],
   }), [scenes, t]);

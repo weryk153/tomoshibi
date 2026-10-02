@@ -1,8 +1,8 @@
 import { Box } from "@chakra-ui/react";
 import { lazy, memo, Suspense, useCallback, useEffect, useState } from "react";
 import { useScene } from "@/context/scene-context";
-import { CURRENT_BACKGROUND_SCENE_ID } from "@/scenes/scene";
 import Background from "./background";
+import CameraScene from "./camera-scene";
 import "./scene.css";
 
 const Scene3D = lazy(() => import("./scene-3d"));
@@ -48,11 +48,25 @@ const Scene = memo(() => {
     [],
   );
 
-  if (
-    activeScene.id === CURRENT_BACKGROUND_SCENE_ID ||
-    !resolvedSourceUrl ||
-    failed
-  ) {
+  const sceneBoxProps = {
+    className: "tomoshibi-scene",
+    "data-scene-id": activeScene.id,
+    "data-scene-type": activeScene.type,
+    style: {
+      "--scene-transition": `${activeScene.transitionMs}ms`,
+    } as React.CSSProperties,
+  };
+
+  // 攝影機場景沒有網址，要在「網址空的就退回預設背景」之前處理。
+  if (activeScene.type === "camera") {
+    return (
+      <Box key={activeScene.id} {...sceneBoxProps}>
+        <CameraScene opacity={activeScene.opacity} />
+      </Box>
+    );
+  }
+
+  if (!resolvedSourceUrl || failed) {
     return <Background />;
   }
 
@@ -68,17 +82,7 @@ const Scene = memo(() => {
   } as const;
 
   return (
-    <Box
-      key={`${activeScene.id}:${resolvedSourceUrl}`}
-      className="tomoshibi-scene"
-      data-scene-id={activeScene.id}
-      data-scene-type={activeScene.type}
-      style={
-        {
-          "--scene-transition": `${activeScene.transitionMs}ms`,
-        } as React.CSSProperties
-      }
-    >
+    <Box key={`${activeScene.id}:${resolvedSourceUrl}`} {...sceneBoxProps}>
       {activeScene.type === "image" && (
         <img
           src={resolvedSourceUrl}

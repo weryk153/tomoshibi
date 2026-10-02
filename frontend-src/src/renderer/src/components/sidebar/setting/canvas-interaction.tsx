@@ -3,11 +3,14 @@
 import { Stack, Text } from '@chakra-ui/react';
 import { useTranslation } from 'react-i18next';
 import { useLive2dSettings } from '@/hooks/sidebar/setting/use-live2d-settings';
+import { interactionSettingsOf } from '@/utils/canvas-interaction';
 import { SwitchField } from './common';
 
 function CanvasInteraction(): JSX.Element {
   const { t } = useTranslation();
   const { modelInfo, handleInputChange } = useLive2dSettings();
+  // 沒設過的開關顯示實際行為（開著），不是關著。
+  const settings = interactionSettingsOf(modelInfo);
 
   return (
     <Stack gap={2}>
@@ -15,13 +18,13 @@ function CanvasInteraction(): JSX.Element {
 
       <SwitchField
         label={t('settings.live2d.pointerInteractive')}
-        checked={modelInfo.pointerInteractive ?? false}
+        checked={settings.pointerInteractive}
         onChange={(checked) => handleInputChange('pointerInteractive', checked)}
       />
 
       <SwitchField
         label={t('settings.live2d.scrollToResize')}
-        checked={modelInfo.scrollToResize ?? true}
+        checked={settings.scrollToResize}
         onChange={(checked) => handleInputChange('scrollToResize', checked)}
       />
 
@@ -31,7 +34,7 @@ function CanvasInteraction(): JSX.Element {
       <SwitchField
         label={t('settings.live2d.lookAtPointer')}
         help={t('settings.live2d.lookAtPointerDesc')}
-        checked={modelInfo.lookAtPointer ?? true}
+        checked={settings.lookAtPointer}
         onChange={(checked) => handleInputChange('lookAtPointer', checked)}
       />
     </Stack>

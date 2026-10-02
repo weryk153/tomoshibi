@@ -3,8 +3,7 @@ interface Window {
     setIgnoreMouseEvents: (ignore: boolean) => void
     showContextMenu?: () => void
     onModeChanged: (callback: (mode: string) => void) => void
-    getBackgroundPreferences?: () => Promise<{ backgroundUrl: string } | null>
-    setBackgroundPreferences?: (backgroundUrl: string) => Promise<void>
+    restartBackend?: () => Promise<{ ok: boolean; reason?: 'not-managed' | 'failed'; logPath?: string }>
   }
   TomoshibiEffects?: {
     play: (

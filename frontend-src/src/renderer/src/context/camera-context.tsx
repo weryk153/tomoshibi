@@ -10,6 +10,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { toaster } from '@/components/ui/tw/toaster';
 import { cameraErrorKey } from '@/utils/media-error';
+import { createStreamSlot } from '@/utils/stream-slot';
 
 /**
  * Camera configuration interface
@@ -66,6 +67,7 @@ export function CameraProvider({ children }: { children: ReactNode }) {
   );
   const streamRef = useRef<MediaStream | null>(null);
   const backgroundStreamRef = useRef<MediaStream | null>(null);
+  const backgroundSlotRef = useRef(createStreamSlot<MediaStream>());
   const videoRef = useRef<HTMLVideoElement>(null);
 
   // Start camera stream
@@ -115,6 +117,8 @@ export function CameraProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const startBackgroundCamera = useCallback(async () => {
+    // 領號碼：等 getUserMedia 的這段時間裡被停掉或又開了一次，回來的串流就作廢。
+    const token = backgroundSlotRef.current.begin();
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
         throw new Error(t('error.cameraApiNotSupported'));
@@ -133,6 +137,7 @@ export function CameraProvider({ children }: { children: ReactNode }) {
         },
       });
 
+      if (!backgroundSlotRef.current.accept(token, stream)) return;
       backgroundStreamRef.current = stream;
       setIsBackgroundStreaming(true);
     } catch (err) {
@@ -148,11 +153,10 @@ export function CameraProvider({ children }: { children: ReactNode }) {
   }, [cameraConfig, t]);
 
   const stopBackgroundCamera = useCallback(() => {
-    if (backgroundStreamRef.current) {
-      backgroundStreamRef.current.getTracks().forEach((track) => track.stop());
-      backgroundStreamRef.current = null;
-      setIsBackgroundStreaming(false);
-    }
+    // 也會讓還在等的那次開啟作廢（見 utils/stream-slot.ts）。
+    backgroundSlotRef.current.stop();
+    backgroundStreamRef.current = null;
+    setIsBackgroundStreaming(false);
   }, []);
 
   // Memoized context value

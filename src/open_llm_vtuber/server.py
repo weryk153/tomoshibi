@@ -24,6 +24,7 @@ from .translator_route import init_translator_route
 from .player_route import init_player_route
 from .engine_config_route import init_engine_config_route
 from .network_route import init_network_route
+from .origin_guard import install_origin_guard
 from .voice_route import init_voice_route
 from .memory_route import init_memory_route
 from .perf_route import init_perf_route
@@ -121,6 +122,8 @@ class WebSocketServer:
             allow_methods=["*"],
             allow_headers=["*"],
         )
+        # 別的網站送來的寫入與 WebSocket 一律擋掉（CORS 開著、本機又一律可信）。
+        install_origin_guard(self.app)
 
         # Include routes, passing the context instance
         # The context will be populated during the initialize step

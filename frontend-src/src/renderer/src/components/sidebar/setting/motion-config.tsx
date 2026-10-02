@@ -473,7 +473,7 @@ function MotionConfig({ modelName, isLoaded }: MotionConfigProps): JSX.Element {
                 {t('settings.live2d.previewButton')}
               </Button>
               {!canPreview && (
-                <Text fontSize="xs" color="whiteAlpha.500">{t('settings.live2d.previewDisabledReason')}</Text>
+                <Text fontSize="xs" color="whiteAlpha.500">{isLoaded ? t('settings.live2d.previewDisabledReason') : t('settings.live2d.previewNotOnScreen')}</Text>
               )}
             </HStack>
 
@@ -530,7 +530,7 @@ function MotionConfig({ modelName, isLoaded }: MotionConfigProps): JSX.Element {
                   {t('settings.live2d.expressionResetButton')}
                 </Button>
                 {!canPreview && (
-                  <Text fontSize="xs" color="whiteAlpha.500">{t('settings.live2d.previewDisabledReason')}</Text>
+                  <Text fontSize="xs" color="whiteAlpha.500">{isLoaded ? t('settings.live2d.previewDisabledReason') : t('settings.live2d.previewNotOnScreen')}</Text>
                 )}
               </HStack>
 

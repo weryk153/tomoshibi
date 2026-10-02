@@ -14,10 +14,12 @@ import { Field, TextInput } from '@/components/ui/tw/primitives';
 import { toaster } from "@/components/ui/tw/toaster";
 import { useScene } from "@/context/scene-context";
 import { useWebSocket } from "@/context/websocket-context";
+import { useBgUrl } from "@/context/bgurl-context";
 import {
-  CURRENT_BACKGROUND_SCENE_ID,
+  DEFAULT_SCENE_ID,
   SCENE_FITS,
   SCENE_TYPES,
+  serverBackgroundUrl,
   ScenePreset,
   SceneType,
 } from "@/scenes/scene";
@@ -52,14 +54,13 @@ function Scenes(): JSX.Element {
     { name: string; url: string }[]
   >([]);
   const selected = scenes.find((scene) => scene.id === selectedId) || scenes[0];
-  const sceneLabel = (scene: ScenePreset) =>
-    scene.id === CURRENT_BACKGROUND_SCENE_ID
-      ? t("settings.scenes.currentBackground")
-      : scene.name;
+  const sceneLabel = (scene: ScenePreset) => scene.name;
+  // 伺服器上的背景圖（backgrounds/ 底下），圖片場景可以直接選。
+  const { backgroundFiles } = useBgUrl();
 
   useEffect(() => {
     if (!scenes.some((scene) => scene.id === selectedId)) {
-      setSelectedId(CURRENT_BACKGROUND_SCENE_ID);
+      setSelectedId(scenes[0]?.id ?? DEFAULT_SCENE_ID);
     }
   }, [scenes, selectedId]);
 
@@ -114,6 +115,13 @@ function Scenes(): JSX.Element {
       }),
     [t],
   );
+  const serverBackgroundCollection = useMemo(
+    () =>
+      createListCollection({
+        items: backgroundFiles.map((name) => ({ value: serverBackgroundUrl(name), label: name })),
+      }),
+    [backgroundFiles],
+  );
   const installedLive2DCollection = useMemo(
     () =>
       createListCollection({
@@ -126,7 +134,7 @@ function Scenes(): JSX.Element {
   );
 
   const updateSelected = (update: Partial<ScenePreset>) => {
-    if (!selected.builtin) updateScene(selected.id, update);
+    updateScene(selected.id, update);
   };
 
   const addScene = (type: SceneType) => {
@@ -143,7 +151,7 @@ function Scenes(): JSX.Element {
   };
 
   const importAsset = async (file: File | undefined) => {
-    if (!file || selected.builtin) return;
+    if (!file) return;
     setIsImporting(true);
     try {
       const error = await importSceneAsset(selected.id, file);
@@ -181,6 +189,9 @@ function Scenes(): JSX.Element {
         </Button>
         <Button size="sm" onClick={() => addScene("model3d")}>
           {t("settings.scenes.add3d")}
+        </Button>
+        <Button size="sm" onClick={() => addScene("camera")}>
+          {t("settings.scenes.addCamera")}
         </Button>
       </HStack>
 
@@ -234,12 +245,7 @@ function Scenes(): JSX.Element {
       >
         <Stack gap="3">
           <Heading size="xs">{sceneLabel(selected)}</Heading>
-          {selected.builtin ? (
-            <Text fontSize="sm" color="fg.muted">
-              {t("settings.scenes.currentBackgroundHelp")}
-            </Text>
-          ) : (
-            <>
+          <>
               <Field label={t("settings.scenes.name")}>
                 <TextInput
                   value={selected.name}
@@ -259,7 +265,12 @@ function Scenes(): JSX.Element {
                 placeholder={t("settings.scenes.type")}
                 disabled={Boolean(selected.assetKey)}
               />
-              {selected.type !== "live2d" && (
+              {selected.type === "camera" && (
+                <Text fontSize="sm" color="fg.muted">
+                  {t("settings.scenes.cameraHelp")}
+                </Text>
+              )}
+              {selected.type !== "live2d" && selected.type !== "camera" && (
                 <Field
                   label={t("settings.scenes.asset")}
                   help={
@@ -332,6 +343,24 @@ function Scenes(): JSX.Element {
                     placeholder={t("settings.scenes.selectLive2d")}
                   />
                 )}
+              {selected.type === "image" &&
+                !selected.assetKey &&
+                serverBackgroundCollection.items.length > 0 && (
+                  <SelectField
+                    label={t("settings.scenes.serverBackground")}
+                    value={
+                      serverBackgroundCollection.items.some(
+                        (item) => item.value === selected.sourceUrl,
+                      )
+                        ? [selected.sourceUrl]
+                        : []
+                    }
+                    onChange={(value) => updateSelected({ sourceUrl: value[0] || "" })}
+                    collection={serverBackgroundCollection}
+                    placeholder={t("settings.scenes.serverBackgroundPlaceholder")}
+                  />
+                )}
+              {selected.type !== "camera" && (
               <Field
                 label={t("settings.scenes.sourceUrl")}
                 help={
@@ -354,7 +383,8 @@ function Scenes(): JSX.Element {
                   </Text>
                 )}
               </Field>
-              {selected.type !== "model3d" && selected.type !== "live2d" && (
+              )}
+              {(selected.type === "image" || selected.type === "video") && (
                 <SelectField
                   label={t("settings.scenes.fit")}
                   value={[selected.fit]}
@@ -597,7 +627,10 @@ function Scenes(): JSX.Element {
                     colorPalette="red"
                     onClick={() => {
                       deleteScene(selected.id);
-                      setSelectedId(CURRENT_BACKGROUND_SCENE_ID);
+                      // 刪光了 scene-context 會補回預設背景（DEFAULT_SCENE_ID）。
+                      setSelectedId(
+                        scenes.find((scene) => scene.id !== selected.id)?.id ?? DEFAULT_SCENE_ID,
+                      );
                     }}
                   >
                     {t("settings.scenes.delete")}
@@ -620,8 +653,7 @@ function Scenes(): JSX.Element {
                   {t("settings.scenes.delete")}
                 </Button>
               )}
-            </>
-          )}
+          </>
         </Stack>
       </Box>
     </Stack>

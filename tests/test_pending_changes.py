@@ -13,9 +13,10 @@ from src.open_llm_vtuber import pending_changes, pending_route
 
 @pytest.fixture(autouse=True)
 def _fresh():
-    pending_changes.clear()
+    # clear() 不清要重啟的項目，這裡要整份清掉。
+    pending_changes._pending.clear()
     yield
-    pending_changes.clear()
+    pending_changes._pending.clear()
 
 
 def test_marks_are_kept_in_order_without_duplicates():
@@ -31,7 +32,10 @@ def test_the_route_lists_them():
     app = FastAPI()
     app.include_router(pending_route.init_pending_route())
     pending_changes.mark("tools")
-    assert TestClient(app).get("/api/pending-changes").json() == {"pending": ["tools"]}
+    assert TestClient(app).get("/api/pending-changes").json() == {
+        "pending": ["tools"],
+        "needs_restart": False,
+    }
 
 
 def test_saving_the_active_character_is_pending_but_another_is_not(
@@ -171,3 +175,33 @@ def test_editing_a_whole_character_is_pending_only_when_she_is_active(
     response = client.put(f"/api/characters/{edited}", json=_EDIT)
     assert response.status_code == 200, response.text
     assert pending_changes.pending() == expected
+
+
+def test_a_reload_keeps_the_restart_items():
+    pending_changes.mark("tools")
+    pending_changes.mark("host")
+
+    pending_changes.clear()
+
+    assert pending_changes.pending() == ["host"]
+    assert pending_changes.needs_restart() is True
+
+
+def test_unmark_removes_one_item_and_restart_follows():
+    pending_changes.mark("host")
+    pending_changes.unmark("host")
+    pending_changes.unmark("never-marked")
+
+    assert pending_changes.pending() == []
+    assert pending_changes.needs_restart() is False
+
+
+def test_the_route_says_whether_a_restart_is_needed():
+    pending_changes.mark("host")
+    app = FastAPI()
+    app.include_router(pending_route.init_pending_route())
+
+    assert TestClient(app).get("/api/pending-changes").json() == {
+        "pending": ["host"],
+        "needs_restart": True,
+    }

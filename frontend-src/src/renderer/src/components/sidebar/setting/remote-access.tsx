@@ -1,13 +1,9 @@
 /* eslint-disable react/require-default-props */
-// remote-access 分頁：唯讀顯示「這台伺服器現在能被哪些其他裝置連到」。
-//
-// 這個分頁**沒有任何寫入能力**，因為後端根本沒有對應的寫入端點——
-// GET /api/network-info（api/network.ts）只能讀。使用者不能透過這個畫面
-// 「打開遠端存取」，conf.yaml 的 system_config.host 只能手動編輯，或者去設定
-// Tailscale Serve。offTitle／recommendTailscale／lanOptIn 這三段文案就是在
-// 指路去做這兩件事——不要因為想讓這個分頁「看起來能做點什麼」就加一顆按鈕
-// 或一個表單去暗示它能改變伺服器的綁定位址，那會是使用者以為按下去就會生效、
-// 實際上什麼都沒發生的最壞情況。
+// remote-access：「這台伺服器現在能被哪些其他裝置連到」，以及「允許區網連線」
+// 開關。開關寫 conf.yaml 的 system_config.host（POST /api/network/host），綁定位址
+// 啟動時就決定了，要重啟後端才生效——抽屜頂端的提示會換成「重新啟動後端」。
+// 下面列出的網址看的是這次啟動實際綁的位址（localhost_only），不是開關：重啟前
+// 列出 LAN 網址會是「看起來能用、其實連不上」。
 //
 // 跟 asr.tsx／tts.tsx／memory.tsx 同一種 active-refetch 慣例：網路狀態在
 // App 執行期間真的會變（換 Wi-Fi、開關 Tailscale），所以使用者切回這個分頁時
@@ -25,8 +21,11 @@ import { settingStyles } from './setting-styles';
 import { Clipboard as ArkClipboard } from '@ark-ui/react';
 import { Button } from '@/components/ui/tw/primitives';
 import { useWebSocket } from '@/context/websocket-context';
+import { SaveStatus } from '@/components/ui/tw/save-status';
+import { useAutosave } from '@/hooks/use-autosave';
+import { SwitchField } from './common';
 import {
-  fetchNetworkInfo, pickPrimaryUrl, shouldWarnMicNeedsHttps,
+  fetchNetworkInfo, pickPrimaryUrl, setAllowOtherDevices, shouldWarnMicNeedsHttps,
   type NetworkInfo, type NetworkUrl,
 } from '@/api/network.ts';
 
@@ -75,6 +74,18 @@ function RemoteAccess({ active = true }: RemoteAccessProps): JSX.Element {
 
   const [info, setInfo] = useState<NetworkInfo | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  // 允許區網連線：切了就存；存失敗就退回原值。成功後重抓，下面的提示跟著變。
+  const lanSaver = useAutosave(async (allow: boolean) => {
+    const result = await setAllowOtherDevices(baseUrl, allow);
+    if (!result.ok) {
+      setInfo((current) => (current ? { ...current, allow_other_devices: !allow } : current));
+      return { ok: false, error: result.error } as const;
+    }
+    setRefreshTick((n) => n + 1);
+    return { ok: true } as const;
+  }, { delayMs: 0 });
 
   useEffect(() => {
     if (!active) return undefined;
@@ -93,7 +104,7 @@ function RemoteAccess({ active = true }: RemoteAccessProps): JSX.Element {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [active, baseUrl]);
+  }, [active, baseUrl, refreshTick]);
 
   if (loadError) {
     return (
@@ -118,6 +129,27 @@ function RemoteAccess({ active = true }: RemoteAccessProps): JSX.Element {
       <Heading size="md" mb={1}>{t('settings.remoteAccess.tab')}</Heading>
       <Text fontSize="sm" color="whiteAlpha.800">{t('settings.remoteAccess.intro')}</Text>
 
+      <Stack gap={1}>
+        <SwitchField
+          label={t('settings.remoteAccess.allowLan')}
+          help={t('settings.remoteAccess.allowLanHelp')}
+          checked={info.allow_other_devices}
+          onChange={(checked) => {
+            setInfo((current) => (current ? { ...current, allow_other_devices: checked } : current));
+            lanSaver.change(checked);
+          }}
+          disabled={lanSaver.state.phase === 'saving'}
+        />
+        <SaveStatus state={lanSaver.state} />
+        {info.allow_other_devices && info.localhost_only && (
+          <Text fontSize="xs" color="orange.300">{t('settings.remoteAccess.allowLanPendingRestart')}</Text>
+        )}
+        {/* 關掉了，但這次啟動還開著：重啟前其他裝置照樣連得到，要講清楚。 */}
+        {!info.allow_other_devices && !info.localhost_only && (
+          <Text fontSize="xs" color="orange.300">{t('settings.remoteAccess.closeLanPendingRestart')}</Text>
+        )}
+      </Stack>
+
       {/* 有 https_url 就代表 Tailscale Serve 已經把服務代理出去了，遠端存取其實
           是通的——這時再顯示橘色的「遠端存取目前關閉」會跟下面那句
           alreadyReachable 自相矛盾。所以這個提示只在「連 HTTPS 網址都沒有」時出現。 */}
@@ -129,9 +161,11 @@ function RemoteAccess({ active = true }: RemoteAccessProps): JSX.Element {
           <Text fontSize="xs" color="whiteAlpha.800" mb={2}>
             {t('settings.remoteAccess.recommendTailscale')}
           </Text>
-          <Text fontSize="xs" color="whiteAlpha.700">
-            {t('settings.remoteAccess.lanOptIn')}
-          </Text>
+          {!info.allow_other_devices && (
+            <Text fontSize="xs" color="whiteAlpha.700">
+              {t('settings.remoteAccess.lanOptIn')}
+            </Text>
+          )}
         </Box>
       )}
 

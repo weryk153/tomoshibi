@@ -1,4 +1,4 @@
-export const SCENE_TYPES = ["image", "video", "live2d", "model3d"] as const;
+export const SCENE_TYPES = ["image", "video", "live2d", "model3d", "camera"] as const;
 export const SCENE_FITS = ["cover", "contain"] as const;
 
 export type SceneType = (typeof SCENE_TYPES)[number];
@@ -46,18 +46,18 @@ export interface ScenePerformanceBinding {
 }
 
 export interface SceneStore {
-  version: 1;
+  // 第 2 版：背景只由場景決定，沒有內建的「目前背景」場景（見 normalizeSceneStore）。
+  version: 2;
   activeSceneId: string;
   customScenes: ScenePreset[];
   performanceBindings: Record<string, ScenePerformanceBinding>;
 }
 
-export const CURRENT_BACKGROUND_SCENE_ID = "current-background";
-
-export const CURRENT_BACKGROUND_SCENE: ScenePreset = {
-  id: CURRENT_BACKGROUND_SCENE_ID,
-  builtin: true,
-  name: "Current background",
+// 新場景與正規化時缺欄位的預設值。
+const SCENE_DEFAULTS: ScenePreset = {
+  id: "",
+  builtin: false,
+  name: "",
   type: "image",
   sourceUrl: "",
   fit: "cover",
@@ -83,11 +83,58 @@ export const CURRENT_BACKGROUND_SCENE: ScenePreset = {
   },
 };
 
-export function createEmptySceneStore(): SceneStore {
+// 預設背景場景沿用舊「目前背景」的 id：舊演出綁的就是這個 id，轉換後直接接上。
+export const DEFAULT_SCENE_ID = "current-background";
+export const DEFAULT_BACKGROUND_PATH = "/bg/ceiling-window-room-night.jpeg";
+
+export function createDefaultScene(
+  name: string,
+  sourceUrl = DEFAULT_BACKGROUND_PATH,
+): ScenePreset {
+  return { ...createScenePreset(DEFAULT_SCENE_ID, "image", name), sourceUrl };
+}
+
+// 伺服器上的檔案存成相對路徑（/bg/…），顯示時接上後端位址：桌面版的頁面不是從
+// 後端載入的，相對路徑會找錯地方。
+export function resolveSceneUrl(sourceUrl: string, baseUrl: string): string {
+  if (!sourceUrl.startsWith("/") || sourceUrl.startsWith("//")) return sourceUrl;
+  return `${baseUrl.replace(/\/+$/, "")}${sourceUrl}`;
+}
+
+// 伺服器 backgrounds/ 底下的一張圖。檔名可能有空白、#、? 之類，要編碼。
+export function serverBackgroundUrl(name: string): string {
+  return `/bg/${encodeURIComponent(name)}`;
+}
+
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+// 指向這台後端 /bg/ 的完整網址（以前一般頁存的就是這種）改存相對路徑：換了連線
+// 位址（localhost／127.0.0.1／區網）也找得到，內建背景選單也認得。別的網站的網址不動。
+function localServerPath(url: string, baseUrl?: string): string {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.pathname.startsWith("/bg/")) return url;
+    const sameServer = baseUrl ? parsed.origin === new URL(baseUrl).origin : false;
+    return sameServer || LOOPBACK_HOSTS.has(parsed.hostname) ? parsed.pathname : url;
+  } catch {
+    return url;
+  }
+}
+
+// 開 app 時不自己打開攝影機：上次停在攝影機場景的話，改用第一個不是攝影機的場景。
+// （桌面版的攝影機權限是自動允許的，不改的話每次開 app 鏡頭就亮。）
+export function withoutCameraAtStartup(store: SceneStore): SceneStore {
+  const active = store.customScenes.find((scene) => scene.id === store.activeSceneId);
+  if (active?.type !== "camera") return store;
+  const other = store.customScenes.find((scene) => scene.type !== "camera");
+  return other ? { ...store, activeSceneId: other.id } : store;
+}
+
+export function createEmptySceneStore(defaultName = "Background"): SceneStore {
   return {
-    version: 1,
-    activeSceneId: CURRENT_BACKGROUND_SCENE_ID,
-    customScenes: [],
+    version: 2,
+    activeSceneId: DEFAULT_SCENE_ID,
+    customScenes: [createDefaultScene(defaultName)],
     performanceBindings: {},
   };
 }
@@ -98,7 +145,7 @@ export function createScenePreset(
   name = "New scene",
 ): ScenePreset {
   return {
-    ...cloneScenePreset(CURRENT_BACKGROUND_SCENE),
+    ...cloneScenePreset(SCENE_DEFAULTS),
     id,
     builtin: false,
     name,
@@ -168,8 +215,8 @@ function normalizeScene(value: unknown): ScenePreset | null {
   const name = String(raw.name || "").trim() || "Untitled scene";
   if (!/^[a-z0-9][a-z0-9_-]{0,63}$/i.test(id)) return null;
 
-  const defaults = CURRENT_BACKGROUND_SCENE.model;
-  const live2dDefaults = CURRENT_BACKGROUND_SCENE.live2d;
+  const defaults = SCENE_DEFAULTS.model;
+  const live2dDefaults = SCENE_DEFAULTS.live2d;
   const model = raw.model || defaults;
   const live2d = raw.live2d || live2dDefaults;
   const backgroundColor = String(
@@ -237,29 +284,43 @@ function normalizeScene(value: unknown): ScenePreset | null {
 }
 
 export function getScenePresets(store: SceneStore): ScenePreset[] {
-  return [
-    cloneScenePreset(CURRENT_BACKGROUND_SCENE),
-    ...store.customScenes.map(cloneScenePreset),
-  ];
+  return store.customScenes.map(cloneScenePreset);
 }
 
-export function normalizeSceneStore(value: unknown): SceneStore {
-  if (!value || typeof value !== "object") return createEmptySceneStore();
-  const raw = value as Partial<SceneStore>;
-  const usedIds = new Set([CURRENT_BACKGROUND_SCENE_ID]);
-  const customScenes = Array.isArray(raw.customScenes)
-    ? raw.customScenes
-        .map(normalizeScene)
-        .filter((scene): scene is ScenePreset => {
-          if (!scene || usedIds.has(scene.id)) return false;
-          usedIds.add(scene.id);
-          return true;
-        })
-        .slice(0, 100)
-    : [];
+export function normalizeSceneStore(
+  value: unknown,
+  options: { legacyBackgroundUrl?: string | null; defaultName?: string; baseUrl?: string } = {},
+): SceneStore {
+  const defaultName = options.defaultName ?? "Background";
+  const raw = (value && typeof value === "object" ? value : {}) as Partial<
+    Omit<SceneStore, "version">
+  > & { version?: number };
+  // 第 2 版以前（或從沒存過）：舊的「目前背景」是內建場景、背景本身記在一般頁，
+  // 這裡一次性轉成一個普通的圖片場景放在最前面。之後刪掉就是刪掉了。
+  const legacy = !(typeof raw.version === "number" && raw.version >= 2);
+  const usedIds = new Set<string>();
+  const scenes: ScenePreset[] = [];
+  if (legacy) {
+    const legacyUrl = normalizeSourceUrl(options.legacyBackgroundUrl);
+    const url = legacyUrl ? localServerPath(legacyUrl, options.baseUrl) : DEFAULT_BACKGROUND_PATH;
+    scenes.push(createDefaultScene(defaultName, url));
+    usedIds.add(DEFAULT_SCENE_ID);
+  }
+  if (Array.isArray(raw.customScenes)) {
+    raw.customScenes.map(normalizeScene).forEach((scene) => {
+      if (!scene || usedIds.has(scene.id) || scenes.length >= 100) return;
+      usedIds.add(scene.id);
+      scenes.push({ ...scene, sourceUrl: localServerPath(scene.sourceUrl, options.baseUrl) });
+    });
+  }
+  // 全部刪光：補一個預設背景，畫面不會空白。
+  if (scenes.length === 0) {
+    scenes.push(createDefaultScene(defaultName));
+    usedIds.add(DEFAULT_SCENE_ID);
+  }
   const activeSceneId = usedIds.has(String(raw.activeSceneId))
     ? String(raw.activeSceneId)
-    : CURRENT_BACKGROUND_SCENE_ID;
+    : scenes[0].id;
   const performanceBindings: Record<string, ScenePerformanceBinding> = {};
   if (raw.performanceBindings && typeof raw.performanceBindings === "object") {
     Object.entries(raw.performanceBindings)
@@ -278,9 +339,9 @@ export function normalizeSceneStore(value: unknown): SceneStore {
       });
   }
   return {
-    version: 1,
+    version: 2,
     activeSceneId,
-    customScenes,
+    customScenes: scenes,
     performanceBindings,
   };
 }

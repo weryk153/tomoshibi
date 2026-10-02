@@ -164,7 +164,6 @@
         "clean": "清爽淺色",
         "cute": "粉嫩可愛"
       },
-      "useCameraBackground": "使用攝像頭背景",
       "showSubtitle": "顯示字幕",
       "voiceVolume": "語音音量（%）",
       "voiceVolumeHelp": "她說話的音量。超過 100% 會真的放大訊號（GPT-SoVITS 的輸出本來就很小聲），後面串了限幅器所以不會破音。不影響配樂，也不影響嘴型——嘴型走的是另一條管線，音量調到 0 嘴還是會動。",
@@ -185,16 +184,6 @@
       "engineBackgroundUrl": "背景工作的端點",
       "engineBackgroundModel": "背景工作的模型",
       "engineBackgroundInvalid": "沒有存：端點要是 http:// 或 https:// 開頭的網址，兩欄都不能有引號或換行。",
-      "backgroundImage": "背景圖片",
-      "customBgUrlPlaceholder": "輸入圖片網址",
-      "bgUpload": "上傳圖片",
-      "bgUploadLabel": "上傳背景",
-      "bgUploadHelp": "從你的電腦選一張圖，會存到伺服器並加進上面的清單。",
-      "bgUploaded": "背景已上傳並套用。",
-      "bgUploadFailed": "背景上傳失敗，請再試一次。",
-      "bgNotImage": "請選擇圖片檔。",
-      "bgTooLarge": "圖片太大 — 請選 12MB 以下的。",
-      "customBgUrl": "或輸入自訂背景網址",
       "wsUrl": "WebSocket 位址",
       "baseUrl": "伺服器位址",
       "imageCompressionQuality": "圖片壓縮品質",
@@ -206,11 +195,10 @@
       "cameraDenied": "沒有攝影機權限，所以背景沒有切換。請在瀏覽器或系統設定裡允許這個 App 使用攝影機。",
       "cameraNotFound": "找不到攝影機，所以背景沒有切換。請確認裝置已接上。",
       "cameraInUse": "攝影機正被其他程式使用，所以背景沒有切換。關掉那個程式再試一次。",
-      "cameraFailed": "攝影機開啟失敗，所以背景沒有切換。",
+      "cameraFailed": "攝影機開啟失敗。",
       "connectionSection": "連線設定",
       "connectionHelp": "這兩個欄位改完要按「連線」才生效——邊打邊套用的話，每輸入一個字元就會重連一次。",
-      "connect": "連線",
-      "customBgUrlEmpty": "網址不能空白"
+      "connect": "連線"
     },
     "characters": {
       "description": "建立、編輯、切換你的陪伴角色，完全不用碰 YAML。",
@@ -274,7 +262,7 @@
       "voiceLangHelp": "語音合成用哪種語言唸。跟上面的回覆語言不同時，後端會在合成前先翻譯一次，每句多花數秒——兩者設成一樣最快。",
       "ttsEngine": "語音合成引擎",
       "ttsEngineInherit": "跟底稿角色一樣",
-      "ttsEngineHelp": "她用哪個引擎發聲：Edge TTS 用上面的聲音，GPT-SoVITS 用下面的參考音。選「跟底稿角色一樣」會把底稿角色現在的選擇存成她自己的。",
+      "ttsEngineHelp": "她用哪個引擎發聲；選了之後下面只出現那個引擎的設定。選「跟底稿角色一樣」會把底稿角色現在的選擇存成她自己的。",
       "aiAvatar": "AI 頭像",
       "aiAvatarHelp": "顯示在 AI 訊息旁的頭像。留空則用名稱首字。圖片請小於 512KB。",
       "aiAvatarChoose": "選擇頭像",
@@ -418,7 +406,8 @@
       "sharedBadge": "（Live2D 與 VRM 共用）",
       "live2dOnlySectionTitle": "動作與表情對應（Live2D 專屬）",
       "vrmOnlySectionTitle": "動作與表情對應（VRM 專屬）",
-      "motionConfigFixErrors": "有欄位不合法，改好才會存"
+      "motionConfigFixErrors": "有欄位不合法，改好才會存",
+      "previewNotOnScreen": "這個模型不在畫面上，不能試播；換到用它的角色就能試。"
     },
     "performances": {
       "title": "演出方案管理",
@@ -504,8 +493,6 @@
       "add3d": "新增 3D 場景",
       "active": "使用中",
       "use": "套用",
-      "currentBackground": "目前背景",
-      "currentBackgroundHelp": "沿用「常規」分頁設定的背景圖片或攝影機畫面。",
       "name": "場景名稱",
       "type": "場景種類",
       "asset": "本機素材",
@@ -541,7 +528,8 @@
         "image": "2D 圖片",
         "video": "2D 影片",
         "live2d": "2D Live2D 模型",
-        "model3d": "3D 場景"
+        "model3d": "3D 場景",
+        "camera": "攝影機"
       },
       "fits": {
         "cover": "填滿並裁切",
@@ -555,7 +543,12 @@
       },
       "usingImportedFile": "目前用匯入的檔案；要改用網址或換類型，先移除檔案",
       "removeFile": "移除檔案",
-      "removeFileConfirm": "確定移除匯入的檔案？"
+      "removeFileConfirm": "確定移除匯入的檔案？",
+      "defaultBackground": "背景",
+      "addCamera": "新增攝影機",
+      "cameraHelp": "背景是你的攝影機畫面（左右鏡像）。用這個場景時才會開攝影機。",
+      "serverBackground": "內建背景",
+      "serverBackgroundPlaceholder": "選一張伺服器上的背景圖"
     },
     "asr": {
       "micModeLabel": "麥克風模式",
@@ -678,7 +671,7 @@
       "asrEngineLabel": "辨識引擎",
       "asrEnginePlaceholder": "選一個辨識引擎",
       "asrEngineHelp": "把你說的話轉成文字的引擎。sherpa=純 CPU、任何機器可跑；faster-whisper=要先下載模型、CPU 慢、有 NVIDIA GPU 才快（Mac 的 MPS 不支援）；groq/azure=雲端，要網路與金鑰、零本地算力。",
-      "asrEngineSectionNote": "這個區塊有自己的儲存按鈕，按下就直接寫進設定檔——但要重啟後端（或重新切換一次角色）才會套用到目前的對話。",
+      "asrEngineSectionNote": "辨識引擎與金鑰按下面的「儲存」才會切換；存好之後由設定頂端的提示重新載入。",
       "asrEnginePendingNotice": "尚未儲存——目前仍在用 {{current}}。請在下面輸入憑證並按儲存才會切換。",
       "asrSherpa": "sherpa-onnx（本地 · CPU · 輕量，預設）",
       "asrFasterWhisper": "faster-whisper（本地 · 較準 · 需要 GPU · 這裡沒裝相依套件，選了會靜默退回 sherpa-onnx）",
@@ -762,11 +755,15 @@
       "micHttpsNote": "用 http 網址可以打字聊天，但麥克風需要 HTTPS。要在手機上講話，請依教學設定 Tailscale Serve（HTTPS）。",
       "offTitle": "在手機或平板上使用",
       "recommendTailscale": "最簡單又安全的方式是用 Tailscale——私密、加密，而且麥克風也能用。請看教學（docs/remote-access-tailscale.md）。",
-      "lanOptIn": "或：想同一個 Wi-Fi 直接連，可在 conf.yaml 把 host 設成 0.0.0.0——但只在你信任的網路這麼做（同網路的人都能打開、沒有密碼保護）。",
+      "lanOptIn": "或：同一個 Wi-Fi 直接連，打開上面的「允許區網連線」——只在你信任的網路這麼做（同網路的人都能打開、沒有密碼保護）。",
       "alreadyReachable": "上面的 HTTPS 網址已經可以從手機連線，直接掃描或複製使用即可。",
       "empty": "找不到可用的網路位址",
       "loading": "正在尋找可用的網路位址…",
-      "error": "讀取網路位址失敗"
+      "error": "讀取網路位址失敗",
+      "allowLan": "允許區網連線",
+      "allowLanHelp": "打開後，同一個網路上的任何人都能打開這個 App，沒有密碼保護；只在你信任的網路打開。要重新啟動後端才生效。",
+      "allowLanPendingRestart": "已打開，重新啟動後端之後其他裝置才連得到。",
+      "closeLanPendingRestart": "已關閉，但重新啟動後端之前，其他裝置還是連得到。"
     },
     "about": {
       "title": "Tomoshibi",
@@ -842,12 +839,17 @@
         "perfPreset": "效能模式",
         "memory": "長期記憶開關",
         "character": "正在用的角色",
-        "other": "其他設定"
+        "other": "其他設定",
+        "host": "允許區網連線"
       },
-      "liveBlocked": "直播中不能重新載入，直播結束後再按。"
+      "liveBlocked": "直播中不能重新載入，直播結束後再按。",
+      "restart": "重新啟動後端",
+      "restartCommand": "要重新啟動後端才會生效：在執行後端的終端機按 Ctrl+C，再執行 uv run run_server.py。",
+      "restartFailed": "重新啟動後端失敗，後端可能已經停了。可以再試一次，或關掉 App 重開。記錄檔：{{path}}",
+      "retry": "再試一次"
     },
     "stage": {
-      "display": "字幕、音量與背景",
+      "display": "字幕與音量",
       "canvas": "畫布互動"
     },
     "models": {

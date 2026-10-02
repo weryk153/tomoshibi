@@ -1,7 +1,6 @@
 /* eslint-disable no-shadow */
-import { app, ipcMain, globalShortcut, desktopCapturer } from "electron";
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { app, ipcMain, globalShortcut, desktopCapturer, session } from "electron";
+import { appOriginFor } from "./app-origin";
 import { electronApp, optimizer } from "@electron-toolkit/utils";
 import { WindowManager } from "./window-manager";
 import { MenuManager } from "./menu-manager";
@@ -12,40 +11,6 @@ let windowManager: WindowManager;
 let menuManager: MenuManager;
 const backendManager = new BackendManager();
 let isQuitting = false;
-
-interface BackgroundPreferences {
-  backgroundUrl: string;
-}
-
-const backgroundPreferencesPath = (): string => join(
-  app.getPath('userData'),
-  'background-preferences.json',
-);
-
-async function readBackgroundPreferences(): Promise<BackgroundPreferences | null> {
-  try {
-    const parsed = JSON.parse(await readFile(backgroundPreferencesPath(), 'utf8'));
-    if (typeof parsed?.backgroundUrl !== 'string' || !parsed.backgroundUrl.trim()) {
-      return null;
-    }
-    return { backgroundUrl: parsed.backgroundUrl };
-  } catch {
-    return null;
-  }
-}
-
-async function writeBackgroundPreferences(
-  preferences: BackgroundPreferences,
-): Promise<void> {
-  if (typeof preferences?.backgroundUrl !== 'string' || !preferences.backgroundUrl.trim()) {
-    return;
-  }
-  await writeFile(
-    backgroundPreferencesPath(),
-    `${JSON.stringify({ backgroundUrl: preferences.backgroundUrl }, null, 2)}\n`,
-    'utf8',
-  );
-}
 
 function setupIPC(): void {
   ipcMain.handle("get-platform", () => process.platform);
@@ -111,11 +76,24 @@ function setupIPC(): void {
     return sources[0].id;
   });
 
-  ipcMain.handle('background-preferences:get', readBackgroundPreferences);
-  ipcMain.handle(
-    'background-preferences:set',
-    (_event, preferences: BackgroundPreferences) => writeBackgroundPreferences(preferences),
-  );
+
+  // 設定頁「重新啟動後端」：只有這個 app 自己起的後端能重啟。開發模式、或沿用
+  // 別人已經開著的後端時，回 not-managed，畫面改成告訴使用者指令。
+  // 同時按兩次（或兩個視窗）共用同一次重啟：兩個 start() 疊在一起會起兩個後端，
+  // 後起的那個蓋掉 child，先起的就沒人關得到了。
+  let restarting: Promise<{ ok: boolean; reason?: string; logPath?: string }> | null = null;
+  ipcMain.handle('backend:restart', () => {
+    if (restarting) return restarting;
+    restarting = (async () => {
+      if (!backendManager.isRunning()) return { ok: false, reason: 'not-managed' };
+      await backendManager.stop();
+      const result = await backendManager.start(() => {});
+      return result.kind === 'started'
+        ? { ok: true }
+        : { ok: false, reason: 'failed', logPath: backendManager.logPath };
+    })().finally(() => { restarting = null; });
+    return restarting;
+  });
 }
 
 app.whenReady().then(async () => {
@@ -181,6 +159,16 @@ app.whenReady().then(async () => {
 
   app.on("browser-window-created", (_, window) => {
     optimizer.watchWindowShortcuts(window);
+  });
+
+  // 我們自己的頁面（file://）送給後端的請求，Origin 改成後端自己的位址，後端才
+  // 認得出是 app 自己的頁面（見 app-origin.ts、後端 origin_guard.py）。
+  session.defaultSession.webRequest.onBeforeSendHeaders((details, callback) => {
+    const headers = details.requestHeaders;
+    const key = Object.keys(headers).find((name) => name.toLowerCase() === 'origin');
+    const origin = appOriginFor(key ? headers[key] : undefined, details.url);
+    if (key && origin) headers[key] = origin;
+    callback({ requestHeaders: headers });
   });
 
   app.on('web-contents-created', (_, contents) => {

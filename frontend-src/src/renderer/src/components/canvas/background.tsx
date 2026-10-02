@@ -1,51 +1,20 @@
+// 場景沒有可顯示的東西（網址空的、載入失敗、Live2D 場景的底）時的退路：預設背景圖。
+// 背景由場景決定，這裡不再讀任何設定。
 import { Box, Image } from '@chakra-ui/react';
-import { memo, useEffect, useRef } from 'react';
+import { memo } from 'react';
 import { canvasStyles } from './canvas-styles';
-import { useCamera } from '@/context/camera-context';
-import { useBgUrl } from '@/context/bgurl-context';
+import { useWebSocket } from '@/context/websocket-context';
+import { DEFAULT_BACKGROUND_PATH, resolveSceneUrl } from '@/scenes/scene';
 
 const Background = memo(({ children }: { children?: React.ReactNode }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const {
-    backgroundStream, isBackgroundStreaming, startBackgroundCamera, stopBackgroundCamera,
-  } = useCamera();
-  const { useCameraBackground, backgroundUrl } = useBgUrl();
-
-  useEffect(() => {
-    if (useCameraBackground) {
-      startBackgroundCamera();
-    } else {
-      stopBackgroundCamera();
-    }
-  }, [useCameraBackground, startBackgroundCamera, stopBackgroundCamera]);
-
-  useEffect(() => {
-    if (videoRef.current && backgroundStream) {
-      videoRef.current.srcObject = backgroundStream;
-    }
-  }, [backgroundStream]);
-
+  const { baseUrl } = useWebSocket();
   return (
     <Box {...canvasStyles.background.container}>
-      {useCameraBackground ? (
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          style={{
-            ...canvasStyles.background.video,
-            display: isBackgroundStreaming ? 'block' : 'none',
-            transform: 'scaleX(-1)',
-          }}
-        />
-      ) : (
-        <Image
-          {...canvasStyles.background.image}
-          src={backgroundUrl}
-          alt="background"
-        />
-      )}
+      <Image
+        {...canvasStyles.background.image}
+        src={resolveSceneUrl(DEFAULT_BACKGROUND_PATH, baseUrl)}
+        alt="background"
+      />
       {children}
     </Box>
   );

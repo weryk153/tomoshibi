@@ -9,6 +9,8 @@ const MAX_BYTES: Record<SceneType, number> = {
   video: 250 * 1024 * 1024,
   live2d: 0,
   model3d: 120 * 1024 * 1024,
+  // 攝影機場景沒有檔案。
+  camera: 0,
 };
 
 const EXTENSIONS: Record<SceneType, readonly string[]> = {
@@ -16,6 +18,7 @@ const EXTENSIONS: Record<SceneType, readonly string[]> = {
   video: [".mp4", ".webm", ".mov", ".m4v", ".ogv"],
   live2d: [],
   model3d: [".glb"],
+  camera: [],
 };
 
 export type SceneAssetError = "empty" | "unsupported" | "tooLarge";

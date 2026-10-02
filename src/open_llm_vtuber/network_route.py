@@ -27,6 +27,7 @@ from fastapi import APIRouter, Request
 from loguru import logger
 from starlette.responses import JSONResponse
 
+from . import pending_changes
 from .api_guard import (
     forbidden as _forbidden,
     is_tailscale_ip as _is_cgnat,
@@ -64,14 +65,10 @@ def current_host() -> str:
         return "127.0.0.1"
 
 
-def _server_bound_localhost_only() -> bool:
-    """伺服器是不是只聽 loopback。
-
-    是的話，底下算出來的 LAN 與 Tailscale IP 網址其實連不通——UI 要據此顯示
-    引導，而不是列出一串按了沒反應的網址。（Tailscale Serve 不受影響，它是從
-    loopback 代理進來的。）
-    """
-    return is_localhost_only(current_host())
+def _same_bind(a: str, b: str) -> bool:
+    """兩個綁定位址效果一樣嗎：一樣的字串，或都是只聽本機。"""
+    a, b = str(a).strip(), str(b).strip()
+    return a == b or (is_localhost_only(a) and is_localhost_only(b))
 
 
 def write_host(allow_other_devices: bool) -> None:
@@ -182,7 +179,7 @@ def _tailscale_serve_https_url(port: Optional[int]) -> Optional[str]:
     return None
 
 
-def _collect_network_urls(request: Request) -> dict:
+def _collect_network_urls(request: Request, startup_host: str) -> dict:
     """Reachable URLs other devices can use to open this companion: the LAN URL
     (same Wi-Fi), the Tailscale URL (anywhere), and — if Tailscale Serve is
     proxying HTTPS to this port — the secure HTTPS URL the microphone needs."""
@@ -214,7 +211,10 @@ def _collect_network_urls(request: Request) -> dict:
         "https_url": https_url,
         # True when the server only listens on loopback — the LAN/Tailscale-IP
         # URLs above won't connect, so the UI shows setup guidance instead.
-        "localhost_only": _server_bound_localhost_only(),
+        # 這次啟動實際綁的位址；conf.yaml 改了也要重啟才算數。
+        "localhost_only": is_localhost_only(startup_host),
+        # conf.yaml 的設定（設定頁開關顯示這個）。重啟前可以跟上面不同。
+        "allow_other_devices": not is_localhost_only(current_host()),
         # Microphone capture needs a secure context (HTTPS) on a remote host;
         # plain-IP http works for text but not the mic. Tailscale Serve = HTTPS.
         "mic_needs_https": scheme != "https",
@@ -224,12 +224,14 @@ def _collect_network_urls(request: Request) -> dict:
 def init_network_route() -> APIRouter:
     """遠端存取的端點。"""
     router = APIRouter()
+    # 伺服器啟動時建 router：這時讀到的就是這次綁的位址。
+    startup_host = current_host()
 
     @router.get("/api/network-info")
     async def network_info(request: Request):
         # 刻意不限本機：已經連到這台伺服器的裝置，本來就有資格知道其他可用的
         # 網址（例如要把網址給平板）。回傳的只有非機密的 LAN／Tailscale 位址。
-        info = await asyncio.to_thread(_collect_network_urls, request)
+        info = await asyncio.to_thread(_collect_network_urls, request, startup_host)
         return JSONResponse(info)
 
     @router.post("/api/network/host")
@@ -264,6 +266,13 @@ def init_network_route() -> APIRouter:
                 content={"ok": False, "error": "Could not write config file."},
             )
 
+        new_host = OPEN_HOST if allow else "127.0.0.1"
+        # 綁定位址啟動時就決定了：跟這次啟動時不同才要重啟；改回原樣就不用。
+        # 比實際位址，不只比「是不是本機」：啟動時綁某個區網 IP、改成 0.0.0.0 也要重啟。
+        if _same_bind(new_host, startup_host):
+            pending_changes.unmark("host")
+        else:
+            pending_changes.mark("host")
         logger.info(f"[network] host set to {'0.0.0.0' if allow else '127.0.0.1'}")
         return JSONResponse(
             {

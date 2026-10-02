@@ -164,7 +164,6 @@
         "clean": "クリーン",
         "cute": "キュート"
       },
-      "useCameraBackground": "カメラを背景に使う",
       "showSubtitle": "字幕を表示",
       "voiceVolume": "音声の音量（%）",
       "voiceVolumeHelp": "キャラクターの声の再生音量。100% を超えると信号を増幅します（GPT-SoVITS の出力はもともと小さめ）。リミッターを通すので音割れしません。BGM とリップシンクには影響しません。",
@@ -185,16 +184,6 @@
       "engineBackgroundUrl": "バックグラウンド処理のエンドポイント",
       "engineBackgroundModel": "バックグラウンド処理のモデル",
       "engineBackgroundInvalid": "保存されませんでした：エンドポイントは http:// か https:// で始まる URL にし、どちらの欄にも引用符や改行を入れないでください。",
-      "backgroundImage": "背景画像",
-      "customBgUrlPlaceholder": "画像URLを入力",
-      "bgUpload": "画像をアップロード",
-      "bgUploadLabel": "背景をアップロード",
-      "bgUploadHelp": "パソコンから画像を選ぶと、サーバーに保存され上のリストに追加されます。",
-      "bgUploaded": "背景をアップロードして適用しました。",
-      "bgUploadFailed": "背景をアップロードできませんでした。もう一度お試しください。",
-      "bgNotImage": "画像ファイルを選んでください。",
-      "bgTooLarge": "画像が大きすぎます。12MB以下を選んでください。",
-      "customBgUrl": "またはカスタム背景URLを入力",
       "wsUrl": "WebSocket URL",
       "baseUrl": "Base URL",
       "imageCompressionQuality": "画像の圧縮品質",
@@ -206,11 +195,10 @@
       "cameraDenied": "カメラの権限がないため、背景は切り替わりませんでした。ブラウザまたはシステム設定でカメラを許可してください。",
       "cameraNotFound": "カメラが見つからないため、背景は切り替わりませんでした。接続を確認してください。",
       "cameraInUse": "カメラが他のアプリで使用中のため、背景は切り替わりませんでした。そのアプリを終了して再試行してください。",
-      "cameraFailed": "カメラを起動できなかったため、背景は切り替わりませんでした。",
+      "cameraFailed": "カメラを起動できませんでした。",
       "connectionSection": "接続設定",
       "connectionHelp": "この2つは「接続」を押すと反映されます。入力のたびに適用すると、1文字ごとに再接続が走ってしまいます。",
-      "connect": "接続",
-      "customBgUrlEmpty": "URL を空にはできません"
+      "connect": "接続"
     },
     "characters": {
       "description": "コンパニオンのキャラクターを作成・編集・切り替えできます。YAMLを触る必要はありません。",
@@ -274,7 +262,7 @@
       "voiceLangHelp": "音声合成が読み上げる言語です。上の返答の言語と違う場合、バックエンドは合成前に翻訳を挟むため一文ごとに数秒増えます。両方を揃えるのが最速です。",
       "ttsEngine": "音声合成エンジン",
       "ttsEngineInherit": "ベースキャラクターと同じ",
-      "ttsEngineHelp": "彼女が話すエンジンを選びます。Edge TTS は上の声、GPT-SoVITS は下の参照音声を使います。「ベースキャラクターと同じ」を選ぶと、ベースキャラクターの今の選択を彼女の設定として保存します。",
+      "ttsEngineHelp": "彼女が話すエンジンを選びます。選ぶと下にそのエンジンの設定だけが表示されます。「ベースキャラクターと同じ」を選ぶと、ベースキャラクターの今の選択を彼女の設定として保存します。",
       "aiAvatar": "AIのアバター",
       "aiAvatarHelp": "AIのメッセージの横に表示されるアバターです。空欄にすると名前の頭文字を使います。画像は512KB未満にしてください。",
       "aiAvatarChoose": "アバターを選ぶ",
@@ -418,7 +406,8 @@
       "sharedBadge": "（Live2D と VRM で共通）",
       "live2dOnlySectionTitle": "モーションと表情の対応（Live2D 専用）",
       "vrmOnlySectionTitle": "モーションと表情の対応（VRM 専用）",
-      "motionConfigFixErrors": "不正な欄があります。直すと保存されます"
+      "motionConfigFixErrors": "不正な欄があります。直すと保存されます",
+      "previewNotOnScreen": "このモデルは画面に表示されていないため試せません。このモデルを使うキャラクターに切り替えてください。"
     },
     "performances": {
       "title": "演出プリセット管理",
@@ -504,8 +493,6 @@
       "add3d": "3Dシーンを追加",
       "active": "使用中",
       "use": "適用",
-      "currentBackground": "現在の背景",
-      "currentBackgroundHelp": "「一般」タブで設定した背景画像またはカメラ映像を使用します。",
       "name": "シーン名",
       "type": "シーン種類",
       "asset": "ローカル素材",
@@ -541,7 +528,8 @@
         "image": "2D画像",
         "video": "2D動画",
         "live2d": "2D Live2Dモデル",
-        "model3d": "3Dシーン"
+        "model3d": "3Dシーン",
+        "camera": "カメラ"
       },
       "fits": {
         "cover": "画面を埋めて切り抜く",
@@ -555,7 +543,12 @@
       },
       "usingImportedFile": "インポートしたファイルを使っています。URL や種類を変えるには先にファイルを削除してください",
       "removeFile": "ファイルを削除",
-      "removeFileConfirm": "インポートしたファイルを削除しますか？"
+      "removeFileConfirm": "インポートしたファイルを削除しますか？",
+      "defaultBackground": "背景",
+      "addCamera": "カメラを追加",
+      "cameraHelp": "背景にカメラ映像（左右反転）を表示します。このシーンを使っている間だけカメラがオンになります。",
+      "serverBackground": "内蔵の背景",
+      "serverBackgroundPlaceholder": "サーバーの背景画像を選ぶ"
     },
     "asr": {
       "micModeLabel": "マイクのモード",
@@ -678,7 +671,7 @@
       "asrEngineLabel": "認識エンジン",
       "asrEnginePlaceholder": "認識エンジンを選択",
       "asrEngineHelp": "あなたの発話をテキストに変換するエンジンです。sherpa＝純CPUで、どのマシンでも動きます。faster-whisper＝モデルをダウンロードし、CPUでは遅く、NVIDIA GPUがあるときだけ高速です（MacのMPSは非対応）。groq/azure＝クラウドで、ネットワークとキーが必要ですが、ローカルの計算は不要です。",
-      "asrEngineSectionNote": "このセクションには独自の保存ボタンがあり、押すと設定ファイルに直接書き込まれます。ただし現在の会話に反映するにはバックエンドの再起動（またはキャラクターの切り替え直し）が必要です。",
+      "asrEngineSectionNote": "認識エンジンとキーは下の「保存」を押したときに切り替わります。その後、設定上部の通知から再読み込みしてください。",
       "asrEnginePendingNotice": "まだ保存されていません——現在も {{current}} を使用中です。下で認証情報を入力し、保存を押すと切り替わります。",
       "asrSherpa": "sherpa-onnx（ローカル・CPU・軽量、デフォルト）",
       "asrFasterWhisper": "faster-whisper（ローカル・高精度・GPU必須・依存関係が未導入のため、選択すると sherpa-onnx に静かにフォールバック）",
@@ -762,11 +755,15 @@
       "micHttpsNote": "テキストチャットはhttpで使えますが、マイクにはHTTPSが必要です。スマホで話すには、ガイドに従ってTailscale Serve（HTTPS）を設定してください。",
       "offTitle": "スマホやタブレットで使う",
       "recommendTailscale": "いちばん簡単で安全なのはTailscaleです。プライベートで暗号化され、マイクも使えます。ガイド（docs/remote-access-tailscale.md）をご覧ください。",
-      "lanOptIn": "または、同じWi-Fiでアクセスするには、conf.yamlでhost: 0.0.0.0に設定してください。ただし、信頼できるネットワークでのみ行ってください（同じネットワークの誰でも開けてしまい、パスワード保護はありません）。",
+      "lanOptIn": "または、上の「LAN からの接続を許可」をオンにすると同じ Wi-Fi から直接接続できます。信頼できるネットワークでのみ（同じネットワークの誰でも開けます。パスワードはありません）。",
       "alreadyReachable": "上のHTTPS URLはすでにスマホから利用できます。スキャンするかコピーして使ってください。",
       "empty": "到達可能なネットワークアドレスが見つかりません",
       "loading": "到達可能なネットワークアドレスを探しています…",
-      "error": "ネットワークアドレスの読み込みに失敗しました"
+      "error": "ネットワークアドレスの読み込みに失敗しました",
+      "allowLan": "LAN からの接続を許可",
+      "allowLanHelp": "オンにすると、同じネットワーク上の誰でもこのアプリを開けます（パスワードなし）。信頼できるネットワークでのみ使ってください。バックエンドの再起動後に反映されます。",
+      "allowLanPendingRestart": "オンにしました。バックエンドの再起動後に他の端末から接続できます。",
+      "closeLanPendingRestart": "オフにしましたが、バックエンドを再起動するまでは他の端末から接続できます。"
     },
     "about": {
       "title": "Tomoshibi",
@@ -842,12 +839,17 @@
         "perfPreset": "パフォーマンスモード",
         "memory": "長期記憶のスイッチ",
         "character": "使用中のキャラクター",
-        "other": "その他の設定"
+        "other": "その他の設定",
+        "host": "LAN からの接続を許可"
       },
-      "liveBlocked": "配信中は再読み込みできません。配信終了後に押してください。"
+      "liveBlocked": "配信中は再読み込みできません。配信終了後に押してください。",
+      "restart": "バックエンドを再起動",
+      "restartCommand": "バックエンドの再起動後に反映されます：実行中のターミナルで Ctrl+C を押し、uv run run_server.py を実行してください。",
+      "restartFailed": "バックエンドの再起動に失敗しました（停止している可能性があります）。もう一度試すか、アプリを終了して開き直してください。ログ：{{path}}",
+      "retry": "もう一度試す"
     },
     "stage": {
-      "display": "字幕・音量・背景",
+      "display": "字幕と音量",
       "canvas": "キャンバス操作"
     },
     "models": {

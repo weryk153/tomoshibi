@@ -10,6 +10,9 @@ def init_pending_route() -> APIRouter:
 
     @router.get("/api/pending-changes")
     async def get_pending():
-        return {"pending": pending_changes.pending()}
+        return {
+            "pending": pending_changes.pending(),
+            "needs_restart": pending_changes.needs_restart(),
+        }
 
     return router

@@ -22,7 +22,8 @@ tests/test_api_guard.py 釘住。
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Optional
+from urllib.parse import urlsplit
 
 from ruamel.yaml import YAML
 from starlette.responses import JSONResponse
@@ -130,3 +131,30 @@ def make_yaml() -> YAML:
     yaml.width = 4096
     yaml.indent(mapping=2, sequence=4, offset=2)
     return yaml
+
+
+# 本機的開發伺服器（前端 vite、Electron 開發模式）：只有這台機器上的程式會在這裡。
+_LOCAL_ORIGIN_HOSTS = {"localhost", "127.0.0.1", "[::1]", "::1"}
+
+
+def origin_allowed(origin: Optional[str], host: Optional[str], tailscale: bool) -> bool:
+    """瀏覽器送來的請求是不是這個 app 自己的頁面發的。
+
+    跨站請求一定帶 Origin；沒帶的是腳本或 curl，不是 CSRF 的路徑，放行。
+    - 跟伺服器同一個位址（Host 標頭）：app 自己的頁面，含區網手機與舞台頁。
+    - localhost／127.0.0.1／::1 的任何埠：本機的開發伺服器。
+    - 從 Tailscale 進來、Origin 是 *.ts.net：Tailscale Serve 前面的頁面（Serve
+      可能把 Host 改成本機位址，所以不能只比 Host）。
+    其他一律不放行，包括沙箱 iframe 送的 "null"。
+    """
+    if origin is None:
+        return True
+    parsed = urlsplit(origin)
+    if parsed.scheme not in ("http", "https") or not parsed.netloc:
+        return False
+    if host and parsed.netloc.lower() == host.lower():
+        return True
+    hostname = (parsed.hostname or "").lower()
+    if hostname in _LOCAL_ORIGIN_HOSTS:
+        return True
+    return tailscale and hostname.endswith(".ts.net")

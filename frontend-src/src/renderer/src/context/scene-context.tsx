@@ -7,12 +7,15 @@ import {
   useRef,
   useState,
 } from "react";
+import i18n from "i18next";
+import { useWebSocket } from "./websocket-context";
 import {
   cloneScenePreset,
   createScenePreset,
-  createEmptySceneStore,
   getScenePresets,
   normalizeSceneStore,
+  resolveSceneUrl,
+  withoutCameraAtStartup,
   ScenePerformanceBinding,
   ScenePreset,
   SceneStore,
@@ -51,15 +54,37 @@ interface SceneContextValue {
 
 const SceneContext = createContext<SceneContextValue | null>(null);
 
-function loadStore(): SceneStore {
+// 存檔前的正規化：場景刪光時補回的預設背景要用介面語言的名字。
+function normalizeStore(value: unknown): SceneStore {
+  return normalizeSceneStore(value, {
+    defaultName: i18n.t("settings.scenes.defaultBackground"),
+  });
+}
+
+// STORAGE_KEY 名字帶 v1 但不改：改了等於丟掉所有人的場景。裡面存的版本號才是
+// 第幾版（見 scenes/scene.ts 的 normalizeSceneStore）。
+function loadStore(baseUrl: string): SceneStore {
+  const defaultName = i18n.t("settings.scenes.defaultBackground");
+  let legacyBackgroundUrl: string | null = null;
+  try {
+    // 一般頁以前把背景存在這裡（useLocalStorage 存的是 JSON 字串）。第一次載入
+    // 第 2 版時轉成「背景」場景。
+    const legacy = window.localStorage.getItem("backgroundUrl");
+    const parsed: unknown = legacy ? JSON.parse(legacy) : null;
+    legacyBackgroundUrl = typeof parsed === "string" ? parsed : null;
+  } catch {
+    legacyBackgroundUrl = null;
+  }
   try {
     const saved = window.localStorage.getItem(STORAGE_KEY);
-    return saved
-      ? normalizeSceneStore(JSON.parse(saved))
-      : createEmptySceneStore();
+    return normalizeSceneStore(saved ? JSON.parse(saved) : null, {
+      legacyBackgroundUrl,
+      defaultName,
+      baseUrl,
+    });
   } catch (error) {
     console.warn("[Scene] Could not read saved scene configuration:", error);
-    return createEmptySceneStore();
+    return normalizeSceneStore(null, { legacyBackgroundUrl, defaultName, baseUrl });
   }
 }
 
@@ -87,7 +112,10 @@ export function SceneProvider({
 }: {
   children: React.ReactNode;
 }): JSX.Element {
-  const [store, setStore] = useState<SceneStore>(loadStore);
+  const { baseUrl } = useWebSocket();
+  const [store, setStore] = useState<SceneStore>(
+    () => withoutCameraAtStartup(loadStore(baseUrl)),
+  );
   const [temporarySceneId, setTemporarySceneId] = useState<string | null>(null);
   const [resolvedSourceUrl, setResolvedSourceUrl] = useState("");
   const temporaryTimerRef = useRef<number | null>(null);
@@ -98,11 +126,27 @@ export function SceneProvider({
 
   useEffect(() => saveStore(store), [store]);
 
+  // 同一個瀏覽器開著別的分頁（例如舞台頁）改了場景：跟著換，不然這邊下一次存檔
+  // 會用舊的那份把別的分頁剛改的蓋掉。storage 事件只在別的分頁改了才會來，而且值
+  // 沒變不會觸發，所以不會兩邊互相丟來丟去。
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY || !event.newValue) return;
+      try {
+        setStore(normalizeStore(JSON.parse(event.newValue)));
+      } catch {
+        // 壞掉的值不理，下次存檔會蓋回正常的。
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   useEffect(() => {
     let alive = true;
     let objectUrl: string | null = null;
     if (!activeScene.assetKey) {
-      setResolvedSourceUrl(activeScene.sourceUrl);
+      setResolvedSourceUrl(resolveSceneUrl(activeScene.sourceUrl, baseUrl));
       return () => undefined;
     }
     setResolvedSourceUrl("");
@@ -119,7 +163,7 @@ export function SceneProvider({
       alive = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
-  }, [activeScene.assetKey, activeScene.assetVersion, activeScene.sourceUrl]);
+  }, [activeScene.assetKey, activeScene.assetVersion, activeScene.sourceUrl, baseUrl]);
 
   useEffect(
     () => () => {
@@ -140,7 +184,7 @@ export function SceneProvider({
       }
       setTemporarySceneId(null);
       setStore((current) =>
-        normalizeSceneStore({
+        normalizeStore({
           ...current,
           activeSceneId: sceneId,
         }),
@@ -153,7 +197,7 @@ export function SceneProvider({
   const createScene = useCallback((type: SceneType = "image"): string => {
     const id = createId();
     setStore((current) =>
-      normalizeSceneStore({
+      normalizeStore({
         ...current,
         customScenes: [...current.customScenes, createScenePreset(id, type)],
       }),
@@ -176,7 +220,7 @@ export function SceneProvider({
         });
       }
       setStore((current) =>
-        normalizeSceneStore({
+        normalizeStore({
           ...current,
           customScenes: current.customScenes.map((scene) =>
             scene.id === sceneId
@@ -209,7 +253,7 @@ export function SceneProvider({
             ([, binding]) => binding.sceneId !== sceneId,
           ),
         );
-        return normalizeSceneStore({
+        return normalizeStore({
           ...current,
           activeSceneId:
             current.activeSceneId === sceneId
@@ -234,7 +278,7 @@ export function SceneProvider({
   const importSceneAsset = useCallback(
     async (sceneId: string, file: File): Promise<SceneAssetError | null> => {
       const scene = scenes.find((candidate) => candidate.id === sceneId);
-      if (!scene || scene.builtin) return "unsupported";
+      if (!scene) return "unsupported";
       const assetKey = `scene::${sceneId}`;
       const invalid = await saveSceneAsset(assetKey, file, scene.type);
       if (invalid) return invalid;
@@ -260,7 +304,7 @@ export function SceneProvider({
         const performanceBindings = { ...current.performanceBindings };
         if (binding) performanceBindings[performanceId] = binding;
         else delete performanceBindings[performanceId];
-        return normalizeSceneStore({ ...current, performanceBindings });
+        return normalizeStore({ ...current, performanceBindings });
       });
     },
     [],
@@ -278,7 +322,7 @@ export function SceneProvider({
       if (!binding.restoreAfter) {
         setTemporarySceneId(null);
         setStore((current) =>
-          normalizeSceneStore({
+          normalizeStore({
             ...current,
             activeSceneId: binding.sceneId,
           }),

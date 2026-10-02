@@ -164,7 +164,6 @@
         "clean": "Clean",
         "cute": "Cute"
       },
-      "useCameraBackground": "Use Camera Background",
       "showSubtitle": "Show Subtitle",
       "voiceVolume": "Voice volume (%)",
       "voiceVolumeHelp": "Playback volume for the character's voice. Above 100% amplifies the signal (GPT-SoVITS output is very quiet); a limiter prevents clipping. Does not affect background music or lip sync.",
@@ -185,16 +184,6 @@
       "engineBackgroundUrl": "Background endpoint",
       "engineBackgroundModel": "Background model",
       "engineBackgroundInvalid": "Not saved: the endpoint must be a URL starting with http:// or https://, and neither field may contain quotes or line breaks.",
-      "backgroundImage": "Background Image",
-      "customBgUrlPlaceholder": "Enter image URL",
-      "bgUpload": "Upload image",
-      "bgUploadLabel": "Upload a background",
-      "bgUploadHelp": "Add an image from your computer; it's saved on the server and added to the list above.",
-      "bgUploaded": "Background uploaded and applied.",
-      "bgUploadFailed": "Could not upload the background. Please try again.",
-      "bgNotImage": "Please choose an image file.",
-      "bgTooLarge": "Image too large — please pick one under 12MB.",
-      "customBgUrl": "Or enter a custom background URL",
       "wsUrl": "WebSocket URL",
       "baseUrl": "Base URL",
       "imageCompressionQuality": "Image Compression Quality",
@@ -206,11 +195,10 @@
       "cameraDenied": "Camera permission denied, so the background was not switched. Allow camera access in your browser or system settings.",
       "cameraNotFound": "No camera found, so the background was not switched. Check that a camera is connected.",
       "cameraInUse": "The camera is in use by another app, so the background was not switched. Close that app and try again.",
-      "cameraFailed": "The camera could not be started, so the background was not switched.",
+      "cameraFailed": "The camera could not be started.",
       "connectionSection": "Connection",
       "connectionHelp": "These two take effect when you press Connect. Applying as you type would reconnect on every keystroke.",
-      "connect": "Connect",
-      "customBgUrlEmpty": "The URL can't be empty"
+      "connect": "Connect"
     },
     "characters": {
       "description": "Create, edit, and switch your companion characters — no YAML needed.",
@@ -274,7 +262,7 @@
       "voiceLangHelp": "The language speech synthesis reads in. When it differs from the reply language above, the backend translates each line before synthesising, adding seconds per sentence — matching the two is fastest.",
       "ttsEngine": "TTS engine",
       "ttsEngineInherit": "Same as the base character",
-      "ttsEngineHelp": "Pick the voice she speaks with. Edge TTS uses the voice above; GPT-SoVITS uses the reference audio below. \"Same as the base character\" copies the base character's current choice into hers.",
+      "ttsEngineHelp": "Pick the engine she speaks with; the settings below change to match it. \"Same as the base character\" copies the base character's current choice into hers.",
       "aiAvatar": "AI avatar",
       "aiAvatarHelp": "Avatar shown next to AI messages. Leave empty to use the name's initial. Keep images under 512KB.",
       "aiAvatarChoose": "Choose avatar",
@@ -418,7 +406,8 @@
       "sharedBadge": "(shared by Live2D and VRM)",
       "live2dOnlySectionTitle": "Motion and expression mapping (Live2D only)",
       "vrmOnlySectionTitle": "Motion and expression mapping (VRM only)",
-      "motionConfigFixErrors": "Some fields are invalid; fix them to save"
+      "motionConfigFixErrors": "Some fields are invalid; fix them to save",
+      "previewNotOnScreen": "This model isn't on screen, so it can't be previewed — switch to a character that uses it."
     },
     "performances": {
       "title": "Performance Manager",
@@ -504,8 +493,6 @@
       "add3d": "Add 3D scene",
       "active": "Active",
       "use": "Use",
-      "currentBackground": "Current background",
-      "currentBackgroundHelp": "Uses the background image or camera selected on the General tab.",
       "name": "Scene name",
       "type": "Scene type",
       "asset": "Local asset",
@@ -541,7 +528,8 @@
         "image": "2D image",
         "video": "2D video",
         "live2d": "2D Live2D model",
-        "model3d": "3D scene"
+        "model3d": "3D scene",
+        "camera": "Camera"
       },
       "fits": {
         "cover": "Fill and crop",
@@ -555,7 +543,12 @@
       },
       "usingImportedFile": "Using the imported file. Remove it first to use a URL or change the type",
       "removeFile": "Remove file",
-      "removeFileConfirm": "Remove the imported file?"
+      "removeFileConfirm": "Remove the imported file?",
+      "defaultBackground": "Background",
+      "addCamera": "Add camera",
+      "cameraHelp": "The background is your camera feed (mirrored). The camera turns on only while this scene is in use.",
+      "serverBackground": "Built-in background",
+      "serverBackgroundPlaceholder": "Pick a background from the server"
     },
     "asr": {
       "micModeLabel": "Microphone mode",
@@ -678,7 +671,7 @@
       "asrEngineLabel": "Recognition engine",
       "asrEnginePlaceholder": "Pick a recognition engine",
       "asrEngineHelp": "The engine that turns your speech into text. sherpa = pure CPU, runs on any machine; faster-whisper = downloads a model, slow on CPU, fast only with an NVIDIA GPU (Mac MPS unsupported); groq/azure = cloud, need network + a key, zero local compute.",
-      "asrEngineSectionNote": "This section has its own save button that writes straight to the config file — but the backend needs a restart (or switching character again) before it reaches the current conversation.",
+      "asrEngineSectionNote": "The recognition engine and its key switch only when you press Save below; after that, reload from the notice at the top of settings.",
       "asrEnginePendingNotice": "Not saved yet — still using {{current}}. Enter credentials below and press Save to switch.",
       "asrSherpa": "sherpa-onnx (local · CPU · light, default)",
       "asrFasterWhisper": "faster-whisper (local · more accurate · needs GPU · dependency not installed here, silently falls back to sherpa-onnx)",
@@ -762,11 +755,15 @@
       "micHttpsNote": "Text chat works over http, but the microphone needs HTTPS. To talk on a phone, set up Tailscale Serve (HTTPS) per the guide.",
       "offTitle": "Use it on your phone or tablet",
       "recommendTailscale": "The easiest secure way is Tailscale — it's private, encrypted, and the microphone works too. See the guide (docs/remote-access-tailscale.md).",
-      "lanOptIn": "Or, for same-Wi-Fi access, set host: 0.0.0.0 in conf.yaml — but only on a network you trust (anyone on the same network could open it; there's no password).",
+      "lanOptIn": "Or connect directly on the same Wi-Fi by turning on \"Allow LAN connections\" above — only on networks you trust (anyone on them can open it; there's no password).",
       "alreadyReachable": "The HTTPS URL above already works from your phone — scan or copy it to use it.",
       "empty": "No reachable network address found",
       "loading": "Looking for a reachable network address…",
-      "error": "Failed to load network addresses"
+      "error": "Failed to load network addresses",
+      "allowLan": "Allow LAN connections",
+      "allowLanHelp": "When on, anyone on the same network can open this app — there is no password. Only turn it on for networks you trust. Takes effect after a backend restart.",
+      "allowLanPendingRestart": "On — other devices can connect after the backend restarts.",
+      "closeLanPendingRestart": "Turned off — but other devices can still connect until the backend restarts."
     },
     "about": {
       "title": "Tomoshibi",
@@ -842,12 +839,17 @@
         "perfPreset": "Performance mode",
         "memory": "Long-term memory switch",
         "character": "The active character",
-        "other": "Other settings"
+        "other": "Other settings",
+        "host": "Allow LAN connections"
       },
-      "liveBlocked": "Can't reload during a live stream; reload after it ends."
+      "liveBlocked": "Can't reload during a live stream; reload after it ends.",
+      "restart": "Restart backend",
+      "restartCommand": "Takes effect after a backend restart: press Ctrl+C in the terminal running it, then run uv run run_server.py.",
+      "restartFailed": "Restarting the backend failed and it may have stopped. Try again, or quit and reopen the app. Log: {{path}}",
+      "retry": "Try again"
     },
     "stage": {
-      "display": "Subtitles, volume & background",
+      "display": "Subtitles & volume",
       "canvas": "Canvas interaction"
     },
     "models": {
