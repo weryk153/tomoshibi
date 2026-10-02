@@ -13,6 +13,7 @@ from typing import Any, Optional
 
 from loguru import logger
 
+from ..active_character_store import get_active_character_filename
 from ..chat_history_manager import create_new_history
 from ..conversations.conversation_handler import (
     PROACTIVE_TEXT,
@@ -38,6 +39,18 @@ class WebSocketStreamHost:
             self._ws.client_contexts.get(uid),
             self._ws.client_connections.get(uid),
         )
+
+    async def prepare_stage(self, stage_uid: str) -> None:
+        """舞台頁的角色是連上那一刻載入的；之後在主視窗換角色只換主視窗那個連線。
+        開播前把舞台換成現在選的角色，並讓舞台頁換模型。"""
+        context = self._ws.client_contexts.get(stage_uid)
+        socket = self._ws.client_connections.get(stage_uid)
+        active = get_active_character_filename()
+        if context is None or not active or active == context.active_config_file:
+            return
+        await context.load_character_config(active)
+        if socket is not None:
+            await context._send_model_and_conf(socket)
 
     def new_stream_history(self, stage_uid: str) -> str:
         # 只建檔，不記成「上次聊到哪」：私人聊天的進度不動。

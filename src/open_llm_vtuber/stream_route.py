@@ -51,6 +51,7 @@ def init_stream_route(controller: Any) -> APIRouter:
             settings = write_stream_settings(body)
         except ValueError as error:
             return JSONResponse(status_code=400, content={"error": str(error)})
+        controller.apply_settings(settings)
         return {"settings": settings.model_dump()}
 
     @router.post("/api/stream/start")

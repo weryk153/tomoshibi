@@ -12,6 +12,10 @@ class FakeController:
     def __init__(self):
         self.live = False
         self.started_with = []
+        self.applied = []
+
+    def apply_settings(self, settings):
+        self.applied.append(settings)
 
     def status(self):
         return {"live": self.live}
@@ -53,6 +57,7 @@ def test_settings_are_saved_and_bad_ones_refused(client):
     )
     assert r.status_code == 200
     assert r.json()["settings"]["blocklist"] == ["笨蛋"]
+    assert client.controller.applied[-1].blocklist == ["笨蛋"]
     assert client.get("/api/stream").json()["settings"]["quiet_seconds"] == 40
     bad = client.post("/api/stream/settings", json={"quiet_seconds": 0})
     assert bad.status_code == 400

@@ -120,7 +120,7 @@ def test_private_triggers_are_refused_while_live():
     asyncio.run(h._handle_config_switch(me, "me", {"file": "kurisu.yaml"}))
 
     assert h.current_conversation_tasks == {}
-    assert [m.get("text_key") for m in me.sent] == [
+    assert [m.get("text_key") for m in me.sent if m["type"] == "error"] == [
         "privateChatPaused",
         "switchBlocked",
     ]
@@ -145,3 +145,22 @@ def test_broadcast_skips_the_stage():
     asyncio.run(h.broadcast_stream_state(False))
     assert me.sent == [{"type": "stream-state", "live": False}]
     assert stage.sent == []
+
+
+def test_private_mic_audio_is_dropped_while_live():
+    """直播中主視窗的麥克風不能累積語音、停播後一次送出去變成私人對話。"""
+    import numpy as np
+
+    h = handler(FakeStream(live=True, stage_uid="stage"))
+    me = FakeSocket()
+    h.client_connections["me"] = me
+    h.client_contexts["me"] = context()
+    h.received_data_buffers["me"] = np.array([0.1, 0.2], dtype=np.float32)
+
+    asyncio.run(h._handle_audio_data(me, "me", {"audio": [0.3, 0.4]}))
+    asyncio.run(h._handle_conversation_trigger(me, "me", {"type": "mic-audio-end"}))
+
+    assert len(h.received_data_buffers["me"]) == 0
+    assert h.current_conversation_tasks == {}
+    # 前端講完話時切到「思考中」，要告訴它這一輪不會發生，回到閒置。
+    assert {"type": "control", "text": "conversation-chain-end"} in me.sent

@@ -148,3 +148,32 @@ def test_a_stream_history_does_not_move_the_private_resume_point():
     assert history_uid
     assert active_history_store.get_active_history_uid("frieren") == "private-1"
     assert host.character_names("stage") == ("芙莉蓮", "frieren")
+
+
+def test_preparing_the_stage_switches_it_to_the_current_character(monkeypatch):
+    """OBS 一直開著、你在主視窗換了角色再開播：直播要用現在選的角色。"""
+    from src.open_llm_vtuber.stream import host as host_module
+
+    loaded, announced = [], []
+    ws, host = setup(None)
+    stage = ws.client_contexts["stage"]
+    stage.active_config_file = "kurisu.yaml"
+
+    async def load_character_config(name):
+        loaded.append(name)
+        stage.active_config_file = name
+
+    async def send_model_and_conf(socket):
+        announced.append(socket)
+
+    stage.load_character_config = load_character_config
+    stage._send_model_and_conf = send_model_and_conf
+    monkeypatch.setattr(
+        host_module, "get_active_character_filename", lambda: "char_frieren.yaml"
+    )
+
+    asyncio.run(host.prepare_stage("stage"))
+    asyncio.run(host.prepare_stage("stage"))
+
+    assert loaded == ["char_frieren.yaml"]
+    assert announced == [ws.client_connections["stage"]]

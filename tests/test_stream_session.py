@@ -154,3 +154,22 @@ def test_nothing_runs_while_the_stage_is_away():
 
     asyncio.run(run())
     assert turns == ["一"]
+
+
+def test_an_unexpected_reader_error_is_retried_not_swallowed():
+    """讀聊天室遇到非預期的例外（YouTube 改版）不能默默死掉、畫面還顯示已連上。"""
+    clock = Clock()
+
+    class Flaky(ScriptedSource):
+        async def messages(self):
+            if not self.attempts[0][0]:
+                self.attempts.pop(0)
+                raise AttributeError("'list' object has no attribute 'get'")
+            async for message in super().messages():
+                yield message
+
+    source = Flaky(clock, [([], "error"), (["好"], "end")])
+    session, turns = make(clock, source, [], backoff=(5.0,))
+    assert asyncio.run(session.run()) == "ended"
+    assert turns == ["好"]
+    assert "AttributeError" in session.last_error

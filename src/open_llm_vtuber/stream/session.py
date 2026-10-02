@@ -44,9 +44,10 @@ class StreamSession:
         self.stage_ready = asyncio.Event()
         self.current: Optional[ChatMessage] = None
         self.last_error = ""
+        # 直播中改設定（StreamController.apply_settings）會直接換掉這兩個。
+        self.quiet_seconds = quiet_seconds
         self._source = source
         self._run_turn = run_turn
-        self._quiet = quiet_seconds
         self._failure_limit = failure_limit
         self._clock = clock
         self._sleep = sleep
@@ -83,11 +84,18 @@ class StreamSession:
                     self.picker.offer(message, self._clock())
                 self._ended = True
                 return
-            except ChatSourceError as error:
-                self.last_error = str(error)
+            except Exception as error:
+                # 非預期的例外（例如 YouTube 改了回應形狀）也當成暫時讀不到：記下來、
+                # 等一下重連。只接 ChatSourceError 的話讀聊天室這條線會默默死掉，
+                # 畫面還顯示「已連上」，整場再也收不到留言。
+                if isinstance(error, ChatSourceError):
+                    self.last_error = str(error)
+                    logger.warning(f"[stream] chat unreadable: {error}")
+                else:
+                    self.last_error = f"{type(error).__name__}: {error}"
+                    logger.exception("[stream] chat reader failed unexpectedly")
                 self._retrying = True
                 wait = self._backoff[min(attempt, len(self._backoff) - 1)]
-                logger.warning(f"[stream] chat unreadable ({error}); retry in {wait}s")
                 attempt += 1
                 await self._sleep(wait)
 
@@ -100,7 +108,7 @@ class StreamSession:
             if comment is None:
                 if self._ended:
                     return "ended"
-                if now - last_spoke < self._quiet:
+                if now - last_spoke < self.quiet_seconds:
                     await self._sleep(IDLE_POLL_SECONDS)
                     continue
             self.current = comment

@@ -832,7 +832,8 @@
         "already_live": "Already live",
         "no_stage": "The stage page is not connected",
         "no_url": "No live video URL yet",
-        "bad_url": "That is not a live video URL"
+        "bad_url": "That is not a live video URL",
+        "no_history": "Could not create the stream conversation"
       }
     }
   },

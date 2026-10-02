@@ -31,7 +31,11 @@ class FakeHost:
         self.live_events = []
         self.stopped_audio = []
         self.turns = []
+        self.prepared = []
         self.block = asyncio.Event()
+
+    async def prepare_stage(self, stage_uid):
+        self.prepared.append(stage_uid)
 
     def new_stream_history(self, stage_uid):
         self.histories += 1
@@ -186,3 +190,41 @@ def test_after_failures_start_continues_the_same_conversation():
     first, resumed, fresh = asyncio.run(run())
     assert resumed == first
     assert fresh != first
+
+
+def test_settings_changed_while_live_apply_now():
+    """直播中加黑名單要立刻生效，不用停了再開（那會開新的一段對話）。"""
+
+    async def run():
+        host = FakeHost()
+        c = controller(host)
+        c.attach_stage("stage-1")
+        await c.start()
+        c.apply_settings(StreamConfig(blocklist=["笨蛋"], quiet_seconds=90))
+        session = c._session
+        rules, quiet = session.picker.rules, session.quiet_seconds
+        await c.stop()
+        return rules, quiet
+
+    rules, quiet = asyncio.run(run())
+    assert rules.blocklist == ("笨蛋",)
+    assert rules.names == ("芙莉蓮",)
+    assert quiet == 90
+
+
+def test_the_stage_is_brought_to_the_current_character_and_history_must_exist():
+    async def run():
+        host = FakeHost()
+        c = controller(host)
+        c.attach_stage("stage-1")
+        await c.start()
+        await c.stop()
+        host.new_stream_history = lambda uid: ""
+        with pytest.raises(StreamError) as no_history:
+            await c.start()
+        return host.prepared, no_history.value.reason, c.live
+
+    prepared, reason, live = asyncio.run(run())
+    assert prepared == ["stage-1", "stage-1"]  # 每次開始前都對齊一次
+    assert reason == "no_history"
+    assert live is False

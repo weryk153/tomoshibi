@@ -793,6 +793,8 @@ class WebSocketHandler:
         self, websocket: WebSocket, client_uid: str, data: WSMessage
     ) -> None:
         """Handle incoming audio data"""
+        if self._streaming() and not self._is_stage(client_uid):
+            return  # 直播中私人聊天暫停：不累積，免得停播後整包當成一句話送出
         audio_data = data.get("audio", [])
         if audio_data:
             self.received_data_buffers[client_uid] = np.append(
@@ -804,6 +806,8 @@ class WebSocketHandler:
         self, websocket: WebSocket, client_uid: str, data: WSMessage
     ) -> None:
         """Handle incoming raw audio data for VAD processing"""
+        if self._streaming() and not self._is_stage(client_uid):
+            return
         context = self.client_contexts[client_uid]
         # vad_engine can be None if VAD failed to load (graceful init_vad). Raw audio
         # streams continuously, so silently ignore it rather than erroring per chunk.
@@ -838,6 +842,8 @@ class WebSocketHandler:
         # 直播中角色大腦正在對觀眾講話：私人聊天先暫停，閒置計時器的觸發靜默略過。
         if self._streaming():
             if data.get("type") != "ai-speak-signal":
+                if client_uid in self.received_data_buffers:
+                    self.received_data_buffers[client_uid] = np.array([])
                 await websocket.send_text(
                     json.dumps(
                         {
@@ -846,6 +852,10 @@ class WebSocketHandler:
                             "text_key": "privateChatPaused",
                         }
                     )
+                )
+                # 前端說完話就切到「思考中」；這一輪不會發生，讓它回到閒置。
+                await websocket.send_text(
+                    json.dumps({"type": "control", "text": "conversation-chain-end"})
                 )
             return
         # 主動發言的計時器在前端，每個連線各有一個。兩台同時開著時兩邊都會送

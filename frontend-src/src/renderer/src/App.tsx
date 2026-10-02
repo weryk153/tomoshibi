@@ -218,7 +218,8 @@ function AppWithGlobalStyles(): JSX.Element {
                                   <StreamProvider>
                                     <BrowserProvider>
                                       <WebSocketHandler>
-                                        <Toaster />
+                                        {/* 舞台頁不顯示提示框：直播畫面上不能冒出錯誤訊息。 */}
+                                        {!IS_STAGE && <Toaster />}
                                         {!IS_STAGE && <FirstRunWizard />}
                                         <AppContent />
                                       </WebSocketHandler>

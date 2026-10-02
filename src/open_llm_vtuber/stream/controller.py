@@ -25,6 +25,8 @@ class StreamError(Exception):
 
 
 class StreamHost(Protocol):
+    async def prepare_stage(self, stage_uid: str) -> None: ...
+
     def new_stream_history(self, stage_uid: str) -> str: ...
 
     def character_names(self, stage_uid: str) -> tuple[str, ...]: ...
@@ -91,19 +93,18 @@ class StreamController:
         if url != settings.youtube_url:
             settings = self._write_settings({"youtube_url": url})
 
+        # 舞台頁可能比你在主視窗換角色更早連上：開播前讓它換成現在選的角色。
+        await self._host.prepare_stage(self.stage_uid)
         # 連續失敗而暫停的，按開始接著同一段對話；其他情況開新的一段。
         if not (self.stopped_reason == "failures" and self._history_uid):
-            self._history_uid = self._host.new_stream_history(self.stage_uid)
-        rules = PickerRules(
-            blocklist=tuple(settings.blocklist),
-            max_chars=settings.max_comment_chars,
-            max_age=settings.comment_max_age_seconds,
-            viewer_cooldown=settings.same_viewer_cooldown_seconds,
-            names=self._host.character_names(self.stage_uid),
-        )
+            history_uid = self._host.new_stream_history(self.stage_uid)
+            if not history_uid:
+                # 沒有自己那段對話，引擎會退回「目前的對話」——那是你的私人對話。
+                raise StreamError("no_history")
+            self._history_uid = history_uid
         session = StreamSession(
             source,
-            CommentPicker(rules),
+            CommentPicker(self._rules(settings)),
             self._host.turn_runner(self._history_uid),
             quiet_seconds=settings.quiet_seconds,
             failure_limit=settings.failure_limit,
@@ -115,6 +116,31 @@ class StreamController:
         self._task = asyncio.create_task(self._run(session))
         await self._host.live_changed(True)
         return self.status()
+
+    def _rules(self, settings: StreamConfig) -> PickerRules:
+        return PickerRules(
+            blocklist=tuple(settings.blocklist),
+            max_chars=settings.max_comment_chars,
+            max_age=settings.comment_max_age_seconds,
+            viewer_cooldown=settings.same_viewer_cooldown_seconds,
+            names=self._host.character_names(self.stage_uid) if self.stage_uid else (),
+        )
+
+    def apply_settings(self, settings: StreamConfig) -> None:
+        """直播中改的設定立刻生效（黑名單、字數、冷卻、冷場秒數）。"""
+        session = self._session
+        if session is None or not self.live:
+            return
+        names = session.picker.rules.names
+        rules = self._rules(settings)
+        session.picker.rules = PickerRules(
+            blocklist=rules.blocklist,
+            max_chars=rules.max_chars,
+            max_age=rules.max_age,
+            viewer_cooldown=rules.viewer_cooldown,
+            names=names,
+        )
+        session.quiet_seconds = settings.quiet_seconds
 
     async def _run(self, session: StreamSession) -> None:
         reason = "error"
