@@ -1367,7 +1367,12 @@ function Characters(): JSX.Element {
 
         <HStack>
           {/* 改了就存；這顆只是回到清單（關掉前把還沒送的那筆送出去）。 */}
-          <Button variant="outline" onClick={() => { charSaver.flush(); closeEdit(); }}>
+          {/* 有欄位不合法時那份還沒存：關掉就會丟掉其他欄位的修改，先擋住。 */}
+          <Button
+            variant="outline"
+            disabled={charSaver.state.phase === 'invalid'}
+            onClick={() => { charSaver.flush(); closeEdit(); }}
+          >
             {t('common.close')}
           </Button>
         </HStack>

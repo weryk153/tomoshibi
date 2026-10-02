@@ -10,6 +10,7 @@ import { Field } from '@/components/ui/tw/primitives';
 import { toaster } from '@/components/ui/tw/toaster';
 import { SaveStatus } from '@/components/ui/tw/save-status';
 import { useAutosave } from '@/hooks/use-autosave';
+import { useStream } from '@/context/stream-context';
 import { useWebSocket } from '@/context/websocket-context';
 import { useConfig } from '@/context/character-config-context';
 import { wsService } from '@/services/websocket-service';
@@ -61,7 +62,8 @@ function Personas(): JSX.Element {
 
   useEffect(() => {
     const subscription = wsService.onMessage((message) => {
-      if (message.type !== 'persona-switched') return;
+      // 被後端拒絕（例如直播中）也要停止轉圈，不然套用鍵永遠在載入中。
+      if (message.type !== 'persona-switched' && message.type !== 'error') return;
       setApplyingId(undefined);
       setRefreshTick((value) => value + 1);
     });
@@ -109,10 +111,12 @@ function Personas(): JSX.Element {
   }, [baseUrl, closeForm, draft, t]);
 
   // 編輯：改了就存；正在用的人設存好就重新套用，她立刻換成新的說法。
+  const { live: streaming } = useStream();
   const editSaver = useAutosave(async (edit: { id: string; name: string; prompt: string }) => {
     const result = await updatePersona(baseUrl, edit.id, { name: edit.name, prompt: edit.prompt });
     if (!result.ok) return { ok: false, error: result.error } as const;
-    if (activeId === edit.id) {
+    // 直播中後端不准換人設（她正在對觀眾講話）：存了，但等直播結束再按「套用」。
+    if (activeId === edit.id && !streaming) {
       setApplyingId(edit.id);
       sendMessage({ type: 'switch-persona', persona_id: edit.id });
     }
@@ -193,6 +197,9 @@ function Personas(): JSX.Element {
         )}
         {formError && <Text color="red.300" fontSize="sm">{formError}</Text>}
         {mode === 'edit' && <SaveStatus state={editSaver.state} />}
+        {mode === 'edit' && streaming && editingId === activeId && (
+          <Text fontSize="xs" color="orange.300">{t('settings.personas.applyAfterStream')}</Text>
+        )}
         <HStack>
           {mode === 'create' ? (
             <>

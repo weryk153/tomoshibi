@@ -336,7 +336,8 @@
       "deleted": "已刪除「{{name}}」。",
       "confirmDelete": "確定刪除「{{name}}」？",
       "confirm": "確定",
-      "create": "建立"
+      "create": "建立",
+      "applyAfterStream": "直播中：改了會存，但要等直播結束再按一次「套用」她才會換上。"
     },
     "user": {
       "sectionTitle": "你（我的暱稱與頭像）",

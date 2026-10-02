@@ -89,16 +89,13 @@ def test_the_page_sends_the_starting_point():
     api = Path("frontend-src/src/renderer/src/api/memory.ts").read_text(
         encoding="utf-8"
     )
-    assert (
-        "saveMemoryContent(\n      baseUrl, confUid, contentDraft, memory?.content,\n    )"
-        in page
-    )
+    # 頁面改成改了就存（離開欄位才送）：起點在排進存檔的那一刻帶上，存檔時原樣送出。
+    assert "saveMemoryContent(baseUrl, edit.uid, edit.draft, edit.from)" in page
+    assert "draft: e.target.value, from: memory?.content }" in page
     assert "edited_from: editedFrom" in api
     # 她自己的記憶也是：引擎記的那一份同樣只刪頁面上有、存回來不見的行。
-    assert (
-        "saveSelfMemoryContent(\n      baseUrl, confUid, selfDraft, memory?.self_content,\n    )"
-        in page
-    )
+    assert "saveSelfMemoryContent(baseUrl, edit.uid, edit.draft, edit.from)" in page
+    assert "draft: e.target.value, from: memory?.self_content }" in page
     assert api.count("edited_from: editedFrom") == 2
 
 

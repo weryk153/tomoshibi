@@ -336,7 +336,8 @@
       "deleted": "「{{name}}」を削除しました。",
       "confirmDelete": "「{{name}}」を削除しますか？",
       "confirm": "確認",
-      "create": "作成"
+      "create": "作成",
+      "applyAfterStream": "配信中：変更は保存されますが、配信終了後に「適用」を押すと反映されます。"
     },
     "user": {
       "sectionTitle": "あなた（名前とアバター）",

@@ -34,6 +34,7 @@ import { Button } from '@/components/ui/tw/primitives';
 import { SaveStatus } from '@/components/ui/tw/save-status';
 import { useAutosave } from '@/hooks/use-autosave';
 import { parseBoundedNumber } from '@/utils/setting-values';
+import { anyInvalidWeightDraft, removeWeightDraft } from '@/utils/weight-drafts';
 import { useWebSocket } from '@/context/websocket-context';
 import { useLive2DConfig } from '@/context/live2d-config-context';
 // 表情的「回到原樣」沿用 app 自己那條路（解除目前表情，不是套一個中性表情
@@ -293,6 +294,7 @@ function MotionConfig(): JSX.Element {
   }, []);
 
   const removeTapMotionCandidate = useCallback((hitAreaId: string, entryIndex: number) => {
+    setWeightTexts((prev) => removeWeightDraft(prev, hitAreaId, entryIndex));
     setTapMotionEdits((prev) => ({
       ...prev,
       [hitAreaId]: (prev[hitAreaId] ?? []).filter((_, i) => i !== entryIndex),
@@ -343,8 +345,7 @@ function MotionConfig(): JSX.Element {
   }, [config, modelName, buildMotionMap, buildEmotionMap, baseUrl, live2DConfig, t, tapMotionEdits]);
 
   const baselineRef = useRef<string | null>(null);
-  const weightInvalid = Object.values(weightTexts)
-    .some((text) => parseBoundedNumber(text, { min: 0 }) === null);
+  const weightInvalid = anyInvalidWeightDraft(weightTexts, tapMotionEdits);
   const motionSaver = useAutosave(async (snapshot: string) => {
     void snapshot;
     return saveConfig();

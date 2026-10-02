@@ -336,7 +336,8 @@
       "deleted": "“{{name}}” 페르소나를 삭제했어요.",
       "confirmDelete": "“{{name}}” 페르소나를 삭제할까요?",
       "confirm": "확인",
-      "create": "만들기"
+      "create": "만들기",
+      "applyAfterStream": "방송 중: 변경은 저장되지만, 방송이 끝난 뒤 '적용'을 눌러야 반영됩니다."
     },
     "user": {
       "sectionTitle": "나(내 이름과 아바타)",

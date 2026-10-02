@@ -226,6 +226,7 @@ function General({ onCancel }: GeneralProps): JSX.Element {
 
   // 自訂背景網址：停手就套用，空白不存。
   const customBgSaver = useAutosave(async (url: string) => {
+    if (url.trim() === settings.customBgUrl) return { ok: true } as const;
     bgSelectionSessionRef.current += 1;
     handleSettingChange("selectedBgUrl", []);
     handleSettingChange("customBgUrl", url.trim());
@@ -374,7 +375,8 @@ function General({ onCancel }: GeneralProps): JSX.Element {
               value={customBgDraft}
               onChange={(value) => {
                 setCustomBgDraft(value);
-                if (value.trim() !== settings.customBgUrl) customBgSaver.change(value);
+                // 每次都排：打了又改回原值時，存檔器才會送最後那個（而不是中間打的字）。
+                customBgSaver.change(value);
               }}
               onBlur={customBgSaver.flush}
               placeholder={t("settings.general.customBgUrlPlaceholder")}

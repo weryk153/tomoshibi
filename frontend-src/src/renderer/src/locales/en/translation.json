@@ -336,7 +336,8 @@
       "deleted": "Deleted “{{name}}”.",
       "confirmDelete": "Delete “{{name}}”?",
       "confirm": "Confirm",
-      "create": "Create"
+      "create": "Create",
+      "applyAfterStream": "Live: changes are saved, but press Apply after the stream ends for her to use them."
     },
     "user": {
       "sectionTitle": "You (your name & avatar)",
