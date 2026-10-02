@@ -15,8 +15,6 @@ What this fork adds (MIT)
 - Proactive conversation — she opens up on her own when the room goes quiet,
   optionally riffing on today's headlines: news_topics.py, topics_route.py,
   proactive_context.py
-- Sleep mode — say goodnight and she stops initiating until you speak again:
-  sleep_mode.py
 - Group conversation — two characters talking to each other:
   conversations/group_conversation.py
 - Stage performances — camera/lighting presets the character can trigger from
