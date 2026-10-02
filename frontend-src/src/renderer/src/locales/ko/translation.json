@@ -112,7 +112,13 @@
     "voiceFailed": "설치 실패: {{error}}",
     "voiceRetry": "다시 시도",
     "voiceHelp": "기본 목소리는 츠쿠요미짱 코퍼스(CV. 유메사키 레이)예요. 음성 설정에서 다른 참조 음성으로 바꿀 수 있어요.",
-    "modelHasNoTools": "이 모델은 도구를 쓸 수 없어 웹 검색과 시간 도구가 동작하지 않습니다. 도구 스위치는 바꾸지 않았습니다."
+    "modelHasNoTools": "이 모델은 도구를 쓸 수 없어 웹 검색과 시간 도구가 동작하지 않습니다. 도구 스위치는 바꾸지 않았습니다.",
+    "tabLocal": "이 컴퓨터의 모델",
+    "currentlyUsing": "사용 중: {{model}} ({{where}})",
+    "notConfiguredYet": "아직 언어 모델을 설정하지 않았습니다",
+    "whereLmStudio": "로컬 LM Studio",
+    "whereOllama": "로컬 Ollama",
+    "whereNamed": "{{name}}"
   },
   "effects": {
     "characterEntrance": {

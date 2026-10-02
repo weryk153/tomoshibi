@@ -26,6 +26,10 @@ import {
   pullOllamaModel,
   installOllama,
   type LlmMode,
+  type LlmSource,
+  type ActiveLlm,
+  activeWhere,
+  initialSource,
   type ApiKeyProvider,
   type LlmFormState,
   type LlmSaveResult,
@@ -97,7 +101,11 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
   const { t } = useTranslation();
   const { baseUrl: backendBaseUrl } = useWebSocket();
 
-  const [mode, setMode] = useState<LlmMode>('apikey');
+  // 四選一的來源，打開時停在正在用的那個（載入現值之後才知道）。
+  const [mode, setMode] = useState<LlmSource>('local');
+  // 真正在用的那一塊，最上面那行「目前使用」讀它。存檔或套用之後重抓。
+  const [active, setActive] = useState<ActiveLlm | null>(null);
+  const [configured, setConfigured] = useState(false);
   const [provider, setProvider] = useState<ApiKeyProvider>('openai');
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
@@ -128,12 +136,24 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
         setModel(result.data.model || '');
         setCustomUrl(result.data.base_url || '');
         setHasExistingKey(Boolean(result.data.has_real_key));
+        setActive(result.data.active ?? null);
+        setConfigured(Boolean(result.data.is_configured));
+        setMode(initialSource(result.data.active, Boolean(result.data.is_configured)));
+        if (result.data.active?.api_provider) setProvider(result.data.active.api_provider);
       }
       setIsLoadingInitial(false);
     })();
     return () => {
       cancelled = true;
     };
+  }, [backendBaseUrl]);
+
+  // 存檔或套用之後重抓「目前使用」。
+  const refreshActive = useCallback(async () => {
+    const result = await fetchLlmConfig(backendBaseUrl);
+    if (!result.ok) return;
+    setActive(result.data.active ?? null);
+    setConfigured(Boolean(result.data.is_configured));
   }, [backendBaseUrl]);
 
   const probeOllama = useCallback(async () => {
@@ -419,8 +439,9 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
   const handleSubmit = useCallback(async () => {
     setSaveError(null);
 
+    if (mode === 'local') return;
     const state: LlmFormState = {
-      mode,
+      mode: mode as LlmMode,
       provider,
       apiKey,
       model,
@@ -432,6 +453,7 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
     setIsSaving(false);
 
     if (result.ok) {
+      void refreshActive();
       onSaved(result.data);
       return;
     }
@@ -442,195 +464,38 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
       return;
     }
     setSaveError(result.error || t('setup.testFailed'));
-  }, [mode, provider, apiKey, model, customUrl, hasExistingKey, backendBaseUrl, onSaved, t]);
+  }, [mode, provider, apiKey, model, customUrl, hasExistingKey, backendBaseUrl, onSaved, t, refreshActive]);
 
   const existingKeyPlaceholder = hasExistingKey ? t('setup.keyAlreadySetPlaceholder') : undefined;
 
+  // 偵測套用成功之後，「目前使用」跟著換。
+  useEffect(() => {
+    if (applyPhase === 'applied') void refreshActive();
+  }, [applyPhase, refreshActive]);
+
+  const where = active ? activeWhere(active) : null;
+  const whereText = where ? t(where.key, { name: where.name }) : '';
+
   return (
     <Stack {...settingStyles.common.container}>
-      <Stack gap={3}>
-        <Text fontWeight="bold">{t('setup.detectTitle')}</Text>
-
-        {applyPhase === 'applied' && appliedInfo ? (
-          <Stack gap={3}>
-            <Text fontWeight="semibold" color="green.300">
-              {t('setup.detectApplied', { model: appliedInfo.model })}
-            </Text>
-            {appliedInfo.note && <NoticeBox text={appliedInfo.note} tone="blue" />}
-            {appliedInfo.noTools && <NoticeBox text={t('setup.modelHasNoTools')} />}
-            <Text fontSize="sm" color="whiteAlpha.700">
-              {t('setup.savedReady')}
-            </Text>
-            <Button tone="blue" onClick={handleContinueAfterApply} className="self-start">
-              {t('setup.startChatting')}
-            </Button>
-          </Stack>
-        ) : (
-          <Stack gap={3}>
-            {detectStatus === 'loading' && (
-              <Text fontSize="sm" color="whiteAlpha.700">
-                {t('setup.detectScanning')}
-              </Text>
-            )}
-
-            {detectStatus === 'error' && detectError && (
-              <Text fontSize="sm" color="red.300">{detectError}</Text>
-            )}
-
-            {detectStatus === 'ready' && detectResult && detectResult.models.length > 0 && (
-              <Stack gap={2}>
-                <Text fontSize="sm" color="whiteAlpha.700">{t('setup.detectFound')}</Text>
-                <Stack gap={2}>
-                  {detectResult.models.map((m) => {
-                    const key = detectModelKey(m);
-                    const selected = key === selectedKey;
-                    return (
-                      <Box
-                        key={key}
-                        onClick={() => handleSelectDetected(m)}
-                        cursor="pointer"
-                        borderWidth="1px"
-                        borderColor={selected ? 'blue.400' : 'whiteAlpha.200'}
-                        bg={selected ? 'blue.900' : 'whiteAlpha.50'}
-                        borderRadius="md"
-                        px={3}
-                        py={2}
-                      >
-                        <Text fontWeight="semibold">{m.id}</Text>
-                        <HStack flexWrap="wrap" gap={2} mt={1}>
-                          <Text fontSize="xs" color="whiteAlpha.600">{m.backend}</Text>
-                          {m.is_vlm && (
-                            <Text fontSize="xs" color="purple.300">{t('setup.detectVision')}</Text>
-                          )}
-                          {m.supports_tools && (
-                            <Text fontSize="xs" color="teal.300">{t('setup.detectTools')}</Text>
-                          )}
-                        </HStack>
-                      </Box>
-                    );
-                  })}
-                </Stack>
-                <Button
-                  tone="blue"
-                  onClick={handleApplyDetected}
-                  loading={applyPhase === 'applying'}
-                  disabled={!selectedKey || applyPhase === 'applying'}
-                  className="self-start"
-                >
-                  {t('setup.detectUse')}
-                </Button>
-                {applyPhase === 'error' && applyError && (
-                  <Text fontSize="sm" color="red.300">{applyError}</Text>
-                )}
-              </Stack>
-            )}
-
-            {detectStatus === 'ready' && detectResult && detectResult.models.length === 0
-              && detectResult.ollama_available && (
-                <Stack gap={2}>
-                  <Text fontSize="sm" color="orange.300">{t('setup.detectEmptyOllama')}</Text>
-                  <Text fontWeight="semibold">{t('setup.ollamaRecommendedTitle')}</Text>
-                  <Text fontSize="sm" color="whiteAlpha.700">
-                    {t('setup.ollamaRecommendedDesc', { model: detectResult.recommended_pull })}
-                  </Text>
-
-                  {pullPhase === 'idle' && (
-                    <Button tone="blue" onClick={handlePullRecommended} className="self-start">
-                      {t('setup.ollamaUseRecommended', { model: detectResult.recommended_pull })}
-                    </Button>
-                  )}
-                  {pullPhase === 'preparing' && (
-                    <Text fontSize="sm" color="whiteAlpha.700">
-                      {t('setup.ollamaDownloadPreparing')}
-                    </Text>
-                  )}
-                  {pullPhase === 'downloading' && (
-                    <Text fontSize="sm" color="whiteAlpha.700">
-                      {t('setup.ollamaDownloading', { percent: pullPercent ?? 0 })}
-                    </Text>
-                  )}
-                  {pullPhase === 'applying' && (
-                    <Text fontSize="sm" color="whiteAlpha.700">
-                      {t('setup.ollamaApplying')}
-                    </Text>
-                  )}
-                  {pullPhase === 'error' && pullError && (
-                    <Text fontSize="sm" color="red.300">{pullError}</Text>
-                  )}
-                </Stack>
-            )}
-
-            {detectStatus === 'ready' && detectResult && detectResult.models.length === 0
-              && !detectResult.ollama_available && detectResult.lmstudio_available && (
-                <Text fontSize="sm" color="orange.300">{t('setup.detectEmptyLmStudio')}</Text>
-            )}
-
-            {detectStatus === 'ready' && detectResult && detectResult.models.length === 0
-              && !detectResult.ollama_available && !detectResult.lmstudio_available && (
-                // 沒裝跟裝了沒開，下一步完全不同。原本兩種都只有一行「請先安裝
-                // Ollama 或 LM Studio」，沒有連結、也沒有重新偵測的按鈕——不會用
-                // 終端機的人卡在這裡，已經裝好只是沒開的人還會以為自己裝失敗。
-                <Stack gap={2}>
-                  {detectResult.ollama_installed ? (
-                    <>
-                      <Text fontWeight="semibold">{t('setup.ollamaNotRunningTitle')}</Text>
-                      <Text fontSize="sm" color="whiteAlpha.700">
-                        {t('setup.ollamaNotRunningDesc')}
-                      </Text>
-                      <Button tone="blue" onClick={() => { void runDetect(); }} className="self-start">
-                        {t('setup.ollamaRecheck')}
-                      </Button>
-                    </>
-                  ) : (
-                    <>
-                      <Text fontWeight="semibold">{t('setup.ollamaInstallTitle')}</Text>
-                      <Text fontSize="sm" color="whiteAlpha.700">
-                        {detectResult.ollama_install_supported
-                          ? t('setup.ollamaOneClickDesc', { model: detectResult.recommended_pull })
-                          : t('setup.ollamaInstallDesc')}
-                      </Text>
-                      {oneClickProgress() ? (
-                        <Text fontSize="sm" color="whiteAlpha.700">{oneClickProgress()}</Text>
-                      ) : (
-                        <div className="flex flex-wrap gap-2">
-                          {detectResult.ollama_install_supported && (
-                            <Button tone="blue" onClick={() => { void handleOneClickInstall(); }}>
-                              {t('setup.ollamaOneClickButton')}
-                            </Button>
-                          )}
-                          {/* 自己裝的備案。桌面版由 window-manager 的 setWindowOpenHandler 交給系統瀏覽器開 */}
-                          <Button
-                            tone={detectResult.ollama_install_supported ? 'gray' : 'blue'}
-                            variant={detectResult.ollama_install_supported ? 'outline' : 'solid'}
-                            onClick={() => window.open(OLLAMA_DOWNLOAD_URL, '_blank')}
-                          >
-                            {t('setup.ollamaInstallDownloadLink')}
-                          </Button>
-                          <Button tone="gray" variant="outline" onClick={() => { void runDetect(); }}>
-                            {t('setup.ollamaInstallRecheck')}
-                          </Button>
-                        </div>
-                      )}
-                      {installPhase === 'error' && installError && (
-                        <Text fontSize="sm" color="red.300">{installError}</Text>
-                      )}
-                      {pullPhase === 'error' && pullError && (
-                        <Text fontSize="sm" color="red.300">{pullError}</Text>
-                      )}
-                    </>
-                  )}
-                </Stack>
-            )}
-          </Stack>
-        )}
-      </Stack>
+      {/* 最上面固定寫「目前在用什麼」：真正在用的那一塊，不是下面表單正在編輯的那塊。 */}
+      {!isLoadingInitial && (
+        <Text fontWeight="semibold" color={configured && active ? 'green.300' : 'orange.300'}>
+          {configured && active
+            ? t('setup.currentlyUsing', { model: active.model, where: whereText })
+            : t('setup.notConfiguredYet')}
+        </Text>
+      )}
 
       <Tabs.Root
         value={mode}
-        onValueChange={(details) => setMode(details.value as LlmMode)}
+        onValueChange={(details) => setMode(details.value as LlmSource)}
         {...settingStyles.settingUI.tabs.root}
       >
         <Tabs.List {...settingStyles.settingUI.tabs.list}>
+          <Tabs.Trigger value="local" {...settingStyles.settingUI.tabs.trigger}>
+            {t('setup.tabLocal')}
+          </Tabs.Trigger>
           <Tabs.Trigger value="apikey" {...settingStyles.settingUI.tabs.trigger}>
             {t('setup.tabApiKey')}
           </Tabs.Trigger>
@@ -641,6 +506,185 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
             {t('setup.tabCustom')}
           </Tabs.Trigger>
         </Tabs.List>
+
+        <Tabs.Content value="local" {...settingStyles.settingUI.tabs.content}>
+          <Stack gap={3}>
+            <Text fontWeight="bold">{t('setup.detectTitle')}</Text>
+
+            {applyPhase === 'applied' && appliedInfo ? (
+              <Stack gap={3}>
+                <Text fontWeight="semibold" color="green.300">
+                  {t('setup.detectApplied', { model: appliedInfo.model })}
+                </Text>
+                {appliedInfo.note && <NoticeBox text={appliedInfo.note} tone="blue" />}
+                {appliedInfo.noTools && <NoticeBox text={t('setup.modelHasNoTools')} />}
+                <Text fontSize="sm" color="whiteAlpha.700">
+                  {t('setup.savedReady')}
+                </Text>
+                <Button tone="blue" onClick={handleContinueAfterApply} className="self-start">
+                  {t('setup.startChatting')}
+                </Button>
+              </Stack>
+            ) : (
+              <Stack gap={3}>
+                {detectStatus === 'loading' && (
+                  <Text fontSize="sm" color="whiteAlpha.700">
+                    {t('setup.detectScanning')}
+                  </Text>
+                )}
+
+                {detectStatus === 'error' && detectError && (
+                  <Text fontSize="sm" color="red.300">{detectError}</Text>
+                )}
+
+                {detectStatus === 'ready' && detectResult && detectResult.models.length > 0 && (
+                  <Stack gap={2}>
+                    <Text fontSize="sm" color="whiteAlpha.700">{t('setup.detectFound')}</Text>
+                    <Stack gap={2}>
+                      {detectResult.models.map((m) => {
+                        const key = detectModelKey(m);
+                        const selected = key === selectedKey;
+                        return (
+                          <Box
+                            key={key}
+                            onClick={() => handleSelectDetected(m)}
+                            cursor="pointer"
+                            borderWidth="1px"
+                            borderColor={selected ? 'blue.400' : 'whiteAlpha.200'}
+                            bg={selected ? 'blue.900' : 'whiteAlpha.50'}
+                            borderRadius="md"
+                            px={3}
+                            py={2}
+                          >
+                            <Text fontWeight="semibold">{m.id}</Text>
+                            <HStack flexWrap="wrap" gap={2} mt={1}>
+                              <Text fontSize="xs" color="whiteAlpha.600">{m.backend}</Text>
+                              {m.is_vlm && (
+                                <Text fontSize="xs" color="purple.300">{t('setup.detectVision')}</Text>
+                              )}
+                              {m.supports_tools && (
+                                <Text fontSize="xs" color="teal.300">{t('setup.detectTools')}</Text>
+                              )}
+                            </HStack>
+                          </Box>
+                        );
+                      })}
+                    </Stack>
+                    <Button
+                      tone="blue"
+                      onClick={handleApplyDetected}
+                      loading={applyPhase === 'applying'}
+                      disabled={!selectedKey || applyPhase === 'applying'}
+                      className="self-start"
+                    >
+                      {t('setup.detectUse')}
+                    </Button>
+                    {applyPhase === 'error' && applyError && (
+                      <Text fontSize="sm" color="red.300">{applyError}</Text>
+                    )}
+                  </Stack>
+                )}
+
+                {detectStatus === 'ready' && detectResult && detectResult.models.length === 0
+                  && detectResult.ollama_available && (
+                    <Stack gap={2}>
+                      <Text fontSize="sm" color="orange.300">{t('setup.detectEmptyOllama')}</Text>
+                      <Text fontWeight="semibold">{t('setup.ollamaRecommendedTitle')}</Text>
+                      <Text fontSize="sm" color="whiteAlpha.700">
+                        {t('setup.ollamaRecommendedDesc', { model: detectResult.recommended_pull })}
+                      </Text>
+
+                      {pullPhase === 'idle' && (
+                        <Button tone="blue" onClick={handlePullRecommended} className="self-start">
+                          {t('setup.ollamaUseRecommended', { model: detectResult.recommended_pull })}
+                        </Button>
+                      )}
+                      {pullPhase === 'preparing' && (
+                        <Text fontSize="sm" color="whiteAlpha.700">
+                          {t('setup.ollamaDownloadPreparing')}
+                        </Text>
+                      )}
+                      {pullPhase === 'downloading' && (
+                        <Text fontSize="sm" color="whiteAlpha.700">
+                          {t('setup.ollamaDownloading', { percent: pullPercent ?? 0 })}
+                        </Text>
+                      )}
+                      {pullPhase === 'applying' && (
+                        <Text fontSize="sm" color="whiteAlpha.700">
+                          {t('setup.ollamaApplying')}
+                        </Text>
+                      )}
+                      {pullPhase === 'error' && pullError && (
+                        <Text fontSize="sm" color="red.300">{pullError}</Text>
+                      )}
+                    </Stack>
+                )}
+
+                {detectStatus === 'ready' && detectResult && detectResult.models.length === 0
+                  && !detectResult.ollama_available && detectResult.lmstudio_available && (
+                    <Text fontSize="sm" color="orange.300">{t('setup.detectEmptyLmStudio')}</Text>
+                )}
+
+                {detectStatus === 'ready' && detectResult && detectResult.models.length === 0
+                  && !detectResult.ollama_available && !detectResult.lmstudio_available && (
+                    // 沒裝跟裝了沒開，下一步完全不同。原本兩種都只有一行「請先安裝
+                    // Ollama 或 LM Studio」，沒有連結、也沒有重新偵測的按鈕——不會用
+                    // 終端機的人卡在這裡，已經裝好只是沒開的人還會以為自己裝失敗。
+                    <Stack gap={2}>
+                      {detectResult.ollama_installed ? (
+                        <>
+                          <Text fontWeight="semibold">{t('setup.ollamaNotRunningTitle')}</Text>
+                          <Text fontSize="sm" color="whiteAlpha.700">
+                            {t('setup.ollamaNotRunningDesc')}
+                          </Text>
+                          <Button tone="blue" onClick={() => { void runDetect(); }} className="self-start">
+                            {t('setup.ollamaRecheck')}
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Text fontWeight="semibold">{t('setup.ollamaInstallTitle')}</Text>
+                          <Text fontSize="sm" color="whiteAlpha.700">
+                            {detectResult.ollama_install_supported
+                              ? t('setup.ollamaOneClickDesc', { model: detectResult.recommended_pull })
+                              : t('setup.ollamaInstallDesc')}
+                          </Text>
+                          {oneClickProgress() ? (
+                            <Text fontSize="sm" color="whiteAlpha.700">{oneClickProgress()}</Text>
+                          ) : (
+                            <div className="flex flex-wrap gap-2">
+                              {detectResult.ollama_install_supported && (
+                                <Button tone="blue" onClick={() => { void handleOneClickInstall(); }}>
+                                  {t('setup.ollamaOneClickButton')}
+                                </Button>
+                              )}
+                              {/* 自己裝的備案。桌面版由 window-manager 的 setWindowOpenHandler 交給系統瀏覽器開 */}
+                              <Button
+                                tone={detectResult.ollama_install_supported ? 'gray' : 'blue'}
+                                variant={detectResult.ollama_install_supported ? 'outline' : 'solid'}
+                                onClick={() => window.open(OLLAMA_DOWNLOAD_URL, '_blank')}
+                              >
+                                {t('setup.ollamaInstallDownloadLink')}
+                              </Button>
+                              <Button tone="gray" variant="outline" onClick={() => { void runDetect(); }}>
+                                {t('setup.ollamaInstallRecheck')}
+                              </Button>
+                            </div>
+                          )}
+                          {installPhase === 'error' && installError && (
+                            <Text fontSize="sm" color="red.300">{installError}</Text>
+                          )}
+                          {pullPhase === 'error' && pullError && (
+                            <Text fontSize="sm" color="red.300">{pullError}</Text>
+                          )}
+                        </>
+                      )}
+                    </Stack>
+                )}
+              </Stack>
+            )}
+          </Stack>
+        </Tabs.Content>
 
         <Tabs.Content value="apikey" {...settingStyles.settingUI.tabs.content}>
           <Stack gap={6}>
@@ -761,12 +805,13 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
         </Tabs.Content>
       </Tabs.Root>
 
-      {saveError && (
+      {mode !== 'local' && saveError && (
         <Text fontSize="sm" color="red.300">
           {saveError}
         </Text>
       )}
 
+      {mode !== 'local' && (
       <Button
         tone="blue"
         onClick={handleSubmit}
@@ -779,6 +824,7 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
       >
         {t('setup.testAndSave')}
       </Button>
+      )}
     </Stack>
   );
 }
