@@ -1,14 +1,8 @@
 /* eslint-disable react-hooks/rules-of-hooks */
-// 這個分頁分成三塊，跟 asr.tsx 同一種「一部分走 Apply/Revert、其餘自己即時
-// 存檔」的模式（見 asr.tsx 檔頭說明）：
-// - 畫布互動設定（pointerInteractive／scrollToResize）：走 ，抽屜
-//   關閉時由 handleCancel 還原。TabActions 就放在這一塊裡面，視覺上它管到哪
-//   裡一目了然。
-// - 舞台特效預覽與入場音樂：按下去就播、上傳就存，不可還原。
-// - 動作設定（MotionConfig）：寫的是 model_dict.json 的 motionMap／tapMotions，
-//   後端狀態、即時存檔。
-// 後兩塊刻意不接進 TabActions——2e 子專案整批就是在消滅「一顆按鈕看起來管全部」
-// 的混淆，每一塊都有自己的標題與常駐說明文字把界線講清楚。
+// 這個分頁分成三塊，每一塊都改了就存：
+// - 畫布互動設定（pointerInteractive／scrollToResize／lookAtPointer）：寫 localStorage，立刻生效。
+// - 舞台特效預覽與入場音樂：按下去就播、上傳就存。
+// - 動作與表情對應（MotionConfig／VrmMotionConfig）：寫 model_dict.json，停手就存。
 import {
   Box, Button, Heading, Input, Stack, Text,
 } from '@chakra-ui/react';

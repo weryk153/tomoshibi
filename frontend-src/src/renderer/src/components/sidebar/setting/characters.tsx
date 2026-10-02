@@ -612,15 +612,15 @@ function Characters(): JSX.Element {
     },
   });
 
-  // 表單任何一欄改了就排一次存檔；剛打開表單時填進來的那一份不算。
+  // 表單任何一欄改了就排一次存檔（存檔器只送最後那份）；剛打開表單時填進來的
+  // 那一份不算。不跟「存過的值」比：改了又改回去，最後那份一樣要存。
   useEffect(() => {
     if (!draft) return;
-    const snapshot = JSON.stringify(draft);
     if (loadedDraftRef.current === null) {
-      loadedDraftRef.current = snapshot;
+      loadedDraftRef.current = 'loaded';
       return;
     }
-    if (snapshot === loadedDraftRef.current || !baselineRef.current) return;
+    if (!baselineRef.current) return;
     charSaver.change({ draft, baseline: baselineRef.current });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draft]);

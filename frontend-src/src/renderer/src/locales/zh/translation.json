@@ -376,9 +376,9 @@
         "saveFailed": "無法儲存這個音檔。"
       },
       "previewSettingsSectionTitle": "畫布互動設定",
-      "previewSettingsSectionDesc": "這三個開關改了就立刻生效，跟這個分頁其他設定一樣。Live2D 與 VRM 角色都適用。",
+      "previewSettingsSectionDesc": "這三個開關改了就立刻生效。Live2D 與 VRM 角色都適用。",
       "motionConfigSectionTitle": "動作清單",
-      "motionConfigSectionNote": "這個區塊直接寫入 model_dict.json，跟抽屜的套用／還原是兩回事。修改不會自動存檔，要按最下面的「儲存」才會生效。",
+      "motionConfigSectionNote": "改了就存，套用到用這個模型的所有角色。",
       "vrmNoIdle": "沒有 motions/idle.vrma，改用程序式微擺",
       "vrmOrphanWarningItem": "「{{keyword}}」→ {{clip}}",
       "vrmOrphanUnknownClip": "不明動作",
@@ -428,7 +428,8 @@
       "tapAreaIndexRandom": "（群組內隨機）",
       "sharedBadge": "（Live2D 與 VRM 共用）",
       "live2dOnlySectionTitle": "動作與表情對應（Live2D 專屬）",
-      "vrmOnlySectionTitle": "動作與表情對應（VRM 專屬）"
+      "vrmOnlySectionTitle": "動作與表情對應（VRM 專屬）",
+      "motionConfigFixErrors": "有欄位不合法，改好才會存"
     },
     "performances": {
       "title": "演出方案管理",

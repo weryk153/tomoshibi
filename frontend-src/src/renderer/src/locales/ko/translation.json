@@ -376,9 +376,9 @@
         "saveFailed": "이 오디오 파일을 저장할 수 없어요."
       },
       "previewSettingsSectionTitle": "캔버스 상호작용 설정",
-      "previewSettingsSectionDesc": "이 세 개의 스위치는 이 탭의 다른 설정과 마찬가지로 바로 반영돼요. Live2D와 VRM 캐릭터 모두에 적용돼요.",
+      "previewSettingsSectionDesc": "이 세 스위치는 바꾸면 바로 적용됩니다. Live2D와 VRM 캐릭터 모두에 적용됩니다.",
       "motionConfigSectionTitle": "동작 목록",
-      "motionConfigSectionNote": "이 구역은 model_dict.json에 직접 기록하며 서랍의 적용/되돌리기와는 별개예요. 변경은 자동 저장되지 않으니 아래 '저장'을 눌러 주세요.",
+      "motionConfigSectionNote": "바꾸면 바로 저장되고, 이 모델을 쓰는 모든 캐릭터에 적용됩니다.",
       "vrmNoIdle": "motions/idle.vrma 가 없어 절차적 흔들림을 사용합니다",
       "vrmOrphanWarningItem": "“{{keyword}}” → {{clip}}",
       "vrmOrphanUnknownClip": "알 수 없는 모션",
@@ -428,7 +428,8 @@
       "tapAreaIndexRandom": "(그룹 내 무작위)",
       "sharedBadge": "(Live2D와 VRM 공용)",
       "live2dOnlySectionTitle": "모션과 표정 매핑 (Live2D 전용)",
-      "vrmOnlySectionTitle": "모션과 표정 매핑 (VRM 전용)"
+      "vrmOnlySectionTitle": "모션과 표정 매핑 (VRM 전용)",
+      "motionConfigFixErrors": "올바르지 않은 칸이 있습니다. 고치면 저장됩니다"
     },
     "performances": {
       "title": "연출 프리셋 관리",

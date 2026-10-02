@@ -376,9 +376,9 @@
         "saveFailed": "この音声ファイルを保存できませんでした。"
       },
       "previewSettingsSectionTitle": "キャンバス操作の設定",
-      "previewSettingsSectionDesc": "この3つのスイッチは、このタブの他の設定と同じくすぐに反映されます。Live2D と VRM のどちらのキャラクターにも適用されます。",
+      "previewSettingsSectionDesc": "この3つのスイッチは切り替えるとすぐ反映されます。Live2D と VRM の両方のキャラクターに適用されます。",
       "motionConfigSectionTitle": "モーション一覧",
-      "motionConfigSectionNote": "このセクションは model_dict.json に直接書き込み、ドロワーの適用／取り消しとは別です。変更は自動保存されません。下の「保存」を押してください。",
+      "motionConfigSectionNote": "変更するとすぐ保存され、このモデルを使うすべてのキャラクターに適用されます。",
       "vrmNoIdle": "motions/idle.vrma がないため、プロシージャルな揺れを使用します",
       "vrmOrphanWarningItem": "「{{keyword}}」→ {{clip}}",
       "vrmOrphanUnknownClip": "不明なモーション",
@@ -428,7 +428,8 @@
       "tapAreaIndexRandom": "（グループ内でランダム）",
       "sharedBadge": "（Live2D と VRM で共通）",
       "live2dOnlySectionTitle": "モーションと表情の対応（Live2D 専用）",
-      "vrmOnlySectionTitle": "モーションと表情の対応（VRM 専用）"
+      "vrmOnlySectionTitle": "モーションと表情の対応（VRM 専用）",
+      "motionConfigFixErrors": "不正な欄があります。直すと保存されます"
     },
     "performances": {
       "title": "演出プリセット管理",

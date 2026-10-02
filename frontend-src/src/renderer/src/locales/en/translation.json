@@ -376,9 +376,9 @@
         "saveFailed": "Could not save this audio file."
       },
       "previewSettingsSectionTitle": "Canvas interaction",
-      "previewSettingsSectionDesc": "These three switches take effect immediately, like everything else on this tab. They apply to both Live2D and VRM characters.",
+      "previewSettingsSectionDesc": "These three switches take effect as soon as you change them. They apply to both Live2D and VRM characters.",
       "motionConfigSectionTitle": "Motion list",
-      "motionConfigSectionNote": "This section writes directly to model_dict.json and is separate from the drawer's Apply/Revert. Changes are not saved automatically — press Save at the bottom.",
+      "motionConfigSectionNote": "Saves as you change it, for every character that uses this model.",
       "vrmNoIdle": "No motions/idle.vrma — using procedural sway",
       "vrmOrphanWarningItem": "“{{keyword}}” → {{clip}}",
       "vrmOrphanUnknownClip": "unknown clip",
@@ -428,7 +428,8 @@
       "tapAreaIndexRandom": "(random within group)",
       "sharedBadge": "(shared by Live2D and VRM)",
       "live2dOnlySectionTitle": "Motion and expression mapping (Live2D only)",
-      "vrmOnlySectionTitle": "Motion and expression mapping (VRM only)"
+      "vrmOnlySectionTitle": "Motion and expression mapping (VRM only)",
+      "motionConfigFixErrors": "Some fields are invalid; fix them to save"
     },
     "performances": {
       "title": "Performance Manager",
