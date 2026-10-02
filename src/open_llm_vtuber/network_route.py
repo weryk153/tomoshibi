@@ -65,6 +65,12 @@ def current_host() -> str:
         return "127.0.0.1"
 
 
+def _same_bind(a: str, b: str) -> bool:
+    """兩個綁定位址效果一樣嗎：一樣的字串，或都是只聽本機。"""
+    a, b = str(a).strip(), str(b).strip()
+    return a == b or (is_localhost_only(a) and is_localhost_only(b))
+
+
 def write_host(allow_other_devices: bool) -> None:
     """改寫綁定位址。開放＝0.0.0.0，關閉＝127.0.0.1。
 
@@ -262,7 +268,8 @@ def init_network_route() -> APIRouter:
 
         new_host = OPEN_HOST if allow else "127.0.0.1"
         # 綁定位址啟動時就決定了：跟這次啟動時不同才要重啟；改回原樣就不用。
-        if is_localhost_only(new_host) == is_localhost_only(startup_host):
+        # 比實際位址，不只比「是不是本機」：啟動時綁某個區網 IP、改成 0.0.0.0 也要重啟。
+        if _same_bind(new_host, startup_host):
             pending_changes.unmark("host")
         else:
             pending_changes.mark("host")
