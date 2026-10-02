@@ -274,7 +274,7 @@
       "voiceLangHelp": "语音合成用哪种语言朗读。与上面的回复语言不同时，后端会在合成前先翻译一次，每句多花数秒——两者设成一样最快。",
       "ttsEngine": "语音合成引擎",
       "ttsEngineInherit": "跟底稿角色一样",
-      "ttsEngineHelp": "她用哪个引擎发声：Edge TTS 用上面的声音，GPT-SoVITS 用下面的参考音。选「跟底稿角色一样」会把底稿角色现在的选择存成她自己的。",
+      "ttsEngineHelp": "她用哪个引擎发声；选了之后下面只出现那个引擎的设置。选「跟底稿角色一样」会把底稿角色现在的选择存成她自己的。",
       "aiAvatar": "AI 头像",
       "aiAvatarHelp": "显示在 AI 消息旁的头像。留空则用名称首字。图片请小于 512KB。",
       "aiAvatarChoose": "选择头像",
@@ -418,7 +418,8 @@
       "sharedBadge": "（Live2D 与 VRM 共用）",
       "live2dOnlySectionTitle": "动作与表情对应（Live2D 专属）",
       "vrmOnlySectionTitle": "动作与表情对应（VRM 专属）",
-      "motionConfigFixErrors": "有字段不合法，改好才会保存"
+      "motionConfigFixErrors": "有字段不合法，改好才会保存",
+      "previewNotOnScreen": "这个模型不在画面上，不能试播；换到用它的角色就能试。"
     },
     "performances": {
       "title": "演出方案管理",
@@ -678,7 +679,7 @@
       "asrEngineLabel": "识别引擎",
       "asrEnginePlaceholder": "选一个识别引擎",
       "asrEngineHelp": "把你说的话转成文字的引擎。sherpa=纯 CPU、任何机器可跑；faster-whisper=要先下载模型、CPU 慢、有 NVIDIA GPU 才快（Mac 的 MPS 不支持）；groq/azure=云端，要网络与密钥、零本地算力。",
-      "asrEngineSectionNote": "这个区块有自己的保存按钮，按下就直接写进配置文件——但要重启后端（或重新切换一次角色）才会应用到当前对话。",
+      "asrEngineSectionNote": "识别引擎与密钥按下面的「保存」才会切换；保存之后由设置顶部的提示重新加载。",
       "asrEnginePendingNotice": "尚未保存——目前仍在用 {{current}}。请在下面输入凭证并按保存才会切换。",
       "asrSherpa": "sherpa-onnx（本地 · CPU · 轻量，默认）",
       "asrFasterWhisper": "faster-whisper（本地 · 较准 · 需要 GPU · 这里没装依赖，选了会静默退回 sherpa-onnx）",
@@ -762,11 +763,14 @@
       "micHttpsNote": "用 http 网址可以打字聊天，但麦克风需要 HTTPS。要在手机上讲话，请按教程设置 Tailscale Serve（HTTPS）。",
       "offTitle": "在手机或平板上使用",
       "recommendTailscale": "最简单又安全的方式是用 Tailscale——私密、加密，而且麦克风也能用。请看教程（docs/remote-access-tailscale.md）。",
-      "lanOptIn": "或：想同一个 Wi-Fi 直接连，可在 conf.yaml 把 host 设成 0.0.0.0——但只在你信任的网络这么做（同网络的人都能打开、没有密码保护）。",
+      "lanOptIn": "或：同一个 Wi-Fi 直接连，打开上面的「允许局域网连接」——只在你信任的网络这么做（同网络的人都能打开、没有密码保护）。",
       "alreadyReachable": "上面的 HTTPS 网址已经可以从手机连接，直接扫描或复制使用即可。",
       "empty": "找不到可用的网络地址",
       "loading": "正在寻找可用的网络地址…",
-      "error": "读取网络地址失败"
+      "error": "读取网络地址失败",
+      "allowLan": "允许局域网连接",
+      "allowLanHelp": "打开后，同一网络上的任何人都能打开这个 App，没有密码保护；只在你信任的网络打开。要重新启动后端才生效。",
+      "allowLanPendingRestart": "已打开，重新启动后端之后其他设备才连得上。"
     },
     "about": {
       "title": "Tomoshibi",
@@ -842,9 +846,12 @@
         "perfPreset": "性能模式",
         "memory": "长期记忆开关",
         "character": "正在用的角色",
-        "other": "其他设置"
+        "other": "其他设置",
+        "host": "允许局域网连接"
       },
-      "liveBlocked": "直播中不能重新加载，直播结束后再按。"
+      "liveBlocked": "直播中不能重新加载，直播结束后再按。",
+      "restart": "重新启动后端",
+      "restartCommand": "要重新启动后端才会生效：在运行后端的终端按 Ctrl+C，再运行 uv run run_server.py。"
     },
     "stage": {
       "display": "字幕、音量与背景",

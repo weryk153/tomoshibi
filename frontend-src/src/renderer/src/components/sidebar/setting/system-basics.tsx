@@ -1,4 +1,4 @@
-// 系統頁的基本設定：介面語言、伺服器連線、截圖壓縮。從原本的「一般」分頁搬來。
+// 系統頁的基本設定：介面語言、伺服器連線、截圖壓縮。
 //
 // 連線是整個抽屜裡唯一要按按鈕的地方：這兩個欄位每改一個字元就會重連一次，
 // 必須等使用者打完才送。關抽屜時丟掉沒按「連線」的草稿（onCancel）。
@@ -79,14 +79,16 @@ function SystemBasics({ onCancel }: SystemBasicsProps): JSX.Element {
 
   return (
     <Stack gap={4}>
+      {/* 介面語言：這個 App 的選單與按鈕。她說話的語言在角色頁。 */}
       <SelectField
-        label={t('settings.general.language')}
+        label={t('settings.general.interfaceLanguage')}
         value={[i18n.language]}
         onChange={(value) => {
           if (value[0] && value[0] !== i18n.language) i18n.changeLanguage(value[0]);
         }}
         collection={languages}
-        placeholder={t('settings.general.language')}
+        placeholder={t('settings.general.interfaceLanguage')}
+        help={t('settings.general.interfaceLanguageHelp')}
       />
 
       <Stack gap={2} pt={3} borderTopWidth="1px" borderColor="whiteAlpha.200">

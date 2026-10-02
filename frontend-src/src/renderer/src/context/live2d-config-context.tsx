@@ -2,6 +2,7 @@ import {
   createContext, useCallback, useContext, useState, useMemo,
 } from 'react';
 import { useLocalStorage } from '@/hooks/utils/use-local-storage';
+import { INTERACTION_DEFAULTS, interactionSettingsOf } from '@/utils/canvas-interaction';
 
 /**
  * Model emotion mapping interface
@@ -137,7 +138,7 @@ export function Live2DConfigProvider({ children }: { children: React.ReactNode }
 
   const [interactionSettings, setInteractionSettings] = useLocalStorage(
     'live2dInteractionSettings',
-    { pointerInteractive: true, scrollToResize: true, lookAtPointer: true },
+    { ...INTERACTION_DEFAULTS },
   );
 
   const [modelInfo, setModelInfoState] = useLocalStorage<ModelInfo | undefined>(
@@ -156,16 +157,15 @@ export function Live2DConfigProvider({ children }: { children: React.ReactNode }
       return;
     }
 
-    const pointerInteractive = info.pointerInteractive
-      ?? interactionSettings.pointerInteractive;
-    const lookAtPointer = info.lookAtPointer
-      ?? interactionSettings.lookAtPointer;
-    const scrollToResize = info.scrollToResize
-      ?? interactionSettings.scrollToResize;
+    // 存著的設定可能缺鍵（舊版存的）：缺的用預設值補，不留 undefined 給畫面猜。
+    const saved = interactionSettingsOf(interactionSettings);
+    const pointerInteractive = info.pointerInteractive ?? saved.pointerInteractive;
+    const lookAtPointer = info.lookAtPointer ?? saved.lookAtPointer;
+    const scrollToResize = info.scrollToResize ?? saved.scrollToResize;
     if (
-      pointerInteractive !== interactionSettings.pointerInteractive
-      || lookAtPointer !== interactionSettings.lookAtPointer
-      || scrollToResize !== interactionSettings.scrollToResize
+      pointerInteractive !== saved.pointerInteractive
+      || lookAtPointer !== saved.lookAtPointer
+      || scrollToResize !== saved.scrollToResize
     ) {
       setInteractionSettings({ pointerInteractive, scrollToResize, lookAtPointer });
     }

@@ -274,7 +274,7 @@
       "voiceLangHelp": "音声合成が読み上げる言語です。上の返答の言語と違う場合、バックエンドは合成前に翻訳を挟むため一文ごとに数秒増えます。両方を揃えるのが最速です。",
       "ttsEngine": "音声合成エンジン",
       "ttsEngineInherit": "ベースキャラクターと同じ",
-      "ttsEngineHelp": "彼女が話すエンジンを選びます。Edge TTS は上の声、GPT-SoVITS は下の参照音声を使います。「ベースキャラクターと同じ」を選ぶと、ベースキャラクターの今の選択を彼女の設定として保存します。",
+      "ttsEngineHelp": "彼女が話すエンジンを選びます。選ぶと下にそのエンジンの設定だけが表示されます。「ベースキャラクターと同じ」を選ぶと、ベースキャラクターの今の選択を彼女の設定として保存します。",
       "aiAvatar": "AIのアバター",
       "aiAvatarHelp": "AIのメッセージの横に表示されるアバターです。空欄にすると名前の頭文字を使います。画像は512KB未満にしてください。",
       "aiAvatarChoose": "アバターを選ぶ",
@@ -418,7 +418,8 @@
       "sharedBadge": "（Live2D と VRM で共通）",
       "live2dOnlySectionTitle": "モーションと表情の対応（Live2D 専用）",
       "vrmOnlySectionTitle": "モーションと表情の対応（VRM 専用）",
-      "motionConfigFixErrors": "不正な欄があります。直すと保存されます"
+      "motionConfigFixErrors": "不正な欄があります。直すと保存されます",
+      "previewNotOnScreen": "このモデルは画面に表示されていないため試せません。このモデルを使うキャラクターに切り替えてください。"
     },
     "performances": {
       "title": "演出プリセット管理",
@@ -678,7 +679,7 @@
       "asrEngineLabel": "認識エンジン",
       "asrEnginePlaceholder": "認識エンジンを選択",
       "asrEngineHelp": "あなたの発話をテキストに変換するエンジンです。sherpa＝純CPUで、どのマシンでも動きます。faster-whisper＝モデルをダウンロードし、CPUでは遅く、NVIDIA GPUがあるときだけ高速です（MacのMPSは非対応）。groq/azure＝クラウドで、ネットワークとキーが必要ですが、ローカルの計算は不要です。",
-      "asrEngineSectionNote": "このセクションには独自の保存ボタンがあり、押すと設定ファイルに直接書き込まれます。ただし現在の会話に反映するにはバックエンドの再起動（またはキャラクターの切り替え直し）が必要です。",
+      "asrEngineSectionNote": "認識エンジンとキーは下の「保存」を押したときに切り替わります。その後、設定上部の通知から再読み込みしてください。",
       "asrEnginePendingNotice": "まだ保存されていません——現在も {{current}} を使用中です。下で認証情報を入力し、保存を押すと切り替わります。",
       "asrSherpa": "sherpa-onnx（ローカル・CPU・軽量、デフォルト）",
       "asrFasterWhisper": "faster-whisper（ローカル・高精度・GPU必須・依存関係が未導入のため、選択すると sherpa-onnx に静かにフォールバック）",
@@ -762,11 +763,14 @@
       "micHttpsNote": "テキストチャットはhttpで使えますが、マイクにはHTTPSが必要です。スマホで話すには、ガイドに従ってTailscale Serve（HTTPS）を設定してください。",
       "offTitle": "スマホやタブレットで使う",
       "recommendTailscale": "いちばん簡単で安全なのはTailscaleです。プライベートで暗号化され、マイクも使えます。ガイド（docs/remote-access-tailscale.md）をご覧ください。",
-      "lanOptIn": "または、同じWi-Fiでアクセスするには、conf.yamlでhost: 0.0.0.0に設定してください。ただし、信頼できるネットワークでのみ行ってください（同じネットワークの誰でも開けてしまい、パスワード保護はありません）。",
+      "lanOptIn": "または、上の「LAN からの接続を許可」をオンにすると同じ Wi-Fi から直接接続できます。信頼できるネットワークでのみ（同じネットワークの誰でも開けます。パスワードはありません）。",
       "alreadyReachable": "上のHTTPS URLはすでにスマホから利用できます。スキャンするかコピーして使ってください。",
       "empty": "到達可能なネットワークアドレスが見つかりません",
       "loading": "到達可能なネットワークアドレスを探しています…",
-      "error": "ネットワークアドレスの読み込みに失敗しました"
+      "error": "ネットワークアドレスの読み込みに失敗しました",
+      "allowLan": "LAN からの接続を許可",
+      "allowLanHelp": "オンにすると、同じネットワーク上の誰でもこのアプリを開けます（パスワードなし）。信頼できるネットワークでのみ使ってください。バックエンドの再起動後に反映されます。",
+      "allowLanPendingRestart": "オンにしました。バックエンドの再起動後に他の端末から接続できます。"
     },
     "about": {
       "title": "Tomoshibi",
@@ -842,9 +846,12 @@
         "perfPreset": "パフォーマンスモード",
         "memory": "長期記憶のスイッチ",
         "character": "使用中のキャラクター",
-        "other": "その他の設定"
+        "other": "その他の設定",
+        "host": "LAN からの接続を許可"
       },
-      "liveBlocked": "配信中は再読み込みできません。配信終了後に押してください。"
+      "liveBlocked": "配信中は再読み込みできません。配信終了後に押してください。",
+      "restart": "バックエンドを再起動",
+      "restartCommand": "バックエンドの再起動後に反映されます：実行中のターミナルで Ctrl+C を押し、uv run run_server.py を実行してください。"
     },
     "stage": {
       "display": "字幕・音量・背景",

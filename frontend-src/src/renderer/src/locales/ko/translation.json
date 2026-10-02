@@ -274,7 +274,7 @@
       "voiceLangHelp": "음성 합성이 읽어 주는 언어예요. 위의 답변 언어와 다르면 백엔드가 합성 전에 한 번 번역하기 때문에 문장마다 몇 초가 더 걸려요. 둘을 같게 맞추는 편이 가장 빨라요.",
       "ttsEngine": "음성 합성 엔진",
       "ttsEngineInherit": "기본 캐릭터와 같게",
-      "ttsEngineHelp": "그녀가 말하는 엔진을 고릅니다. Edge TTS는 위의 목소리, GPT-SoVITS는 아래 참조 음성을 씁니다. 「기본 캐릭터와 같게」를 고르면 기본 캐릭터의 지금 선택을 그녀의 설정으로 저장합니다.",
+      "ttsEngineHelp": "그녀가 말하는 엔진을 고릅니다. 고르면 아래에 그 엔진의 설정만 나옵니다. 「기본 캐릭터와 같게」를 고르면 기본 캐릭터의 지금 선택을 그녀의 설정으로 저장합니다.",
       "aiAvatar": "AI 아바타",
       "aiAvatarHelp": "AI 메시지 옆에 표시되는 아바타예요. 비워 두면 이름의 첫 글자를 사용해요. 이미지는 512KB 미만으로 유지하세요.",
       "aiAvatarChoose": "아바타 선택",
@@ -418,7 +418,8 @@
       "sharedBadge": "(Live2D와 VRM 공용)",
       "live2dOnlySectionTitle": "모션과 표정 매핑 (Live2D 전용)",
       "vrmOnlySectionTitle": "모션과 표정 매핑 (VRM 전용)",
-      "motionConfigFixErrors": "올바르지 않은 칸이 있습니다. 고치면 저장됩니다"
+      "motionConfigFixErrors": "올바르지 않은 칸이 있습니다. 고치면 저장됩니다",
+      "previewNotOnScreen": "이 모델은 화면에 없어서 미리 볼 수 없습니다. 이 모델을 쓰는 캐릭터로 전환하세요."
     },
     "performances": {
       "title": "연출 프리셋 관리",
@@ -678,7 +679,7 @@
       "asrEngineLabel": "인식 엔진",
       "asrEnginePlaceholder": "인식 엔진 선택",
       "asrEngineHelp": "당신의 말을 텍스트로 바꾸는 엔진이에요. sherpa = 순수 CPU로 어떤 기기에서도 실행; faster-whisper = 모델을 내려받으며 CPU에서는 느리고 NVIDIA GPU에서만 빠름(Mac MPS는 미지원); groq/azure = 클라우드로 네트워크와 키가 필요하고 로컬 연산은 없음.",
-      "asrEngineSectionNote": "이 구역에는 자체 저장 버튼이 있어서 누르면 설정 파일에 바로 기록돼요. 다만 현재 대화에 반영하려면 백엔드를 다시 시작(또는 캐릭터를 다시 전환)해야 해요.",
+      "asrEngineSectionNote": "인식 엔진과 키는 아래의 \"저장\"을 눌러야 바뀝니다. 그다음 설정 위쪽의 알림에서 다시 불러오세요.",
       "asrEnginePendingNotice": "아직 저장되지 않았어요 — 현재는 여전히 {{current}}을(를) 사용 중이에요. 아래에서 자격 증명을 입력하고 저장을 눌러야 전환돼요.",
       "asrSherpa": "sherpa-onnx(로컬 · CPU · 경량, 기본값)",
       "asrFasterWhisper": "faster-whisper(로컬 · 더 정확 · GPU 필요 · 의존성이 설치되어 있지 않아 선택해도 조용히 sherpa-onnx로 대체됨)",
@@ -762,11 +763,14 @@
       "micHttpsNote": "텍스트 채팅은 http로 작동하지만 마이크는 HTTPS가 필요해요. 휴대폰에서 대화하려면 가이드에 따라 Tailscale Serve(HTTPS)를 설정하세요.",
       "offTitle": "휴대폰이나 태블릿에서 사용하기",
       "recommendTailscale": "가장 쉽고 안전한 방법은 Tailscale이에요 — 비공개에 암호화되고 마이크도 작동해요. 가이드를 참고하세요(docs/remote-access-tailscale.md).",
-      "lanOptIn": "또는, 같은 Wi-Fi 접속을 위해 conf.yaml에서 host: 0.0.0.0으로 설정하세요 — 단, 신뢰하는 네트워크에서만 하세요(같은 네트워크의 누구나 열 수 있고 비밀번호가 없어요).",
+      "lanOptIn": "또는 위의 \"LAN 연결 허용\"을 켜면 같은 Wi-Fi에서 바로 연결할 수 있습니다. 신뢰하는 네트워크에서만 하세요(같은 네트워크의 누구나 열 수 있고 비밀번호가 없습니다).",
       "alreadyReachable": "위의 HTTPS URL은 이미 휴대폰에서 작동해요 — 스캔하거나 복사해서 사용하세요.",
       "empty": "연결 가능한 네트워크 주소를 찾을 수 없어요",
       "loading": "연결 가능한 네트워크 주소를 찾는 중…",
-      "error": "네트워크 주소를 불러오지 못했어요"
+      "error": "네트워크 주소를 불러오지 못했어요",
+      "allowLan": "LAN 연결 허용",
+      "allowLanHelp": "켜면 같은 네트워크의 누구나 이 앱을 열 수 있습니다(비밀번호 없음). 신뢰하는 네트워크에서만 켜세요. 백엔드를 다시 시작해야 적용됩니다.",
+      "allowLanPendingRestart": "켰습니다. 백엔드를 다시 시작한 뒤 다른 기기에서 연결할 수 있습니다."
     },
     "about": {
       "title": "Tomoshibi",
@@ -842,9 +846,12 @@
         "perfPreset": "성능 모드",
         "memory": "장기 기억 스위치",
         "character": "사용 중인 캐릭터",
-        "other": "기타 설정"
+        "other": "기타 설정",
+        "host": "LAN 연결 허용"
       },
-      "liveBlocked": "방송 중에는 다시 불러올 수 없습니다. 방송이 끝난 뒤 누르세요."
+      "liveBlocked": "방송 중에는 다시 불러올 수 없습니다. 방송이 끝난 뒤 누르세요.",
+      "restart": "백엔드 다시 시작",
+      "restartCommand": "백엔드를 다시 시작해야 적용됩니다: 실행 중인 터미널에서 Ctrl+C를 누른 뒤 uv run run_server.py를 실행하세요."
     },
     "stage": {
       "display": "자막, 음량, 배경",
