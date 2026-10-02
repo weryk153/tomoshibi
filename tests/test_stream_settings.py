@@ -72,3 +72,26 @@ def test_templates_carry_the_defaults(template):
     root = Path(__file__).resolve().parent.parent
     data = yaml.safe_load((root / template).read_text("utf-8"))
     assert StreamConfig.model_validate(data["stream_config"]) == StreamConfig()
+
+
+def test_a_bad_hand_edit_falls_back_field_by_field():
+    """手改 conf.yaml 寫錯一個值，不能害整個程式開不起來。"""
+    Path("conf.yaml").write_text(
+        CONF + "stream_config:\n  quiet_seconds: 2\n  blocklist: ['笨蛋']\n", "utf-8"
+    )
+    settings = read_stream_settings()
+    assert settings.quiet_seconds == 30
+    assert settings.blocklist == ["笨蛋"]
+
+
+def test_the_app_config_tolerates_a_bad_stream_block():
+    from src.open_llm_vtuber.config_manager.main import Config
+
+    root = Path(__file__).resolve().parent.parent
+    data = yaml.safe_load(
+        (root / "config_templates/conf.default.yaml").read_text("utf-8")
+    )
+    data["stream_config"] = {"quiet_seconds": 2, "failure_limit": 5}
+    config = Config.model_validate(data)
+    assert config.stream_config.quiet_seconds == 30
+    assert config.stream_config.failure_limit == 5

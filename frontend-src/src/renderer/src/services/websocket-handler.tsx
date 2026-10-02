@@ -169,6 +169,8 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
         setAiState('idle');
         break;
       case 'full-text':
+        // 舞台頁的字幕在直播畫面上：連線、思考中這類狀態通知不放上去。
+        if (IS_STAGE) break;
         if (message.text || message.text_key) {
           // 後端只送英文字面值（"Thinking..."、"Connection established"），照
           // 原樣顯示的話中文介面上會冒出英文。text_key 是可翻譯的穩定代號；
@@ -339,7 +341,10 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
         break;
       case 'error':
         toaster.create({
-          title: message.text_key ? t(`stream.${message.text_key}`) : message.message,
+          // text_key 是完整的翻譯鍵（例如 stream.privateChatPaused）；沒有翻譯就顯示原文。
+          title: message.text_key
+            ? t(message.text_key, { defaultValue: message.message || '' })
+            : message.message,
           type: 'error',
           duration: 2000,
         });
@@ -390,6 +395,8 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
       case 'interrupt-signal':
         // Handle forwarded interrupt
         interrupt(false); // do not send interrupt signal to server
+        // 停播時舞台上講到一半的那句也收掉。
+        if (IS_STAGE) clearSpeechSubtitle();
         break;
       case 'tool_call_status':
         if (message.tool_id && message.tool_name && message.status) {

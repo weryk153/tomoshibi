@@ -12,12 +12,13 @@
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 import time
 from typing import Awaitable, Callable, Literal, Optional
 
 from loguru import logger
 
-from .chat_source import ChatMessage, ChatSource, ChatSourceError
+from .chat_source import ChatEnded, ChatMessage, ChatSource, ChatSourceError
 from .comment_picker import CommentPicker
 
 TurnResult = Literal["ok", "failed", "interrupted"]
@@ -54,6 +55,7 @@ class StreamSession:
         self._backoff = backoff
         self._retrying = False
         self._ended = False
+        self._ended_event = asyncio.Event()
         self._failures = 0
 
     def chat_status(self) -> str:
@@ -64,6 +66,14 @@ class StreamSession:
         if getattr(self._source, "connected", False):
             return "connected"
         return "connecting"
+
+    def visible_error(self) -> str:
+        """給畫面看的錯誤：重新連上之後就不再掛著舊的錯誤。"""
+        return "" if self.chat_status() in ("connected", "ended") else self.last_error
+
+    def _end(self) -> None:
+        self._ended = True
+        self._ended_event.set()
 
     async def run(self) -> str:
         reader = asyncio.create_task(self._read())
@@ -81,8 +91,15 @@ class StreamSession:
                 async for message in self._source.messages():
                     self._retrying = False
                     attempt = 0
-                    self.picker.offer(message, self._clock())
-                self._ended = True
+                    # 留言的年紀從收到的那一刻算：YouTube 的時間戳記是伺服器的，
+                    # 本機時鐘差個一分鐘就會全部被當成過期。
+                    now = self._clock()
+                    self.picker.offer(dataclasses.replace(message, timestamp=now), now)
+                self._end()
+                return
+            except ChatEnded as error:
+                self.last_error = str(error)
+                self._end()
                 return
             except Exception as error:
                 # 非預期的例外（例如 YouTube 改了回應形狀）也當成暫時讀不到：記下來、
@@ -98,11 +115,24 @@ class StreamSession:
                 wait = self._backoff[min(attempt, len(self._backoff) - 1)]
                 attempt += 1
                 await self._sleep(wait)
+                self._retrying = False
 
     async def _talk(self) -> str:
         last_spoke = self._clock()
         while True:
-            await self.stage_ready.wait()
+            if not self.stage_ready.is_set():
+                # 舞台不在時也要聽「直播結束了」，不然收播後一直掛著直播中。
+                waiters = [
+                    asyncio.ensure_future(self.stage_ready.wait()),
+                    asyncio.ensure_future(self._ended_event.wait()),
+                ]
+                try:
+                    await asyncio.wait(waiters, return_when=asyncio.FIRST_COMPLETED)
+                finally:
+                    for waiter in waiters:
+                        waiter.cancel()
+                if not self.stage_ready.is_set():
+                    return "ended"
             now = self._clock()
             comment = self.picker.pick(now)
             if comment is None:

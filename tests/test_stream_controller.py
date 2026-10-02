@@ -228,3 +228,27 @@ def test_the_stage_is_brought_to_the_current_character_and_history_must_exist():
     assert prepared == ["stage-1", "stage-1"]  # 每次開始前都對齊一次
     assert reason == "no_history"
     assert live is False
+
+
+def test_stop_during_the_end_broadcast_still_tells_everyone():
+    """直播自己結束、正在廣播「停了」時你剛好按停止：主視窗不能卡在直播中。"""
+
+    class SlowHost(FakeHost):
+        async def live_changed(self, live):
+            if live is False and "slow" not in self.live_events:
+                self.live_events.append("slow")
+                await asyncio.sleep(10)
+            self.live_events.append(live)
+
+    async def run():
+        host = SlowHost()
+        host.block.set()
+        c = controller(host, FakeSource(["嗨"], hang=False))
+        c.attach_stage("stage-1")
+        await c.start()
+        await _until(lambda: "slow" in host.live_events)
+        await c.stop()
+        return host.live_events
+
+    events = asyncio.run(run())
+    assert events[-1] is False

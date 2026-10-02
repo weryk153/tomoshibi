@@ -58,6 +58,7 @@ class StreamController:
         self._session: Optional[StreamSession] = None
         self._task: Optional[asyncio.Task] = None
         self._history_uid: Optional[str] = None
+        self._end_announced = True
 
     @property
     def live(self) -> bool:
@@ -113,6 +114,7 @@ class StreamController:
         session.stage_ready.set()
         self._session = session
         self.stopped_reason = None
+        self._end_announced = False
         self._task = asyncio.create_task(self._run(session))
         await self._host.live_changed(True)
         return self.status()
@@ -153,7 +155,11 @@ class StreamController:
             logger.exception("[stream] session crashed")
         finally:
             self.stopped_reason = reason
-            await self._host.live_changed(False)
+            try:
+                await self._host.live_changed(False)
+                self._end_announced = True
+            except asyncio.CancelledError:
+                pass  # 廣播到一半被 stop() 取消：stop() 會補一次
 
     async def stop(self) -> dict:
         task = self._task
@@ -162,6 +168,10 @@ class StreamController:
             await asyncio.gather(task, return_exceptions=True)
             if self.stage_uid:
                 await self._host.stop_stage_audio(self.stage_uid)
+        # 直播剛好自己結束、廣播到一半被這裡取消的話，主視窗會卡在直播中。
+        if not self._end_announced:
+            await self._host.live_changed(False)
+            self._end_announced = True
         return self.status()
 
     def status(self) -> dict:
@@ -179,6 +189,6 @@ class StreamController:
                 {"author": current.author, "text": current.text} if current else None
             ),
             "stopped_reason": self.stopped_reason,
-            "last_error": session.last_error if session else "",
+            "last_error": session.visible_error() if session else "",
             "history_uid": self._history_uid,
         }

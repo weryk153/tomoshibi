@@ -5,7 +5,7 @@
 
 from typing import ClassVar, Dict, List
 
-from pydantic import Field, field_validator
+from pydantic import Field, ValidationError, field_validator
 
 from .i18n import Description, I18nMixin
 
@@ -39,6 +39,25 @@ class StreamConfig(I18nMixin):
             if word and word not in cleaned:
                 cleaned.append(word)
         return cleaned
+
+    @classmethod
+    def lenient(cls, data: object) -> "StreamConfig":
+        """手改 conf.yaml 寫錯的欄位退回預設，其他照用；不讓一個錯值害程式開不起來。"""
+        if isinstance(data, cls):
+            return data
+        if not isinstance(data, dict):
+            return cls()
+        try:
+            return cls.model_validate(data)
+        except ValidationError:
+            kept = {}
+            for key, value in data.items():
+                try:
+                    cls.model_validate({key: value})
+                except ValidationError:
+                    continue
+                kept[key] = value
+            return cls.model_validate(kept)
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "youtube_url": Description(

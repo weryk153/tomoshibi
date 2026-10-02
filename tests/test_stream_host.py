@@ -177,3 +177,58 @@ def test_preparing_the_stage_switches_it_to_the_current_character(monkeypatch):
 
     assert loaded == ["char_frieren.yaml"]
     assert announced == [ws.client_connections["stage"]]
+
+
+def test_an_empty_quiet_turn_is_not_a_failure():
+    """冷場那輪的句子可能全被主機擋掉（講錯畫面來源之類）；那不是模型壞了。"""
+
+    async def empty(**kwargs):
+        return ""
+
+    assert asyncio.run(setup(empty)[1].turn_runner("s")(None)) == "ok"
+    assert asyncio.run(setup(empty)[1].turn_runner("s")(comment())) == "failed"
+
+
+def test_a_cut_off_turn_tells_the_agent():
+    """停播或舞台斷線時她沒講完：跟私人聊天被打斷一樣告訴 agent。"""
+
+    async def slow(**kwargs):
+        await asyncio.Event().wait()
+
+    ws, host = setup(slow)
+    told = []
+    ws.client_contexts["stage"].agent_engine = SimpleNamespace(
+        handle_interrupt=told.append
+    )
+
+    async def disconnect_midway():
+        run = asyncio.create_task(host.turn_runner("s")(comment()))
+        while "stage" not in ws.current_conversation_tasks:
+            await asyncio.sleep(0)
+        ws.current_conversation_tasks["stage"].cancel()
+        return await run
+
+    assert asyncio.run(disconnect_midway()) == "interrupted"
+    assert told == [""]
+
+
+def test_preparing_the_stage_waits_for_a_private_turn_in_flight():
+    ws, host = setup(None)
+    ws.client_contexts["stage"].active_config_file = "same.yaml"
+
+    async def scenario():
+        async def private_turn():
+            await asyncio.sleep(0.05)
+
+        ws.current_conversation_tasks["me"] = asyncio.create_task(private_turn())
+        await host.prepare_stage("stage")
+        return ws.current_conversation_tasks["me"].done()
+
+    from src.open_llm_vtuber.stream import host as host_module
+
+    original = host_module.get_active_character_filename
+    host_module.get_active_character_filename = lambda: "same.yaml"
+    try:
+        assert asyncio.run(scenario()) is True
+    finally:
+        host_module.get_active_character_filename = original

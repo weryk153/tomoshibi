@@ -28,6 +28,10 @@ class ChatSourceError(Exception):
     """讀不到聊天室：網路、YouTube 改版、這支影片沒有聊天室。"""
 
 
+class ChatEnded(ChatSourceError):
+    """聊天室已經結束（直播收了）。不重試，直播流程當成正常結束。"""
+
+
 class ChatSource(Protocol):
     connected: bool
 

@@ -173,3 +173,58 @@ def test_an_unexpected_reader_error_is_retried_not_swallowed():
     assert asyncio.run(session.run()) == "ended"
     assert turns == ["好"]
     assert "AttributeError" in session.last_error
+
+
+def test_status_recovers_after_a_reconnect_in_a_quiet_chat():
+    clock = Clock()
+    source = ScriptedSource(clock, [([], "error"), ([], "hang")])
+    session, turns = make(clock, source, [], backoff=(5.0,), quiet_seconds=10_000)
+
+    async def run():
+        task = asyncio.create_task(session.run())
+        while clock.now < 1010:
+            await asyncio.sleep(0)
+        status, error = session.chat_status(), session.visible_error()
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+        return status, error
+
+    assert asyncio.run(run()) == ("connected", "")
+
+
+def test_a_chat_that_has_ended_is_not_retried():
+    from src.open_llm_vtuber.stream.chat_source import ChatEnded
+
+    clock = Clock()
+
+    class Ended(ScriptedSource):
+        async def messages(self):
+            raise ChatEnded("聊天室已經結束")
+            yield  # pragma: no cover
+
+    session, turns = make(clock, Ended(clock, []), [])
+    assert asyncio.run(asyncio.wait_for(session.run(), 5)) == "ended"
+
+
+def test_the_chat_ending_while_the_stage_is_away_still_finishes():
+    clock = Clock()
+    source = ScriptedSource(clock, [([], "end")])
+    session, turns = make(clock, source, [])
+    session.stage_ready.clear()
+    assert asyncio.run(asyncio.wait_for(session.run(), 5)) == "ended"
+    assert turns == []
+
+
+def test_comment_age_counts_from_when_it_arrived():
+    """YouTube 的時間戳記是伺服器的；本機時鐘差一分鐘就會全部當成過期。"""
+    clock = Clock()
+
+    class Skewed(ScriptedSource):
+        async def messages(self):
+            self.connected = True
+            yield ChatMessage(id="1", author="a", text="安安", timestamp=0.0)
+
+    session, turns = make(clock, Skewed(clock, []), [])
+    assert asyncio.run(session.run()) == "ended"
+    assert turns == ["安安"]

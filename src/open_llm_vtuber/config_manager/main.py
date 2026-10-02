@@ -1,5 +1,5 @@
 # config_manager/main.py
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from typing import Dict, ClassVar
 
 from .system import SystemConfig
@@ -20,6 +20,12 @@ class Config(I18nMixin, BaseModel):
     stream_config: StreamConfig = Field(
         default_factory=StreamConfig, alias="stream_config"
     )
+
+    @field_validator("stream_config", mode="before")
+    @classmethod
+    def _lenient_stream_config(cls, value):
+        # 直播設定寫錯不該讓整個程式開不起來。
+        return StreamConfig.lenient(value)
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "system_config": Description(

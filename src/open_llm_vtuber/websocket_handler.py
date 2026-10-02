@@ -164,6 +164,8 @@ class WebSocketHandler:
         self.received_data_buffers: Dict[str, np.ndarray] = {}
         # 直播控制器（server.py 建好後設定）。沒開直播功能時是 None。
         self.stream = None
+        # 用 ?stage=1 連上來的連線。被新的舞台頁取代的也還在這裡：它仍然不是一般連線。
+        self.stage_clients: set[str] = set()
 
         # Message handlers mapping
         self._message_handlers = self._init_message_handlers()
@@ -196,9 +198,20 @@ class WebSocketHandler:
         }
 
     def _is_stage(self, client_uid: str) -> bool:
-        # getattr：既有測試用 __new__ 建物件、沒跑 __init__，沒有 stream 屬性。
+        # getattr：既有測試用 __new__ 建物件、沒跑 __init__，沒有這些屬性。
+        if client_uid in getattr(self, "stage_clients", ()):
+            return True
         stream = getattr(self, "stream", None)
         return stream is not None and stream.stage_uid == client_uid
+
+    def _streaming_refusal(self) -> str:
+        return json.dumps(
+            {
+                "type": "error",
+                "message": "Stop the live stream before switching characters.",
+                "text_key": "stream.switchBlocked",
+            }
+        )
 
     def _streaming(self) -> bool:
         stream = getattr(self, "stream", None)
@@ -272,15 +285,16 @@ class WebSocketHandler:
         stage: bool = False,
     ):
         """Send initial connection messages to the client"""
-        await websocket.send_text(
-            json.dumps(
-                {
-                    "type": "full-text",
-                    "text": "Connection established",
-                    "text_key": "connectionEstablished",
-                }
+        if not stage:  # 舞台頁的字幕在直播畫面上，不放連線通知
+            await websocket.send_text(
+                json.dumps(
+                    {
+                        "type": "full-text",
+                        "text": "Connection established",
+                        "text_key": "connectionEstablished",
+                    }
+                )
             )
-        )
 
         await websocket.send_text(
             json.dumps(
@@ -301,11 +315,25 @@ class WebSocketHandler:
             # 舞台頁（OBS 擷取用）不屬於任何一段私人對話：不還原、不新建，也就不會
             # 動到「上次聊到哪」。開播時直播流程會給它自己那段對話。
             session_service_context.history_uid = ""
+            if not hasattr(self, "stage_clients"):
+                self.stage_clients = set()
+            self.stage_clients.add(client_uid)
             stream = getattr(self, "stream", None)
             replaced = stream.attach_stage(client_uid) if stream else None
-            old_socket = self.client_connections.get(replaced) if replaced else None
-            if old_socket is not None:
-                await old_socket.send_text(json.dumps({"type": "stage-replaced"}))
+            if replaced:
+                # 舊的舞台頁正在講的那句收掉，不然兩頁同時出聲。
+                old_task = self.current_conversation_tasks.get(replaced)
+                if old_task is not None and not old_task.done():
+                    old_task.cancel()
+                old_socket = self.client_connections.get(replaced)
+                if old_socket is not None:
+                    try:
+                        await old_socket.send_text(
+                            json.dumps({"type": "stage-replaced"})
+                        )
+                    except Exception as e:
+                        # OBS 重整時舊的連線可能半關著；不能因此拖垮新的舞台頁。
+                        logger.debug(f"stage-replaced not delivered: {e}")
             return
 
         # Put the session back in the conversation the user was last having.
@@ -477,6 +505,7 @@ class WebSocketHandler:
         stream = getattr(self, "stream", None)
         if stream is not None:
             stream.detach_stage(client_uid)
+        getattr(self, "stage_clients", set()).discard(client_uid)
         context = self.client_contexts.get(client_uid)
         group = self.chat_group_manager.get_client_group(client_uid)
         if group:
@@ -849,7 +878,7 @@ class WebSocketHandler:
                         {
                             "type": "error",
                             "message": "Live stream in progress — private chat is paused.",
-                            "text_key": "privateChatPaused",
+                            "text_key": "stream.privateChatPaused",
                         }
                     )
                 )
@@ -960,15 +989,7 @@ class WebSocketHandler:
     ):
         """Handle switching to a different configuration"""
         if self._streaming():
-            await websocket.send_text(
-                json.dumps(
-                    {
-                        "type": "error",
-                        "message": "Stop the live stream before switching characters.",
-                        "text_key": "switchBlocked",
-                    }
-                )
-            )
+            await websocket.send_text(self._streaming_refusal())
             return
         config_file_name = data.get("file")
         if config_file_name:
@@ -983,6 +1004,10 @@ class WebSocketHandler:
         設定精靈與 LLM 設定頁存檔後會送這個。原本只能叫使用者「關掉終端機、重新
         執行 start-companion」，桌面版使用者根本沒有終端機可關。
         """
+        # 直播中重新載入會換掉舞台正在用的角色大腦設定。
+        if self._streaming():
+            await websocket.send_text(self._streaming_refusal())
+            return
         # 新連線是從 default_context_cache 複製引擎的（見 _init_service_context）。
         # 只重載這個連線的話，使用者一重新整理頁面就又拿到舊的 LLM。
         try:
@@ -1000,6 +1025,10 @@ class WebSocketHandler:
         self, websocket: WebSocket, client_uid: str, data: WSMessage
     ) -> None:
         """Apply a prompt preset without changing character, model, voice or memory."""
+        # 角色大腦是主視窗和舞台共用的：直播中換人設會讓她講到一半變了個人。
+        if self._streaming():
+            await websocket.send_text(self._streaming_refusal())
+            return
         context = self.client_contexts[client_uid]
         await context.apply_persona(websocket, data.get("persona_id"))
 

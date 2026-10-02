@@ -20,7 +20,7 @@ BLOCK = "stream_config"
 
 def read_stream_settings() -> StreamConfig:
     data = read_yaml(conf_editor.CONF_PATH) or {}
-    return StreamConfig.model_validate(data.get(BLOCK) or {})
+    return StreamConfig.lenient(data.get(BLOCK) or {})
 
 
 def _render(value: Any) -> str:

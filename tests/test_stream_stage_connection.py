@@ -121,8 +121,8 @@ def test_private_triggers_are_refused_while_live():
 
     assert h.current_conversation_tasks == {}
     assert [m.get("text_key") for m in me.sent if m["type"] == "error"] == [
-        "privateChatPaused",
-        "switchBlocked",
+        "stream.privateChatPaused",
+        "stream.switchBlocked",
     ]
 
 
@@ -164,3 +164,53 @@ def test_private_mic_audio_is_dropped_while_live():
     assert h.current_conversation_tasks == {}
     # 前端講完話時切到「思考中」，要告訴它這一輪不會發生，回到閒置。
     assert {"type": "control", "text": "conversation-chain-end"} in me.sent
+
+
+def test_persona_switch_and_reload_are_refused_while_live():
+    """角色大腦是主視窗和舞台共用的：直播中換人設會讓她講到一半變了個人。"""
+    h = handler(FakeStream(live=True, stage_uid="stage"))
+    me = FakeSocket()
+    h.client_connections["me"] = me
+    h.client_contexts["me"] = context()
+    asyncio.run(h._handle_persona_switch(me, "me", {"persona_id": "x"}))
+    asyncio.run(h._handle_config_reload(me, "me", {}))
+    assert [m.get("text_key") for m in me.sent] == [
+        "stream.switchBlocked",
+        "stream.switchBlocked",
+    ]
+
+
+class FailingSocket(FakeSocket):
+    async def send_text(self, payload):
+        raise RuntimeError("socket half closed")
+
+
+def test_a_replaced_stage_stays_a_stage_and_its_turn_is_cancelled():
+    stream = FakeStream()
+    h = handler(stream)
+    connect(h, "stage-1", stage=True)
+    h.client_connections["stage-1"] = FailingSocket()  # OBS 重整時舊的連線半關著
+
+    async def in_flight():
+        await asyncio.Event().wait()
+
+    async def scenario():
+        h.current_conversation_tasks["stage-1"] = asyncio.create_task(in_flight())
+        await asyncio.sleep(0)
+        socket, ctx = FakeSocket(), context()
+        h.client_connections["stage-2"] = socket
+        h.client_contexts["stage-2"] = ctx
+        h.chat_group_manager.client_group_map["stage-2"] = ""
+        await h._send_initial_messages(socket, "stage-2", ctx, stage=True)
+        await asyncio.sleep(0)
+        return h.current_conversation_tasks["stage-1"].cancelled()
+
+    assert asyncio.run(scenario()) is True
+    assert stream.stage_uid == "stage-2"
+    assert h._is_stage("stage-1")  # 舊的舞台頁也不能被當成一般連線
+
+
+def test_the_stage_gets_no_connection_notice():
+    h = handler(FakeStream())
+    socket, _ = connect(h, "stage", stage=True)
+    assert "full-text" not in types(socket)

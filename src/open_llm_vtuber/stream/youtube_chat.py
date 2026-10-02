@@ -24,7 +24,7 @@ from urllib.parse import parse_qs, urlparse
 
 import httpx
 
-from .chat_source import ChatMessage, ChatSourceError
+from .chat_source import ChatEnded, ChatMessage, ChatSourceError
 
 CHAT_PAGE = "https://www.youtube.com/live_chat"
 CHAT_API = "https://www.youtube.com/youtubei/v1/live_chat/get_live_chat"
@@ -95,7 +95,7 @@ def parse_chat_page(html: str) -> tuple[str, str]:
         raise ChatSourceError("這支影片沒有進行中的聊天室")
     continuation, _ = _first_continuation(renderer.get("continuations"))
     if not continuation:
-        raise ChatSourceError("聊天室已經結束")
+        raise ChatEnded("聊天室已經結束")
     return version.group(1), continuation
 
 

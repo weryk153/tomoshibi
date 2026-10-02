@@ -201,21 +201,21 @@ function App(): JSX.Element {
 function AppWithGlobalStyles(): JSX.Element {
   return (
     <>
-      <CameraProvider>
-        <ScreenCaptureProvider>
-          <CharacterConfigProvider>
-            <ChatHistoryProvider>
-              <AiStateProvider>
-                <ProactiveSpeakProvider>
-                  <Live2DConfigProvider>
-                    <StageEffectProvider>
-                      <BgUrlProvider>
-                        <SceneProvider>
-                          <StagePerformanceProvider>
-                            <SubtitleProvider>
-                              <VADProvider>
-                                <GroupProvider>
-                                  <StreamProvider>
+      <StreamProvider>
+        <CameraProvider>
+          <ScreenCaptureProvider>
+            <CharacterConfigProvider>
+              <ChatHistoryProvider>
+                <AiStateProvider>
+                  <ProactiveSpeakProvider>
+                    <Live2DConfigProvider>
+                      <StageEffectProvider>
+                        <BgUrlProvider>
+                          <SceneProvider>
+                            <StagePerformanceProvider>
+                              <SubtitleProvider>
+                                <VADProvider>
+                                  <GroupProvider>
                                     <BrowserProvider>
                                       <WebSocketHandler>
                                         {/* 舞台頁不顯示提示框：直播畫面上不能冒出錯誤訊息。 */}
@@ -224,21 +224,21 @@ function AppWithGlobalStyles(): JSX.Element {
                                         <AppContent />
                                       </WebSocketHandler>
                                     </BrowserProvider>
-                                  </StreamProvider>
-                                </GroupProvider>
-                              </VADProvider>
-                            </SubtitleProvider>
-                          </StagePerformanceProvider>
-                        </SceneProvider>
-                      </BgUrlProvider>
-                    </StageEffectProvider>
-                  </Live2DConfigProvider>
-                </ProactiveSpeakProvider>
-              </AiStateProvider>
-            </ChatHistoryProvider>
-          </CharacterConfigProvider>
-        </ScreenCaptureProvider>
-      </CameraProvider>
+                                  </GroupProvider>
+                                </VADProvider>
+                              </SubtitleProvider>
+                            </StagePerformanceProvider>
+                          </SceneProvider>
+                        </BgUrlProvider>
+                      </StageEffectProvider>
+                    </Live2DConfigProvider>
+                  </ProactiveSpeakProvider>
+                </AiStateProvider>
+              </ChatHistoryProvider>
+            </CharacterConfigProvider>
+          </ScreenCaptureProvider>
+        </CameraProvider>
+      </StreamProvider>
     </>
   );
 }

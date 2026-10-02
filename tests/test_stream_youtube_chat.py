@@ -210,3 +210,14 @@ def test_open_chat_source_picks_by_url(tmp_path):
     assert isinstance(youtube, YouTubeChatSource) and youtube.video_id == VID
     with pytest.raises(ValueError):
         open_chat_source("https://www.youtube.com/@LofiGirl/live")
+
+
+def test_a_chat_without_a_next_continuation_has_ended():
+    from src.open_llm_vtuber.stream.chat_source import ChatEnded
+
+    page = PAGE.replace(
+        '"continuations":[{"invalidationContinuationData":{"continuation":"C1","timeoutMs":10000}}]',
+        '"continuations":[]',
+    )
+    with pytest.raises(ChatEnded):
+        parse_chat_page(page)

@@ -24,6 +24,9 @@ from .chat_source import ChatMessage
 from .session import TurnResult
 
 
+PRIVATE_TURN_WAIT_SECONDS = 60.0
+
+
 class WebSocketStreamHost:
     def __init__(self, ws_handler: Any, *, process=process_single_conversation):
         self._ws = ws_handler
@@ -43,6 +46,14 @@ class WebSocketStreamHost:
     async def prepare_stage(self, stage_uid: str) -> None:
         """舞台頁的角色是連上那一刻載入的；之後在主視窗換角色只換主視窗那個連線。
         開播前把舞台換成現在選的角色，並讓舞台頁換模型。"""
+        # 私人聊天正在講的那句先讓它講完：角色大腦是共用的，不然兩邊的聲音疊在一起。
+        pending = [
+            task
+            for uid, task in list(self._ws.current_conversation_tasks.items())
+            if uid != stage_uid and task is not None and not task.done()
+        ]
+        if pending:
+            await asyncio.wait(pending, timeout=PRIVATE_TURN_WAIT_SECONDS)
         context = self._ws.client_contexts.get(stage_uid)
         socket = self._ws.client_connections.get(stage_uid)
         active = get_active_character_filename()
@@ -104,6 +115,9 @@ class WebSocketStreamHost:
             try:
                 reply = await task
             except asyncio.CancelledError:
+                # 停播或舞台斷線，她沒講完：跟私人聊天被打斷一樣告訴 agent，不然它會
+                # 記成整句都說出口了。聽到了多少不知道，當成沒聽到。
+                self._tell_interrupted(context)
                 # 自己被取消（按停止）就往外丟；只有那一輪被取消（舞台斷線）才算中斷。
                 current = asyncio.current_task()
                 if current is not None and current.cancelling():
@@ -112,9 +126,22 @@ class WebSocketStreamHost:
             except Exception as error:
                 logger.warning(f"[stream] turn failed: {type(error).__name__}: {error}")
                 return "failed"
-            return "ok" if reply else "failed"
+            if reply:
+                return "ok"
+            # 冷場那輪的句子可能全被主機擋掉，那不是模型壞了；回留言卻什麼都沒有才算。
+            return "ok" if comment is None else "failed"
 
         return run_turn
+
+    @staticmethod
+    def _tell_interrupted(context: Any) -> None:
+        agent = getattr(context, "agent_engine", None)
+        if agent is None:
+            return
+        try:
+            agent.handle_interrupt("")
+        except Exception as error:
+            logger.warning(f"[stream] interrupt not recorded: {error}")
 
     async def live_changed(self, live: bool) -> None:
         await self._ws.broadcast_stream_state(live)
