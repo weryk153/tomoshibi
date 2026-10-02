@@ -15,6 +15,7 @@ import {
   getScenePresets,
   normalizeSceneStore,
   resolveSceneUrl,
+  withoutCameraAtStartup,
   ScenePerformanceBinding,
   ScenePreset,
   SceneStore,
@@ -62,7 +63,7 @@ function normalizeStore(value: unknown): SceneStore {
 
 // STORAGE_KEY 名字帶 v1 但不改：改了等於丟掉所有人的場景。裡面存的版本號才是
 // 第幾版（見 scenes/scene.ts 的 normalizeSceneStore）。
-function loadStore(): SceneStore {
+function loadStore(baseUrl: string): SceneStore {
   const defaultName = i18n.t("settings.scenes.defaultBackground");
   let legacyBackgroundUrl: string | null = null;
   try {
@@ -79,10 +80,11 @@ function loadStore(): SceneStore {
     return normalizeSceneStore(saved ? JSON.parse(saved) : null, {
       legacyBackgroundUrl,
       defaultName,
+      baseUrl,
     });
   } catch (error) {
     console.warn("[Scene] Could not read saved scene configuration:", error);
-    return normalizeSceneStore(null, { legacyBackgroundUrl, defaultName });
+    return normalizeSceneStore(null, { legacyBackgroundUrl, defaultName, baseUrl });
   }
 }
 
@@ -111,7 +113,9 @@ export function SceneProvider({
   children: React.ReactNode;
 }): JSX.Element {
   const { baseUrl } = useWebSocket();
-  const [store, setStore] = useState<SceneStore>(loadStore);
+  const [store, setStore] = useState<SceneStore>(
+    () => withoutCameraAtStartup(loadStore(baseUrl)),
+  );
   const [temporarySceneId, setTemporarySceneId] = useState<string | null>(null);
   const [resolvedSourceUrl, setResolvedSourceUrl] = useState("");
   const temporaryTimerRef = useRef<number | null>(null);
@@ -121,6 +125,22 @@ export function SceneProvider({
     scenes.find((scene) => scene.id === activeSceneId) || scenes[0];
 
   useEffect(() => saveStore(store), [store]);
+
+  // 同一個瀏覽器開著別的分頁（例如舞台頁）改了場景：跟著換，不然這邊下一次存檔
+  // 會用舊的那份把別的分頁剛改的蓋掉。storage 事件只在別的分頁改了才會來，而且值
+  // 沒變不會觸發，所以不會兩邊互相丟來丟去。
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== STORAGE_KEY || !event.newValue) return;
+      try {
+        setStore(normalizeStore(JSON.parse(event.newValue)));
+      } catch {
+        // 壞掉的值不理，下次存檔會蓋回正常的。
+      }
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   useEffect(() => {
     let alive = true;

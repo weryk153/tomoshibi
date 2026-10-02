@@ -19,6 +19,7 @@ import {
   DEFAULT_SCENE_ID,
   SCENE_FITS,
   SCENE_TYPES,
+  serverBackgroundUrl,
   ScenePreset,
   SceneType,
 } from "@/scenes/scene";
@@ -117,7 +118,7 @@ function Scenes(): JSX.Element {
   const serverBackgroundCollection = useMemo(
     () =>
       createListCollection({
-        items: backgroundFiles.map((name) => ({ value: `/bg/${name}`, label: name })),
+        items: backgroundFiles.map((name) => ({ value: serverBackgroundUrl(name), label: name })),
       }),
     [backgroundFiles],
   );

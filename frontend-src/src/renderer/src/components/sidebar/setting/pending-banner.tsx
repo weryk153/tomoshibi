@@ -11,10 +11,11 @@ import { Button } from '@/components/ui/tw/primitives';
 import { useWebSocket } from '@/context/websocket-context';
 import { useSwitchCharacter } from '@/hooks/utils/use-switch-character';
 import {
-  fetchPending, pendingAction, pendingLabelKeys, type DesktopRestart,
+  fetchPending, hasReloadItems, pendingAction, pendingLabelKeys, type DesktopRestart,
 } from '@/api/pending.ts';
 import { useStream } from '@/context/stream-context';
 import { useAiState } from '@/context/ai-state-context';
+import { wsService } from '@/services/websocket-service';
 
 const POLL_MS = 3000;
 
@@ -61,6 +62,8 @@ export function PendingBanner({ active }: { active: boolean }): JSX.Element | nu
     const result = await window.api.restartBackend();
     setRestarting(false);
     if (result.ok) {
+      // 後端剛重開：連線不等退避那一輪，馬上重連。
+      wsService.reconnectNow();
       void refresh();
     } else if (result.reason === 'not-managed') {
       setNotManaged(true);
@@ -81,7 +84,7 @@ export function PendingBanner({ active }: { active: boolean }): JSX.Element | nu
         >
           {t('settings.pending.count', { count: keys.length })}
         </button>
-        {action === 'reload' && (
+        {(action === 'reload' || (action !== 'restart-desktop' && hasReloadItems(keys))) && (
           <Button
             size="xs"
             tone="orange"

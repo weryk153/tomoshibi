@@ -195,7 +195,7 @@
       "cameraDenied": "Camera permission denied, so the background was not switched. Allow camera access in your browser or system settings.",
       "cameraNotFound": "No camera found, so the background was not switched. Check that a camera is connected.",
       "cameraInUse": "The camera is in use by another app, so the background was not switched. Close that app and try again.",
-      "cameraFailed": "The camera could not be started, so the background was not switched.",
+      "cameraFailed": "The camera could not be started.",
       "connectionSection": "Connection",
       "connectionHelp": "These two take effect when you press Connect. Applying as you type would reconnect on every keystroke.",
       "connect": "Connect"
@@ -762,7 +762,8 @@
       "error": "Failed to load network addresses",
       "allowLan": "Allow LAN connections",
       "allowLanHelp": "When on, anyone on the same network can open this app — there is no password. Only turn it on for networks you trust. Takes effect after a backend restart.",
-      "allowLanPendingRestart": "On — other devices can connect after the backend restarts."
+      "allowLanPendingRestart": "On — other devices can connect after the backend restarts.",
+      "closeLanPendingRestart": "Turned off — but other devices can still connect until the backend restarts."
     },
     "about": {
       "title": "Tomoshibi",

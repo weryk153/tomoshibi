@@ -144,6 +144,10 @@ function RemoteAccess({ active = true }: RemoteAccessProps): JSX.Element {
         {info.allow_other_devices && info.localhost_only && (
           <Text fontSize="xs" color="orange.300">{t('settings.remoteAccess.allowLanPendingRestart')}</Text>
         )}
+        {/* 關掉了，但這次啟動還開著：重啟前其他裝置照樣連得到，要講清楚。 */}
+        {!info.allow_other_devices && !info.localhost_only && (
+          <Text fontSize="xs" color="orange.300">{t('settings.remoteAccess.closeLanPendingRestart')}</Text>
+        )}
       </Stack>
 
       {/* 有 https_url 就代表 Tailscale Serve 已經把服務代理出去了，遠端存取其實
@@ -157,9 +161,11 @@ function RemoteAccess({ active = true }: RemoteAccessProps): JSX.Element {
           <Text fontSize="xs" color="whiteAlpha.800" mb={2}>
             {t('settings.remoteAccess.recommendTailscale')}
           </Text>
-          <Text fontSize="xs" color="whiteAlpha.700">
-            {t('settings.remoteAccess.lanOptIn')}
-          </Text>
+          {!info.allow_other_devices && (
+            <Text fontSize="xs" color="whiteAlpha.700">
+              {t('settings.remoteAccess.lanOptIn')}
+            </Text>
+          )}
         </Box>
       )}
 

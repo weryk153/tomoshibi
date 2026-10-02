@@ -101,6 +101,35 @@ export function resolveSceneUrl(sourceUrl: string, baseUrl: string): string {
   return `${baseUrl.replace(/\/+$/, "")}${sourceUrl}`;
 }
 
+// 伺服器 backgrounds/ 底下的一張圖。檔名可能有空白、#、? 之類，要編碼。
+export function serverBackgroundUrl(name: string): string {
+  return `/bg/${encodeURIComponent(name)}`;
+}
+
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+// 指向這台後端 /bg/ 的完整網址（以前一般頁存的就是這種）改存相對路徑：換了連線
+// 位址（localhost／127.0.0.1／區網）也找得到，內建背景選單也認得。別的網站的網址不動。
+function localServerPath(url: string, baseUrl?: string): string {
+  try {
+    const parsed = new URL(url);
+    if (!parsed.pathname.startsWith("/bg/")) return url;
+    const sameServer = baseUrl ? parsed.origin === new URL(baseUrl).origin : false;
+    return sameServer || LOOPBACK_HOSTS.has(parsed.hostname) ? parsed.pathname : url;
+  } catch {
+    return url;
+  }
+}
+
+// 開 app 時不自己打開攝影機：上次停在攝影機場景的話，改用第一個不是攝影機的場景。
+// （桌面版的攝影機權限是自動允許的，不改的話每次開 app 鏡頭就亮。）
+export function withoutCameraAtStartup(store: SceneStore): SceneStore {
+  const active = store.customScenes.find((scene) => scene.id === store.activeSceneId);
+  if (active?.type !== "camera") return store;
+  const other = store.customScenes.find((scene) => scene.type !== "camera");
+  return other ? { ...store, activeSceneId: other.id } : store;
+}
+
 export function createEmptySceneStore(defaultName = "Background"): SceneStore {
   return {
     version: 2,
@@ -260,7 +289,7 @@ export function getScenePresets(store: SceneStore): ScenePreset[] {
 
 export function normalizeSceneStore(
   value: unknown,
-  options: { legacyBackgroundUrl?: string | null; defaultName?: string } = {},
+  options: { legacyBackgroundUrl?: string | null; defaultName?: string; baseUrl?: string } = {},
 ): SceneStore {
   const defaultName = options.defaultName ?? "Background";
   const raw = (value && typeof value === "object" ? value : {}) as Partial<
@@ -268,12 +297,12 @@ export function normalizeSceneStore(
   > & { version?: number };
   // 第 2 版以前（或從沒存過）：舊的「目前背景」是內建場景、背景本身記在一般頁，
   // 這裡一次性轉成一個普通的圖片場景放在最前面。之後刪掉就是刪掉了。
-  const legacy = raw.version !== 2;
+  const legacy = !(typeof raw.version === "number" && raw.version >= 2);
   const usedIds = new Set<string>();
   const scenes: ScenePreset[] = [];
   if (legacy) {
-    const url =
-      normalizeSourceUrl(options.legacyBackgroundUrl) || DEFAULT_BACKGROUND_PATH;
+    const legacyUrl = normalizeSourceUrl(options.legacyBackgroundUrl);
+    const url = legacyUrl ? localServerPath(legacyUrl, options.baseUrl) : DEFAULT_BACKGROUND_PATH;
     scenes.push(createDefaultScene(defaultName, url));
     usedIds.add(DEFAULT_SCENE_ID);
   }
@@ -281,7 +310,7 @@ export function normalizeSceneStore(
     raw.customScenes.map(normalizeScene).forEach((scene) => {
       if (!scene || usedIds.has(scene.id) || scenes.length >= 100) return;
       usedIds.add(scene.id);
-      scenes.push(scene);
+      scenes.push({ ...scene, sourceUrl: localServerPath(scene.sourceUrl, options.baseUrl) });
     });
   }
   // 全部刪光：補一個預設背景，畫面不會空白。

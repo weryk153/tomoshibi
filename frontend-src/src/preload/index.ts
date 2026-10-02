@@ -66,11 +66,6 @@ const api = {
   updateConfigFiles: (files: ConfigFile[]) => {
     ipcRenderer.send('update-config-files', files);
   },
-  getBackgroundPreferences: () => ipcRenderer.invoke('background-preferences:get'),
-  setBackgroundPreferences: (backgroundUrl: string) => ipcRenderer.invoke(
-    'background-preferences:set',
-    { backgroundUrl },
-  ),
   restartBackend: () => ipcRenderer.invoke('backend:restart'),
 };
 

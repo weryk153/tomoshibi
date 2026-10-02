@@ -8,6 +8,8 @@ import {
   getScenePresets,
   normalizeSceneStore,
   resolveSceneUrl,
+  serverBackgroundUrl,
+  withoutCameraAtStartup,
 } from "./scene.ts";
 
 test("新安裝有一個普通的背景場景，而且正在用它", () => {
@@ -25,7 +27,8 @@ test("migrates a legacy background url: 一般頁換過的背景變成背景場�
     defaultName: "背景",
   });
   assert.equal(store.customScenes[0].id, DEFAULT_SCENE_ID);
-  assert.equal(store.customScenes[0].sourceUrl, "http://127.0.0.1:12393/bg/cozy.jpeg");
+  // 指向本機後端的 /bg/ 存成相對路徑（見下面那個測試）。
+  assert.equal(store.customScenes[0].sourceUrl, "/bg/cozy.jpeg");
   assert.equal(store.customScenes[0].name, "背景");
   assert.equal(store.activeSceneId, DEFAULT_SCENE_ID);
 });
@@ -156,4 +159,60 @@ test("讀取場景清單時回傳副本，避免編輯畫面污染儲存資料",
   const presets = getScenePresets(store);
   presets[0].model.cameraPosition[0] = 99;
   assert.equal(store.customScenes[0].model.cameraPosition[0], 0);
+});
+
+test("比第 2 版新的儲存不會被當成舊版重新轉換", () => {
+  const room = createScenePreset("room", "image", "Room");
+  const store = normalizeSceneStore(
+    { version: 3, activeSceneId: "room", customScenes: [room], performanceBindings: {} },
+    { legacyBackgroundUrl: "http://x/bg/old.jpeg", defaultName: "背景" },
+  );
+  assert.deepEqual(store.customScenes.map((s) => s.id), ["room"]);
+});
+
+test("指向這台後端 /bg/ 的完整網址存成相對路徑：換位址也找得到、內建背景選單認得", () => {
+  const legacy = normalizeSceneStore(null, {
+    legacyBackgroundUrl: "http://127.0.0.1:12393/bg/cozy.jpeg",
+    defaultName: "背景",
+    baseUrl: "http://localhost:12393",
+  });
+  assert.equal(legacy.customScenes[0].sourceUrl, "/bg/cozy.jpeg");
+
+  const stored = normalizeSceneStore(
+    {
+      version: 2,
+      activeSceneId: "a",
+      customScenes: [
+        { ...createScenePreset("a", "image", "A"), sourceUrl: "http://localhost:12393/bg/a.png" },
+        { ...createScenePreset("b", "image", "B"), sourceUrl: "https://cdn.example/bg/b.png" },
+      ],
+      performanceBindings: {},
+    },
+    { baseUrl: "http://127.0.0.1:12393" },
+  );
+  assert.deepEqual(stored.customScenes.map((s) => s.sourceUrl), [
+    "/bg/a.png",
+    "https://cdn.example/bg/b.png",
+  ]);
+});
+
+test("伺服器背景的檔名要編碼", () => {
+  assert.equal(serverBackgroundUrl("night #2.jpeg"), "/bg/night%20%232.jpeg");
+});
+
+test("開 app 時不會自己打開攝影機：上次停在攝影機場景就改用第一個別的場景", () => {
+  const store = normalizeSceneStore({
+    version: 2,
+    activeSceneId: "cam",
+    customScenes: [createScenePreset("room", "image", "Room"), createScenePreset("cam", "camera", "Cam")],
+    performanceBindings: {},
+  });
+  assert.equal(withoutCameraAtStartup(store).activeSceneId, "room");
+  const onlyCamera = normalizeSceneStore({
+    version: 2,
+    activeSceneId: "cam",
+    customScenes: [createScenePreset("cam", "camera", "Cam")],
+    performanceBindings: {},
+  });
+  assert.equal(withoutCameraAtStartup(onlyCamera).activeSceneId, "cam");
 });

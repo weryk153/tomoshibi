@@ -1,8 +1,6 @@
 /* eslint-disable no-shadow */
 import { app, ipcMain, globalShortcut, desktopCapturer, session } from "electron";
 import { appOriginFor } from "./app-origin";
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { electronApp, optimizer } from "@electron-toolkit/utils";
 import { WindowManager } from "./window-manager";
 import { MenuManager } from "./menu-manager";
@@ -13,40 +11,6 @@ let windowManager: WindowManager;
 let menuManager: MenuManager;
 const backendManager = new BackendManager();
 let isQuitting = false;
-
-interface BackgroundPreferences {
-  backgroundUrl: string;
-}
-
-const backgroundPreferencesPath = (): string => join(
-  app.getPath('userData'),
-  'background-preferences.json',
-);
-
-async function readBackgroundPreferences(): Promise<BackgroundPreferences | null> {
-  try {
-    const parsed = JSON.parse(await readFile(backgroundPreferencesPath(), 'utf8'));
-    if (typeof parsed?.backgroundUrl !== 'string' || !parsed.backgroundUrl.trim()) {
-      return null;
-    }
-    return { backgroundUrl: parsed.backgroundUrl };
-  } catch {
-    return null;
-  }
-}
-
-async function writeBackgroundPreferences(
-  preferences: BackgroundPreferences,
-): Promise<void> {
-  if (typeof preferences?.backgroundUrl !== 'string' || !preferences.backgroundUrl.trim()) {
-    return;
-  }
-  await writeFile(
-    backgroundPreferencesPath(),
-    `${JSON.stringify({ backgroundUrl: preferences.backgroundUrl }, null, 2)}\n`,
-    'utf8',
-  );
-}
 
 function setupIPC(): void {
   ipcMain.handle("get-platform", () => process.platform);
@@ -112,11 +76,6 @@ function setupIPC(): void {
     return sources[0].id;
   });
 
-  ipcMain.handle('background-preferences:get', readBackgroundPreferences);
-  ipcMain.handle(
-    'background-preferences:set',
-    (_event, preferences: BackgroundPreferences) => writeBackgroundPreferences(preferences),
-  );
 
   // 設定頁「重新啟動後端」：只有這個 app 自己起的後端能重啟。開發模式、或沿用
   // 別人已經開著的後端時，回 not-managed，畫面改成告訴使用者指令。

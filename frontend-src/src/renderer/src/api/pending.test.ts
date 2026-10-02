@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { pendingAction, pendingLabelKeys } from './pending.ts'
+import { hasReloadItems, pendingAction, pendingLabelKeys } from './pending.ts'
 
 test('each pending key has a label; unknown ones get a generic label', () => {
   assert.deepEqual(pendingLabelKeys(['engine', 'nope']), [
@@ -24,4 +24,10 @@ test('a desktop restart that failed says so and offers a retry — no terminal c
 
 test('the LAN switch has its own label', () => {
   assert.deepEqual(pendingLabelKeys(['host']), ['settings.pending.items.host'])
+})
+
+test('the reload button stays when some items only need a reload, even while a restart is pending', () => {
+  assert.equal(hasReloadItems(['host']), false)
+  assert.equal(hasReloadItems(['host', 'tools']), true)
+  assert.equal(hasReloadItems([]), false)
 })

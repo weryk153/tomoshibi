@@ -335,18 +335,23 @@ class WebSocketService {
     }, delay);
   }
 
+  /** 現在是斷的就立刻重連（例如剛重啟完後端），不要等退避那一輪。 */
+  reconnectNow() {
+    if (this.currentState === 'OPEN' || this.currentState === 'CONNECTING') return;
+    if (!shouldAutoReconnect({ intentional: this.intentionalClose, url: this.lastUrl })) return;
+    this.cancelPendingReconnect();
+    this.reconnectAttempt = 0;
+    if (this.lastUrl) this.connect(this.lastUrl);
+  }
+
   /** 回到前景時如果是斷的就立刻重連，不要等退避那一輪。 */
   private bindVisibilityReconnect() {
     if (this.visibilityBound || typeof document === 'undefined') return;
     this.visibilityBound = true;
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState !== 'visible') return;
-      if (this.currentState === 'OPEN' || this.currentState === 'CONNECTING') return;
-      if (!shouldAutoReconnect({ intentional: this.intentionalClose, url: this.lastUrl })) return;
       // 使用者正看著畫面，這時候等 8 秒或 30 秒都太久了。
-      this.cancelPendingReconnect();
-      this.reconnectAttempt = 0;
-      if (this.lastUrl) this.connect(this.lastUrl);
+      this.reconnectNow();
     });
   }
 

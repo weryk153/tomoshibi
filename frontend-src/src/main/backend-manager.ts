@@ -143,6 +143,8 @@ export class BackendManager {
 
     try {
       mkdirSync(join(this.workspace, 'logs'), { recursive: true });
+      // 從設定頁重啟時會再跑一次 start()：先把上一次的記錄檔關掉，不要每重啟一次漏一個。
+      this.log?.end();
       this.log = createWriteStream(this.logPath, { flags: 'a' });
       this.write(`\n===== ${new Date().toISOString()} Tomoshibi ${app.getVersion()} =====`);
 

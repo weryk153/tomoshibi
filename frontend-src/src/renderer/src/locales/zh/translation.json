@@ -195,7 +195,7 @@
       "cameraDenied": "沒有攝影機權限，所以背景沒有切換。請在瀏覽器或系統設定裡允許這個 App 使用攝影機。",
       "cameraNotFound": "找不到攝影機，所以背景沒有切換。請確認裝置已接上。",
       "cameraInUse": "攝影機正被其他程式使用，所以背景沒有切換。關掉那個程式再試一次。",
-      "cameraFailed": "攝影機開啟失敗，所以背景沒有切換。",
+      "cameraFailed": "攝影機開啟失敗。",
       "connectionSection": "連線設定",
       "connectionHelp": "這兩個欄位改完要按「連線」才生效——邊打邊套用的話，每輸入一個字元就會重連一次。",
       "connect": "連線"
@@ -762,7 +762,8 @@
       "error": "讀取網路位址失敗",
       "allowLan": "允許區網連線",
       "allowLanHelp": "打開後，同一個網路上的任何人都能打開這個 App，沒有密碼保護；只在你信任的網路打開。要重新啟動後端才生效。",
-      "allowLanPendingRestart": "已打開，重新啟動後端之後其他裝置才連得到。"
+      "allowLanPendingRestart": "已打開，重新啟動後端之後其他裝置才連得到。",
+      "closeLanPendingRestart": "已關閉，但重新啟動後端之前，其他裝置還是連得到。"
     },
     "about": {
       "title": "Tomoshibi",

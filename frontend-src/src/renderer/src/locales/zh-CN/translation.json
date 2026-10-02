@@ -195,7 +195,7 @@
       "cameraDenied": "没有摄像头权限，所以背景没有切换。请在浏览器或系统设置里允许这个 App 使用摄像头。",
       "cameraNotFound": "找不到摄像头，所以背景没有切换。请确认设备已接上。",
       "cameraInUse": "摄像头正被其他程序使用，所以背景没有切换。关掉那个程序再试一次。",
-      "cameraFailed": "摄像头开启失败，所以背景没有切换。",
+      "cameraFailed": "摄像头开启失败。",
       "connectionSection": "连接设置",
       "connectionHelp": "这两个字段改完要按「连接」才生效——边打边应用的话，每输入一个字符就会重连一次。",
       "connect": "连接"
@@ -762,7 +762,8 @@
       "error": "读取网络地址失败",
       "allowLan": "允许局域网连接",
       "allowLanHelp": "打开后，同一网络上的任何人都能打开这个 App，没有密码保护；只在你信任的网络打开。要重新启动后端才生效。",
-      "allowLanPendingRestart": "已打开，重新启动后端之后其他设备才连得上。"
+      "allowLanPendingRestart": "已打开，重新启动后端之后其他设备才连得上。",
+      "closeLanPendingRestart": "已关闭，但重新启动后端之前，其他设备还是连得上。"
     },
     "about": {
       "title": "Tomoshibi",

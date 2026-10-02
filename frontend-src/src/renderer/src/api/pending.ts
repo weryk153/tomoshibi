@@ -34,3 +34,11 @@ export function pendingLabelKeys(keys: string[]): string[] {
       : 'settings.pending.items.other'
   ))
 }
+
+// 要重啟後端才生效的項目（跟後端 pending_changes.RESTART_KEYS 一致）。
+export const RESTART_KEYS: readonly string[] = ['host']
+
+// 清單裡還有重新載入就會生效的項目嗎：有的話就算同時在等重啟，也要留著重新載入鈕
+// （網頁版只能給重啟指令，不能讓其他項目跟著卡住）。
+export const hasReloadItems = (keys: string[]): boolean =>
+  keys.some((key) => !RESTART_KEYS.includes(key))
