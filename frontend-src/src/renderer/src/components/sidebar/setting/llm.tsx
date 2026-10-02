@@ -25,7 +25,7 @@ function LLM(): JSX.Element {
 
   return (
     <Stack {...settingStyles.common.container}>
-      <LlmForm onSaved={handleSaved} />
+      <LlmForm onSaved={handleSaved} onApplied={reloadCharacter} />
       {saved && (
         <Stack gap={1}>
           <Text fontWeight="bold">{t('setup.savedTitle')}</Text>

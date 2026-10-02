@@ -43,6 +43,10 @@ const OLLAMA_DOWNLOAD_URL = 'https://ollama.com/download';
 
 interface LlmFormProps {
   onSaved: (result: LlmSaveResult) => void
+  // 偵測到的模型套用成功的那一刻（設定檔已經改了）。設定分頁用它立刻重新載入，
+  // 不然「目前使用」已經換了、對話卻要等按「開始聊天」才換。精靈不需要：它在
+  // onSaved 才收尾。
+  onApplied?: () => void
 }
 
 // 純顯示用的範例模型名稱——只是給使用者一個參考（modelHelp 的 {{example}}
@@ -97,7 +101,7 @@ function NoticeBox({ text, tone = 'yellow' }: { text: string; tone?: 'yellow' | 
   );
 }
 
-function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
+function LlmForm({ onSaved, onApplied }: LlmFormProps): JSX.Element {
   const { t } = useTranslation();
   const { baseUrl: backendBaseUrl } = useWebSocket();
 
@@ -470,8 +474,10 @@ function LlmForm({ onSaved }: LlmFormProps): JSX.Element {
 
   // 偵測套用成功之後，「目前使用」跟著換。
   useEffect(() => {
-    if (applyPhase === 'applied') void refreshActive();
-  }, [applyPhase, refreshActive]);
+    if (applyPhase !== 'applied') return;
+    void refreshActive();
+    onApplied?.();
+  }, [applyPhase, refreshActive, onApplied]);
 
   const where = active ? activeWhere(active) : null;
   const whereText = where ? t(where.key, { name: where.name }) : '';
