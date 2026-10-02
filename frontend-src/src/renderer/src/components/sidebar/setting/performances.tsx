@@ -3,6 +3,7 @@ import { createListCollection } from '@ark-ui/react/collection';
 import {
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -10,10 +11,13 @@ import { useTranslation } from 'react-i18next';
 import { Field, TextInput, Checkbox } from '@/components/ui/tw/primitives';
 import { toaster } from '@/components/ui/tw/toaster';
 import {
-  NumberField,
   SelectField,
   SwitchField,
 } from './common';
+import { DraftNumberField } from '@/components/ui/tw/draft-number-field';
+import { SaveStatus } from '@/components/ui/tw/save-status';
+import { useAutosave } from '@/hooks/use-autosave';
+import { splitKeywords } from '@/utils/setting-values';
 import { settingStyles } from './setting-styles';
 import { useStagePerformance } from '@/context/stage-performance-context';
 import { useScene } from '@/context/scene-context';
@@ -79,12 +83,35 @@ function Performances(): JSX.Element {
     }
   }, [compatiblePresets, selectedPresetId]);
 
+  // 只有換了方案才重設草稿。存檔會產生新的方案物件（id 不變），用物件當依賴的話
+  // 一存檔、或改了上面的輪播設定，正在編輯的草稿就被蓋掉。
+  const [keywordsText, setKeywordsText] = useState('');
+  const draftLoadedRef = useRef(false);
   useEffect(() => {
-    setDraft(selectedPreset && !selectedPreset.builtin
+    const next = selectedPreset && !selectedPreset.builtin
       ? cloneStagePerformancePreset(selectedPreset)
-      : null);
+      : null;
+    draftLoadedRef.current = false;
+    setDraft(next);
+    setKeywordsText(next ? next.conditions.keywords.join('，') : '');
     setPendingDelete(false);
-  }, [selectedPreset]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedPreset?.id]);
+
+  // 草稿改了就存（停手 0.8 秒）；剛載入的那一份不算。
+  const draftSaver = useAutosave(async (next: StagePerformancePreset) => {
+    updatePreset(next.id, next);
+    return { ok: true } as const;
+  });
+  useEffect(() => {
+    if (!draft) return;
+    if (!draftLoadedRef.current) {
+      draftLoadedRef.current = true;
+      return;
+    }
+    draftSaver.change(draft);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draft]);
 
   useEffect(() => {
     let active = true;
@@ -163,15 +190,6 @@ function Performances(): JSX.Element {
     }
   };
 
-  const saveDraft = () => {
-    if (!draft) return;
-    updatePreset(draft.id, draft);
-    toaster.create({
-      title: t('settings.performances.saved'),
-      type: 'success',
-      duration: 1800,
-    });
-  };
 
   const removeDraft = () => {
     if (!draft) return;
@@ -254,9 +272,10 @@ function Performances(): JSX.Element {
             collection={modeCollection}
             placeholder={t('settings.performances.playMode')}
           />
-          <NumberField
+          <DraftNumberField
             label={t('settings.performances.avoidRecent')}
             value={pool.avoidRecent}
+            integer
             min={0}
             max={10}
             step={1}
@@ -401,7 +420,7 @@ function Performances(): JSX.Element {
                   collection={scaleCollection}
                   placeholder={t('settings.performances.scale')}
                 />
-                <NumberField
+                <DraftNumberField
                   label={t('settings.performances.intensity')}
                   value={draft.intensity}
                   min={0.35}
@@ -412,7 +431,7 @@ function Performances(): JSX.Element {
                     intensity: Number(value),
                   })}
                 />
-                <NumberField
+                <DraftNumberField
                   label={t('settings.performances.weight')}
                   value={draft.weight}
                   min={0.01}
@@ -423,7 +442,7 @@ function Performances(): JSX.Element {
                     weight: Number(value),
                   })}
                 />
-                <NumberField
+                <DraftNumberField
                   label={t('settings.performances.probability')}
                   value={Math.round(draft.probability * 100)}
                   min={0}
@@ -434,7 +453,7 @@ function Performances(): JSX.Element {
                     probability: Number(value) / 100,
                   })}
                 />
-                <NumberField
+                <DraftNumberField
                   label={t('settings.performances.cooldown')}
                   value={Math.round(draft.cooldownMs / 1000)}
                   min={0}
@@ -450,7 +469,7 @@ function Performances(): JSX.Element {
                   checked={draft.sound}
                   onChange={(sound) => setDraft({ ...draft, sound })}
                 />
-                <NumberField
+                <DraftNumberField
                   label={t('settings.performances.musicVolume')}
                   value={Math.round(draft.musicVolume * 100)}
                   min={0}
@@ -461,7 +480,7 @@ function Performances(): JSX.Element {
                     musicVolume: Number(value) / 100,
                   })}
                 />
-                <NumberField
+                <DraftNumberField
                   label={t('settings.performances.musicFadeIn')}
                   value={draft.musicFadeInMs}
                   min={0}
@@ -472,7 +491,7 @@ function Performances(): JSX.Element {
                     musicFadeInMs: Number(value),
                   })}
                 />
-                <NumberField
+                <DraftNumberField
                   label={t('settings.performances.musicFadeOut')}
                   value={draft.musicFadeOutMs}
                   min={0}
@@ -514,17 +533,20 @@ function Performances(): JSX.Element {
                   label={t('settings.performances.keywords')}
                   help={t('settings.performances.keywordsHelp')}
                 >
+                  {/* 欄位保留打的字（含逗號），拆成清單只寫進草稿。 */}
                   <TextInput
-                    value={draft.conditions.keywords.join(', ')}
-                    onChange={(event) => setDraft({
-                      ...draft,
-                      conditions: {
-                        ...draft.conditions,
-                        keywords: event.target.value.split(',')
-                          .map((value) => value.trim())
-                          .filter(Boolean),
-                      },
-                    })}
+                    value={keywordsText}
+                    onChange={(event) => {
+                      setKeywordsText(event.target.value);
+                      setDraft({
+                        ...draft,
+                        conditions: {
+                          ...draft.conditions,
+                          keywords: splitKeywords(event.target.value),
+                        },
+                      });
+                    }}
+                    onBlur={draftSaver.flush}
                   />
                 </Field>
                 <Text fontSize="sm" fontWeight="semibold">
@@ -574,10 +596,8 @@ function Performances(): JSX.Element {
                     </Checkbox>
                   ))}
                 </HStack>
+                <SaveStatus state={draftSaver.state} />
                 <HStack>
-                  <Button colorPalette="blue" size="sm" onClick={saveDraft}>
-                    {t('common.save')}
-                  </Button>
                   {pendingDelete ? (
                     <>
                       <Text fontSize="xs" color="red.300">

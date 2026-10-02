@@ -564,7 +564,10 @@
         "unsupported": "文件格式与场景类型不符。",
         "tooLarge": "素材太大：图片上限 24MB、视频 250MB、3D 场景 120MB。",
         "saveFailed": "无法保存这个场景素材。"
-      }
+      },
+      "usingImportedFile": "目前用导入的文件；要改用网址或换类型，先移除文件",
+      "removeFile": "移除文件",
+      "removeFileConfirm": "确定移除导入的文件？"
     },
     "asr": {
       "micModeLabel": "麦克风模式",

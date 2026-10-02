@@ -564,7 +564,10 @@
         "unsupported": "檔案格式與場景種類不符。",
         "tooLarge": "素材太大：圖片上限 24MB、影片 250MB、3D 場景 120MB。",
         "saveFailed": "無法儲存這個場景素材。"
-      }
+      },
+      "usingImportedFile": "目前用匯入的檔案；要改用網址或換類型，先移除檔案",
+      "removeFile": "移除檔案",
+      "removeFileConfirm": "確定移除匯入的檔案？"
     },
     "asr": {
       "micModeLabel": "麥克風模式",

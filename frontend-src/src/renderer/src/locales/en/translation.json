@@ -564,7 +564,10 @@
         "unsupported": "The file format does not match the scene type.",
         "tooLarge": "The asset is too large: 24MB for images, 250MB for videos, and 120MB for 3D scenes.",
         "saveFailed": "Could not save this scene asset."
-      }
+      },
+      "usingImportedFile": "Using the imported file. Remove it first to use a URL or change the type",
+      "removeFile": "Remove file",
+      "removeFileConfirm": "Remove the imported file?"
     },
     "asr": {
       "micModeLabel": "Microphone mode",

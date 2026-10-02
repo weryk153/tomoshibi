@@ -564,7 +564,10 @@
         "unsupported": "ファイル形式がシーン種類と一致しません。",
         "tooLarge": "素材が大きすぎます。画像24MB、動画250MB、3Dシーン120MBまでです。",
         "saveFailed": "このシーン素材を保存できませんでした。"
-      }
+      },
+      "usingImportedFile": "インポートしたファイルを使っています。URL や種類を変えるには先にファイルを削除してください",
+      "removeFile": "ファイルを削除",
+      "removeFileConfirm": "インポートしたファイルを削除しますか？"
     },
     "asr": {
       "micModeLabel": "マイクのモード",
