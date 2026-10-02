@@ -31,6 +31,7 @@ from .gpt_sovits_route import init_gpt_sovits_route
 from .stream.controller import StreamController
 from .stream.host import WebSocketStreamHost
 from .stream_route import init_stream_route
+from .pending_route import init_pending_route
 from . import gpt_sovits_service
 from .topics_route import (
     init_topics_route,
@@ -149,6 +150,7 @@ class WebSocketServer:
         self.app.include_router(init_perf_route())  # 引擎與硬體
         self.app.include_router(init_topics_route())  # 主動話題
         self.app.include_router(init_gpt_sovits_route())  # 一鍵安裝本機語音
+        self.app.include_router(init_pending_route())  # 還沒生效的設定
 
         # 直播模式：控制器透過 host 用 ws_handler 的連線跑每一輪。
         stream_host = WebSocketStreamHost(ws_handler)

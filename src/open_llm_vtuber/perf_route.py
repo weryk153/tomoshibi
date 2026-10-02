@@ -31,6 +31,7 @@ from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse
 from loguru import logger
 
+from . import pending_changes
 from .api_guard import (
     is_trusted_request as _is_local_request,
     forbidden as _forbidden,
@@ -475,6 +476,7 @@ def init_perf_route() -> APIRouter:
             return bad
 
         logger.info(f"[perf] asr saved (model={asr_model})")
+        pending_changes.mark("asr")
         return JSONResponse(
             {
                 "ok": True,
@@ -510,6 +512,7 @@ def init_perf_route() -> APIRouter:
             return bad
 
         logger.info("[perf] gpt-sovits service address saved")
+        pending_changes.mark("tts")
         return JSONResponse({"ok": True, **_tts_from_conf(), "restart_required": True})
 
     @router.post("/api/perf/preset")
@@ -537,6 +540,7 @@ def init_perf_route() -> APIRouter:
             return bad
 
         logger.info(f"[perf] preset applied (name={name})")
+        pending_changes.mark("perfPreset")
         return JSONResponse(
             {
                 "ok": True,

@@ -8,6 +8,7 @@ import numpy as np
 from loguru import logger
 
 from .service_context import ServiceContext
+from . import pending_changes
 from .chat_group import (
     ChatGroupManager,
     handle_group_operation,
@@ -994,7 +995,8 @@ class WebSocketHandler:
         config_file_name = data.get("file")
         if config_file_name:
             context = self.client_contexts[client_uid]
-            await context.handle_config_switch(websocket, config_file_name)
+            if await context.handle_config_switch(websocket, config_file_name):
+                pending_changes.clear()
 
     async def _handle_config_reload(
         self, websocket: WebSocket, client_uid: str, data: WSMessage
@@ -1019,7 +1021,9 @@ class WebSocketHandler:
                 f"Could not reload the shared context ({type(e).__name__}: {e})"
             )
         context = self.client_contexts[client_uid]
-        await context.handle_config_reload(websocket)
+        # 重新讀了 conf.yaml 與角色檔：之前登記的「還沒生效」都生效了。
+        if await context.handle_config_reload(websocket):
+            pending_changes.clear()
 
     async def _handle_persona_switch(
         self, websocket: WebSocket, client_uid: str, data: WSMessage

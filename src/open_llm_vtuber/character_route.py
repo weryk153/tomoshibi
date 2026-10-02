@@ -34,6 +34,7 @@ from fastapi import APIRouter, Request
 from starlette.responses import JSONResponse
 from loguru import logger
 
+from . import pending_changes
 from . import character_settings
 from .default_personas import swap_for_model_change
 from .api_guard import (
@@ -41,6 +42,7 @@ from .api_guard import (
     is_trusted_request as _is_local_request,
     make_yaml as _make_yaml,
 )
+from .active_character_store import get_active_character_filename
 from .conf_editor import write_conf_document
 from .config_manager.utils import read_yaml
 from .utils.path_safety import safe_join
@@ -757,6 +759,15 @@ def _rescan_skins() -> None:
     list_all_skins()
 
 
+def _mark_if_active(filename: str) -> None:
+    """改的是正在用的角色才登記「還沒生效」：她沒在用的角色，下次選她時就會讀到。"""
+    active = get_active_character_filename() or CONF_PATH
+    if filename == active or (
+        filename in (CONF_PATH, "conf.yaml") and active in (CONF_PATH, "conf.yaml")
+    ):
+        pending_changes.mark("character")
+
+
 def init_character_route() -> APIRouter:
     """角色管理的端點。只接受可信來源。
 
@@ -1060,6 +1071,7 @@ def init_character_route() -> APIRouter:
                 status_code=500,
                 content={"ok": False, "error": "Could not write character file."},
             )
+        _mark_if_active(filename)
         return JSONResponse(
             {
                 "ok": True,
@@ -1157,6 +1169,7 @@ def init_character_route() -> APIRouter:
                 )
 
             logger.info("base character (conf.yaml) updated")
+            _mark_if_active(CONF_PATH)
             return JSONResponse(
                 {
                     "ok": True,
@@ -1309,6 +1322,7 @@ def init_character_route() -> APIRouter:
             )
 
         logger.info(f"character updated: file={filename} conf_uid={conf_uid}")
+        _mark_if_active(filename)
         return JSONResponse(
             {
                 "ok": True,
