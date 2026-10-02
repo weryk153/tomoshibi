@@ -53,6 +53,13 @@ interface SceneContextValue {
 
 const SceneContext = createContext<SceneContextValue | null>(null);
 
+// 存檔前的正規化：場景刪光時補回的預設背景要用介面語言的名字。
+function normalizeStore(value: unknown): SceneStore {
+  return normalizeSceneStore(value, {
+    defaultName: i18n.t("settings.scenes.defaultBackground"),
+  });
+}
+
 // STORAGE_KEY 名字帶 v1 但不改：改了等於丟掉所有人的場景。裡面存的版本號才是
 // 第幾版（見 scenes/scene.ts 的 normalizeSceneStore）。
 function loadStore(): SceneStore {
@@ -157,7 +164,7 @@ export function SceneProvider({
       }
       setTemporarySceneId(null);
       setStore((current) =>
-        normalizeSceneStore({
+        normalizeStore({
           ...current,
           activeSceneId: sceneId,
         }),
@@ -170,7 +177,7 @@ export function SceneProvider({
   const createScene = useCallback((type: SceneType = "image"): string => {
     const id = createId();
     setStore((current) =>
-      normalizeSceneStore({
+      normalizeStore({
         ...current,
         customScenes: [...current.customScenes, createScenePreset(id, type)],
       }),
@@ -193,7 +200,7 @@ export function SceneProvider({
         });
       }
       setStore((current) =>
-        normalizeSceneStore({
+        normalizeStore({
           ...current,
           customScenes: current.customScenes.map((scene) =>
             scene.id === sceneId
@@ -226,7 +233,7 @@ export function SceneProvider({
             ([, binding]) => binding.sceneId !== sceneId,
           ),
         );
-        return normalizeSceneStore({
+        return normalizeStore({
           ...current,
           activeSceneId:
             current.activeSceneId === sceneId
@@ -277,7 +284,7 @@ export function SceneProvider({
         const performanceBindings = { ...current.performanceBindings };
         if (binding) performanceBindings[performanceId] = binding;
         else delete performanceBindings[performanceId];
-        return normalizeSceneStore({ ...current, performanceBindings });
+        return normalizeStore({ ...current, performanceBindings });
       });
     },
     [],
@@ -295,7 +302,7 @@ export function SceneProvider({
       if (!binding.restoreAfter) {
         setTemporarySceneId(null);
         setStore((current) =>
-          normalizeSceneStore({
+          normalizeStore({
             ...current,
             activeSceneId: binding.sceneId,
           }),
