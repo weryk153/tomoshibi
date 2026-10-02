@@ -71,3 +71,52 @@ def test_the_key_is_created_when_absent(tmp_path, monkeypatch):
     nr.write_host(allow_other_devices=True)
 
     assert "host: '0.0.0.0'" in path.read_text(encoding="utf-8")
+
+
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from src.open_llm_vtuber import pending_changes  # noqa: E402
+
+
+def _app(monkeypatch):
+    monkeypatch.setattr(nr, "_is_local_request", lambda request: True)
+    app = FastAPI()
+    app.include_router(nr.init_network_route())
+    return TestClient(app)
+
+
+def test_opening_up_needs_a_restart(conf, monkeypatch):
+    pending_changes._pending.clear()
+    client = _app(monkeypatch)  # 啟動時是 127.0.0.1
+
+    response = client.post("/api/network/host", json={"allow_other_devices": True})
+
+    assert response.status_code == 200
+    assert pending_changes.needs_restart() is True
+    pending_changes._pending.clear()
+
+
+def test_toggling_back_before_restarting_leaves_nothing_pending(conf, monkeypatch):
+    pending_changes._pending.clear()
+    client = _app(monkeypatch)
+
+    client.post("/api/network/host", json={"allow_other_devices": True})
+    client.post("/api/network/host", json={"allow_other_devices": False})
+
+    assert pending_changes.pending() == []
+
+
+def test_network_info_separates_the_setting_from_the_running_bind(conf, monkeypatch):
+    # read_yaml 只讀工作目錄底下的檔案。
+    monkeypatch.chdir(conf.parent)
+    pending_changes._pending.clear()
+    client = _app(monkeypatch)
+    client.post("/api/network/host", json={"allow_other_devices": True})
+
+    info = client.get("/api/network-info").json()
+
+    # 設定已經打開，但這次啟動還是只聽本機：網址還連不上，畫面不能列出來。
+    assert info["allow_other_devices"] is True
+    assert info["localhost_only"] is True
+    pending_changes._pending.clear()
