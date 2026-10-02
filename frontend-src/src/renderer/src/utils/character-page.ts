@@ -31,12 +31,15 @@ export const voiceFieldGroups = (engine: string): { edge: boolean; gptSovits: bo
 }
 
 // 清單重抓之後右邊要顯示誰：原本選的還在就留著；不在了（被刪掉）就回到正在用的
-// 那個；連那個都找不到就第一筆。
+// 那個；連那個都找不到就第一筆。waitingFor 是剛建立、清單還沒重抓到的那一個：
+// 等她出現就選她，出現之前不動（不然會先跳去正在用的那個，新角色就選不到了）。
 export const nextSelection = (
   records: { filename: string; conf_uid: string | null }[],
   selected: string | null,
   activeConfUid: string,
+  waitingFor: string | null = null,
 ): string | null => {
+  if (waitingFor) return records.some((r) => r.filename === waitingFor) ? waitingFor : selected
   if (selected && records.some((r) => r.filename === selected)) return selected
   const active = records.find((r) => isActiveCharacter(r, activeConfUid))
   return (active ?? records[0])?.filename ?? null

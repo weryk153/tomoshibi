@@ -20,7 +20,7 @@ export function CharacterList({
 }: CharacterListProps): JSX.Element {
   const { t } = useTranslation();
   return (
-    <nav className="flex shrink-0 flex-col gap-1 md:w-44" aria-label={t('settings.tabs.characters')}>
+    <nav className="flex shrink-0 flex-col gap-1 md:sticky md:top-0 md:w-44" aria-label={t('settings.tabs.characters')}>
       <div className="mb-2 flex gap-2">
         <Button size="xs" tone="blue" variant={creating ? 'solid' : 'outline'} onClick={onCreate}>
           {t('settings.characters.add')}

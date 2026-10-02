@@ -203,6 +203,8 @@ function Characters(): JSX.Element {
   // 都丟棄不寫，避免舊表單的延遲錯誤訊息冒出現在新表單上（同一機制順便解決
   // avatarUploading/avatarUploadError 在兩個表單間串味的問題）。
   const formSessionRef = useRef(0);
+  // 剛建立、清單還沒重抓到的那個角色的檔名（見下面選取的 effect）。
+  const waitingForRef = useRef<string | null>(null);
 
   // 角色清單。refreshTick 讓存檔/刪除成功後可以重新拉一次，不用整頁重載。
   useEffect(() => {
@@ -696,8 +698,7 @@ function Characters(): JSX.Element {
       });
       setRefreshTick((n) => n + 1);
       // 建好就選中她：清單重抓到新檔後，下面選取的 effect 會打開她的設定。
-      setSelectedFilename(result.data.filename);
-      setDraft(null);
+      waitingForRef.current = result.data.filename;
       closeCreateForm();
     } else {
       setCreateError(result.error || t('settings.characters.errSaveFailed'));
@@ -840,7 +841,8 @@ function Characters(): JSX.Element {
   // 右邊永遠是某一個角色：原本選的還在就留著，被刪了就回到正在用的那個。
   useEffect(() => {
     if (!characters || showCreateForm) return;
-    const next = nextSelection(characters, selectedFilename, confUid);
+    const next = nextSelection(characters, selectedFilename, confUid, waitingForRef.current);
+    if (waitingForRef.current && next === waitingForRef.current) waitingForRef.current = null;
     if (next === selectedFilename && draft) return;
     const record = characters.find((c) => c.filename === next);
     if (record) openEdit(record); else closeEdit();
@@ -853,6 +855,7 @@ function Characters(): JSX.Element {
     if (record.filename === selectedFilename && !showCreateForm) return;
     if (charSaver.state.phase === 'invalid') return;
     charSaver.flush();
+    waitingForRef.current = null;
     if (showCreateForm) closeCreateForm();
     openEdit(record);
   }, [charSaver, closeCreateForm, openEdit, selectedFilename, showCreateForm]);

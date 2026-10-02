@@ -53,3 +53,10 @@ test('a persona is applied live only to the character in use', () => {
   assert.equal(personaApplyMode(true), 'live')
   assert.equal(personaApplyMode(false), 'stored')
 })
+
+test('a just-created character is selected once the refreshed list has her, not replaced by the active one', () => {
+  // 清單還沒重抓到新檔：先不動（不要跳去正在用的那個）。
+  assert.equal(nextSelection(records, null, 'frieren', 'new.yaml'), null)
+  const refreshed = [...records, { filename: 'new.yaml', conf_uid: 'new' }]
+  assert.equal(nextSelection(refreshed, null, 'frieren', 'new.yaml'), 'new.yaml')
+})
