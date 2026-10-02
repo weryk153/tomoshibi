@@ -119,11 +119,20 @@ function setupIPC(): void {
 
   // 設定頁「重新啟動後端」：只有這個 app 自己起的後端能重啟。開發模式、或沿用
   // 別人已經開著的後端時，回 not-managed，畫面改成告訴使用者指令。
-  ipcMain.handle('backend:restart', async () => {
-    if (!backendManager.isRunning()) return { ok: false, reason: 'not-managed' };
-    await backendManager.stop();
-    const result = await backendManager.start(() => {});
-    return result.kind === 'started' ? { ok: true } : { ok: false, reason: 'failed' };
+  // 同時按兩次（或兩個視窗）共用同一次重啟：兩個 start() 疊在一起會起兩個後端，
+  // 後起的那個蓋掉 child，先起的就沒人關得到了。
+  let restarting: Promise<{ ok: boolean; reason?: string; logPath?: string }> | null = null;
+  ipcMain.handle('backend:restart', () => {
+    if (restarting) return restarting;
+    restarting = (async () => {
+      if (!backendManager.isRunning()) return { ok: false, reason: 'not-managed' };
+      await backendManager.stop();
+      const result = await backendManager.start(() => {});
+      return result.kind === 'started'
+        ? { ok: true }
+        : { ok: false, reason: 'failed', logPath: backendManager.logPath };
+    })().finally(() => { restarting = null; });
+    return restarting;
   });
 }
 

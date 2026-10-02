@@ -10,7 +10,9 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/tw/primitives';
 import { useWebSocket } from '@/context/websocket-context';
 import { useSwitchCharacter } from '@/hooks/utils/use-switch-character';
-import { fetchPending, pendingAction, pendingLabelKeys } from '@/api/pending.ts';
+import {
+  fetchPending, pendingAction, pendingLabelKeys, type DesktopRestart,
+} from '@/api/pending.ts';
 import { useStream } from '@/context/stream-context';
 import { useAiState } from '@/context/ai-state-context';
 
@@ -23,8 +25,10 @@ export function PendingBanner({ active }: { active: boolean }): JSX.Element | nu
   const [keys, setKeys] = useState<string[]>([]);
   const [needsRestart, setNeedsRestart] = useState(false);
   const [restarting, setRestarting] = useState(false);
-  // 桌面版重啟失敗（例如後端不是 app 起的）：退回顯示指令。
-  const [restartFailed, setRestartFailed] = useState(false);
+  // 後端不是這個 app 起的（開發模式、沿用別人開著的）：改顯示終端機指令。
+  const [notManaged, setNotManaged] = useState(false);
+  // 桌面版重啟失敗：後端可能已經停了。說失敗、給記錄檔位置與重試，不叫人去開終端機。
+  const [restartFailure, setRestartFailure] = useState<{ logPath?: string } | null>(null);
   const [open, setOpen] = useState(false);
   const { live } = useStream();
   const { aiState } = useAiState();
@@ -34,6 +38,7 @@ export function PendingBanner({ active }: { active: boolean }): JSX.Element | nu
     if (result.ok) {
       setKeys(result.data.pending);
       setNeedsRestart(Boolean(result.data.needs_restart));
+      if (!result.data.needs_restart) setRestartFailure(null);
     }
   }, [baseUrl]);
 
@@ -44,15 +49,24 @@ export function PendingBanner({ active }: { active: boolean }): JSX.Element | nu
     return () => clearInterval(timer);
   }, [active, refresh]);
 
-  const action = pendingAction(needsRestart, Boolean(window.api?.restartBackend) && !restartFailed);
+  const desktop: DesktopRestart = !window.api?.restartBackend || notManaged
+    ? 'unavailable'
+    : restartFailure ? 'failed' : 'available';
+  const action = pendingAction(needsRestart, desktop);
 
   const restart = async (): Promise<void> => {
     if (!window.api?.restartBackend) return;
     setRestarting(true);
+    setRestartFailure(null);
     const result = await window.api.restartBackend();
     setRestarting(false);
-    if (!result.ok) setRestartFailed(true);
-    else void refresh();
+    if (result.ok) {
+      void refresh();
+    } else if (result.reason === 'not-managed') {
+      setNotManaged(true);
+    } else {
+      setRestartFailure({ logPath: result.logPath });
+    }
   };
 
   if (keys.length === 0) return null;
@@ -78,7 +92,7 @@ export function PendingBanner({ active }: { active: boolean }): JSX.Element | nu
             {t('settings.pending.reload')}
           </Button>
         )}
-        {action === 'restart-desktop' && (
+        {(action === 'restart-desktop' || action === 'restart-failed') && (
           <Button
             size="xs"
             tone="orange"
@@ -86,10 +100,15 @@ export function PendingBanner({ active }: { active: boolean }): JSX.Element | nu
             disabled={live || restarting}
             loading={restarting}
           >
-            {t('settings.pending.restart')}
+            {action === 'restart-failed' ? t('settings.pending.retry') : t('settings.pending.restart')}
           </Button>
         )}
       </div>
+      {action === 'restart-failed' && (
+        <p className="mt-1 text-xs text-red-200">
+          {t('settings.pending.restartFailed', { path: restartFailure?.logPath ?? '' })}
+        </p>
+      )}
       {action === 'restart-command' && (
         <p className="mt-1 text-xs text-amber-100/80">{t('settings.pending.restartCommand')}</p>
       )}

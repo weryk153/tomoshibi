@@ -843,7 +843,9 @@
       },
       "liveBlocked": "直播中不能重新載入，直播結束後再按。",
       "restart": "重新啟動後端",
-      "restartCommand": "要重新啟動後端才會生效：在執行後端的終端機按 Ctrl+C，再執行 uv run run_server.py。"
+      "restartCommand": "要重新啟動後端才會生效：在執行後端的終端機按 Ctrl+C，再執行 uv run run_server.py。",
+      "restartFailed": "重新啟動後端失敗，後端可能已經停了。可以再試一次，或關掉 App 重開。記錄檔：{{path}}",
+      "retry": "再試一次"
     },
     "stage": {
       "display": "字幕與音量",

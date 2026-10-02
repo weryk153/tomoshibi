@@ -10,10 +10,16 @@ test('each pending key has a label; unknown ones get a generic label', () => {
 })
 
 test('only a restart item changes the button; the desktop app restarts by itself', () => {
-  assert.equal(pendingAction(false, true), 'reload')
-  assert.equal(pendingAction(false, false), 'reload')
-  assert.equal(pendingAction(true, true), 'restart-desktop')
-  assert.equal(pendingAction(true, false), 'restart-command')
+  assert.equal(pendingAction(false, 'available'), 'reload')
+  assert.equal(pendingAction(false, 'unavailable'), 'reload')
+  assert.equal(pendingAction(true, 'available'), 'restart-desktop')
+  assert.equal(pendingAction(true, 'unavailable'), 'restart-command')
+})
+
+test('a desktop restart that failed says so and offers a retry — no terminal command for app users', () => {
+  assert.equal(pendingAction(true, 'failed'), 'restart-failed')
+  // 失敗後就算清單變了（例如沒有要重啟的了），也不會卡在失敗畫面。
+  assert.equal(pendingAction(false, 'failed'), 'reload')
 })
 
 test('the LAN switch has its own label', () => {

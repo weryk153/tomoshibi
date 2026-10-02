@@ -843,7 +843,9 @@
       },
       "liveBlocked": "配信中は再読み込みできません。配信終了後に押してください。",
       "restart": "バックエンドを再起動",
-      "restartCommand": "バックエンドの再起動後に反映されます：実行中のターミナルで Ctrl+C を押し、uv run run_server.py を実行してください。"
+      "restartCommand": "バックエンドの再起動後に反映されます：実行中のターミナルで Ctrl+C を押し、uv run run_server.py を実行してください。",
+      "restartFailed": "バックエンドの再起動に失敗しました（停止している可能性があります）。もう一度試すか、アプリを終了して開き直してください。ログ：{{path}}",
+      "retry": "もう一度試す"
     },
     "stage": {
       "display": "字幕と音量",

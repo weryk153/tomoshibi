@@ -843,7 +843,9 @@
       },
       "liveBlocked": "Can't reload during a live stream; reload after it ends.",
       "restart": "Restart backend",
-      "restartCommand": "Takes effect after a backend restart: press Ctrl+C in the terminal running it, then run uv run run_server.py."
+      "restartCommand": "Takes effect after a backend restart: press Ctrl+C in the terminal running it, then run uv run run_server.py.",
+      "restartFailed": "Restarting the backend failed and it may have stopped. Try again, or quit and reopen the app. Log: {{path}}",
+      "retry": "Try again"
     },
     "stage": {
       "display": "Subtitles & volume",
