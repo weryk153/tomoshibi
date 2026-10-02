@@ -139,7 +139,8 @@
       "memory": "기억",
       "perf": "성능",
       "about": "정보",
-      "avatar": "아바타"
+      "avatar": "아바타",
+      "stream": "방송"
     },
     "groups": {
       "companion": "컴패니언",
@@ -792,6 +793,47 @@
     },
     "tts": {
       "voiceIsPerCharacter": "어떤 캐릭터가 GPT-SoVITS를 쓰고 어떤 참조 음성·언어를 쓸지는 캐릭터마다 「캐릭터」에서 설정합니다. 이 페이지에서는 GPT-SoVITS 서비스 위치만 설정합니다."
+    },
+    "stream": {
+      "title": "YouTube 라이브 방송",
+      "stageUrlLabel": "무대 페이지 URL (OBS 브라우저 소스에 붙여넣기)",
+      "stageUrlHelp": "「OBS로 오디오 제어」를 체크하면 그녀의 목소리가 들어옵니다. URL 끝에 &bg=none을 붙이면 배경이 투명해집니다.",
+      "urlLabel": "방송 영상 URL",
+      "urlHelp": "watch?v=… 또는 youtu.be/… 링크를 붙여넣으세요. 채널 URL로는 방송을 찾을 수 없습니다.",
+      "blocklistLabel": "금지어",
+      "blocklistHelp": "한 줄에 하나씩. 포함된 댓글은 건너뜁니다.",
+      "quietLabel": "침묵 시간(초)",
+      "quietHelp": "답할 댓글이 이 시간 동안 없으면 그녀가 직접 화제를 꺼냅니다 (5～3600).",
+      "start": "방송 시작",
+      "stop": "중지",
+      "loading": "불러오는 중…",
+      "needStage": "먼저 OBS나 브라우저에서 무대 페이지를 여세요",
+      "needUrl": "먼저 방송 영상 URL을 붙여넣으세요",
+      "stageConnected": "무대 페이지 연결됨",
+      "stageMissing": "무대 페이지 연결 안 됨",
+      "chat": {
+        "idle": "채팅: 시작 전",
+        "connecting": "채팅: 연결 중",
+        "connected": "채팅: 연결됨",
+        "retrying": "채팅: 끊김, 다시 연결 중",
+        "ended": "채팅: 방송 종료"
+      },
+      "counts": "읽음 {{read}}개, 건너뜀 {{dropped}}개, 대기 {{queued}}개",
+      "current": "답하는 중: {{author}}: {{text}}",
+      "stopped": {
+        "ended": "방송이 끝나 자동으로 중지했습니다",
+        "failures": "연속 실패로 일시 중지했습니다. 시작을 누르면 같은 대화를 이어갑니다",
+        "stopped": "중지됨",
+        "error": "내부 오류로 중지했습니다"
+      },
+      "lastError": "최근 오류: {{error}}",
+      "saveFailed": "저장하지 못했습니다",
+      "errors": {
+        "already_live": "이미 방송 중입니다",
+        "no_stage": "무대 페이지가 연결되지 않았습니다",
+        "no_url": "방송 영상 URL이 아직 없습니다",
+        "bad_url": "방송 영상 URL이 아닙니다"
+      }
     }
   },
   "footer": {
@@ -810,7 +852,8 @@
     "removeFile": "문서 제거",
     "interrupt": "말을 끊기",
     "collapseControls": "입력 컨트롤 접기",
-    "expandControls": "입력 컨트롤 펼치기"
+    "expandControls": "입력 컨트롤 펼치기",
+    "streamingPaused": "방송 중에는 개인 채팅이 멈춥니다"
   },
   "sidebar": {
     "camera": "카메라",

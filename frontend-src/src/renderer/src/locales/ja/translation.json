@@ -139,7 +139,8 @@
       "memory": "メモリー",
       "perf": "パフォーマンス",
       "about": "について",
-      "avatar": "アバター"
+      "avatar": "アバター",
+      "stream": "配信"
     },
     "groups": {
       "companion": "コンパニオン",
@@ -792,6 +793,47 @@
     },
     "tts": {
       "voiceIsPerCharacter": "どのキャラクターが GPT-SoVITS を使うか、どの参照音声・言語を使うかは、キャラクターごとに「キャラクター」で設定します。このページで設定するのは GPT-SoVITS サービスの場所だけです。"
+    },
+    "stream": {
+      "title": "YouTube ライブ配信",
+      "stageUrlLabel": "ステージページの URL（OBS のブラウザソースに貼り付け）",
+      "stageUrlHelp": "「OBS で音声を制御する」にチェックを入れると彼女の声を取り込めます。URL の末尾に &bg=none を付けると背景が透明になります。",
+      "urlLabel": "配信動画の URL",
+      "urlHelp": "watch?v=… または youtu.be/… の URL を貼ってください。チャンネルの URL では配信を取得できません。",
+      "blocklistLabel": "NG ワード",
+      "blocklistHelp": "1 行に 1 語。含まれるコメントはスキップします。",
+      "quietLabel": "沈黙の秒数",
+      "quietHelp": "返事できるコメントがこの秒数なければ、彼女が自分から話題を出します（5～3600）。",
+      "start": "配信開始",
+      "stop": "停止",
+      "loading": "読み込み中…",
+      "needStage": "先に OBS かブラウザでステージページを開いてください",
+      "needUrl": "先に配信動画の URL を貼ってください",
+      "stageConnected": "ステージページ接続済み",
+      "stageMissing": "ステージページ未接続",
+      "chat": {
+        "idle": "チャット：未開始",
+        "connecting": "チャット：接続中",
+        "connected": "チャット：接続済み",
+        "retrying": "チャット：切断、再接続中",
+        "ended": "チャット：配信終了"
+      },
+      "counts": "読み込み {{read}} 件、スキップ {{dropped}} 件、待機 {{queued}} 件",
+      "current": "返答中：{{author}}：{{text}}",
+      "stopped": {
+        "ended": "配信が終了したため自動停止しました",
+        "failures": "失敗が続いたため一時停止しました。開始を押すと同じ会話を続けます",
+        "stopped": "停止しました",
+        "error": "内部エラーで停止しました"
+      },
+      "lastError": "直近のエラー：{{error}}",
+      "saveFailed": "保存できませんでした",
+      "errors": {
+        "already_live": "すでに配信中です",
+        "no_stage": "ステージページが接続されていません",
+        "no_url": "配信動画の URL がまだありません",
+        "bad_url": "配信動画の URL ではありません"
+      }
     }
   },
   "footer": {
@@ -810,7 +852,8 @@
     "removeFile": "文書を削除",
     "interrupt": "話を遮る",
     "collapseControls": "入力コントロールを折りたたむ",
-    "expandControls": "入力コントロールを展開する"
+    "expandControls": "入力コントロールを展開する",
+    "streamingPaused": "配信中は個別チャットを一時停止しています"
   },
   "sidebar": {
     "camera": "カメラ",

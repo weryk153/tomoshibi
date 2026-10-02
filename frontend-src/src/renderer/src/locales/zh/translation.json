@@ -139,7 +139,8 @@
       "memory": "記憶",
       "perf": "效能",
       "about": "關於",
-      "avatar": "角色外觀"
+      "avatar": "角色外觀",
+      "stream": "直播"
     },
     "groups": {
       "companion": "陪伴設定",
@@ -792,6 +793,47 @@
     },
     "tts": {
       "voiceIsPerCharacter": "哪個角色用 GPT-SoVITS、用哪段參考音和哪種語言，在「角色」頁各自設定。這一頁只設 GPT-SoVITS 服務在哪裡。"
+    },
+    "stream": {
+      "title": "YouTube 直播",
+      "stageUrlLabel": "舞台頁網址（貼到 OBS 的瀏覽器來源）",
+      "stageUrlHelp": "勾「透過 OBS 控制音訊」就能收到她的聲音。網址後面加 &bg=none 背景會透明。",
+      "urlLabel": "直播影片網址",
+      "urlHelp": "貼 watch?v=… 或 youtu.be/… 的網址；頻道網址抓不到直播。",
+      "blocklistLabel": "黑名單",
+      "blocklistHelp": "一行一個字詞；留言含有就略過。",
+      "quietLabel": "冷場秒數",
+      "quietHelp": "這麼多秒沒有能回的留言，她就自己找話題（5～3600）。",
+      "start": "開始直播",
+      "stop": "停止",
+      "loading": "讀取中……",
+      "needStage": "先在 OBS 或瀏覽器打開舞台頁",
+      "needUrl": "先貼直播網址",
+      "stageConnected": "舞台頁已連上",
+      "stageMissing": "舞台頁沒連上",
+      "chat": {
+        "idle": "聊天室：未開始",
+        "connecting": "聊天室：連線中",
+        "connected": "聊天室：已連上",
+        "retrying": "聊天室：斷線，重連中",
+        "ended": "聊天室：直播已結束"
+      },
+      "counts": "讀到 {{read}} 則、丟掉 {{dropped}} 則、排隊 {{queued}} 則",
+      "current": "正在回：{{author}}：{{text}}",
+      "stopped": {
+        "ended": "直播結束，已自動停止",
+        "failures": "連續失敗，已暫停；按開始會接著同一段對話",
+        "stopped": "已停止",
+        "error": "程式出錯，已停止"
+      },
+      "lastError": "最近的錯誤：{{error}}",
+      "saveFailed": "存不進去",
+      "errors": {
+        "already_live": "已經在直播了",
+        "no_stage": "舞台頁沒連上",
+        "no_url": "還沒貼直播網址",
+        "bad_url": "這不是直播影片的網址"
+      }
     }
   },
   "footer": {
@@ -810,7 +852,8 @@
     "removeFile": "移除文件",
     "interrupt": "打斷她說話",
     "collapseControls": "收合輸入控制列",
-    "expandControls": "展開輸入控制列"
+    "expandControls": "展開輸入控制列",
+    "streamingPaused": "直播中，私人聊天暫停"
   },
   "sidebar": {
     "camera": "攝像頭",

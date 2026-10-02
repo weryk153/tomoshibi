@@ -139,7 +139,8 @@
       "memory": "Memory",
       "perf": "Performance",
       "about": "About",
-      "avatar": "Avatar"
+      "avatar": "Avatar",
+      "stream": "Stream"
     },
     "groups": {
       "companion": "Companion",
@@ -792,6 +793,47 @@
     },
     "tts": {
       "voiceIsPerCharacter": "Which character uses GPT-SoVITS, with which reference voice and language, is set per character on the Characters page. This page only sets where the GPT-SoVITS service is."
+    },
+    "stream": {
+      "title": "YouTube live stream",
+      "stageUrlLabel": "Stage page URL (paste into an OBS Browser Source)",
+      "stageUrlHelp": "Tick “Control audio via OBS” to capture her voice. Add &bg=none for a transparent background.",
+      "urlLabel": "Live video URL",
+      "urlHelp": "Paste a watch?v=… or youtu.be/… link; channel URLs don't work.",
+      "blocklistLabel": "Blocked words",
+      "blocklistHelp": "One per line; comments containing any are skipped.",
+      "quietLabel": "Quiet seconds",
+      "quietHelp": "After this many seconds without an answerable comment she starts a topic herself (5–3600).",
+      "start": "Go live",
+      "stop": "Stop",
+      "loading": "Loading…",
+      "needStage": "Open the stage page in OBS or a browser first",
+      "needUrl": "Paste the live video URL first",
+      "stageConnected": "Stage page connected",
+      "stageMissing": "Stage page not connected",
+      "chat": {
+        "idle": "Chat: not started",
+        "connecting": "Chat: connecting",
+        "connected": "Chat: connected",
+        "retrying": "Chat: lost, reconnecting",
+        "ended": "Chat: stream ended"
+      },
+      "counts": "Read {{read}}, skipped {{dropped}}, queued {{queued}}",
+      "current": "Answering: {{author}}: {{text}}",
+      "stopped": {
+        "ended": "The stream ended; stopped automatically",
+        "failures": "Paused after repeated failures; Go live continues the same conversation",
+        "stopped": "Stopped",
+        "error": "Stopped after an internal error"
+      },
+      "lastError": "Last error: {{error}}",
+      "saveFailed": "Could not save",
+      "errors": {
+        "already_live": "Already live",
+        "no_stage": "The stage page is not connected",
+        "no_url": "No live video URL yet",
+        "bad_url": "That is not a live video URL"
+      }
     }
   },
   "footer": {
@@ -810,7 +852,8 @@
     "removeFile": "Remove document",
     "interrupt": "Interrupt her",
     "collapseControls": "Collapse input controls",
-    "expandControls": "Expand input controls"
+    "expandControls": "Expand input controls",
+    "streamingPaused": "Live stream in progress — chat paused"
   },
   "sidebar": {
     "camera": "Camera",

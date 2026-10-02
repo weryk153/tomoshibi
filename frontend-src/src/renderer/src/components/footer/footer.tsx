@@ -12,6 +12,7 @@ import { footerStyles } from './footer-styles';
 import AIStateIndicator from './ai-state-indicator';
 import { useFooter } from '@/hooks/footer/use-footer';
 import { useAiState, AiStateEnum } from '@/context/ai-state-context';
+import { useStream } from '@/context/stream-context';
 
 // Type definitions
 interface FooterProps {
@@ -40,6 +41,8 @@ interface MessageInputProps {
   onCompositionStart: () => void
   onCompositionEnd: () => void
   onSend: () => void | Promise<void>
+  // 直播中私人聊天暫停（後端也會擋）。
+  disabled?: boolean
 }
 
 // Reusable components
@@ -108,6 +111,7 @@ const MessageInput = memo(({
   onCompositionStart,
   onCompositionEnd,
   onSend,
+  disabled = false,
 }: MessageInputProps) => {
   const { t } = useTranslation();
 
@@ -125,13 +129,14 @@ const MessageInput = memo(({
           onKeyDown={onKeyDown}
           onCompositionStart={onCompositionStart}
           onCompositionEnd={onCompositionEnd}
-          placeholder={t('footer.typeYourMessage')}
+          disabled={disabled}
+          placeholder={disabled ? t('footer.streamingPaused') : t('footer.typeYourMessage')}
           {...footerStyles.footer.input}
         />
         <IconButton
           aria-label={t('footer.send')}
           title={t('footer.send')}
-          disabled={!value.trim()}
+          disabled={disabled || !value.trim()}
           onClick={onSend}
           {...footerStyles.footer.sendButton}
         >
@@ -158,6 +163,7 @@ function Footer({ isCollapsed = false, onToggle }: FooterProps): JSX.Element {
     micOn,
   } = useFooter();
   const { aiState } = useAiState();
+  const { live } = useStream();
 
   return (
     <Box {...footerStyles.footer.container(isCollapsed)}>
@@ -184,6 +190,7 @@ function Footer({ isCollapsed = false, onToggle }: FooterProps): JSX.Element {
             onCompositionStart={handleCompositionStart}
             onCompositionEnd={handleCompositionEnd}
             onSend={handleSend}
+            disabled={live}
           />
         </HStack>
       </Box>
