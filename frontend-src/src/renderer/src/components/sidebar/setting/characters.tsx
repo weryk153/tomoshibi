@@ -1,6 +1,6 @@
-// 角色管理分頁：清單 + 建立表單 + 編輯表單。跟 LLM／About 一樣是無 props 的
-// 分頁（見 setting-ui.tsx 的三處註冊）——存檔／建立是即時打 API，不需要外層
-// 抽屜的 Save/Cancel 去觸發，所以不接 onSave/onCancel。
+// 角色頁：左邊是角色清單（character-list.tsx），右邊是選中角色的六區——基本、
+// 人設版本、外觀、聲音、語言、記憶——或新增表單。跟角色走的設定只在這裡改。
+// 每一欄改了就存到她的角色檔；新增角色例外，必填齊了按「建立」。
 //
 // 送出一律先用 buildCharacterUpdate 把 draft 疊在現值上再送出：draft 本身在
 // 進入編輯畫面時就用「現值 ?? ''」完整初始化成四個真正的字串（見
@@ -29,6 +29,17 @@ import { settingStyles } from './setting-styles';
 import { toaster } from '@/components/ui/tw/toaster';
 import { useWebSocket } from '@/context/websocket-context';
 import { useConfig } from '@/context/character-config-context';
+import { useLive2DConfig } from '@/context/live2d-config-context';
+import {
+  characterDraftProblem, isActiveCharacter, isLoadedModel, nextSelection, skinTypeOf, voiceFieldGroups,
+  type SkinOption,
+} from '@/utils/character-page';
+import Personas from './personas';
+import Memory from './memory';
+import MotionConfig from './motion-config';
+import VrmMotionConfig from './vrm-motion-config';
+import { CharacterList } from './character-list';
+import { SettingSection } from './setting-section';
 import { useSwitchCharacter } from '@/hooks/utils/use-switch-character';
 import { useAutosave } from '@/hooks/use-autosave';
 import { SaveStatus } from '@/components/ui/tw/save-status';
@@ -54,10 +65,6 @@ import { buildUrl, normalizeError } from '@/api/http.ts';
 import { fetchPerf, type PerfState } from '@/api/perf.ts';
 import { gptSovitsLangLabelKey } from '@/utils/gpt-sovits-langs';
 import { ttsModelLabelKey } from '@/utils/tts-models';
-
-interface SkinOption {
-  name: string
-}
 
 interface VoiceOption {
   value: string
@@ -132,7 +139,8 @@ const INHERIT_ENGINE = '__inherit__';
 function Characters(): JSX.Element {
   const { t } = useTranslation();
   const { baseUrl } = useWebSocket();
-  const { confName } = useConfig();
+  const { confUid } = useConfig();
+  const live2DConfig = useLive2DConfig();
   const { switchCharacter } = useSwitchCharacter();
 
   const [characters, setCharacters] = useState<CharacterRecord[] | null>(null);
@@ -196,6 +204,8 @@ function Characters(): JSX.Element {
   // 都丟棄不寫，避免舊表單的延遲錯誤訊息冒出現在新表單上（同一機制順便解決
   // avatarUploading/avatarUploadError 在兩個表單間串味的問題）。
   const formSessionRef = useRef(0);
+  // 剛建立、清單還沒重抓到的那個角色的檔名（見下面選取的 effect）。
+  const waitingForRef = useRef<string | null>(null);
 
   // 角色清單。refreshTick 讓存檔/刪除成功後可以重新拉一次，不用整頁重載。
   useEffect(() => {
@@ -225,8 +235,10 @@ function Characters(): JSX.Element {
       const result = await fetchLive2dSkins(baseUrl);
       if (cancelled) return;
       if (result.ok) {
-        const data = result.data as { skins?: { name: string }[] };
-        setSkins(Array.isArray(data.skins) ? data.skins.map((s) => ({ name: s.name })) : []);
+        const data = result.data as { skins?: { name: string; type?: string }[] };
+        setSkins(Array.isArray(data.skins)
+          ? data.skins.map((s) => ({ name: s.name, type: s.type === 'vrm' ? 'vrm' : 'live2d' }))
+          : []);
       } else {
         setSkinsError(result.error);
       }
@@ -408,11 +420,10 @@ function Characters(): JSX.Element {
     [characters, selectedFilename],
   );
 
-  // 這個角色自己的開關（字幕翻成你看的語言、可以寫動作描寫）：改了就存，不跟整份
-  // 表單一起存。
-  // 翻字幕、動作描寫：切了就存。正在用的角色要重新載入才生效，由抽屜頂端的提示處理。
+  // 這個角色自己的開關（字幕翻成你看的語言、可以寫動作描寫、長期記憶）：切了就
+  // 存，不跟整份表單一起存。正在用的角色要重新載入才生效，由抽屜頂端的提示處理。
   const toggleSaver = useAutosave(async (change: {
-    filename: string; name: 'translate_subtitle' | 'actions_enabled'; checked: boolean;
+    filename: string; name: 'translate_subtitle' | 'actions_enabled' | 'long_term_memory_enabled'; checked: boolean;
   }) => {
     const result = await saveCharacterSettings(baseUrl, change.filename, { [change.name]: change.checked });
     if (!result.ok) return { ok: false, error: result.error } as const;
@@ -423,7 +434,7 @@ function Characters(): JSX.Element {
   }, { delayMs: 0 });
 
   const handleToggle = useCallback((
-    name: 'translate_subtitle' | 'actions_enabled',
+    name: 'translate_subtitle' | 'actions_enabled' | 'long_term_memory_enabled',
     checked: boolean,
   ) => {
     if (!selectedRecord) return;
@@ -605,10 +616,8 @@ function Characters(): JSX.Element {
 
   const charSaver = useAutosave(saveDraft, {
     validate: ({ draft: d }: { draft: EditDraft; baseline: CharacterRecord }) => {
-      if (!d.conf_name.trim()) return t('settings.characters.errNameRequired');
-      if (!d.persona_prompt.trim()) return t('settings.characters.errPersonaRequired');
-      if (!d.live2d_model_name.trim()) return t('settings.characters.errSkinRequired');
-      return null;
+      const problem = characterDraftProblem(d);
+      return problem ? t(problem) : null;
     },
   });
 
@@ -687,6 +696,8 @@ function Characters(): JSX.Element {
         duration: 2500,
       });
       setRefreshTick((n) => n + 1);
+      // 建好就選中她：清單重抓到新檔後，下面選取的 effect 會打開她的設定。
+      waitingForRef.current = result.data.filename;
       closeCreateForm();
     } else {
       setCreateError(result.error || t('settings.characters.errSaveFailed'));
@@ -826,6 +837,40 @@ function Characters(): JSX.Element {
     }
   }, [runAvatarUpload, selectedRecord]);
 
+  // 右邊永遠是某一個角色：原本選的還在就留著，被刪了就回到正在用的那個。
+  useEffect(() => {
+    if (!characters || showCreateForm) return;
+    const next = nextSelection(characters, selectedFilename, confUid, waitingForRef.current);
+    if (waitingForRef.current && next === waitingForRef.current) waitingForRef.current = null;
+    if (next === selectedFilename && draft) return;
+    const record = characters.find((c) => c.filename === next);
+    if (record) openEdit(record); else closeEdit();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [characters, confUid, showCreateForm]);
+
+  // 換走（選別的角色、開新增表單）之前，先把這個角色還沒送的那筆送完。
+  // - 有欄位不合法時那份存不了，換走就會丟掉其他欄位的修改：留在原地，flush 讓頂端
+  //   的存檔狀態說哪一欄不行。就地檢查草稿，不看存檔器的狀態——停手 0.8 秒內就點
+  //   走的話，它還沒變成「不合法」。
+  // - 要等送完（await）才換：存檔器只有一格，換過去之後新角色的第一個字會把還沒
+  //   送出的舊角色那筆擠掉。
+  const leaveCurrent = useCallback(async (): Promise<boolean> => {
+    if (draft && characterDraftProblem(draft)) {
+      await charSaver.flush();
+      return false;
+    }
+    await charSaver.flush();
+    return true;
+  }, [charSaver, draft]);
+
+  const selectCharacter = useCallback(async (record: CharacterRecord) => {
+    if (record.filename === selectedFilename && !showCreateForm) return;
+    if (!showCreateForm && !(await leaveCurrent())) return;
+    waitingForRef.current = null;
+    if (showCreateForm) closeCreateForm();
+    openEdit(record);
+  }, [closeCreateForm, leaveCurrent, openEdit, selectedFilename, showCreateForm]);
+
   if (characters === null) {
     return (
       <Stack {...settingStyles.common.container}>
@@ -836,14 +881,13 @@ function Characters(): JSX.Element {
     );
   }
 
-  if (showCreateForm && createDraft) {
-    return (
+  const renderCreateForm = (draftForCreate: CreateDraft): JSX.Element => (
       <Stack {...settingStyles.common.container} maxW="none">
         <Heading size="sm">{t('settings.characters.addTitle')}</Heading>
 
         <InputField
           label={t('settings.characters.name')}
-          value={createDraft.conf_name}
+          value={draftForCreate.conf_name}
           onChange={(value) => setCreateDraft((d) => (d ? { ...d, conf_name: value } : d))}
           placeholder={t('settings.characters.namePlaceholder')}
         />
@@ -853,7 +897,7 @@ function Characters(): JSX.Element {
           help={t('settings.characters.personaHelp')}
           rows={8}
           placeholder={t('settings.characters.personaPlaceholder')}
-          value={createDraft.persona_prompt}
+          value={draftForCreate.persona_prompt}
           onChange={(value) => setCreateDraft((d) => (d ? { ...d, persona_prompt: value } : d))}
         />
 
@@ -866,7 +910,7 @@ function Characters(): JSX.Element {
         ) : (
           <SelectField
             label={t('settings.characters.skin')}
-            value={createDraft.live2d_model_name ? [createDraft.live2d_model_name] : []}
+            value={draftForCreate.live2d_model_name ? [draftForCreate.live2d_model_name] : []}
             onChange={(value) => setCreateDraft((d) => (
               d ? { ...d, live2d_model_name: value[0] ?? '' } : d
             ))}
@@ -878,7 +922,7 @@ function Characters(): JSX.Element {
         <Stack gap={2}>
           <SelectField
             label={t('settings.characters.voice')}
-            value={[createDraft.voice]}
+            value={[draftForCreate.voice]}
             onChange={(value) => setCreateDraft((d) => (
               d ? { ...d, voice: value[0] ?? INHERIT_VOICE } : d
             ))}
@@ -895,11 +939,11 @@ function Characters(): JSX.Element {
             <Button
               size="xs"
               variant="outline"
-              disabled={!createDraft.voice || createDraft.voice === INHERIT_VOICE}
-              loading={previewingVoice === createDraft.voice}
-              onClick={() => handlePreview(createDraft.voice)}
+              disabled={!draftForCreate.voice || draftForCreate.voice === INHERIT_VOICE}
+              loading={previewingVoice === draftForCreate.voice}
+              onClick={() => handlePreview(draftForCreate.voice)}
             >
-              {previewingVoice === createDraft.voice
+              {previewingVoice === draftForCreate.voice
                 ? t('settings.characters.previewing')
                 : t('settings.characters.preview')}
             </Button>
@@ -932,7 +976,7 @@ function Characters(): JSX.Element {
             延遲的主要來源之一，所以文案要講清楚這件事。 */}
         <InputField
           label={t('settings.characters.replyLanguage')}
-          value={createDraft.reply_language}
+          value={draftForCreate.reply_language}
           onChange={(value) => setCreateDraft((d) => (d ? { ...d, reply_language: value } : d))}
           placeholder={t('settings.characters.replyLanguagePlaceholder')}
           help={t('settings.characters.replyLanguageHelp')}
@@ -942,7 +986,7 @@ function Characters(): JSX.Element {
           <Stack gap={2}>
             <SelectField
               label={t('settings.characters.ttsEngine')}
-              value={[createDraft.tts_model]}
+              value={[draftForCreate.tts_model]}
               onChange={(value) => setCreateDraft((d) => (
                 d ? { ...d, tts_model: value[0] ?? INHERIT_ENGINE } : d
               ))}
@@ -959,7 +1003,7 @@ function Characters(): JSX.Element {
           <Stack gap={2}>
             <SelectField
               label={t('settings.characters.voiceLang')}
-              value={[createDraft.voice_lang]}
+              value={[draftForCreate.voice_lang]}
               onChange={(value) => setCreateDraft((d) => (
                 d ? { ...d, voice_lang: value[0] ?? INHERIT_LANG } : d
               ))}
@@ -977,7 +1021,7 @@ function Characters(): JSX.Element {
         <Stack gap={2}>
           <SelectField
             label={t('settings.characters.refAudioPath')}
-            value={[createDraft.ref_audio_path || INHERIT_VOICE]}
+            value={[draftForCreate.ref_audio_path || INHERIT_VOICE]}
             onChange={(value) => setCreateDraft((d) => {
               if (!d) return d;
               const picked = value[0] === INHERIT_VOICE ? '' : (value[0] ?? '');
@@ -1000,7 +1044,7 @@ function Characters(): JSX.Element {
 
         <InputField
           label={t('settings.characters.promptText')}
-          value={createDraft.prompt_text}
+          value={draftForCreate.prompt_text}
           onChange={(value) => setCreateDraft((d) => (d ? { ...d, prompt_text: value } : d))}
           placeholder={t('settings.characters.promptTextPlaceholder')}
           help={t('settings.characters.promptTextHelp')}
@@ -1010,7 +1054,7 @@ function Characters(): JSX.Element {
           <Stack gap={2}>
             <SelectField
               label={t('settings.characters.promptLang')}
-              value={[createDraft.prompt_lang]}
+              value={[draftForCreate.prompt_lang]}
               onChange={(value) => setCreateDraft((d) => (
                 d ? { ...d, prompt_lang: value[0] ?? INHERIT_LANG } : d
               ))}
@@ -1025,7 +1069,7 @@ function Characters(): JSX.Element {
 
         <InputField
           label={t('settings.characters.slug')}
-          value={createDraft.slug}
+          value={draftForCreate.slug}
           onChange={(value) => setCreateDraft((d) => (d ? { ...d, slug: value } : d))}
           placeholder={t('settings.characters.slugPlaceholder')}
           help={t('settings.characters.slugHelp')}
@@ -1033,7 +1077,7 @@ function Characters(): JSX.Element {
 
         <InputField
           label={t('settings.characters.aiName')}
-          value={createDraft.character_name}
+          value={draftForCreate.character_name}
           onChange={(value) => setCreateDraft((d) => (d ? { ...d, character_name: value } : d))}
           help={t('settings.characters.aiNameHelp')}
         />
@@ -1063,9 +1107,9 @@ function Characters(): JSX.Element {
             >
               {t('settings.characters.aiAvatarChoose')}
             </Button>
-            {createDraft.avatar && (
+            {draftForCreate.avatar && (
               <>
-                <Text fontSize="xs" color="whiteAlpha.700">{createDraft.avatar}</Text>
+                <Text fontSize="xs" color="whiteAlpha.700">{draftForCreate.avatar}</Text>
                 <Button
                   size="xs"
                   variant="ghost"
@@ -1101,357 +1145,30 @@ function Characters(): JSX.Element {
           </Button>
         </HStack>
       </Stack>
-    );
-  }
+  );
 
-  if (selectedRecord && draft) {
+  // 選中角色的六區：基本、人設版本、外觀、聲音、語言、記憶。每一欄改了就存到
+  // 她的角色檔；正在用的角色要重新載入才生效，由抽屜頂端的提示處理。
+  const renderSections = (record: CharacterRecord, edit: EditDraft, isActive: boolean): JSX.Element => {
+    const voiceGroups = voiceFieldGroups(edit.tts_model);
+    const modelLoaded = isLoadedModel(edit.live2d_model_name, live2DConfig.modelInfo?.name);
     return (
-      <Stack {...settingStyles.common.container} maxW="none">
-        <Heading size="sm">{t('settings.characters.editTitle')}</Heading>
-        <SaveStatus state={charSaver.state} />
-
-        {selectedRecord.is_base && (
-          <Text fontSize="xs" color="yellow.300">
-            {t('settings.characters.editBaseNote')}
-          </Text>
-        )}
-
-        <InputField
-          label={t('settings.characters.name')}
-          value={draft.conf_name}
-          onChange={(value) => setDraft((d) => (d ? { ...d, conf_name: value } : d))}
-          placeholder={t('settings.characters.namePlaceholder')}
-        />
-
-        <TextareaField
-          label={t('settings.characters.persona')}
-          help={t('settings.characters.personaHelp')}
-          rows={8}
-          placeholder={t('settings.characters.personaPlaceholder')}
-          value={draft.persona_prompt}
-          onChange={(value) => setDraft((d) => (d ? { ...d, persona_prompt: value } : d))}
-        />
-
-        {skinsLoading ? (
-          <Text fontSize="xs" color="whiteAlpha.600">{t('settings.characters.loadingOptions')}</Text>
-        ) : skinsError ? (
-          <Text fontSize="xs" color="red.300">{t('settings.characters.errLoadFailed')}</Text>
-        ) : skins.length === 0 ? (
-          <Text fontSize="xs" color="whiteAlpha.600">{t('settings.characters.noSkinsHint')}</Text>
-        ) : (
-          <SelectField
-            label={t('settings.characters.skin')}
-            value={draft.live2d_model_name ? [draft.live2d_model_name] : []}
-            onChange={(value) => setDraft((d) => (d ? { ...d, live2d_model_name: value[0] ?? '' } : d))}
-            collection={skinCollection}
-            placeholder={t('settings.characters.skin')}
-          />
-        )}
-
+      <Stack gap={6}>
         <Stack gap={2}>
-          <SelectField
-            label={t('settings.characters.voice')}
-            value={[draft.voice]}
-            onChange={(value) => setDraft((d) => (d ? { ...d, voice: value[0] ?? INHERIT_VOICE } : d))}
-            collection={voiceCollection}
-            placeholder={t('settings.characters.voice')}
-          />
-          <Text fontSize="xs" color="whiteAlpha.600">
-            {t('settings.characters.voiceHelp')}
-          </Text>
-          <Text fontSize="xs" color="whiteAlpha.500">
-            {t('settings.characters.voiceEngineNote')}
-          </Text>
-          <HStack>
-            <Button
-              size="xs"
-              variant="outline"
-              disabled={!draft.voice || draft.voice === INHERIT_VOICE}
-              loading={previewingVoice === draft.voice}
-              onClick={() => handlePreview(draft.voice)}
-            >
-              {previewingVoice === draft.voice
-                ? t('settings.characters.previewing')
-                : t('settings.characters.preview')}
-            </Button>
-            {!voicesAreFull && (
-              <Button
-                size="xs"
-                variant="ghost"
-                onClick={handleShowAllVoices}
-                loading={loadingFullVoices}
-                disabled={voicesLoading}
-              >
-                {t('settings.characters.showAllVoices')}
-              </Button>
-            )}
-            {voicesLoading && (
-              <Text fontSize="xs" color="whiteAlpha.600">{t('settings.characters.loadingOptions')}</Text>
-            )}
-          </HStack>
-          {voicesError && (
-            <Text fontSize="xs" color="red.300">{t('settings.characters.errLoadFailed')}</Text>
-          )}
-          {previewError && (
-            <Text fontSize="xs" color="red.300">{previewError}</Text>
-          )}
-        </Stack>
-
-        {/* 兩個語言欄位放在語音區塊之後：回覆語言決定她「用什麼語言寫」，發聲
-            語言決定「用什麼語言唸」。兩者不同時後端會在合成前先翻譯一次，那是
-            延遲的主要來源之一，所以文案要講清楚這件事。 */}
-        <InputField
-          label={t('settings.characters.replyLanguage')}
-          value={draft.reply_language}
-          onChange={(value) => setDraft((d) => (d ? { ...d, reply_language: value } : d))}
-          placeholder={t('settings.characters.replyLanguagePlaceholder')}
-          help={t('settings.characters.replyLanguageHelp')}
-        />
-        {selectedRecord && (
-          <SwitchField
-            label={t('settings.characters.translateSubtitle')}
-            checked={Boolean(selectedRecord.translate_subtitle)}
-            onChange={(checked) => handleToggle('translate_subtitle', checked)}
-            help={t('settings.characters.translateSubtitleHelp')}
-          />
-        )}
-        {selectedRecord && (
-          <SwitchField
-            label={t('settings.characters.actionsEnabled')}
-            checked={Boolean(selectedRecord.actions_enabled)}
-            onChange={(checked) => handleToggle('actions_enabled', checked)}
-            help={t('settings.characters.actionsEnabledHelp')}
-          />
-        )}
-        <SaveStatus state={toggleSaver.state} />
-
-        {ttsModels.length > 0 && (
-          <Stack gap={2}>
-            <SelectField
-              label={t('settings.characters.ttsEngine')}
-              value={[draft.tts_model]}
-              onChange={(value) => setDraft((d) => (
-                d ? { ...d, tts_model: value[0] ?? INHERIT_ENGINE } : d
-              ))}
-              collection={engineCollection}
-              placeholder={t('settings.characters.ttsEngine')}
-            />
-            <Text fontSize="xs" color="whiteAlpha.600">
-              {t('settings.characters.ttsEngineHelp')}
-            </Text>
-          </Stack>
-        )}
-
-        {voiceLangs.length > 0 && (
-          <Stack gap={2}>
-            <SelectField
-              label={t('settings.characters.voiceLang')}
-              value={[draft.voice_lang]}
-              onChange={(value) => setDraft((d) => (
-                d ? { ...d, voice_lang: value[0] ?? INHERIT_LANG } : d
-              ))}
-              collection={voiceLangCollection}
-              placeholder={t('settings.characters.voiceLang')}
-            />
-            <Text fontSize="xs" color="whiteAlpha.600">
-              {t('settings.characters.voiceLangHelp')}
-            </Text>
-          </Stack>
-        )}
-
-        {/* 「用誰的聲音」——只對 GPT-SoVITS 有意義。三者是一組：聲線由參考音決定，
-            逐字稿要跟那段音檔對得上，否則克隆出來的音色會歪。 */}
-        <Stack gap={2}>
-          <SelectField
-            label={t('settings.characters.refAudioPath')}
-            value={[draft.ref_audio_path || INHERIT_VOICE]}
-            onChange={(value) => setDraft((d) => {
-              if (!d) return d;
-              const picked = value[0] === INHERIT_VOICE ? '' : (value[0] ?? '');
-              // 換了參考音就換逐字稿。挑不到（手寫路徑、或沒有 sidecar）就維持原值，
-              // 不要拿空字串把使用者自己打的逐字稿洗掉。
-              const transcript = promptTextFor(picked);
-              return {
-                ...d,
-                ref_audio_path: picked,
-                prompt_text: transcript || d.prompt_text,
-              };
-            })}
-            collection={refAudioCollection}
-            placeholder={t('settings.characters.refAudioPath')}
-          />
-          <Text fontSize="xs" color="whiteAlpha.600">
-            {t('settings.characters.refAudioPathHelp')}
-          </Text>
-        </Stack>
-
-        <InputField
-          label={t('settings.characters.promptText')}
-          value={draft.prompt_text}
-          onChange={(value) => setDraft((d) => (d ? { ...d, prompt_text: value } : d))}
-          placeholder={t('settings.characters.promptTextPlaceholder')}
-          help={t('settings.characters.promptTextHelp')}
-        />
-
-        {voiceLangs.length > 0 && (
-          <Stack gap={2}>
-            <SelectField
-              label={t('settings.characters.promptLang')}
-              value={[draft.prompt_lang]}
-              onChange={(value) => setDraft((d) => (
-                d ? { ...d, prompt_lang: value[0] ?? INHERIT_LANG } : d
-              ))}
-              collection={promptLangCollection}
-              placeholder={t('settings.characters.promptLang')}
-            />
-            <Text fontSize="xs" color="whiteAlpha.600">
-              {t('settings.characters.promptLangHelp')}
-            </Text>
-          </Stack>
-        )}
-
-        <InputField
-          label={t('settings.characters.aiName')}
-          value={draft.character_name}
-          onChange={(value) => setDraft((d) => (d ? { ...d, character_name: value } : d))}
-          help={t('settings.characters.aiNameHelp')}
-        />
-
-        <Field
-          label={t('settings.characters.aiAvatar')}
-          help={t('settings.characters.aiAvatarHelp')}
-        >
-          <HStack>
-            <input
-              ref={editAvatarInputRef}
-              type="file"
-              accept="image/*"
-              style={{ display: 'none' }}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                e.target.value = '';
-                if (file) handleEditAvatarFile(file);
-              }}
-            />
-            <Button
-              size="xs"
-              variant="outline"
-              onClick={() => editAvatarInputRef.current?.click()}
-              loading={avatarUploading}
-              disabled={avatarUploading}
-            >
-              {t('settings.characters.aiAvatarChoose')}
-            </Button>
-            {draft.avatar && (
-              <>
-                <Text fontSize="xs" color="whiteAlpha.700">{draft.avatar}</Text>
-                <Button
-                  size="xs"
-                  variant="ghost"
-                  disabled={avatarUploading}
-                  onClick={() => setDraft((d) => (d ? { ...d, avatar: '' } : d))}
-                >
-                  {t('settings.characters.aiAvatarClear')}
-                </Button>
-              </>
-            )}
-          </HStack>
-          {avatarUploadError && (
-            <Text fontSize="xs" color="red.300">{avatarUploadError}</Text>
-          )}
-        </Field>
-
-        {saveError && (
-          <Text fontSize="sm" color="red.300">{saveError}</Text>
-        )}
-
-        <HStack>
-          {/* 改了就存；這顆只是回到清單（關掉前把還沒送的那筆送出去）。 */}
-          {/* 有欄位不合法時那份還沒存：關掉就會丟掉其他欄位的修改，先擋住。 */}
-          <Button
-            variant="outline"
-            disabled={charSaver.state.phase === 'invalid'}
-            onClick={() => { charSaver.flush(); closeEdit(); }}
-          >
-            {t('common.close')}
-          </Button>
-        </HStack>
-      </Stack>
-    );
-  }
-
-  return (
-    <Stack {...settingStyles.common.container} maxW="none">
-      <Stack
-        direction={{ base: 'column', md: 'row' }}
-        align={{ base: 'stretch', md: 'center' }}
-        justify="space-between"
-        gap={3}
-      >
-        <Text fontSize="sm" color="whiteAlpha.700">
-          {t('settings.characters.description')}
-        </Text>
-        <HStack flexWrap="wrap">
-          <Button size="xs" tone="blue" variant="outline" onClick={openCreate}>
-            {t('settings.characters.add')}
-          </Button>
-          <Button size="xs" variant="ghost" onClick={() => setRefreshTick((n) => n + 1)}>
-            {t('settings.characters.refresh')}
-          </Button>
-        </HStack>
-      </Stack>
-
-      <Text fontSize="xs" color="whiteAlpha.500">
-        {t('settings.characters.memoryNote')}
-      </Text>
-
-      {listError && (
-        <Text fontSize="sm" color="red.300">{listError}</Text>
-      )}
-
-      {characters.map((record) => (
-        <Box
-          key={record.filename}
-          p={3}
-          borderWidth="1px"
-          borderColor="whiteAlpha.200"
-          borderRadius="md"
-        >
-          <Stack
-            direction={{ base: 'column', md: 'row' }}
-            align={{ base: 'stretch', md: 'center' }}
-            justify="space-between"
-            gap={3}
-          >
-            <HStack flexWrap="wrap">
-              <Text fontWeight="semibold">{record.conf_name || record.filename}</Text>
-              {record.is_base && (
-                <Text fontSize="xs" color="whiteAlpha.600">
-                  {t('settings.characters.baseBadge')}
-                </Text>
-              )}
-              {record.conf_name === confName && (
-                <Text fontSize="xs" color="green.300">
-                  {t('settings.characters.activeBadge')}
-                </Text>
+          <HStack justify="space-between" flexWrap="wrap" gap={2}>
+            <HStack>
+              <Heading size="sm">{record.conf_name || record.filename}</Heading>
+              {isActive && (
+                <Text fontSize="xs" color="green.300">{t('settings.characters.activeBadge')}</Text>
               )}
             </HStack>
-            <HStack flexWrap="wrap">
-              {/* 這個分頁的說明寫著「建立、編輯、切換」，但切換以前只存在於
-                  「一般」分頁一個叫「角色預設」的下拉選單裡——名字不一樣、
-                  位置也不一樣，站在這裡的人找不到它。切換的動作屬於這張清單。 */}
-              {record.conf_name !== confName && (
-                <Button
-                  size="xs"
-                  tone="blue"
-                  onClick={() => switchCharacter(record.filename)}
-                >
+            <HStack>
+              {/* 切換的動作屬於她的設定頂端：選中誰、就用誰。 */}
+              {!isActive && (
+                <Button size="xs" tone="blue" onClick={() => switchCharacter(record.filename)}>
                   {t('settings.characters.use')}
                 </Button>
               )}
-              <Button size="xs" variant="outline" onClick={() => openEdit(record)}>
-                {t('settings.characters.edit')}
-              </Button>
               {!record.is_base && (
                 <Button
                   size="xs"
@@ -1463,10 +1180,10 @@ function Characters(): JSX.Element {
                 </Button>
               )}
             </HStack>
-          </Stack>
+          </HStack>
 
           {pendingDeleteFilename === record.filename && (
-            <Box mt={2} p={2} borderWidth="1px" borderColor="red.700" borderRadius="sm">
+            <Box p={2} borderWidth="1px" borderColor="red.700" borderRadius="sm">
               <Text fontSize="sm">
                 {t('settings.characters.confirmDelete', {
                   name: record.conf_name || record.filename,
@@ -1498,9 +1215,344 @@ function Characters(): JSX.Element {
               </HStack>
             </Box>
           )}
-        </Box>
-      ))}
-    </Stack>
+
+          <SaveStatus state={charSaver.state} />
+          {record.is_base && (
+            <Text fontSize="xs" color="yellow.300">
+              {t('settings.characters.editBaseNote')}
+            </Text>
+          )}
+          {saveError && (
+            <Text fontSize="sm" color="red.300">{saveError}</Text>
+          )}
+        </Stack>
+
+        <SettingSection title={t('settings.characterPage.basic')}>
+          <InputField
+            label={t('settings.characters.name')}
+            value={edit.conf_name}
+            onChange={(value) => setDraft((d) => (d ? { ...d, conf_name: value } : d))}
+            placeholder={t('settings.characters.namePlaceholder')}
+          />
+
+          <TextareaField
+            label={t('settings.characters.persona')}
+            help={t('settings.characters.personaHelp')}
+            rows={8}
+            placeholder={t('settings.characters.personaPlaceholder')}
+            value={edit.persona_prompt}
+            onChange={(value) => setDraft((d) => (d ? { ...d, persona_prompt: value } : d))}
+          />
+
+          <SwitchField
+            label={t('settings.characters.actionsEnabled')}
+            checked={Boolean(record.actions_enabled)}
+            onChange={(checked) => handleToggle('actions_enabled', checked)}
+            help={t('settings.characters.actionsEnabledHelp')}
+          />
+
+          <InputField
+            label={t('settings.characters.aiName')}
+            value={edit.character_name}
+            onChange={(value) => setDraft((d) => (d ? { ...d, character_name: value } : d))}
+            help={t('settings.characters.aiNameHelp')}
+          />
+
+          <Field
+            label={t('settings.characters.aiAvatar')}
+            help={t('settings.characters.aiAvatarHelp')}
+          >
+            <HStack>
+              <input
+                ref={editAvatarInputRef}
+                type="file"
+                accept="image/*"
+                style={{ display: 'none' }}
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  e.target.value = '';
+                  if (file) handleEditAvatarFile(file);
+                }}
+              />
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => editAvatarInputRef.current?.click()}
+                loading={avatarUploading}
+                disabled={avatarUploading}
+              >
+                {t('settings.characters.aiAvatarChoose')}
+              </Button>
+              {edit.avatar && (
+                <>
+                  <Text fontSize="xs" color="whiteAlpha.700">{edit.avatar}</Text>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    disabled={avatarUploading}
+                    onClick={() => setDraft((d) => (d ? { ...d, avatar: '' } : d))}
+                  >
+                    {t('settings.characters.aiAvatarClear')}
+                  </Button>
+                </>
+              )}
+            </HStack>
+            {avatarUploadError && (
+              <Text fontSize="xs" color="red.300">{avatarUploadError}</Text>
+            )}
+          </Field>
+        </SettingSection>
+
+        <SettingSection
+          title={t('settings.characterPage.personas')}
+          note={t('settings.characterPage.personasNote')}
+        >
+          {record.conf_uid && <Personas confUid={record.conf_uid} isActive={isActive} />}
+        </SettingSection>
+
+        <SettingSection title={t('settings.characterPage.appearance')}>
+          {skinsLoading ? (
+            <Text fontSize="xs" color="whiteAlpha.600">{t('settings.characters.loadingOptions')}</Text>
+          ) : skinsError ? (
+            <Text fontSize="xs" color="red.300">{t('settings.characters.errLoadFailed')}</Text>
+          ) : skins.length === 0 ? (
+            <Text fontSize="xs" color="whiteAlpha.600">{t('settings.characters.noSkinsHint')}</Text>
+          ) : (
+            <SelectField
+              label={t('settings.characters.skin')}
+              value={edit.live2d_model_name ? [edit.live2d_model_name] : []}
+              onChange={(value) => setDraft((d) => (d ? { ...d, live2d_model_name: value[0] ?? '' } : d))}
+              collection={skinCollection}
+              placeholder={t('settings.characters.skin')}
+            />
+          )}
+          {/* 動作與表情對應寫在 model_dict.json，是「這個模型」的設定。Live2D 跟
+              VRM 的資料形狀不同（(group, index)＋HitArea vs. clip 檔名），所以是
+              兩個各自獨立的編輯器。 */}
+          <Text fontSize="xs" color="whiteAlpha.600">{t('settings.characterPage.sharedModelNote')}</Text>
+          {/* key 用模型名：換了模型（換選角色或改上面的選單）就換一個編輯器，舊的
+              卸載時把還沒送的修改存進它自己的模型。不換的話，排隊中的修改會在新模型
+              還沒載入時被當成「沒東西要存」丟掉。 */}
+          {skinTypeOf(skins, edit.live2d_model_name) === 'vrm' ? (
+            <VrmMotionConfig
+              key={edit.live2d_model_name}
+              modelName={edit.live2d_model_name || undefined}
+              isLoaded={modelLoaded}
+            />
+          ) : (
+            <MotionConfig
+              key={edit.live2d_model_name}
+              modelName={edit.live2d_model_name || undefined}
+              isLoaded={modelLoaded}
+            />
+          )}
+        </SettingSection>
+
+        <SettingSection title={t('settings.characterPage.voice')}>
+          {ttsModels.length > 0 && (
+            <Stack gap={2}>
+              <SelectField
+                label={t('settings.characters.ttsEngine')}
+                value={[edit.tts_model]}
+                onChange={(value) => setDraft((d) => (
+                  d ? { ...d, tts_model: value[0] ?? INHERIT_ENGINE } : d
+                ))}
+                collection={engineCollection}
+                placeholder={t('settings.characters.ttsEngine')}
+              />
+              <Text fontSize="xs" color="whiteAlpha.600">
+                {t('settings.characters.ttsEngineHelp')}
+              </Text>
+            </Stack>
+          )}
+
+          {voiceGroups.edge && (
+            <Stack gap={2}>
+              <SelectField
+                label={t('settings.characters.voice')}
+                value={[edit.voice]}
+                onChange={(value) => setDraft((d) => (d ? { ...d, voice: value[0] ?? INHERIT_VOICE } : d))}
+                collection={voiceCollection}
+                placeholder={t('settings.characters.voice')}
+              />
+              <Text fontSize="xs" color="whiteAlpha.600">
+                {t('settings.characters.voiceHelp')}
+              </Text>
+              <Text fontSize="xs" color="whiteAlpha.500">
+                {t('settings.characters.voiceEngineNote')}
+              </Text>
+              <HStack>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={!edit.voice || edit.voice === INHERIT_VOICE}
+                  loading={previewingVoice === edit.voice}
+                  onClick={() => handlePreview(edit.voice)}
+                >
+                  {previewingVoice === edit.voice
+                    ? t('settings.characters.previewing')
+                    : t('settings.characters.preview')}
+                </Button>
+                {!voicesAreFull && (
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    onClick={handleShowAllVoices}
+                    loading={loadingFullVoices}
+                    disabled={voicesLoading}
+                  >
+                    {t('settings.characters.showAllVoices')}
+                  </Button>
+                )}
+                {voicesLoading && (
+                  <Text fontSize="xs" color="whiteAlpha.600">{t('settings.characters.loadingOptions')}</Text>
+                )}
+              </HStack>
+              {voicesError && (
+                <Text fontSize="xs" color="red.300">{t('settings.characters.errLoadFailed')}</Text>
+              )}
+              {previewError && (
+                <Text fontSize="xs" color="red.300">{previewError}</Text>
+              )}
+            </Stack>
+          )}
+
+          {/* 「用誰的聲音」——只對 GPT-SoVITS 有意義。三者是一組：聲線由參考音決定，
+              逐字稿要跟那段音檔對得上，否則克隆出來的音色會歪。 */}
+          {voiceGroups.gptSovits && (
+            <>
+              <Stack gap={2}>
+                <SelectField
+                  label={t('settings.characters.refAudioPath')}
+                  value={[edit.ref_audio_path || INHERIT_VOICE]}
+                  onChange={(value) => setDraft((d) => {
+                    if (!d) return d;
+                    const picked = value[0] === INHERIT_VOICE ? '' : (value[0] ?? '');
+                    // 換了參考音就換逐字稿。挑不到（手寫路徑、或沒有 sidecar）就維持原值，
+                    // 不要拿空字串把使用者自己打的逐字稿洗掉。
+                    const transcript = promptTextFor(picked);
+                    return {
+                      ...d,
+                      ref_audio_path: picked,
+                      prompt_text: transcript || d.prompt_text,
+                    };
+                  })}
+                  collection={refAudioCollection}
+                  placeholder={t('settings.characters.refAudioPath')}
+                />
+                <Text fontSize="xs" color="whiteAlpha.600">
+                  {t('settings.characters.refAudioPathHelp')}
+                </Text>
+              </Stack>
+
+              <InputField
+                label={t('settings.characters.promptText')}
+                value={edit.prompt_text}
+                onChange={(value) => setDraft((d) => (d ? { ...d, prompt_text: value } : d))}
+                placeholder={t('settings.characters.promptTextPlaceholder')}
+                help={t('settings.characters.promptTextHelp')}
+              />
+
+              {voiceLangs.length > 0 && (
+                <Stack gap={2}>
+                  <SelectField
+                    label={t('settings.characters.promptLang')}
+                    value={[edit.prompt_lang]}
+                    onChange={(value) => setDraft((d) => (
+                      d ? { ...d, prompt_lang: value[0] ?? INHERIT_LANG } : d
+                    ))}
+                    collection={promptLangCollection}
+                    placeholder={t('settings.characters.promptLang')}
+                  />
+                  <Text fontSize="xs" color="whiteAlpha.600">
+                    {t('settings.characters.promptLangHelp')}
+                  </Text>
+                </Stack>
+              )}
+            </>
+          )}
+
+          {!voiceGroups.edge && !voiceGroups.gptSovits && (
+            <Text fontSize="xs" color="whiteAlpha.600">{t('settings.characterPage.engineParamsElsewhere')}</Text>
+          )}
+        </SettingSection>
+
+        {/* 回覆語言決定她「用什麼語言寫」，發聲語言決定「用什麼語言唸」。兩者不同時
+            後端會在合成前先翻譯一次，那是延遲的主要來源之一，所以文案要講清楚。 */}
+        <SettingSection title={t('settings.characterPage.language')}>
+          <InputField
+            label={t('settings.characters.replyLanguage')}
+            value={edit.reply_language}
+            onChange={(value) => setDraft((d) => (d ? { ...d, reply_language: value } : d))}
+            placeholder={t('settings.characters.replyLanguagePlaceholder')}
+            help={t('settings.characters.replyLanguageHelp')}
+          />
+
+          {voiceLangs.length > 0 && (
+            <Stack gap={2}>
+              <SelectField
+                label={t('settings.characters.voiceLang')}
+                value={[edit.voice_lang]}
+                onChange={(value) => setDraft((d) => (
+                  d ? { ...d, voice_lang: value[0] ?? INHERIT_LANG } : d
+                ))}
+                collection={voiceLangCollection}
+                placeholder={t('settings.characters.voiceLang')}
+              />
+              <Text fontSize="xs" color="whiteAlpha.600">
+                {t('settings.characters.voiceLangHelp')}
+              </Text>
+            </Stack>
+          )}
+
+          <SwitchField
+            label={t('settings.characters.translateSubtitle')}
+            checked={Boolean(record.translate_subtitle)}
+            onChange={(checked) => handleToggle('translate_subtitle', checked)}
+            help={t('settings.characters.translateSubtitleHelp')}
+          />
+          <SaveStatus state={toggleSaver.state} />
+        </SettingSection>
+
+        <SettingSection title={t('settings.characterPage.memory')}>
+          <SwitchField
+            label={t('settings.memory.toggle')}
+            help={t('settings.memory.toggleHelp')}
+            checked={record.long_term_memory_enabled ?? true}
+            onChange={(checked) => handleToggle('long_term_memory_enabled', checked)}
+          />
+          {isActive && record.conf_uid ? (
+            <Memory confUid={record.conf_uid} />
+          ) : (
+            <Text fontSize="xs" color="whiteAlpha.600">{t('settings.characterPage.memoryNeedsActive')}</Text>
+          )}
+        </SettingSection>
+      </Stack>
+    );
+  };
+
+  return (
+    <div className="flex flex-col gap-4 md:flex-row md:items-start">
+      <CharacterList
+        characters={characters}
+        selectedFilename={selectedFilename}
+        activeConfUid={confUid}
+        creating={showCreateForm}
+        onSelect={selectCharacter}
+        onCreate={async () => {
+          // 同換選角色：先把還沒送的那筆送完；不合法時留在原地。
+          if (!(await leaveCurrent())) return;
+          openCreate();
+        }}
+        onRefresh={() => setRefreshTick((n) => n + 1)}
+      />
+      <div className="min-w-0 flex-1">
+        {listError && <Text fontSize="sm" color="red.300">{listError}</Text>}
+        {showCreateForm && createDraft && renderCreateForm(createDraft)}
+        {!showCreateForm && selectedRecord && draft
+          && renderSections(selectedRecord, draft, isActiveCharacter(selectedRecord, confUid))}
+      </div>
+    </div>
   );
 }
 

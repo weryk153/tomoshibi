@@ -1,9 +1,8 @@
 // 「關於你」區塊：你的暱稱／頭像（純 localStorage，Step 1）、玩家語言與全域
 // 指示（寫 conf.yaml，經 api/player.ts，Step 2／3）、目前角色的發聲語言
 // （唯讀，衍生自 GET /api/characters 的 voice 欄位，Step 4）、用其他語言發聲＋
-// 字幕翻譯（寫 conf.yaml，經 api/translator-config.ts，Step 5）。抽成獨立檔案的
-// 理由見 general.tsx 內嵌處的註解：這幾組設定自成一個主題（「關於你」而不是
-// 「關於 app」），general.tsx 加完 Task 3 的即時存檔區塊後已經接近可審查上限。
+// 字幕翻譯（寫 conf.yaml，經 api/translator-config.ts，Step 5）。放在設定抽屜的
+// 「對話」分頁：這幾組設定是「關於你」，不是「關於 app」。
 //
 // 這裡每一項都改了就存：暱稱／頭像寫 localStorage，玩家語言、全域指示、翻譯
 // 設定打 API（文字等停手或離開欄位才存）。寫進 conf.yaml 的要重新載入才生效，
@@ -68,11 +67,8 @@ function notifyLocalStorageChange(key: string, newValue: string): void {
 }
 
 interface YouProps {
-  // General 本身沒有從 setting-ui.tsx 拿到「目前是不是使用者看得到的分頁」
-  // 這個訊號（不像 asr.tsx／memory.tsx 那樣接了 active prop），所以這個元件的
-  // 三個 GET 在掛載時只會跑一次；active 保留給日後 general.tsx 也接上 activeTab
-  // 訊號時可以直接派上用場，不用改這裡的邏輯。預設 true，理由同 memory.tsx 的
-  // 同名 prop：目前唯一呼叫端（general.tsx）不傳時要退回「一律當作可見」。
+  // 這個分頁是不是使用者看得到的那個（setting-ui.tsx 依 activeTab 算出，「對話」
+  // 分頁傳進來）。預設 true：沒傳時一律當作可見。
   active?: boolean
 }
 
@@ -337,8 +333,8 @@ function You({ active = true }: YouProps): JSX.Element {
   return (
     <Stack gap={4} pt={3} borderTopWidth="1px" borderColor="whiteAlpha.200">
       <Heading size="sm">{t('settings.user.sectionTitle')}</Heading>
-      {/* 常駐提示（不是 toast）：這個區塊每一項都即時生效，不受 general.tsx
-          下面的 TabActions 套用／還原控制——跟 asr.tsx 的 asrEngineSectionNote
+      {/* 常駐提示（不是 toast）：這個區塊每一項都即時生效，不受任何
+          套用／還原按鈕控制——跟 asr.tsx 的 asrEngineSectionNote
           同一種道理、同一種呈現方式，理由見該檔案跟本檔檔頭註解。 */}
       <Text fontSize="xs" color="blue.300">{t('settings.user.sectionNote')}</Text>
 
@@ -403,7 +399,7 @@ function You({ active = true }: YouProps): JSX.Element {
           語言」而非介面文字用哪種語言。help 文案就是用來區分兩者的，這裡用
           常駐 Text 而不是 hover-only 的 tooltip，避免使用者略過。 */}
       {/* 存檔這段 await 期間鎖住下拉選單，避免使用者連續切換造成請求互相
-          競速——跟 general.tsx 的背景圖片上傳同一種做法（bgUploading 時
+          競速——跟 stage-display.tsx 的背景圖片上傳同一種做法（bgUploading 時
           opacity+pointerEvents 鎖住）。 */}
       <Box
         opacity={languageSaver.state.phase === 'saving' ? 0.5 : 1}

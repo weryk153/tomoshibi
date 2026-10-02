@@ -8,8 +8,10 @@ from .persona_store import (
     create_persona,
     delete_persona,
     get_active_persona_id,
+    get_persona,
     is_persona_active,
     list_personas,
+    set_active_persona,
     update_persona,
 )
 
@@ -51,6 +53,30 @@ def init_persona_route() -> APIRouter:
         except Exception:
             return _bad_request("Could not create persona.", 500)
         return JSONResponse({"ok": True, "persona": item}, status_code=201)
+
+    # 要註冊在 /api/personas/{persona_id} 之前：FastAPI 依順序比對，放後面
+    # 會被 persona_id="active" 接走。
+    @router.put("/api/personas/active")
+    async def choose_persona(request: Request):
+        """替某個角色選人設版本，不經過連線。
+
+        正在用的角色走 WebSocket 的 switch-persona（立刻換、她馬上用新的說法）；
+        這條是給設定頁裡「不是正在用的」角色：存起來，切換到她時才生效。
+        """
+        if not _is_local_request(request):
+            return _forbidden()
+        try:
+            body = await request.json()
+        except Exception:
+            return _bad_request("Invalid JSON body.")
+        conf_uid = str(body.get("conf_uid") or "").strip()
+        if not conf_uid:
+            return _bad_request("conf_uid is required.")
+        persona_id = str(body.get("persona_id") or "").strip() or None
+        if persona_id and get_persona(persona_id) is None:
+            return _bad_request("Persona not found.", 404)
+        set_active_persona(conf_uid, persona_id)
+        return JSONResponse({"ok": True, "active_persona_id": persona_id})
 
     @router.put("/api/personas/{persona_id}")
     async def edit_persona(persona_id: str, request: Request):

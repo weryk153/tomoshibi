@@ -75,11 +75,17 @@ interface RowEdit {
   label: string
 }
 
-function MotionConfig(): JSX.Element {
+interface MotionConfigProps {
+  // 要編輯哪個模型（角色頁選中的角色用的那個）。不一定是畫面上那個。
+  modelName: string | undefined
+  // 它是不是畫面上正在顯示的模型：只有它能試播、存檔後才即時換掉點擊動作。
+  isLoaded: boolean
+}
+
+function MotionConfig({ modelName, isLoaded }: MotionConfigProps): JSX.Element {
   const { t } = useTranslation();
   const { baseUrl } = useWebSocket();
   const live2DConfig = useLive2DConfig();
-  const modelName = live2DConfig.modelInfo?.name;
 
   const [config, setConfig] = useState<ModelConfig | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -121,6 +127,8 @@ function MotionConfig(): JSX.Element {
     const id = setInterval(check, 1000);
     return (): void => clearInterval(id);
   }, []);
+  // 不是畫面上的模型就不能試播：按下去會播在另一個模型身上。
+  const canPreview = isLoaded && modelReady;
 
   useEffect(() => {
     if (!modelName) {
@@ -333,7 +341,8 @@ function MotionConfig(): JSX.Element {
       // setModelInfo now stores the renderer scale verbatim.  Scale conversion is
       // performed only when a fresh backend model enters websocket-handler, so a
       // motion-map save cannot accidentally resize or reload the current model.
-      if (live2DConfig.modelInfo) {
+      // 編輯的不是畫面上的模型時不碰 modelInfo，不然會把它的點擊動作塞給畫面上那個。
+      if (isLoaded && live2DConfig.modelInfo) {
         live2DConfig.setModelInfo({
           ...live2DConfig.modelInfo,
           tapMotions: tapMotionEdits,
@@ -342,7 +351,7 @@ function MotionConfig(): JSX.Element {
       return { ok: true } as const;
     }
     return { ok: false, error: result.error || t('settings.live2d.motionConfigSaveFailed') } as const;
-  }, [config, modelName, buildMotionMap, buildEmotionMap, baseUrl, live2DConfig, t, tapMotionEdits]);
+  }, [config, modelName, isLoaded, buildMotionMap, buildEmotionMap, baseUrl, live2DConfig, t, tapMotionEdits]);
 
   const baselineRef = useRef<string | null>(null);
   const weightInvalid = anyInvalidWeightDraft(weightTexts, tapMotionEdits);
@@ -459,11 +468,11 @@ function MotionConfig(): JSX.Element {
                 size="xs"
                 variant="outline"
                 onClick={() => handlePreview(motion)}
-                disabled={!modelReady}
+                disabled={!canPreview}
               >
                 {t('settings.live2d.previewButton')}
               </Button>
-              {!modelReady && (
+              {!canPreview && (
                 <Text fontSize="xs" color="whiteAlpha.500">{t('settings.live2d.previewDisabledReason')}</Text>
               )}
             </HStack>
@@ -516,11 +525,11 @@ function MotionConfig(): JSX.Element {
                   size="xs"
                   variant="outline"
                   onClick={() => resetExpression(LAppAdapter.getInstance())}
-                  disabled={!modelReady}
+                  disabled={!canPreview}
                 >
                   {t('settings.live2d.expressionResetButton')}
                 </Button>
-                {!modelReady && (
+                {!canPreview && (
                   <Text fontSize="xs" color="whiteAlpha.500">{t('settings.live2d.previewDisabledReason')}</Text>
                 )}
               </HStack>
@@ -551,7 +560,7 @@ function MotionConfig(): JSX.Element {
                         size="xs"
                         variant="outline"
                         onClick={() => handleExpressionPreview(expression.name)}
-                        disabled={!modelReady || !expression.name}
+                        disabled={!canPreview || !expression.name}
                       >
                         {t('settings.live2d.previewButton')}
                       </Button>

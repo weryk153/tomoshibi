@@ -1,20 +1,7 @@
-// memory 分頁：長期記憶管理。跟 Characters／LLM／About 一樣是無 props 的分頁
-// （見 setting-ui.tsx 的三處註冊）——存檔是即時打 API，不需要外層抽屜的
-// Save/Cancel 去觸發。
-//
-// 記憶全在引擎手上：核心是開關，手動編輯她自己的記憶與這段對話的記憶收在
-// 展開區。
-//
-// conf_uid 用 useConfig().confUid（既有的 CharacterConfigContext），由
-// websocket-handler 收到後端 'set-model-and-conf' 訊息時填入，代表「目前使用中
-// 的角色」。memory_route.py 檔頭註解明講：「The frontend already tracks the
-// active conf_uid (from the WS 'set-model-and-conf' message), so it passes it
-// explicitly」——講的就是這個 context，所以直接沿用，不用另外做角色選單，也
-// 不用猜一個 conf_uid。WS 訊息送達前 confUid 是空字串，這時後端
-// _resolve_conf_uid 對空字串一律視為「沒帶」而退回 base 角色（見
-// memory_route.py 的 `str(supplied).strip()` 判斷），所以空字串送出是安全的，
-// 不會打到未知角色或觸發 400——切換角色時 confUid 改變，下面的 effect 會重新
-// 載入。
+// 記憶：她自己的記憶（角色層、所有對話共用）與這段對話的記憶。嵌在角色頁的
+// 記憶區，confUid 由角色頁傳進來；只有正在用的角色才會顯示這一區——記憶屬於
+// 一段對話，非使用中的角色沒有對話，後端會回 409。長期記憶的開關不在這裡：
+// 它是角色檔的欄位，跟翻字幕、動作描寫一樣由角色頁的 saveCharacterSettings 寫。
 import {
   useState, useEffect, useCallback, useRef,
 } from 'react';
@@ -29,22 +16,18 @@ import { toaster } from '@/components/ui/tw/toaster';
 import { SaveStatus } from '@/components/ui/tw/save-status';
 import { useAutosave } from '@/hooks/use-autosave';
 import { useWebSocket } from '@/context/websocket-context';
-import { useConfig } from '@/context/character-config-context';
-import { SwitchField } from './common';
 import {
   fetchMemory,
   saveMemoryContent,
-  setMemoryEnabled,
   clearMemory,
   saveSelfMemoryContent,
   clearSelfMemory,
   type MemoryState,
 } from '@/api/memory.ts';
 
-function Memory(): JSX.Element {
+function Memory({ confUid }: { confUid: string }): JSX.Element {
   const { t } = useTranslation();
   const { baseUrl } = useWebSocket();
-  const { confUid } = useConfig();
 
   const [memory, setMemory] = useState<MemoryState | null>(null);
 
@@ -74,12 +57,10 @@ function Memory(): JSX.Element {
   // 載入現值。confUid 改變（切換角色）或 refreshTick 遞增（破壞性操作完成後
   // 想確認結果）都要重新拉一次，不用整頁重載。
   //
-  // 同時在這裡重置「待確認」旗標（pendingSaveContent／pendingClear／
-  // pendingSaveSelf／pendingClearSelf）。Memory 分頁在切換角色時不會 unmount——setting-ui.tsx 的
-  // Tabs.Root 沒設 lazyMount／unmountOnExit，General 分頁切換角色是直接打
-  // WebSocket（見 use-general-settings.ts），不會重新掛載這個元件——state 會
-  // 整份留著。若使用者對角色 A 開了「清除記憶」或「重建索引」的確認框，再切去
-  // 別的分頁換成角色 B，回到 Memory 分頁時如果沒有這行，紅色確認框仍會開著，
+  // 同時在這裡重置「待確認」旗標（pendingClear／pendingClearSelf）。切換角色時
+  // 這個元件不一定會 unmount（setting-ui.tsx 的分頁掛載過就留著），state 會
+  // 整份留著。若使用者對角色 A 開了「清除記憶」的確認框，再切去
+  // 別的分頁換成角色 B，回到這一區時如果沒有這行，紅色確認框仍會開著，
   // 但 confUid 已經指向 B：按下確認會呼叫 clearMemory(confUid=B)，不可逆地
   // 清掉「B」的核心記憶，而使用者以為自己在確認清掉 A。這不是防禦性多寫，是
   // 唯一的重置點——不要因為「看起來多餘」就把這段搬走或精簡掉，那會讓上述資料
@@ -106,16 +87,6 @@ function Memory(): JSX.Element {
       cancelled = true;
     };
   }, [baseUrl, confUid, refreshTick]);
-
-  // 長期記憶開關：切了就存到這個角色的檔案；要重新載入才生效，由抽屜頂端的提示處理。
-  const toggleSaver = useAutosave(async (change: { uid: string; checked: boolean }) => {
-    const result = await setMemoryEnabled(baseUrl, change.uid, change.checked);
-    if (!result.ok) {
-      return { ok: false, error: result.error || t('settings.memory.saveFailed') } as const;
-    }
-    setMemory((m) => (m ? { ...m, enabled: change.checked } : m));
-    return { ok: true } as const;
-  }, { delayMs: 0 });
 
   // 長文字：離開欄位才存（不在停頓時存，不然改到一半就把記憶整份換掉）。每一筆帶著
   // 它屬於哪個角色，排隊中換了角色也不會存到別人身上。
@@ -217,15 +188,6 @@ function Memory(): JSX.Element {
   return (
     <Stack {...settingStyles.common.container} maxW="none">
       <Text fontSize="sm" color="whiteAlpha.700">{t('settings.memory.description')}</Text>
-
-      {/* 核心：開關，打開分頁第一眼就看到 */}
-      <SwitchField
-        label={t('settings.memory.toggle')}
-        checked={memory.enabled}
-        onChange={(checked) => toggleSaver.change({ uid: confUid, checked })}
-        help={t('settings.memory.toggleHelp')}
-      />
-      <SaveStatus state={toggleSaver.state} />
 
       {/* 進階：收在展開區——手動編輯她自己的記憶與這段對話的記憶，不該是打開
           分頁第一眼看到的東西。 */}

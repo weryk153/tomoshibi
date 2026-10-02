@@ -11,7 +11,7 @@ import {
 export function useAutosave<T>(
   save: (value: T) => Promise<SaveResult>,
   options: { delayMs?: number; validate?: (value: T) => string | null } = {},
-): { state: SaveState; change: (value: T) => void; flush: () => void } {
+): { state: SaveState; change: (value: T) => void; flush: () => Promise<void> } {
   const [state, setState] = useState<SaveState>({ phase: 'idle' });
   // 最新的 save／validate，不必因為它們換了身分就重建存檔器（會丟掉排隊的那筆）。
   const saveRef = useRef(save);
@@ -39,6 +39,8 @@ export function useAutosave<T>(
   return {
     state,
     change: saver.change,
-    flush: () => { void saver.flush(); },
+    // 回傳的 promise 在排隊那筆（含正在送的那筆之後接著送的）送完才結束：要在
+    // 換掉表單之前確定存好的呼叫端（角色頁換選角色）會 await 它。
+    flush: () => saver.flush(),
   };
 }

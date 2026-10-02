@@ -34,7 +34,6 @@ import { toaster } from '@/components/ui/tw/toaster';
 import { SaveStatus } from '@/components/ui/tw/save-status';
 import { useAutosave } from '@/hooks/use-autosave';
 import { useWebSocket } from '@/context/websocket-context';
-import { useLive2DConfig } from '@/context/live2d-config-context';
 import { getActiveRenderer } from '@/avatar/character-renderer';
 import { InputField } from './common';
 import { validateKeyword } from '@/api/live2d-config.ts';
@@ -50,11 +49,16 @@ import {
   type VrmMotionRowEdit,
 } from '@/api/vrm-config.ts';
 
-function VrmMotionConfig(): JSX.Element {
+interface VrmMotionConfigProps {
+  // 要編輯哪個模型（角色頁選中的角色用的那個）。不一定是畫面上那個。
+  modelName: string | undefined
+  // 它是不是畫面上正在顯示的模型：只有它能試播、回到原樣。
+  isLoaded: boolean
+}
+
+function VrmMotionConfig({ modelName, isLoaded }: VrmMotionConfigProps): JSX.Element {
   const { t } = useTranslation();
   const { baseUrl } = useWebSocket();
-  const live2DConfig = useLive2DConfig();
-  const modelName = live2DConfig.modelInfo?.name;
 
   const [config, setConfig] = useState<VrmModelConfig | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -107,6 +111,9 @@ function VrmMotionConfig(): JSX.Element {
     const id = setInterval(check, 1000);
     return (): void => clearInterval(id);
   }, []);
+  // 不是畫面上的模型就不能試播：按下去會播在另一個模型身上。
+  const canPreview = isLoaded && previewReady;
+  const canReset = isLoaded && rendererReady;
 
   useEffect(() => {
     if (!modelName) {
@@ -379,11 +386,11 @@ function VrmMotionConfig(): JSX.Element {
                 size="xs"
                 variant="outline"
                 onClick={() => handleMotionPreview(clip.clip)}
-                disabled={!previewReady}
+                disabled={!canPreview}
               >
                 {t('settings.live2d.previewButton')}
               </Button>
-              {!previewReady && (
+              {!canPreview && (
                 <Text fontSize="xs" color="whiteAlpha.500">{t('settings.live2d.previewDisabledReason')}</Text>
               )}
             </HStack>
@@ -432,11 +439,11 @@ function VrmMotionConfig(): JSX.Element {
                   size="xs"
                   variant="outline"
                   onClick={handleResetExpression}
-                  disabled={!rendererReady}
+                  disabled={!canReset}
                 >
                   {t('settings.live2d.expressionResetButton')}
                 </Button>
-                {!rendererReady && (
+                {!canReset && (
                   <Text fontSize="xs" color="whiteAlpha.500">{t('settings.live2d.previewDisabledReason')}</Text>
                 )}
               </HStack>
@@ -461,7 +468,7 @@ function VrmMotionConfig(): JSX.Element {
                         size="xs"
                         variant="outline"
                         onClick={() => handleExpressionPreview(expression.name)}
-                        disabled={!previewReady}
+                        disabled={!canPreview}
                       >
                         {t('settings.live2d.previewButton')}
                       </Button>
