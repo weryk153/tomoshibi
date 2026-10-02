@@ -37,6 +37,9 @@ class CharacterConfig(I18nMixin):
     long_term_memory_enabled: bool = Field(
         default=True, alias="long_term_memory_enabled"
     )
+    # 這個角色可不可以在台詞裡搭配動作描寫（*把視線移開*）。開著才把動作格式與
+    # think_tag 提示接進系統提示；關著提示裡完全不提動作。
+    actions_enabled: bool = Field(default=False, alias="actions_enabled")
     # 這個角色說話用的語言。留空＝沿用 system_config.player_language。
     #
     # 為什麼要在角色層級：player_language 是全域的，設成日文會讓每一個角色都
@@ -61,6 +64,10 @@ class CharacterConfig(I18nMixin):
     )
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
+        "actions_enabled": Description(
+            en="Whether this character may add a short action between asterisks",
+            zh="這個角色可不可以在台詞裡搭配一句星號包起來的動作描寫",
+        ),
         "conf_name": Description(
             en="Name of the character configuration", zh="角色配置名称"
         ),
