@@ -464,11 +464,27 @@ def _keep_what_the_form_does_not_own(existing: dict, from_form: dict) -> dict:
     return result
 
 
+def _sync_mapping(target, desired: dict) -> None:
+    """把 round-trip 讀進來的 target 改成 desired 的內容，就地改。
+
+    已有的鍵留在原位、註解跟著留；值沒變的不重設（保留原本的引號寫法）；
+    desired 沒有的鍵刪掉；新的鍵接在後面。
+    """
+    for key in [k for k in target if k not in desired]:
+        del target[key]
+    for key, value in desired.items():
+        current = target.get(key) if key in target else None
+        if isinstance(value, dict) and hasattr(current, "items"):
+            _sync_mapping(current, value)
+        elif key not in target or current != value:
+            target[key] = value
+
+
 def _write_character_yaml(path: str, character_config: dict) -> None:
     """把角色設定寫成一個角色檔（原子寫入）。
 
-    角色檔是我們自己產生的，沒有使用者寫的註解要保護，所以整份 ruamel dump 就好
-    ——這跟 conf.yaml 完全相反，那邊只能就地改行。
+    檔案已經存在就用 round-trip 就地改：使用者手寫的註解與欄位順序都留著
+    （以前整份重寫，存一次註解就全沒了、欄位也被搬到最後）。新角色才整份寫。
 
     allow_unicode 讓中文名字維持可讀，不要被跳脫成一串逃逸碼。
     """
@@ -488,6 +504,15 @@ def _write_character_yaml(path: str, character_config: dict) -> None:
         )
 
     payload = {"character_config": cc}
+    if os.path.exists(path):
+        try:
+            with open(path, encoding="utf-8") as f:
+                doc = yaml.load(f)
+        except Exception:
+            doc = None
+        if hasattr(doc, "items") and hasattr(doc.get("character_config"), "items"):
+            _sync_mapping(doc["character_config"], cc)
+            payload = doc
 
     conf_dir = os.path.dirname(os.path.abspath(path)) or "."
     tmp_path = os.path.join(conf_dir, "." + os.path.basename(path) + ".tmp")

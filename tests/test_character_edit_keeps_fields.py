@@ -94,3 +94,63 @@ def test_what_the_form_owns_still_follows_the_form(tmp_path, monkeypatch):
     assert (
         saved["tts_config"]["gpt_sovits_tts"]["api_url"] == "http://127.0.0.1:9880/tts"
     )
+
+
+HAND_WRITTEN = """\
+character_config:
+  conf_name: 表情測試
+  conf_uid: char_exprtest
+  # 刻意跟芙莉蓮用同一個模型，兩邊的差異只剩人設。
+  live2d_model_name: mao_pro
+  persona_prompt: |
+    你是小燈。
+  character_name: 小燈
+  # 對照組不需要長期記憶。
+  long_term_memory_enabled: false
+  tts_config:
+    tts_model: gpt_sovits_tts
+    gpt_sovits_tts:
+      ref_audio_path: 'ref/frieren.wav'
+      text_lang: 'ja'
+  reply_language: Traditional Chinese (Taiwan)
+"""
+
+
+def test_a_hand_written_file_keeps_its_comments_and_order(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(character_route, "_rescan_skins", lambda: None)
+    monkeypatch.setattr(
+        character_route, "_load_model_dict", lambda: [{"name": "mao_pro"}]
+    )
+    monkeypatch.setattr(
+        character_route, "_is_local_request", lambda request: True, raising=False
+    )
+    path = tmp_path / "characters" / "char_exprtest.yaml"
+    path.parent.mkdir()
+    path.write_text(HAND_WRITTEN, encoding="utf-8")
+    app = FastAPI()
+    app.include_router(character_route.init_character_route())
+    body = {
+        "conf_name": "表情測試",
+        "persona_prompt": "你是小燈。\n",
+        "live2d_model_name": "mao_pro",
+        "character_name": "小燈x",
+    }
+    with TestClient(app) as client:
+        response = client.put("/api/characters/char_exprtest.yaml", json=body)
+    assert response.status_code == 200, response.text
+
+    text = path.read_text(encoding="utf-8")
+    assert "# 刻意跟芙莉蓮用同一個模型，兩邊的差異只剩人設。" in text
+    assert "# 對照組不需要長期記憶。" in text
+    keys = [
+        line.split(":")[0].strip()
+        for line in text.splitlines()
+        if line.startswith("  ") and not line.startswith("   ") and ":" in line
+    ]
+    # 原有的欄位維持原順序；存檔時替角色補上的自有設定（own_everything）接在後面。
+    assert keys[:8] == [
+        "conf_name", "conf_uid", "live2d_model_name", "persona_prompt",
+        "character_name", "long_term_memory_enabled", "tts_config", "reply_language",
+    ]
+    assert yaml.safe_load(text)["character_config"]["character_name"] == "小燈x"
