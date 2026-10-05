@@ -290,6 +290,8 @@
       "refAudioInherit": "跟底稿角色一樣",
       "translateSubtitle": "字幕翻成你看的語言",
       "translateSubtitleHelp": "把她說的話翻成你看的語言（在「你」設定）顯示在字幕上。她說的、記得的仍然是她自己的語言。",
+      "bilingualSubtitle": "雙語字幕",
+      "bilingualSubtitleHelp": "顯示她唸的原文和翻譯兩行：上行是她實際唸出來的那句，下行是字幕。兩行一樣時只顯示一行。",
       "actionsEnabled": "可以寫動作描寫",
       "actionsEnabledHelp": "讓她在台詞裡搭配一句星號包起來的動作，例如「*把視線移開*」，只顯示在字幕上、不會唸出來。關掉時完全不跟她提動作，感情只用停頓與選詞表現。"
     },

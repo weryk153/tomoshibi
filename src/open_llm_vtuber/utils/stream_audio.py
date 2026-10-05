@@ -91,6 +91,7 @@ def prepare_audio_payload(
     actions: Actions = None,
     forwarded: bool = False,
     subtitle_text: str | None = None,
+    spoken_text: str | None = None,
 ) -> dict[str, any]:
     """
     Prepares the audio payload for sending to a broadcast endpoint.
@@ -105,6 +106,9 @@ def prepare_audio_payload(
             provided it is carried as a separate ``subtitle_text`` field; the frontend
             shows it ONLY for the on-screen subtitle. ``display_text.text`` (the
             canonical reply R) is left untouched so memory/history stay on R.
+        spoken_text (str | None, optional): 雙語字幕開著時她實際唸的那句（見
+            conversations/bilingual.py）。只有給了才多一個 ``spoken_text`` 欄位；
+            沒給時 payload 跟沒有這個功能時逐字相同。
 
     Returns:
         dict: The audio payload to be sent
@@ -114,7 +118,7 @@ def prepare_audio_payload(
 
     if not audio_path:
         # Return payload for silent display
-        return {
+        payload = {
             "type": "audio",
             "audio": None,
             "volumes": [],
@@ -124,6 +128,9 @@ def prepare_audio_payload(
             "actions": actions.to_dict() if actions else None,
             "forwarded": forwarded,
         }
+        if spoken_text:
+            payload["spoken_text"] = spoken_text
+        return payload
 
     try:
         # Pass the format explicitly (derived from the extension) so ffmpeg knows
@@ -150,6 +157,8 @@ def prepare_audio_payload(
         "actions": actions.to_dict() if actions else None,
         "forwarded": forwarded,
     }
+    if spoken_text:
+        payload["spoken_text"] = spoken_text
 
     return payload
 

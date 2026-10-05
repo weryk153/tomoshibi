@@ -25,6 +25,8 @@ interface AudioTaskOptions {
   sliceLength: number
   displayText?: DisplayText | null
   subtitleText?: string
+  // 雙語字幕的上行：她實際唸的那句。只有角色開了雙語字幕、這句又真的翻譯過才有。
+  spokenText?: string
   // 只有笑聲的一句：聲音照播、聊天泡泡照記，畫面字幕留著上一句（見 utils/subtitle-hold.ts）。
   keepSubtitle?: boolean
   expressions?: string[] | number[] | null
@@ -44,7 +46,7 @@ let playGeneration = 0;
 export const useAudioTask = () => {
   const { t } = useTranslation();
   const { aiState, backendSynthComplete, setBackendSynthComplete } = useAiState();
-  const { subtitleText: currentSubtitle, setSubtitleText } = useSubtitle();
+  const { subtitleText: currentSubtitle, setSpeechSubtitle } = useSubtitle();
   const { appendResponse, appendAIMessage } = useChatHistory();
   const { sendMessage } = useWebSocket();
 
@@ -52,7 +54,7 @@ export const useAudioTask = () => {
   const stateRef = useRef({
     aiState,
     currentSubtitle,
-    setSubtitleText,
+    setSpeechSubtitle,
     appendResponse,
     appendAIMessage,
   });
@@ -65,7 +67,7 @@ export const useAudioTask = () => {
   stateRef.current = {
     aiState,
     currentSubtitle,
-    setSubtitleText,
+    setSpeechSubtitle,
     appendResponse,
     appendAIMessage,
   };
@@ -84,7 +86,7 @@ export const useAudioTask = () => {
     const {
       aiState: currentAiState,
       currentSubtitle: subtitleOnScreen,
-      setSubtitleText: updateSubtitle,
+      setSpeechSubtitle: updateSubtitle,
       appendResponse: appendText,
       appendAIMessage: appendAI,
     } = stateRef.current;
@@ -97,7 +99,7 @@ export const useAudioTask = () => {
     }
 
     const {
-      audioBase64, displayText, subtitleText, keepSubtitle, expressions, expressionIntensities, motions,
+      audioBase64, displayText, subtitleText, spokenText, keepSubtitle, expressions, expressionIntensities, motions,
       forwarded,
     } = options;
 
@@ -111,13 +113,14 @@ export const useAudioTask = () => {
       const nextSubtitle = nextSpeechSubtitle({
         hasAudio: Boolean(audioBase64),
         visibleText,
+        spokenText,
         keepSubtitle: Boolean(keepSubtitle),
         current: subtitleOnScreen,
         lastSpoken: lastSpokenSubtitleRef.current,
       });
       if (nextSubtitle !== null) {
         updateSubtitle(nextSubtitle);
-        lastSpokenSubtitleRef.current = nextSubtitle;
+        lastSpokenSubtitleRef.current = nextSubtitle.text;
       }
       if (!forwarded) {
         sendMessage({

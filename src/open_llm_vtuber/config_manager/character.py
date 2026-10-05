@@ -40,6 +40,9 @@ class CharacterConfig(I18nMixin):
     # 這個角色可不可以在台詞裡搭配動作描寫（*把視線移開*）。開著才把動作格式與
     # think_tag 提示接進系統提示；關著提示裡完全不提動作。
     actions_enabled: bool = Field(default=False, alias="actions_enabled")
+    # 雙語字幕：畫面字幕多一行她實際唸出來的那句（語音翻譯後的原文），原本的
+    # 字幕在下一行。只影響畫面；對話紀錄與記憶照舊只存回覆原文。預設關。
+    bilingual_subtitle: bool = Field(default=False, alias="bilingual_subtitle")
     # 這個角色說話用的語言。留空＝沿用 system_config.player_language。
     #
     # 為什麼要在角色層級：player_language 是全域的，設成日文會讓每一個角色都
@@ -79,6 +82,10 @@ class CharacterConfig(I18nMixin):
         "actions_enabled": Description(
             en="Whether this character may add a short action between asterisks",
             zh="這個角色可不可以在台詞裡搭配一句星號包起來的動作描寫",
+        ),
+        "bilingual_subtitle": Description(
+            en="Show the line she actually speaks above the subtitle (two lines)",
+            zh="字幕顯示兩行：上行是她實際唸的原文，下行是原本的字幕",
         ),
         "conf_name": Description(
             en="Name of the character configuration", zh="角色配置名称"

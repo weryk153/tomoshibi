@@ -290,6 +290,8 @@
       "refAudioInherit": "Same as the base character",
       "translateSubtitle": "Translate subtitles into the language you read",
       "translateSubtitleHelp": "Shows her lines translated into the language you read (set under You). What she says and remembers stays in her own language.",
+      "bilingualSubtitle": "Bilingual subtitle",
+      "bilingualSubtitleHelp": "Shows two lines: the line she actually speaks on top, the subtitle below. When both read the same, only one line is shown.",
       "actionsEnabled": "May add an action",
       "actionsEnabledHelp": "Lets her add one short action between asterisks, e.g. *looks away*. It shows in the subtitle and is not spoken. Off: actions are never mentioned to her, so she speaks with pauses and word choice only."
     },

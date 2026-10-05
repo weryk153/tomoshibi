@@ -7,6 +7,7 @@ from loguru import logger
 
 from ..message_handler import message_handler
 from .types import WebSocketSend, BroadcastContext
+from .bilingual import spoken_line
 from .tts_manager import TTSTaskManager
 from ..agent.output_types import SentenceOutput, AudioOutput
 from ..agent.input_types import BatchInput, TextData, ImageData, TextSource, ImageSource
@@ -206,6 +207,8 @@ async def process_agent_output(
     voice_lang = derive_voice_lang(character_config)
     # 口頭禪也是這個角色的設定：每則從正在用的角色讀，換角色後就是新角色的。
     catchphrases = dict(getattr(character_config, "catchphrases", None) or {})
+    # 雙語字幕也是角色自己的開關（角色頁「語言」區）。
+    bilingual_subtitle = bool(getattr(character_config, "bilingual_subtitle", False))
 
     full_response = ""
     try:
@@ -221,6 +224,7 @@ async def process_agent_output(
                 voice_lang,
                 subtitle_collector,
                 catchphrases=catchphrases,
+                bilingual_subtitle=bilingual_subtitle,
             )
         elif isinstance(output, AudioOutput):
             full_response = await handle_audio_output(output, websocket_send)
@@ -248,8 +252,12 @@ async def handle_sentence_output(
     voice_lang: Optional[str] = None,
     subtitle_collector: Optional[List[str]] = None,
     catchphrases: Optional[Dict[str, str]] = None,
+    bilingual_subtitle: bool = False,
 ) -> str:
     """處理一句輸出：需要時翻譯，然後交給語音合成。
+
+    ``bilingual_subtitle`` 開著時，畫面字幕多一行她實際唸的那句（見
+    conversations/bilingual.py）；關著時送出去的 payload 跟以前一樣。
 
     一句話只有角色的口頭禪（``catchphrases`` 的鍵，加上標點空白）時，兩個翻譯
     都不經模型：語音直接換成口頭禪的目標寫法，字幕原樣顯示。模型會把它音譯成
@@ -276,6 +284,7 @@ async def handle_sentence_output(
     full_response = ""
     async for display_text, tts_text, actions in output:
         logger.debug(f"🏃 Processing output: '''{tts_text}'''...")
+        original_tts = tts_text
 
         if translate_engine:
             # 逐句判斷：有實際內容、而且聲音的語言跟這句話的語言不同，才翻譯。
@@ -347,6 +356,17 @@ async def handle_sentence_output(
         if subtitle_collector is not None:
             subtitle_collector.append(subtitle_text)
 
+        speak_kwargs = {}
+        spoken_text = spoken_line(
+            bilingual_subtitle,
+            original_tts=original_tts,
+            tts_text=tts_text,
+            display=display_text.text,
+            subtitle=subtitle_text,
+        )
+        if spoken_text is not None:
+            speak_kwargs["spoken_text"] = spoken_text
+
         await tts_manager.speak(
             tts_text=tts_text,
             display_text=display_text,
@@ -355,6 +375,7 @@ async def handle_sentence_output(
             tts_engine=tts_engine,
             websocket_send=websocket_send,
             subtitle_text=subtitle_text,
+            **speak_kwargs,
         )
     return full_response
 
