@@ -79,6 +79,7 @@ class TTSTaskManager:
         tts_engine: TTSInterface,
         websocket_send: WebSocketSend,
         subtitle_text: Optional[str] = None,
+        spoken_text: Optional[str] = None,
     ) -> None:
         """
         Queue a TTS task while maintaining order of delivery.
@@ -93,6 +94,9 @@ class TTSTaskManager:
             subtitle_text: Optional display-only translated subtitle. When None the
                 frontend falls back to display_text.text (the canonical reply R).
                 This NEVER replaces display_text.text, which memory/history rely on.
+            spoken_text: 雙語字幕開著時她念的那句（見 conversations/bilingual.py）。
+                None＝不帶，payload 跟沒有這個功能時一樣。沒東西可念、走靜音
+                payload 的句子本來就不換字幕，不帶。
         """
         # 沒有字母／文字／數字可念（「……」「♪」、表情符號、*動作*）就不送去合成：
         # 引擎對這種輸入多半回錯（GPT-SoVITS 回 400），會被當成失敗重試再跳通知。
@@ -139,6 +143,7 @@ class TTSTaskManager:
                 tts_engine=tts_engine,
                 sequence_number=current_sequence,
                 subtitle_text=subtitle_text,
+                spoken_text=spoken_text,
             )
         )
         self.task_list.append(task)
@@ -193,6 +198,7 @@ class TTSTaskManager:
         tts_engine: TTSInterface,
         sequence_number: int,
         subtitle_text: Optional[str] = None,
+        spoken_text: Optional[str] = None,
     ) -> None:
         """Process TTS generation and queue the result for ordered delivery"""
         audio_file_path = None
@@ -217,6 +223,7 @@ class TTSTaskManager:
                 display_text=display_text,
                 actions=actions,
                 subtitle_text=subtitle_text,
+                spoken_text=spoken_text,
             )
             has_audio = payload.get("audio") is not None
             logger.info(
@@ -231,6 +238,7 @@ class TTSTaskManager:
                 display_text=display_text,
                 actions=actions,
                 subtitle_text=subtitle_text,
+                spoken_text=spoken_text,
             )
             failure_notice = failure_notice or self._synthesis_failed_notice(e)
 

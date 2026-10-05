@@ -39,6 +39,7 @@ character_config:
   character_name: 'Mao' # 将在群聊中使用，并显示为 AI 的名称。
   avatar: 'mao.png' # 建议使用正方形图像作为头像。将其保存到 avatars 文件夹中。留空则使用角色名称的首字母作为头像。
   human_name: 'Human' # 将在群聊中使用，并显示为人类的名称。
+  bilingual_subtitle: False # 双语字幕：设 True，字幕显示两行，上行是她实际念的原文（语音翻译后），下行是原本的字幕。只影响画面，聊天记录与记忆不变
 
   # 专有名词保护：正式写法 → 要被折回去的错误写法。留空（预设）＝不保护任何名字。
   #
