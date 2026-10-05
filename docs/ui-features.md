@@ -145,6 +145,7 @@
 | MCP 工具開關 | `GET`/`POST /api/agent-config/use-mcpp` | 「模型」頁的「啟用網路搜尋／工具（實驗）」 |
 | 玩家語言 | `GET`/`POST /api/player-language` | 「對話」頁的「閱讀／玩家語言」 |
 | 關於你（全域指示） | `GET`/`POST /api/player-prompt` | 「對話」頁的「關於你（全域指示）」 |
-| 背景圖片上傳 | `POST /api/background`（multipart，12MB 上限） | 前端已不呼叫。背景併進場景之後，自己的圖片影片用場景的「本機素材」匯入，存在這台裝置；伺服器上 `backgrounds/` 的圖從場景的「內建背景」選。後端端點還在 |
+
+背景圖片上傳（以前的 `POST /api/background`）已經拿掉：背景併進場景之後，自己的圖片影片用場景的「本機素材」匯入，存在這台裝置；伺服器上 `backgrounds/` 的圖從場景的「內建背景」選。
 
 `user`（暱稱與頭像）**刻意設計成純前端 localStorage**、無後端端點；`voiceLang` 只是角色發聲語言的唯讀顯示，要改在「角色」頁。

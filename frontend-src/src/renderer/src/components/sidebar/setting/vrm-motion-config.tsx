@@ -1,10 +1,8 @@
 // VRM 版的動作／表情對應編輯器，取代原本唯讀的 vrm-config-summary.tsx。版面
 // 照 motion-config.tsx（Live2D 版）：多重對應只顯示第一筆、其餘原樣帶回，見該
 // 檔案檔頭的完整說明——這裡不重複，只記 VRM 特有的差異：
-// - **沒有自動存檔**。編輯只改本地 state，要按最下面那顆「儲存」才會 PUT。
-//   Live2D 版也是一樣，兩邊共用 motionConfigSectionNote 這句提示——它原本寫著
-//   「每一筆修改都會自己立刻存檔」，但兩個面板都沒有實作自動存檔，使用者改完
-//   關掉抽屜改動就沒了。那句話已經改成實話。
+// - 改了就存：編輯先改本地 state，停手一下由 useAutosave（motionSaver）PUT 出去，
+//   跟 Live2D 版一樣，沒有「儲存」按鈕。
 // - 沒有 (group, index)／HitArea／tapMotions，VRM 的動作只有 clip 檔名可以定位，
 //   點擊區域指派這個區塊完全不存在。
 // - idle 是保留字，待機流程直接用檔名 "idle" 找 .vrma（見後端

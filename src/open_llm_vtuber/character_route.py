@@ -81,12 +81,6 @@ AVATAR_MIME_EXT = {
 }
 AVATAR_MAX_BYTES = 4 * 1024 * 1024
 
-BG_DIR = "backgrounds"
-# 背景不收 svg／webp——scan_bg_directory 掃不到，收了會變成「存好了但看不到」。
-BG_ALLOWED_EXTS = {".jpg", ".jpeg", ".png", ".gif"}
-# 背景是全螢幕的，給比頭像寬鬆的上限。
-BG_MAX_BYTES = 12 * 1024 * 1024
-
 # 找 .model3.json 時往下挖幾層就好，不做無底洞的遞迴。
 MODEL3_GLOB_DEPTHS = ("*.model3.json", "*/*.model3.json", "*/*/*.model3.json")
 
@@ -741,28 +735,6 @@ def _write_avatar_atomic(filename: str, raw: bytes) -> None:
     os.replace(tmp_path, dest)
 
 
-def _safe_bg_filename(orig_name: str, ext: str) -> str:
-    """組出安全的背景檔名：<原檔名的 slug 或隨機碼>-<隨機碼><副檔名>。
-
-    Always appends a short random suffix so an upload never overwrites a bundled
-    background or a previous upload of the same name. ``ext`` includes the dot.
-    """
-    base = _slugify(os.path.splitext(orig_name or "")[0])
-    if not base or not SLUG_RE.match(base):
-        base = "bg"
-    return f"{base}-{uuid.uuid4().hex[:6]}{ext}"
-
-
-def _write_bg_atomic(filename: str, raw: bytes) -> None:
-    """把背景圖寫進 backgrounds/（原子寫入）。"""
-    os.makedirs(BG_DIR, exist_ok=True)
-    dest = os.path.join(BG_DIR, filename)
-    tmp_path = os.path.join(BG_DIR, "." + filename + ".tmp")
-    with open(tmp_path, "wb") as f:
-        f.write(raw)
-    os.replace(tmp_path, dest)
-
-
 # --------------------------------------------------------------------------- #
 # Route factory
 # --------------------------------------------------------------------------- #
@@ -801,7 +773,6 @@ def init_character_route() -> APIRouter:
     - PUT    /api/characters/{檔名}    修改既有角色
     - DELETE /api/characters/{檔名}    刪除角色
     - POST   /api/character/avatar    上傳頭像，回傳存好的檔名
-    - POST   /api/background          上傳背景圖
 
     PUT／DELETE 的檔名是使用者送來的路徑參數，一律先過 _safe_character_path。
     """
@@ -1003,54 +974,6 @@ def init_character_route() -> APIRouter:
             )
 
         logger.info(f"avatar uploaded: {filename} ({len(raw)} bytes)")
-        return JSONResponse({"ok": True, "filename": filename})
-
-    # ------------------------------------------------------------------ #
-    @router.post("/api/background")
-    async def upload_background(request: Request):
-        """存下背景圖，回傳檔名。
-
-        同樣存在伺服器端，理由跟頭像一樣：換裝置也看得到。這也是為什麼背景選單
-        可以直接提供上傳，而不必叫使用者自己把檔案丟進資料夾。
-
-        存好之後 scan_bg_directory 就掃得到，會自動出現在選單裡。
-        """
-        if not _is_local_request(request):
-            return _forbidden()
-
-        content_type = (request.headers.get("content-type") or "").lower()
-        if not content_type.startswith("multipart/form-data"):
-            return _bad_request("Expected a multipart/form-data upload.")
-        try:
-            form = await request.form()
-        except Exception:
-            return _bad_request("Invalid multipart body.")
-        upload = form.get("file")
-        if upload is None or not hasattr(upload, "read"):
-            return _bad_request("Missing 'file' field.")
-        up_name = getattr(upload, "filename", "") or ""
-        up_ext = os.path.splitext(up_name)[1].lower()
-        if up_ext not in BG_ALLOWED_EXTS:
-            return _bad_request("Unsupported image type (use JPG, PNG, or GIF).")
-        try:
-            raw = await upload.read()
-        except Exception:
-            return _bad_request("Could not read the uploaded file.")
-        if not raw or len(raw) > BG_MAX_BYTES:
-            return _bad_request("Image is empty or too large (max 12 MB).")
-
-        filename = _safe_bg_filename(up_name, up_ext)
-        if os.path.basename(filename) != filename:
-            return _bad_request("Could not derive a safe filename.")
-        try:
-            await asyncio.to_thread(_write_bg_atomic, filename, raw)
-        except Exception as e:
-            logger.error(f"background write failed: {type(e).__name__}")
-            return JSONResponse(
-                status_code=500,
-                content={"ok": False, "error": "Could not save the background."},
-            )
-        logger.info(f"background uploaded: {filename} ({len(raw)} bytes)")
         return JSONResponse({"ok": True, "filename": filename})
 
     @router.get("/api/characters/{filename}/settings")
