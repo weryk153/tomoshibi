@@ -522,18 +522,39 @@ def test_an_engine_without_moods_is_refused_with_the_way_out(monkeypatch):
 
 def test_her_background_persona_summary_does_not_change_her_conversation_prompt():
     """ContextBuilder 在 background（她的人設摘要）已經包含在 description 裡時省略
-    Background 段落：接給心情背景工作讀人設，不會讓她自己的對話提示多一段。"""
+    Background 段落：接給心情背景工作讀人設，不會讓她自己的對話提示多一段。
+
+    persona 只是系統提示裡的一段（前面有共用規則、後面有工具說明——跟
+    construct_system_prompt 實際組出來的形狀一樣），不是整份系統提示本身；而且
+    真的跑一輪，讓 _bring_up_to_date 那條每輪刷新 description／background 的路徑
+    被走到，不是只看建構當下的那一次。"""
     from dataclasses import replace
 
     from ai_character_engine.context.builder import ContextBuilder
 
+    persona_text = "你是紅莉栖，中二又傲嬌的天才駭客少女。"
+    wrapped_system = (
+        "Speak naturally and stay fully in character at all times.\n\n"
+        f"{persona_text}\n\n"
+        "## Tools\nYou may call a tool when it helps answer the user."
+    )
     arguments = factory_arguments()
-    arguments["persona_prompt"] = arguments["system_prompt"]
-    created = AgentFactory.create_agent(**arguments)
-    character = created._companion().character
+    arguments["system_prompt"] = wrapped_system
+    arguments["persona_prompt"] = persona_text
+
+    async def scenario():
+        created = AgentFactory.create_agent(**arguments)
+        await say(created, "你好")
+        return created._companion().character
+
+    character = asyncio.run(scenario())
     builder = ContextBuilder()
 
-    assert character.background == arguments["persona_prompt"]
+    assert character.background == persona_text
+    assert character.background != character.description
+    # agent 另外在系統提示後面加了記憶／打斷規則，description 不會一字不差等於
+    # wrapped_system；但 persona 仍是它的一段，才是這個測試真正要的性質。
+    assert character.description.startswith(wrapped_system)
 
     with_background = builder.build_system_prompt(character)
     without_background = builder.build_system_prompt(

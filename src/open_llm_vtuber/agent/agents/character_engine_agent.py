@@ -22,6 +22,7 @@ from uuid import uuid4
 
 from ai_character_engine.host import HostBridgeError, image_from_host
 from ai_character_engine.companion import CompanionClosed, TurnInterrupted
+from ai_character_engine.context.builder import one_line
 from ai_character_engine.llm.models import Message
 from ai_character_engine.tools.models import ToolDefinition
 from ai_character_engine.vision.models import VisionFrame
@@ -153,8 +154,19 @@ class CharacterEngineAgent(AgentInterface):
     def set_system(self, system: str) -> None:
         """主機組好的系統提示（人設與通用規則）。她記得對方什麼、她自己說過什麼，
         都由引擎記、寫進對話的備註。舊 agent 留下的記憶檔不搬：那是當下的話被記成
-        事實，搬進來她每一輪都會照著講。"""
+        事實，搬進來她每一輪都會照著講。
+
+        只換系統提示、不換人設原文（self._persona）：即時換人設（apply_persona）
+        要再呼叫 set_persona，不然 _bring_up_to_date 會發現新系統提示裡已經沒有
+        舊人設，自己把 background 清成 None（見那裡的防呆），不會印出講古的人設。
+        """
         self._system = f"{system}\n\n{MEMORY_RULE}\n\n{INTERRUPT_RULE}"
+
+    def set_persona(self, persona: str) -> None:
+        """她的人設原文換了（即時換人設預設、換角色以外的場合）。之後每一輪
+        _bring_up_to_date 都會拿這份跟系統提示核對，兩邊對得上才會寫進
+        background，讓背景工作（情緒、心情…）讀到的是現在這個人設。"""
+        self._persona = persona
 
     # --- 她記得對方什麼 -------------------------------------------------------
     # 記憶頁讀寫的是這一份。
@@ -483,6 +495,11 @@ class CharacterEngineAgent(AgentInterface):
             # 在引擎那一輪裡面做：這時沒有別的連線在講話，最新的那一則才拿得掉。
             companion.take_back(take_back)
         persona = self._persona or None
+        if persona is not None and one_line(persona) not in one_line(self._system):
+            # 人設跟系統提示對不上（通常是換人設時只叫了 set_system、忘了跟著
+            # 叫 set_persona）：background 寧可沒有，也不能印出跟對話提示矛盾的
+            # 舊人設——description 與 background 永遠不會各講各的。
+            persona = None
         if (
             companion.character.description != self._system
             or companion.character.background != persona

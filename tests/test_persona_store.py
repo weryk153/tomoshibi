@@ -99,3 +99,46 @@ def test_hot_apply_changes_only_prompt_and_can_restore_default(
     assert context.character_config.persona_prompt == "角色原本人設"
     assert context.agent_engine.system == "SYSTEM::角色原本人設"
     assert persona_store.get_active_persona_id("same_character") is None
+
+
+def test_hot_apply_also_updates_the_agents_background_persona(isolated_store):
+    """set_system 換了系統提示之後，有 set_persona 的 agent（如
+    character_engine_agent）要跟著被告知新的人設，不然它自己留著的人設原文會
+    跟新系統提示對不上。"""
+    persona_store.create_persona("直接", "直接、有主見。", "direct")
+
+    class FakeAgent:
+        def __init__(self):
+            self.system = None
+            self.persona = None
+
+        def set_system(self, system):
+            self.system = system
+
+        def set_persona(self, persona):
+            self.persona = persona
+
+    class FakeWebSocket:
+        def __init__(self):
+            self.messages = []
+
+        async def send_text(self, value):
+            self.messages.append(json.loads(value))
+
+    context = ServiceContext()
+    context.character_config = SimpleNamespace(
+        conf_uid="same_character",
+        persona_prompt="角色原本人設",
+    )
+    context.config = SimpleNamespace(character_config=context.character_config)
+    context.character_persona_prompt = "角色原本人設"
+    context.agent_engine = FakeAgent()
+
+    async def fake_construct(prompt):
+        return f"SYSTEM::{prompt}"
+
+    context.construct_system_prompt = fake_construct
+
+    asyncio.run(context.apply_persona(FakeWebSocket(), "direct"))
+
+    assert context.agent_engine.persona == "直接、有主見。"

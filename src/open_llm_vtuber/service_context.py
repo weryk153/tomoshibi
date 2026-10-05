@@ -429,6 +429,10 @@ class ServiceContext:
         if self.config is not None:
             self.config.character_config.persona_prompt = prompt
         self.agent_engine.set_system(effective_system_prompt)
+        if hasattr(self.agent_engine, "set_persona"):
+            # 人設原文也要跟著換，不然她的 background（背景工作讀的人設摘要）
+            # 會停在舊的那個，跟剛換上的系統提示矛盾。
+            self.agent_engine.set_persona(prompt)
         self.system_prompt = effective_system_prompt
         self.active_persona_id = clean_id
 
@@ -461,6 +465,10 @@ class ServiceContext:
                 self.character_config.persona_prompt
             )
             self.agent_engine.set_system(effective_system_prompt)
+            if hasattr(self.agent_engine, "set_persona"):
+                # 這裡不換人設，只是舞台表演清單變了；明講一次還是現在這個人設，
+                # 不要讓它跟剛重組的系統提示脫鉤。
+                self.agent_engine.set_persona(self.character_config.persona_prompt)
             self.system_prompt = effective_system_prompt
         return candidates
 

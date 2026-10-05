@@ -110,17 +110,27 @@ def test_a_change_of_her_mood_reaches_the_page():
 
 
 def test_a_page_that_is_gone_does_not_break_the_engine():
-    agent = Listening()
+    """一個頁面的 socket 關了：引擎呼叫 listener 的當下不能炸，另一個還連著的
+    頁面要照樣收到，而送失敗的 task 用完要從送出中的集合裡消失，不是卡著。"""
+    import src.open_llm_vtuber.character_mood as character_mood
+
+    agent, still_here = Listening(), Sent()
 
     async def closed(_text):
         raise RuntimeError("socket closed")
 
     async def scenario():
         follow_mood(agent, closed)
+        follow_mood(agent, still_here)
         agent.listeners[0](MESSAGE)
-        await asyncio.sleep(0)
+        agent.listeners[1](MESSAGE)
+        await asyncio.sleep(0)  # 讓兩個 task 真的跑
+        await asyncio.sleep(0)  # 讓送失敗那個的 done callback 也跑完
 
     asyncio.run(scenario())
+
+    assert still_here.texts == [MESSAGE]
+    assert character_mood._SENDING == set()
 
 
 def test_following_stops_when_told():

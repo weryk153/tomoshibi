@@ -1029,3 +1029,48 @@ def test_an_agent_that_does_not_know_its_character_has_nothing_to_follow(
         stop()
 
     asyncio.run(scenario())
+
+
+# --- 人設即時換了，background 不能講古 ----------------------------------------------
+
+
+def test_hot_swapping_the_persona_updates_her_background_too(tmp_path):
+    """apply_persona 換人設是叫 set_system 再叫 set_persona；兩個都跟著換，
+    background 才會是新的那個，不會印出跟對話提示矛盾的舊人設。"""
+    from ai_character_engine.context.builder import ContextBuilder
+
+    async def scenario():
+        engine = companion(tmp_path, EngineLLM())
+        current = agent(engine, persona="你是紅莉栖。")
+        await say(current, "你好")
+        current.set_system("你是鋼琴家。")
+        current.set_persona("你是鋼琴家。")
+        await say(current, "再聊")
+        return engine.character
+
+    character = asyncio.run(scenario())
+    prompt = ContextBuilder().build_system_prompt(character)
+
+    assert "Background:" not in prompt
+    assert character.background == "你是鋼琴家。"
+    assert character.description.startswith("你是鋼琴家。")
+
+
+def test_a_persona_left_behind_does_not_leave_a_stale_background(tmp_path):
+    """呼叫方換了系統提示、忘了跟著叫 set_persona：background 寧可沒有，也不能
+    印出跟對話提示矛盾的舊人設。"""
+    from ai_character_engine.context.builder import ContextBuilder
+
+    async def scenario():
+        engine = companion(tmp_path, EngineLLM())
+        current = agent(engine, persona="你是紅莉栖。")
+        await say(current, "你好")
+        current.set_system("你是鋼琴家。")  # 沒有跟著叫 set_persona
+        await say(current, "再聊")
+        return engine.character
+
+    character = asyncio.run(scenario())
+    prompt = ContextBuilder().build_system_prompt(character)
+
+    assert character.background is None
+    assert "Background:" not in prompt
