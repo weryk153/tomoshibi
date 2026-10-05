@@ -6,12 +6,14 @@
 
     uv run --project ../ai-character-engine python scripts/compare_mood.py \
         chat_history/<conf_uid>/<history_uid>.json [...至少三段] \
-        --model qwen/qwen3.5-9b --out docs/superpowers/eval/2026-10-05-mood.html
+        --model qwen/qwen3.5-9b --out docs/superpowers/eval/<日期>-mood.html
 
 每段對話照紀錄重播：使用者那句原樣送進引擎，她的回覆由一個只會照念紀錄的假模型
 給，所以雙方的話跟當時一模一樣。每一輪都跑情緒分析（只讀使用者）與 mood worker
 （讀雙方），用 --base-url 那顆模型。每輪記下：雙方的話、情緒分析看到的使用者與
-規則由它推出的心情、mood worker 的原始回答與引擎收不收、這輪結束後她的心情。
+規則由它推出的心情與有沒有真的改到她、mood worker 的原始回答與引擎收不收、
+收了之後是採用還是保留前一個（心情有慣性：較弱的別種心情、neutral 都不蓋掉現在的）、
+這輪結束後存著的心情。
 
 只讀 chat_history/ 的對話檔，不寫任何東西回去；引擎狀態只在記憶體裡。
 """
@@ -26,7 +28,6 @@ from datetime import datetime
 from pathlib import Path
 
 from ai_character_engine import CharacterProfile
-from ai_character_engine.commit.coordinator import _DEFAULT_POLICIES
 from ai_character_engine.companion import (
     CHARACTER_MOODS,
     CharacterCompanion,
@@ -35,13 +36,15 @@ from ai_character_engine.companion import (
 from ai_character_engine.llm.local import OpenAICompatibleChatClient
 from ai_character_engine.llm.models import LLMResponse, LLMStreamChunk
 from ai_character_engine.state.models import CharacterState
-from ai_character_engine.state.relationship import OBSERVATION_KEY, relationship_patch
+from ai_character_engine.state.mood import MOOD_SYNONYMS, effective_mood
+from ai_character_engine.state.relationship import (
+    APPLIED_OBSERVATION_KEY,
+    OBSERVATION_KEY,
+    relationship_patch,
+)
 
 # 規則改用新詞之前的叫法，讓人對得上舊的紀錄。
 OLD_NAMES = {"sad": "hurt", "worried": "concerned"}
-# 門檻不寫死：跟著引擎的 commit coordinator 對 state.mood_candidate 的政策走，
-# 不然兩邊會慢慢對不上。
-MIN_CONFIDENCE = _DEFAULT_POLICIES["state.mood_candidate"].min_confidence
 
 
 class Replay:
@@ -101,19 +104,13 @@ def parsed(text):
     return data if isinstance(data, dict) else {"raw": text}
 
 
-def accepted(answer) -> bool:
+def canonical(answer) -> str | None:
+    """引擎把這個回答當成哪個心情詞（近義詞照 MOOD_SYNONYMS 換），不是就 None。"""
     if not isinstance(answer, dict):
-        return False
-    word = str(answer.get("mood") or "").strip().casefold()
-    intensity = answer.get("intensity")
-    confidence = answer.get("confidence")
-    return (
-        word in CHARACTER_MOODS
-        and isinstance(intensity, (int, float))
-        and not isinstance(intensity, bool)
-        and isinstance(confidence, (int, float))
-        and confidence >= MIN_CONFIDENCE
-    )
+        return None
+    word = str(answer.get("mood") or "").strip().lower()
+    word = MOOD_SYNONYMS.get(word, word)
+    return word if word in CHARACTER_MOODS else None
 
 
 # 規則只在觀察夠明顯時才動她的心情，其他時候讓心情維持原樣。
@@ -167,11 +164,51 @@ async def replay(path: Path, args) -> tuple[str, list[dict]]:
             call_timeout_seconds=120.0,
         ),
     )
+
+    # 看每個結果實際對她存著的心情做了什麼：包住 commit 與規則，比對前後。
+    def stored():
+        state = companion.runtime.state
+        return state.emotion, state.mood_intensity, state.mood_updated_at
+
+    worker_effects, rule_effects = [], []
+    commit = companion._commits.commit
+
+    async def watched_commit(proposal):
+        before = stored()
+        outcome = await commit(proposal)
+        if proposal.target == "state.mood_candidate":
+            worker_effects.append(
+                (outcome.status.value, outcome.reason, stored() != before)
+            )
+        return outcome
+
+    companion._commits.commit = watched_commit
+    react = companion._react_to_observation
+
+    async def watched_react():
+        before = stored()
+        await react()
+        rule_effects.append(stored() != before)
+
+    companion._react_to_observation = watched_react
+    policy = companion.runtime.state_policy
+    on_event = policy.on_event
+
+    def watched_on_event(event, state):
+        patch = on_event(event, state)
+        if patch is not None and patch.custom_updates.get(APPLIED_OBSERVATION_KEY):
+            rule_effects.append(patch.emotion is not None)
+        return patch
+
+    policy.on_event = watched_on_event
+
     rows, seen = [], None
     try:
         for number, (user, line) in enumerate(pairs, 1):
             her.line = line
             emotion.last = mood.last = None
+            worker_effects.clear()
+            rule_effects.clear()
             await companion.reply(user, conversation_id="replay")
             await companion.settle()
             observation = companion.runtime.state.custom.get(OBSERVATION_KEY)
@@ -181,7 +218,10 @@ async def replay(path: Path, args) -> tuple[str, list[dict]]:
             if fresh:
                 seen = observation.get("proposal_id")
             answer = parsed(mood.last)
-            snapshot = companion.snapshot()
+            word, strength, updated_at = stored()
+            _, now_strength = effective_mood(
+                word, strength, updated_at, now=time.time()
+            )
             rows.append(
                 {
                     "number": number,
@@ -189,9 +229,10 @@ async def replay(path: Path, args) -> tuple[str, list[dict]]:
                     "her": line,
                     "observation": observation if fresh else None,
                     "rule": rule_mood(observation) if fresh else None,
+                    "rule_moved": any(rule_effects),
                     "answer": answer,
-                    "accepted": accepted(answer),
-                    "after": (snapshot.emotion, snapshot.mood_intensity),
+                    "worker": worker_effects[-1] if worker_effects else None,
+                    "after": (word, strength, now_strength),
                 }
             )
             print(f"{path.name} turn {number}/{len(pairs)}", file=sys.stderr)
@@ -222,18 +263,35 @@ def render_row(row: dict, name: str) -> str:
         if rule[0] in OLD_NAMES
         else f"{rule[0]}　{rule[1]:.2f}"
     )
+    if rule is not None and rule != UNCHANGED:
+        rule_text += "\n→ 改了她的心情" if row["rule_moved"] else "\n→ 保留前一個"
+
     answer = row["answer"]
     if answer is None:
         worker = "（這輪沒有呼叫）"
     elif "raw" in answer:
         worker = f"讀不懂：{answer['raw']}"
     else:
+        said = str(answer.get("mood"))
+        word = canonical(answer)
+        if word is not None and word != said.strip().lower():
+            said += f"（當 {word}）"
+        effect = row["worker"]
+        if effect is None:
+            verdict = "不收（解析不過）"
+        elif effect[0] != "committed":
+            verdict = f"不收（{effect[0]}: {effect[1]}）"
+        else:
+            verdict = "收 → 採用" if effect[2] else "收 → 保留前一個"
         worker = (
-            f"{answer.get('mood')}　強度 {answer.get('intensity')}　信心 {answer.get('confidence')}"
+            f"{said}　強度 {answer.get('intensity')}　信心 {answer.get('confidence')}"
             f"\n依據：{'；'.join(map(str, answer.get('evidence') or []))}"
-            f"\n{'收' if row['accepted'] else '不收'}"
+            f"\n{verdict}"
         )
-    after = f"{row['after'][0]}　{row['after'][1]:.2f}"
+    word, strength, now_strength = row["after"]
+    after = f"{word}　{strength:.2f}"
+    if abs(now_strength - strength) >= 0.005:
+        after += f"（淡到現在 {now_strength:.2f}）"
     cells = [row["number"], row["user"], row["her"], seemed, rule_text, worker, after]
     return "<tr>" + "".join(f"<td>{cell(c)}</td>" for c in cells) + "</tr>"
 
