@@ -11,7 +11,8 @@
 每段對話照紀錄重播：使用者那句原樣送進引擎，她的回覆由一個只會照念紀錄的假模型
 給，所以雙方的話跟當時一模一樣。每一輪都跑情緒分析（只讀使用者）與 mood worker
 （讀雙方），用 --base-url 那顆模型。每輪記下：雙方的話、情緒分析看到的使用者與
-規則由它推出的心情與有沒有真的改到她、mood worker 的原始回答與引擎收不收、
+規則會由它推出的心情（每輪都排 mood 判斷，引擎在這種輪不讓規則動心情，
+所以這欄只是「沒排 mood 的輪規則會怎麼做」的參考）、mood worker 的原始回答與引擎收不收、
 收了之後是採用還是保留前一個（心情有慣性：較弱的別種心情、neutral 都不蓋掉現在的）、
 這輪結束後存著的心情。
 
@@ -264,7 +265,11 @@ def render_row(row: dict, name: str) -> str:
         else f"{rule[0]}　{rule[1]:.2f}"
     )
     if rule is not None and rule != UNCHANGED:
-        rule_text += "\n→ 改了她的心情" if row["rule_moved"] else "\n→ 保留前一個"
+        rule_text += (
+            "\n→ 改了她的心情"
+            if row["rule_moved"]
+            else "\n（這輪有 mood 判斷，規則不動心情）"
+        )
 
     answer = row["answer"]
     if answer is None:
@@ -306,7 +311,7 @@ def render(sections: list[tuple[Path, str, list[dict]]], args) -> str:
                 "使用者",
                 name,
                 "使用者看起來（情緒分析）",
-                "規則推出的心情（現行）",
+                "規則會推出的心情（只在沒排 mood 判斷的輪生效；本頁每輪都排）",
                 "mood worker",
                 "這輪之後她的心情",
             )
@@ -327,7 +332,9 @@ def render(sections: list[tuple[Path, str, list[dict]]], args) -> str:
         "<!doctype html><html lang='zh-Hant'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         f"<title>心情判斷對照</title><style>{style}</style></head><body>"
-        f"<h1>她的心情：規則（現行）與 mood worker 並排</h1><p>{cell(meta)}</p>"
+        f"<h1>她的心情：規則（參考）與 mood worker 並排</h1><p>{cell(meta)}</p>"
+        "<p>本頁每輪都排 mood 判斷（mood_every=1）。有 mood 判斷的輪，規則只動信任與好感，"
+        "不動她的心情；規則欄是沒排 mood 判斷的輪（預設 mood_every=2 的奇數輪）規則會推出的心情。</p>"
         + "".join(parts)
         + "</body></html>"
     )
