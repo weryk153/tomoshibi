@@ -1,6 +1,5 @@
 import asyncio
 import json
-import re
 import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Tuple
@@ -11,6 +10,7 @@ from ..avatar_model import AvatarModel
 from ..tts.tts_interface import TTSInterface
 from ..utils.stream_audio import prepare_audio_payload
 from .laughter import is_laughter_only
+from .text_content import has_speakable_text
 from .types import WebSocketSend
 
 
@@ -94,8 +94,12 @@ class TTSTaskManager:
                 frontend falls back to display_text.text (the canonical reply R).
                 This NEVER replaces display_text.text, which memory/history rely on.
         """
-        if len(re.sub(r'[\s.,!?，。！？\'"』」）】\s]+', "", tts_text)) == 0:
-            logger.debug("Empty TTS text, sending silent display payload")
+        # 沒有字母／文字／數字可念（「……」「♪」、表情符號、*動作*）就不送去合成：
+        # 引擎對這種輸入多半回錯（GPT-SoVITS 回 400），會被當成失敗重試再跳通知。
+        if not has_speakable_text(tts_text):
+            logger.debug(
+                "Nothing speakable in TTS text, sending silent display payload"
+            )
             # Get current sequence number for silent payload
             current_sequence = self._sequence_counter
             self._sequence_counter += 1
@@ -235,7 +239,8 @@ class TTSTaskManager:
                 tts_engine.remove_file(audio_file_path)
                 logger.debug("Audio cache file cleaned.")
 
-        # 字幕照常出現（靜音 payload），通知跟在同一句後面，順序不亂。
+        # 靜音 payload 不會換畫面字幕，這句只會出現在聊天泡泡裡；通知跟在同一句
+        # 後面，順序不亂。
         # 被 clear() 取消時 CancelledError 會直接穿出去，不會走到這裡。
         _mark_subtitle_hold(payload, display_text, subtitle_text)
         messages = [payload]

@@ -128,7 +128,9 @@ def test_two_failures_send_silent_payload_and_a_visible_error():
     audio, error = messages
     assert audio["type"] == "audio"
     assert audio["audio"] is None
-    assert audio["display_text"]["text"] == "hello"  # 字幕照樣出現
+    assert (
+        audio["display_text"]["text"] == "hello"
+    )  # 聊天泡泡照樣有這句（靜音 payload 不換畫面字幕）
     assert error["type"] == "error"
     assert error["text_key"] == "notification.ttsTimedOut"
     assert "逾時" in error["message"]
