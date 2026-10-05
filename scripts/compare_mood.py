@@ -116,6 +116,10 @@ def accepted(answer) -> bool:
     )
 
 
+# 規則只在觀察夠明顯時才動她的心情，其他時候讓心情維持原樣。
+UNCHANGED = "unchanged"
+
+
 def rule_mood(observation):
     if not isinstance(observation, dict):
         return None
@@ -125,7 +129,7 @@ def rule_mood(observation):
         now=time.time(),
     )
     if patch is None or patch.emotion is None:
-        return None
+        return UNCHANGED
     return patch.emotion, patch.mood_intensity
 
 
@@ -212,6 +216,8 @@ def render_row(row: dict, name: str) -> str:
     rule_text = (
         "—"
         if rule is None
+        else "不變"
+        if rule == UNCHANGED
         else f"{rule[0]}（舊稱 {OLD_NAMES[rule[0]]}）　{rule[1]:.2f}"
         if rule[0] in OLD_NAMES
         else f"{rule[0]}　{rule[1]:.2f}"
