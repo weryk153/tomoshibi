@@ -2,6 +2,7 @@ import os
 import json
 from typing import Callable
 from loguru import logger
+from .character_mood import follow_mood, send_character_mood
 from fastapi import WebSocket
 
 from prompts import prompt_loader
@@ -59,6 +60,9 @@ class ServiceContext:
         # Tracked so the audio engine is rebuilt when V changes on a character switch
         # even if the translator_config block itself is unchanged.
         self._audio_translate_voice_lang: str | None = None
+        # 引擎建立時帶的角色名單（專有名詞、口頭禪）；換角色時名單不同就重建。
+        self._audio_translate_terms: tuple[dict, dict] | None = None
+        self._subtitle_terms: tuple[dict, dict] | None = None
         # display-only subtitle translation engine; None when disabled
         self.subtitle_translate_engine: TranslateInterface | None = None
 
@@ -87,6 +91,9 @@ class ServiceContext:
 
         self.send_text: Callable = None
         self.client_uid: str = None
+
+        # 停止把她的心情送給這個頁面（見 _follow_mood）。
+        self._stop_following_mood: Callable | None = None
 
     def __str__(self):
         return (
@@ -206,6 +213,7 @@ class ServiceContext:
     async def close(self):
         """Clean up resources, especially the MCPClient."""
         logger.info("Closing ServiceContext resources...")
+        self._unfollow_mood()
         if self.mcp_client:
             logger.info(f"Closing MCPClient for context instance {id(self)}...")
             await self.mcp_client.aclose()
@@ -213,6 +221,22 @@ class ServiceContext:
         if self.agent_engine and hasattr(self.agent_engine, "close"):
             await self.agent_engine.close()  # Ensure agent resources are also closed
         logger.info("ServiceContext closed.")
+
+    def _unfollow_mood(self) -> None:
+        """停止把她的心情送給這個頁面，如果正在跟著的話。_follow_mood 換到新的
+        agent 之前、close() 整個收掉之前都要做，寫一次兩邊共用。"""
+        stop = getattr(self, "_stop_following_mood", None)
+        if stop is not None:
+            stop()
+            self._stop_following_mood = None
+
+    def _follow_mood(self) -> None:
+        """背景結果改了她的心情時送給這個頁面。agent 換了（換角色、存設定）就
+        改跟新的那一個；舊的停掉，不然換走的角色還會送心情過來。"""
+        self._unfollow_mood()
+        self._stop_following_mood = follow_mood(
+            self.agent_engine, getattr(self, "send_text", None)
+        )
 
     async def load_cache(
         self,
@@ -274,6 +298,8 @@ class ServiceContext:
             self.character_config.agent_config.agent_settings.conversation.use_mcpp,
             self.character_config.agent_config.agent_settings.conversation.mcp_enabled_servers,
         )
+        # 這個頁面現在拿的是這個 agent。
+        self._follow_mood()
 
         logger.debug(f"Loaded service context with cache: {character_config}")
 
@@ -315,7 +341,7 @@ class ServiceContext:
         self.init_live2d(config.character_config.live2d_model_name)
 
         # init asr from character config
-        self.init_asr(config.character_config.asr_config)
+        self.init_asr(config.character_config.asr_config, config.character_config)
 
         # init tts from character config
         self.init_tts(config.character_config.tts_config)
@@ -358,6 +384,8 @@ class ServiceContext:
         self.init_translate(
             config.character_config.tts_preprocessor_config.translator_config,
             voice_lang=derive_voice_lang(config.character_config),
+            # 名單（口頭禪、專有名詞）也要讀這次載入的角色，理由同上。
+            character_config=config.character_config,
             # self.system_config 要到這個函式最後才換成新的；字幕翻成這次載入的
             # 「你看的語言」，不是上一份的。
             player_language=(
@@ -406,6 +434,10 @@ class ServiceContext:
         if self.config is not None:
             self.config.character_config.persona_prompt = prompt
         self.agent_engine.set_system(effective_system_prompt)
+        if hasattr(self.agent_engine, "set_persona"):
+            # 人設原文也要跟著換，不然她的 background（背景工作讀的人設摘要）
+            # 會停在舊的那個，跟剛換上的系統提示矛盾。
+            self.agent_engine.set_persona(prompt)
         self.system_prompt = effective_system_prompt
         self.active_persona_id = clean_id
 
@@ -438,6 +470,10 @@ class ServiceContext:
                 self.character_config.persona_prompt
             )
             self.agent_engine.set_system(effective_system_prompt)
+            if hasattr(self.agent_engine, "set_persona"):
+                # 這裡不換人設，只是舞台表演清單變了；明講一次還是現在這個人設，
+                # 不要讓它跟剛重組的系統提示脫鉤。
+                self.agent_engine.set_persona(self.character_config.persona_prompt)
             self.system_prompt = effective_system_prompt
         return candidates
 
@@ -450,11 +486,29 @@ class ServiceContext:
             logger.critical(f"Error initializing Live2D: {e}")
             logger.critical("Try to proceed without Live2D...")
 
-    def init_asr(self, asr_config: ASRConfig) -> None:
+    def init_asr(
+        self, asr_config: ASRConfig, character_config: CharacterConfig | None = None
+    ) -> None:
         # 系統層級「玩家語言」推導 ASR 辨識語言（best-effort）。目前 active 模型
         # sense_voice 只支援 zh/en/ja/ko/yue；clamp 後落在這個集合才覆寫 sherpa 的
         # language leaf，集合外（如法/德/西）回 'auto'，等於不強制 ＝ 維持原本辨識行為。
         # 語音路徑（translate_audio）完全不動。只動 sherpa_onnx_asr 這一個 engine。
+        #
+        # 角色聲音的語言 V 跟玩家語言推導出來的不一樣時（例：角色講日文、玩家語言是
+        # 中文），不能把辨識鎖死在玩家語言——短句會被硬聽成玩家語言的諧音（實測：
+        # pekora 講「おやすみなさい」被鎖中文的 SenseVoice 聽成「歐亞蘇明納賽」）。
+        # 這種情況改成 'auto' 讓它自己偵測語言；V 沒設定、玩家語言本來就推不出明確
+        # 語言（derived 已經是 'auto'）、或兩邊相同時，維持原本 clamp 行為不變。
+        # character_config 沒傳進來時退回 self.character_config，跟改動前行為一致。
+        #
+        # 這段只對 sense_voice 模型生效：language 這個 leaf 只有 from_sense_voice
+        # 會讀（sherpa_onnx_asr.py），其他 model_type 讀了也沒作用。
+        #
+        # 'yue'（廣東話）比較特殊：derive_voice_lang／_normalize_lang 沒有獨立的
+        # yue bucket，廣東話聲音（GPT-SoVITS text_lang='yue'、edge zh-HK-*）一律
+        # 算進 'zh'；但 _clamp_sense_voice_language 對 zh-HK / yue-* 玩家語言會回
+        # 'yue'，跟 bucket 後的 'zh' 是同一件事。比較時把 'yue' 併回 'zh' 的桶，
+        # 不然廣東話玩家對廣東話角色會被誤判成「語言不同」而跳成 auto。
         player_language = (
             getattr(self.system_config, "player_language", "") or ""
         ).strip()
@@ -464,6 +518,27 @@ class ServiceContext:
                 from .asr.sherpa_onnx_asr import VoiceRecognition as _SherpaASR
 
                 derived = _SherpaASR._clamp_sense_voice_language(player_language)
+
+                if getattr(sherpa_block, "model_type", None) == "sense_voice":
+                    from .conversations.conversation_utils import derive_voice_lang
+
+                    voice_lang = derive_voice_lang(
+                        character_config
+                        if character_config is not None
+                        else self.character_config
+                    )
+                    derived_bucket = "zh" if derived == "yue" else derived
+                    if (
+                        voice_lang
+                        and derived != "auto"
+                        and voice_lang != derived_bucket
+                    ):
+                        logger.info(
+                            f"ASR 語言：角色聲音語言 '{voice_lang}' 跟玩家語言推導出的 "
+                            f"'{derived}' 不同，SenseVoice 改用 'auto' 自動偵測語言。"
+                        )
+                        derived = "auto"
+
                 if derived != getattr(sherpa_block, "language", "auto"):
                     sherpa_block.language = derived
         if not self.asr_engine or (self.character_config.asr_config != asr_config):
@@ -633,6 +708,10 @@ class ServiceContext:
                 character_name=target_character.character_name,
                 # 記憶頁的開關：關掉時引擎也不再抽記憶、不再把記憶帶進對話。
                 long_term_memory_enabled=target_character.long_term_memory_enabled,
+                # 她的人設原文（逐字包在 system_prompt 裡）；給引擎的
+                # CharacterProfile.background 讀，背景工作（情緒、心情…）才拿得到
+                # 人設摘要，而不用讀整份系統提示。
+                persona_prompt=persona_prompt,
             )
 
             logger.debug(f"Agent choice: {agent_config.conversation_agent_choice}")
@@ -653,13 +732,21 @@ class ServiceContext:
             )
             self.agent_engine = None
 
+        # 這個頁面現在拿的是這個 agent。
+        self._follow_mood()
+
     def init_translate(
         self,
         translator_config: TranslatorConfig,
         voice_lang: str | None = None,
         player_language: str | None = None,
+        character_config: CharacterConfig | None = None,
     ) -> None:
         """依設定建立或更新翻譯引擎。
+
+        ``character_config`` 是這次要用的角色（換角色時是「新」角色；
+        self.character_config 那時還是舊的）。沒給就用 self.character_config。
+        翻譯器帶的口頭禪、專有名詞都從它讀，名單換了就重建引擎。
 
         Two independent engines are built from the SAME translator_config:
         - ``translate_engine``: AUDIO path (translates tts_text for the spoken voice).
@@ -692,6 +779,22 @@ class ServiceContext:
         player_language_changed = player_language != getattr(
             self, "_subtitle_player_language", None
         )
+        # 角色的名單：兩個角色共用同一份翻譯設定、同一種語音語言時，只有名單
+        # 不同——不比對它，上一個角色的引擎就會原封不動留下來。
+        character = character_config or self.character_config
+        protected_names = dict(getattr(character, "protected_names", None) or {})
+        catchphrases = dict(getattr(character, "catchphrases", None) or {})
+        audio_terms = (protected_names, catchphrases)
+        audio_terms_changed = audio_terms != getattr(
+            self, "_audio_translate_terms", None
+        )
+        # 字幕翻譯器也帶口頭禪，但寫法不換：來源寫法 → 來源寫法，原樣保留。
+        # 目標寫法是為語音語言寫的，字幕翻成的是玩家看的語言。
+        subtitle_catchphrases = {source: source for source in catchphrases}
+        subtitle_terms = (protected_names, subtitle_catchphrases)
+        subtitle_terms_changed = subtitle_terms != getattr(
+            self, "_subtitle_terms", None
+        )
 
         # --- AUDIO translation engine (now ALWAYS built; gate is per-sentence) ---
         # translate_audio is kept as an internal auto-on flag (always True in conf), so
@@ -701,7 +804,13 @@ class ServiceContext:
             logger.debug("Audio translation engine disabled (translate_audio=False).")
             self.translate_engine = None
             self._audio_translate_voice_lang = None
-        elif not self.translate_engine or config_changed or voice_lang_changed:
+            self._audio_translate_terms = None
+        elif (
+            not self.translate_engine
+            or config_changed
+            or voice_lang_changed
+            or audio_terms_changed
+        ):
             provider = translator_config.translate_provider
             # Copy the provider block and override its target leaf with V (mapped per
             # provider). If V can't be derived/mapped, keep the conf's global target.
@@ -724,9 +833,12 @@ class ServiceContext:
             self.translate_engine = TranslateFactory.get_translator(
                 provider,
                 audio_cfg,
-                protected_names=getattr(self.character_config, "protected_names", None),
+                protected_names=protected_names,
+                # 口頭禪的目標寫法是為語音語言寫的，只有這個引擎帶。
+                catchphrases=catchphrases,
             )
             self._audio_translate_voice_lang = voice_lang
+            self._audio_translate_terms = audio_terms
         else:
             logger.info("Audio translation already initialized with the same config.")
 
@@ -738,15 +850,20 @@ class ServiceContext:
             not self.subtitle_translate_engine
             or config_changed
             or player_language_changed
+            or subtitle_terms_changed
         ):
             logger.info(
                 "Initializing subtitle Translator: "
                 f"{translator_config.translate_provider} -> {player_language}"
             )
             self.subtitle_translate_engine = self._build_subtitle_translator(
-                translator_config, player_language or ""
+                translator_config,
+                player_language or "",
+                protected_names,
+                subtitle_catchphrases,
             )
             self._subtitle_player_language = player_language
+            self._subtitle_terms = subtitle_terms
         else:
             logger.info(
                 "Subtitle translation already initialized with the same config."
@@ -758,9 +875,18 @@ class ServiceContext:
         )
 
     def _build_subtitle_translator(
-        self, translator_config: TranslatorConfig, player_language: str
+        self,
+        translator_config: TranslatorConfig,
+        player_language: str,
+        protected_names: dict[str, list[str]] | None = None,
+        catchphrases: dict[str, str] | None = None,
     ) -> TranslateInterface | None:
         """給字幕另外建一個翻譯引擎。
+
+        ``protected_names`` 是這次要用的角色的專有名詞（呼叫端從正在載入的角色
+        讀出來）；沒給就讀 self.character_config。``catchphrases`` 是字幕要原樣
+        保留的口頭禪（來源寫法 → 來源寫法）：口頭禪的目標寫法是為角色的語音語言
+        寫的，字幕翻成的是玩家看的語言，但口頭禪本身不能被翻掉或音譯。
 
         Reuses the SAME provider as the audio path but overrides only the target
         language with the one you read (``player_language``) so the subtitle can differ from the
@@ -799,11 +925,19 @@ class ServiceContext:
             cfg["deeplx_target_lang"] = resolve_deepl_target_lang(target)
         else:  # llm / tencent both use 'target_lang'
             cfg["target_lang"] = target
+        if protected_names is None:
+            protected_names = getattr(self.character_config, "protected_names", None)
+        if catchphrases is None:
+            catchphrases = {
+                source: source
+                for source in getattr(self.character_config, "catchphrases", None) or {}
+            }
         try:
             return TranslateFactory.get_translator(
                 provider,
                 cfg,
-                protected_names=getattr(self.character_config, "protected_names", None),
+                protected_names=protected_names,
+                catchphrases=catchphrases,
             )
         except Exception as e:
             logger.warning(
@@ -1061,6 +1195,10 @@ class ServiceContext:
                     "conf_uid": self.character_config.conf_uid,
                 }
             )
+        )
+        # 換角色、重新載入之後，臉馬上帶著她現在的心情。
+        await send_character_mood(
+            getattr(self, "agent_engine", None), websocket.send_text
         )
 
     async def handle_config_reload(self, websocket: WebSocket) -> bool:

@@ -108,3 +108,77 @@ test("ensureMotionLoaded 轉呼叫 MotionPlayer.ensureLoaded，不觸發 playOnc
   assert.deepEqual(motionCalls, []);
   assert.equal(result, true);
 });
+
+// 空檔時的臉：resetExpression 回到她的心情（resting），不再一律清空。
+// currentEmotion 照真實的 ExpressionController 模擬：setEmotion 成功就變那個名字，
+// clear() 變 null——setRestingExpression 的「臉被接管了就不要搶回去」靠這個判斷。
+function restingRenderer(modelHasIt: boolean) {
+  const calls: unknown[][] = [];
+  let current: string | null = null;
+  const expressions = {
+    get currentEmotion(): string | null {
+      return current;
+    },
+    setEmotion: (name: string, intensity: number): boolean => {
+      calls.push(["set", name, intensity]);
+      if (modelHasIt) current = name;
+      return modelHasIt;
+    },
+    clear: (): void => {
+      calls.push(["clear"]);
+      current = null;
+    },
+  } as unknown as ExpressionController;
+  const renderer = new VRMRenderer({} as unknown as VRM, {} as unknown as MotionPlayer, expressions);
+  return { renderer, calls };
+}
+
+test("resting 表情：resetExpression 回到她的心情，強度照給（權重 0.7×強度在 ExpressionController）", () => {
+  const { renderer, calls } = restingRenderer(true);
+  renderer.setRestingExpression("sad", 0.4);
+  renderer.resetExpression();
+  assert.deepEqual(calls, [["set", "sad", 0.4]]);
+});
+
+test("沒有 resting：resetExpression 清回素顏（跟以前一樣）", () => {
+  const { renderer, calls } = restingRenderer(true);
+  renderer.setRestingExpression(null, 0);
+  renderer.resetExpression();
+  assert.deepEqual(calls, [["clear"]]);
+});
+
+test("強度 0 等於沒有 resting", () => {
+  const { renderer, calls } = restingRenderer(true);
+  renderer.setRestingExpression("sad", 0);
+  renderer.resetExpression();
+  assert.deepEqual(calls, [["clear"]]);
+});
+
+test("模型沒有那個表情：退回清空", () => {
+  const { renderer, calls } = restingRenderer(false);
+  renderer.setRestingExpression("sad", 0.4);
+  renderer.resetExpression();
+  assert.deepEqual(calls, [["set", "sad", 0.4], ["clear"]]);
+});
+
+// fix round 1：avatar.tsx 的 10 秒重算，表情沒換只是強度淡掉時不會再呼叫
+// resetExpression()（見 mood.ts 的 shouldApplyResting），新強度要在
+// setRestingExpression 自己推進去——但只有目前顯示的臉確實還是 resting 本人才推。
+test("強度淡掉、表情沒換：setRestingExpression 自己把新強度推進去，不用呼叫 resetExpression", () => {
+  const { renderer, calls } = restingRenderer(true);
+  renderer.setRestingExpression("sad", 0.4);
+  renderer.resetExpression(); // 先讓畫面真的顯示 sad
+  calls.length = 0;
+  renderer.setRestingExpression("sad", 0.1); // 同一個表情，強度淡了
+  assert.deepEqual(calls, [["set", "sad", 0.1]]);
+});
+
+test("臉被試播接管後：淡掉的新強度不會把它搶回來", () => {
+  const { renderer, calls } = restingRenderer(true);
+  renderer.setRestingExpression("sad", 0.4);
+  renderer.resetExpression(); // 畫面顯示 sad
+  renderer.previewExpression("joy"); // 使用者在設定頁試播，接管了臉
+  calls.length = 0;
+  renderer.setRestingExpression("sad", 0.1); // 心情還是 sad，只是強度淡了
+  assert.deepEqual(calls, []); // 不是目前顯示的那個，不推
+});

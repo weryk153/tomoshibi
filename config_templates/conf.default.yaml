@@ -53,6 +53,18 @@ character_config:
   # protected_names:
   #   星野凛: [星野凜, 星野琳]
 
+  # This character's catchphrases: source form -> the form to use in the
+  # translation target. Empty (the default) means no catchphrase is kept.
+  #
+  # The audio translator (the one rewriting a reply for this character's voice
+  # language) drops sentence-final catchphrases during translation -- they read
+  # as filler, not vocabulary, so a translation model has no reason to keep
+  # them. This list is stated in that translator's system prompt so it keeps
+  # them verbatim instead.
+  # Example:
+  # catchphrases:
+  #   nya: にゃ
+
   # ============== Prompts ==============
 
   # Enter the persona prompt you want to use below.
@@ -98,6 +110,7 @@ character_config:
         emotion_every: 1
         memory_every: 2
         self_memory_every: 2
+        mood_every: 2 # her own mood; her resting face follows it
         summary_every: 0
         reflection_every: 6
         goal_every: 4

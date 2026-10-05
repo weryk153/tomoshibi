@@ -45,6 +45,7 @@ class Offline:
 def offline(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(factory, "_LIVE", {})
+    monkeypatch.setattr(factory, "_MOOD_LISTENERS", {})
     monkeypatch.setattr(factory, "_engine_client", lambda **options: Offline(**options))
     monkeypatch.setattr(factory, "detect_context_window", lambda *a, **k: None)
     Offline.built = []
@@ -229,6 +230,25 @@ def test_the_cognition_settings_reach_the_engine():
     assert (settings.goal_every, settings.call_timeout_seconds) == (9, 45.0)
     assert settings.max_turns_late == 5
     assert settings.emotion_every == 1
+
+
+def test_her_mood_rhythm_from_the_config_file_reaches_the_engine():
+    """走一遍真正的路：conf.yaml 的區塊先過 config_manager 的模型再 model_dump()
+    交給工廠（service_context.init_agent 就是這樣做）。模型不認得的鍵在這一步就沒了。"""
+    from src.open_llm_vtuber.config_manager.agent import AgentSettings
+
+    arguments = factory_arguments()
+    dumped = AgentSettings(
+        conversation=arguments["agent_settings"]["conversation"],
+        character_engine_agent={"mood_every": 5},
+    ).model_dump()
+    arguments["agent_settings"]["character_engine_agent"] = dumped[
+        "character_engine_agent"
+    ]
+
+    settings = AgentFactory.create_agent(**arguments)._companion().settings
+
+    assert settings.mood_every == 5
 
 
 def test_how_much_she_keeps_in_mind_reaches_the_engine():
@@ -448,3 +468,117 @@ def test_an_engine_too_old_for_this_host_is_refused_with_the_way_out(monkeypatch
             provider="lmstudio_llm",
             llm_config={"base_url": "http://127.0.0.1:1234/v1", "model": "m"},
         )
+
+
+# --- 她的心情 ---------------------------------------------------------------------
+
+
+def test_her_mood_reaches_every_page_that_follows_that_character():
+    async def scenario():
+        created = AgentFactory.create_agent(**factory_arguments())
+        heard, also = [], []
+        stop = created.listen_to_mood(heard.append)
+        created.listen_to_mood(also.append)
+        companion = created._companion()
+        companion.on_mood_change(companion.snapshot())
+        stop()
+        companion.on_mood_change(companion.snapshot())
+        return heard, also
+
+    heard, also = asyncio.run(scenario())
+
+    assert [message["type"] for message in heard] == ["character-mood"]
+    assert len(also) == 2
+
+
+def test_a_rebuilt_engine_side_still_reaches_the_pages():
+    """存設定換模型時引擎那一側會換一個；頁面不用重新連線也要收得到。"""
+
+    async def scenario():
+        before = AgentFactory.create_agent(**factory_arguments())
+        heard = []
+        before.listen_to_mood(heard.append)
+        changed = factory_arguments()
+        changed["llm_configs"]["lmstudio_llm"]["model"] = "another-model"
+        after = AgentFactory.create_agent(**changed)
+        companion = after._companion()
+        companion.on_mood_change(companion.snapshot())
+        return heard
+
+    assert len(asyncio.run(scenario())) == 1
+
+
+def test_a_listener_that_fails_does_not_keep_the_others_from_hearing():
+    def broken(_message):
+        raise RuntimeError("socket closed")
+
+    async def scenario():
+        created = AgentFactory.create_agent(**factory_arguments())
+        heard = []
+        created.listen_to_mood(broken)
+        created.listen_to_mood(heard.append)
+        companion = created._companion()
+        companion.on_mood_change(companion.snapshot())
+        return heard
+
+    assert len(asyncio.run(scenario())) == 1
+
+
+def test_an_engine_without_moods_is_refused_with_the_way_out(monkeypatch):
+    import ai_character_engine.companion as engine_companion
+
+    monkeypatch.delattr(engine_companion, "CHARACTER_MOODS")
+
+    with pytest.raises(RuntimeError, match="太舊"):
+        factory.build_companion(
+            conf_uid="kurisu",
+            character_name="紅莉栖",
+            system="你是紅莉栖。",
+            provider="lmstudio_llm",
+            llm_config={"base_url": "http://127.0.0.1:1234/v1", "model": "m"},
+        )
+
+
+def test_her_background_persona_summary_does_not_change_her_conversation_prompt():
+    """ContextBuilder 在 background（她的人設摘要）已經包含在 description 裡時省略
+    Background 段落：接給心情背景工作讀人設，不會讓她自己的對話提示多一段。
+
+    persona 只是系統提示裡的一段（前面有共用規則、後面有工具說明——跟
+    construct_system_prompt 實際組出來的形狀一樣），不是整份系統提示本身；而且
+    真的跑一輪，讓 _bring_up_to_date 那條每輪刷新 description／background 的路徑
+    被走到，不是只看建構當下的那一次。"""
+    from dataclasses import replace
+
+    from ai_character_engine.context.builder import ContextBuilder
+
+    persona_text = "你是紅莉栖，中二又傲嬌的天才駭客少女。"
+    wrapped_system = (
+        "Speak naturally and stay fully in character at all times.\n\n"
+        f"{persona_text}\n\n"
+        "## Tools\nYou may call a tool when it helps answer the user."
+    )
+    arguments = factory_arguments()
+    arguments["system_prompt"] = wrapped_system
+    arguments["persona_prompt"] = persona_text
+
+    async def scenario():
+        created = AgentFactory.create_agent(**arguments)
+        await say(created, "你好")
+        return created._companion().character
+
+    character = asyncio.run(scenario())
+    builder = ContextBuilder()
+
+    assert character.background == persona_text
+    assert character.background != character.description
+    # agent 另外在系統提示後面加了記憶／打斷規則，description 不會一字不差等於
+    # wrapped_system；但 persona 仍是它的一段，才是這個測試真正要的性質。
+    assert character.description.startswith(wrapped_system)
+
+    with_background = builder.build_system_prompt(character)
+    without_background = builder.build_system_prompt(
+        replace(character, background=None)
+    )
+
+    assert with_background == without_background
+    assert "Background:" not in with_background

@@ -8,6 +8,7 @@ import numpy as np
 from loguru import logger
 
 from .service_context import ServiceContext
+from .character_mood import send_character_mood
 from . import pending_changes
 from .chat_group import (
     ChatGroupManager,
@@ -149,6 +150,15 @@ def is_proactive_owner(
     return best_uid == client_uid
 
 
+async def _close_quietly(context: ServiceContext) -> None:
+    """收掉一個建到一半的 context。失敗的連線本來就在報錯，收拾時再出錯只記一筆，
+    不要蓋掉原本的錯。"""
+    try:
+        await context.close()
+    except Exception as e:
+        logger.debug(f"Half-built context not closed ({type(e).__name__}: {e})")
+
+
 class WebSocketHandler:
     """Handles WebSocket connections and message routing"""
 
@@ -242,6 +252,7 @@ class WebSocketHandler:
         Raises:
             Exception: If initialization fails
         """
+        session_service_context = None
         try:
             session_service_context = await self._init_service_context(
                 websocket.send_text, client_uid
@@ -261,7 +272,7 @@ class WebSocketHandler:
             logger.error(
                 f"Failed to initialize connection for client {client_uid}: {e}"
             )
-            await self._cleanup_failed_connection(client_uid)
+            await self._cleanup_failed_connection(client_uid, session_service_context)
             raise
 
     async def _store_client_data(
@@ -307,6 +318,10 @@ class WebSocketHandler:
                     "client_uid": client_uid,
                 }
             )
+        )
+        # 剛連上就帶著她現在的心情（重新整理頁面不會讓她面無表情）。
+        await send_character_mood(
+            session_service_context.agent_engine, websocket.send_text
         )
 
         # Send initial group status
@@ -380,6 +395,15 @@ class WebSocketHandler:
             active_config_file=self.default_context_cache.active_config_file,
         )
 
+        try:
+            await self._restore_active_character(session_service_context)
+        except Exception:
+            # 還沒交給呼叫方，只有這裡收得掉：load_cache 已經開始跟著她的心情。
+            await _close_quietly(session_service_context)
+            raise
+        return session_service_context
+
+    async def _restore_active_character(self, session_service_context) -> None:
         # The backend may stay alive while the browser is closed. A character
         # selected by the previous connection must therefore also be restored on
         # reconnect, not only on a full server restart.
@@ -400,7 +424,6 @@ class WebSocketHandler:
                         "Could not reset active-character state "
                         f"({type(state_error).__name__}: {state_error})"
                     )
-        return session_service_context
 
     async def handle_websocket_communication(
         self, websocket: WebSocket, client_uid: str
@@ -553,11 +576,22 @@ class WebSocketHandler:
         logger.info(f"Client {client_uid} disconnected")
         message_handler.cleanup_client(client_uid)
 
-    async def _cleanup_failed_connection(self, client_uid: str) -> None:
-        """Clean up failed connection data"""
+    async def _cleanup_failed_connection(
+        self, client_uid: str, context: Optional[ServiceContext] = None
+    ) -> None:
+        """Clean up failed connection data
+
+        context 是建到一半、可能還沒存進 client_contexts 的那一個。它得跟正常斷線
+        一樣 close()：load_cache 已經開始跟著她的心情，不收掉的話監聽會一直掛在
+        共用的 agent 上，直到伺服器關掉。
+        """
         self.client_connections.pop(client_uid, None)
         self.client_last_active.pop(client_uid, None)
-        self.client_contexts.pop(client_uid, None)
+        stored = self.client_contexts.pop(client_uid, None)
+        if stored is not None:
+            await _close_quietly(stored)
+        if context is not None and context is not stored:
+            await _close_quietly(context)
         self.received_data_buffers.pop(client_uid, None)
         self.chat_group_manager.client_group_map.pop(client_uid, None)
 

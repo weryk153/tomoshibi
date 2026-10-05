@@ -988,3 +988,117 @@ def test_she_speaks_up_through_the_engine_with_the_hosts_material(tmp_path):
     later = "\n".join(message.content for message in afterwards)
     assert "請你自然地開口" not in later
     assert "- 天文" not in later
+
+
+# --- 她的心情 ---------------------------------------------------------------------
+
+
+def test_her_mood_is_read_from_the_engine(tmp_path):
+    async def scenario():
+        return agent(companion(tmp_path, EngineLLM())).mood_message()
+
+    message = asyncio.run(scenario())
+
+    assert message["type"] == "character-mood"
+    assert (message["mood"], message["intensity"], message["half_life"]) == (
+        "neutral",
+        0.0,
+        300.0,
+    )
+    assert isinstance(message["updated_at"], float)
+
+
+def test_no_mood_while_the_engine_side_is_being_replaced():
+    assert agent(lambda: None).mood_message() is None
+
+
+def test_an_agent_that_does_not_know_its_character_has_nothing_to_follow(
+    tmp_path, monkeypatch
+):
+    def must_not_be_called(key, listener):
+        raise AssertionError(
+            "listen_to_mood must not reach the factory without a mood_key"
+        )
+
+    monkeypatch.setattr(agent_module, "listen_to_mood", must_not_be_called)
+
+    async def scenario():
+        stop = agent(companion(tmp_path, EngineLLM())).listen_to_mood(
+            lambda message: None
+        )
+        stop()
+
+    asyncio.run(scenario())
+
+
+# --- 人設即時換了，background 不能講古 ----------------------------------------------
+
+
+def test_hot_swapping_the_persona_updates_her_background_too(tmp_path):
+    """apply_persona 換人設是叫 set_system 再叫 set_persona；兩個都跟著換，
+    background 才會是新的那個，不會印出跟對話提示矛盾的舊人設。"""
+    from ai_character_engine.context.builder import ContextBuilder
+
+    async def scenario():
+        engine = companion(tmp_path, EngineLLM())
+        current = agent(engine, persona="你是紅莉栖。")
+        await say(current, "你好")
+        current.set_system("你是鋼琴家。")
+        current.set_persona("你是鋼琴家。")
+        await say(current, "再聊")
+        return engine.character
+
+    character = asyncio.run(scenario())
+    prompt = ContextBuilder().build_system_prompt(character)
+
+    assert "Background:" not in prompt
+    assert character.background == "你是鋼琴家。"
+    assert character.description.startswith("你是鋼琴家。")
+
+
+def test_a_persona_left_behind_does_not_leave_a_stale_background(tmp_path):
+    """呼叫方換了系統提示、忘了跟著叫 set_persona：background 寧可沒有，也不能
+    印出跟對話提示矛盾的舊人設。"""
+    from ai_character_engine.context.builder import ContextBuilder
+
+    async def scenario():
+        engine = companion(tmp_path, EngineLLM())
+        current = agent(engine, persona="你是紅莉栖。")
+        await say(current, "你好")
+        current.set_system("你是鋼琴家。")  # 沒有跟著叫 set_persona
+        await say(current, "再聊")
+        return engine.character
+
+    character = asyncio.run(scenario())
+    prompt = ContextBuilder().build_system_prompt(character)
+
+    assert character.background is None
+    assert "Background:" not in prompt
+
+
+def test_a_persona_whose_line_breaks_differ_still_counts_as_contained(tmp_path):
+    """主機自己判斷「人設包在系統提示裡」，規則要跟引擎 ContextBuilder 的一樣
+    （空白壓成一格再比）：換行不同不算矛盾，background 照留、也不另外印一段。"""
+    from ai_character_engine.context.builder import ContextBuilder
+
+    async def scenario():
+        engine = companion(tmp_path, EngineLLM())
+        current = agent(engine, persona="你是紅莉栖。\n\n喜歡實驗。")
+        current.set_system("規則。 你是紅莉栖。 喜歡實驗。")
+        await say(current, "你好")
+        return engine.character
+
+    character = asyncio.run(scenario())
+    prompt = ContextBuilder().build_system_prompt(character)
+
+    assert character.background == "你是紅莉栖。\n\n喜歡實驗。"
+    assert "Background:" not in prompt
+
+
+def test_the_agent_does_not_lean_on_the_engines_private_helpers():
+    """one_line 是引擎 context.builder 裡沒寫進文件的函式；換個名字主機就壞了。"""
+    import inspect
+
+    source = inspect.getsource(agent_module)
+    assert "ai_character_engine.context.builder" not in source
+    assert agent_module._one_line(" a\n\n b\tc ") == "a b c"

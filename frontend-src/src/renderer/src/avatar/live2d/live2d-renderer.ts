@@ -8,6 +8,7 @@ import { isClipMotion } from "../character-renderer.ts";
 import {
   setLive2DExpression,
   clearLive2DExpression,
+  hasLive2DExpression,
 } from "@/hooks/canvas/use-live2d-expression";
 import { playLive2DMotion } from "@/hooks/canvas/use-live2d-motion";
 
@@ -21,6 +22,10 @@ function getAdapter(): any | null {
 }
 
 export function createLive2DRenderer(): CharacterRenderer {
+  // 空檔時的臉：她的心情。Live2D 的表情沒有濃淡——有就整張套上；淡到門檻以下
+  // 時 avatar 會傳 null 進來，回到素顏。
+  let resting: string | number | null = null;
+
   return {
     beginSegment(audio, cues: SpeakCues, firstOfResponse) {
       // Get Live2D manager and model
@@ -138,8 +143,33 @@ export function createLive2DRenderer(): CharacterRenderer {
       }
     },
 
+    setRestingExpression(expression, intensity) {
+      resting = expression !== null && intensity > 0 ? expression : null;
+    },
+
+    isReady() {
+      // 一掛上就註冊了，模型（連同表情清單）是之後才非同步載完。載完之前套表情
+      // 會靜靜失敗，avatar.tsx 卻會以為套過了，之後就不再補——所以要問。
+      const model = getModel();
+      return !!getAdapter() && !!model && model.isLoadComplete?.() === true;
+    },
+
+    modelIdentity() {
+      // 換角色時 live2d.tsx 不會重新註冊，只是換掉底下的 LAppModel；拿實例本身
+      // 當身分，換了模型 avatar.tsx 就會重套一次空檔的臉。
+      return getModel();
+    },
+
     resetExpression() {
-      clearLive2DExpression(getAdapter());
+      const adapter = getAdapter();
+      // fix round 1：模型沒有這個表情（存檔後角色換了模型、表情名對不上）時要清回
+      // 素顏，不然會卡在上一句話講完時的臉——跟 VRM 的 setEmotion 回 false 時退回
+      // clear() 是同一個道理，只是 Live2D 沒有這個訊號，得先自己查表情清單。
+      if (resting !== null && adapter && getModel() && hasLive2DExpression(resting, adapter)) {
+        setLive2DExpression(resting, adapter);
+        return;
+      }
+      clearLive2DExpression(adapter);
     },
   };
 }

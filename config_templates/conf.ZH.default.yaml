@@ -49,6 +49,16 @@ character_config:
   # protected_names:
   #   星野凛: [星野凜, 星野琳]
 
+  # 这个角色的口头禅：来源写法 → 翻译到目标语言时要用的写法。留空（预设）＝
+  # 不保留任何口头禅。
+  #
+  # 音频翻译器（把回复转成这个角色语音语言的那个）逐句翻译时，句尾的口头禅
+  # 常被当成赘字直接丢掉——它不是一般词汇，翻译模型没有理由保留。这份对照表
+  # 会写进那个翻译器的 system prompt，交代照样保留，不要丢掉。
+  # 例：
+  # catchphrases:
+  #   nya: にゃ
+
   # ============== 提示词 ==============
 
   # 只需在下面输入你想使用的人格提示。
@@ -90,6 +100,7 @@ character_config:
         emotion_every: 1
         memory_every: 2
         self_memory_every: 2
+        mood_every: 2 # 她自己的心情；空档时的表情跟着它
         summary_every: 0
         reflection_every: 6
         goal_every: 4

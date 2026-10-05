@@ -175,6 +175,7 @@
       "engine_emotion_every": "情緒　每",
       "engine_memory_every": "記憶　每",
       "engine_self_memory_every": "她自己的事　每",
+      "engine_mood_every": "她的心情　每",
       "engine_goal_every": "目標　每",
       "engine_reflection_every": "反思　每",
       "engineShownHelp": "她同時放在心上的目標（最急的優先）與想法（最新的優先）最多幾條；其餘照樣存著。",

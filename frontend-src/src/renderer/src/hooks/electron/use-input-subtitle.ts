@@ -14,7 +14,7 @@ export function useInputSubtitle() {
     handleCompositionStart,
     handleCompositionEnd,
     handleSend,
-
+    flushPending,
   } = useTextInput();
 
   const { messages } = useChatHistory();
@@ -32,6 +32,10 @@ export function useInputSubtitle() {
 
   const handleInterrupt = () => {
     interrupt();
+    // Same as the footer (use-footer.ts): the user cut her off, so anything
+    // queued while she was talking goes out now — 'interrupted' deliberately
+    // doesn't trigger the idle auto-flush, so without this it stays stuck.
+    flushPending();
     if (autoStartMicOn) {
       startMic();
     }

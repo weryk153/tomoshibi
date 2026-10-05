@@ -43,6 +43,7 @@ def test_reading_gives_the_numbers_and_the_engine_is_always_on():
         "emotion_every": 1,
         "memory_every": 2,
         "self_memory_every": 2,
+        "mood_every": 2,
         "goal_every": 4,
         "reflection_every": 6,
         "goals_shown": 3,
@@ -72,6 +73,13 @@ def test_the_numbers_are_written_where_they_live_and_the_rest_is_kept(conf_file)
     assert "use_mcpp: False" in text
 
 
+def test_her_mood_rhythm_can_be_set_like_the_other_jobs(conf_file):
+    route.write_engine_settings({"mood_every": 0})
+
+    assert "        mood_every: 0\n" in conf_file.read_text(encoding="utf-8")
+    assert route.read_engine_settings()["mood_every"] == 0
+
+
 def test_a_conf_without_the_engine_block_gets_one(conf_file):
     conf_file.write_text(
         "character_config:\n"
@@ -90,6 +98,7 @@ def test_a_conf_without_the_engine_block_gets_one(conf_file):
         "emotion_every": 1,
         "memory_every": 3,
         "self_memory_every": 2,
+        "mood_every": 2,
         "goal_every": 4,
         "reflection_every": 6,
         "goals_shown": 3,

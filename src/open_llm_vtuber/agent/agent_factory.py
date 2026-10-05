@@ -63,6 +63,9 @@ class AgentFactory:
                 or kwargs.get("system_config", {}).get("player_language", "")
                 or ""
             )
+            # 她的人設原文，逐字包在 system_prompt 裡面；給引擎的 CharacterProfile.
+            # background 讀，背景工作（情緒、心情…）才拿得到人設摘要。
+            persona = str(kwargs.get("persona_prompt") or "")
             key = build_companion(
                 conf_uid=conf_uid,
                 character_name=str(kwargs.get("character_name") or ""),
@@ -74,6 +77,7 @@ class AgentFactory:
                     long_term_memory=kwargs.get("long_term_memory_enabled", True),
                 ),
                 language=player_language,
+                persona=persona,
             )
             from .agents.character_engine_agent import CharacterEngineAgent
 
@@ -84,6 +88,8 @@ class AgentFactory:
                 conf_uid=conf_uid,
                 character_name=str(kwargs.get("character_name") or ""),
                 system=system_prompt,
+                persona=persona,
+                mood_key=key,
                 live2d_model=live2d_model,
                 tts_preprocessor_config=tts_preprocessor_config,
                 faster_first_response=conversation.get("faster_first_response", True),

@@ -45,7 +45,26 @@ export interface CharacterRenderer {
   ): void;
   /** 打斷或整輪播完：停 lipsync、回 idle。 */
   stop(): void;
-  /** AI 回到 IDLE：清表情回素顏。 */
+  /**
+   * 空檔時的臉（她的心情）。expression 是這個模型的表情（Live2D 名字或索引、
+   * VRM preset，見 avatar/mood.ts 的 restingFor），null＝沒有心情；intensity 是
+   * 淡掉之後的強度 0..1。基本上只記下來，resetExpression() 才套用；唯一的例外是
+   * VRM 目前顯示的臉就是這個表情時，會順手把淡掉後的濃淡推進去（見 VRMRenderer）。
+   */
+  setRestingExpression(expression: string | number | null, intensity: number): void;
+  /**
+   * 現在套表情有沒有用（模型載完了沒）。avatar.tsx 的空檔重算在還沒就緒時不套、
+   * 也不記成「套過了」，等下一次再試。沒實作＝註冊時就已就緒（VRM 載完才註冊）。
+   * Live2D 是一掛上就註冊、模型之後才非同步載完，所以要這個。
+   */
+  isReady?(): boolean;
+  /**
+   * 畫面上現在是哪一個模型（只比身分，不看內容）。avatar.tsx 用它判斷「模型換了，
+   * 要重套空檔的臉」。沒實作＝renderer 本身就是身分（VRM 換模型會重新註冊）。
+   * Live2D 是同一個 renderer 底下換模型，所以要這個。
+   */
+  modelIdentity?(): unknown;
+  /** AI 回到 IDLE：回到 resting 表情；沒有 resting 就清回素顏。 */
   resetExpression(): void;
   /** 設定頁試播：套一個表情（VRM 是 preset／自訂名）。沒實作＝這個 renderer 不支援試播。 */
   previewExpression?(name: string): void;
@@ -66,10 +85,15 @@ export interface CharacterRenderer {
 }
 
 let active: CharacterRenderer | null = null;
+// fix round 1：avatar.tsx 進 IDLE 時若 renderer 還沒註冊好（VRM 是 lazy import，
+// Live2D 畫布也要等載入），空檔的臉本來要等到下一次 10 秒的 tick 才補上。訂閱這個
+// 就能在 renderer 一註冊好馬上補套一次，不用乾等。
+const registrationListeners = new Set<() => void>();
 
 /** 註冊為當前 renderer。回傳註銷函式；註銷只在自己仍是當前時才清，晚到的不會清掉別人。 */
 export function registerRenderer(renderer: CharacterRenderer): () => void {
   active = renderer;
+  for (const listener of [...registrationListeners]) listener();
   return () => {
     if (active === renderer) active = null;
   };
@@ -77,4 +101,12 @@ export function registerRenderer(renderer: CharacterRenderer): () => void {
 
 export function getActiveRenderer(): CharacterRenderer | null {
   return active;
+}
+
+/** 有新 renderer 註冊時收到通知（不含註銷）。回傳取消訂閱函式。 */
+export function onRendererRegistered(listener: () => void): () => void {
+  registrationListeners.add(listener);
+  return () => {
+    registrationListeners.delete(listener);
+  };
 }

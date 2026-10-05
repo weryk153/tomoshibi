@@ -62,6 +62,18 @@ class CharacterConfig(I18nMixin):
     protected_names: dict[str, list[str]] = Field(
         default_factory=dict, alias="protected_names"
     )
+    # 這個角色的口頭禪：來源寫法 → 翻譯到目標語言時要用的寫法。
+    #
+    # 音訊翻譯器（把回覆轉成她的語音語言）逐句翻譯時，句尾的口頭禪（例如中文裡的
+    # 「nya」）常常被當成贅字直接丟掉——它不是一般詞彙，翻譯模型沒有理由保留。
+    # 這份對照表會被寫進翻譯器的 system prompt，交代「這個詞要照這樣寫，不要丟掉
+    # 也不要意譯」。
+    #
+    # 跟 protected_names 不同：protected_names 保護的是輸出端的簡繁／同音字錯誤，
+    # 任何目標語言都可能發生；catchphrases 的值是寫給某一個特定目標語言的（通常
+    # 就是這個角色的語音語言），所以只接到翻譯目標真的是那個語言的翻譯器上才有
+    # 意義。留空（預設）＝不保留任何口頭禪，行為與沒有這個功能時完全相同。
+    catchphrases: dict[str, str] = Field(default_factory=dict, alias="catchphrases")
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "actions_enabled": Description(

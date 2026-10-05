@@ -28,6 +28,8 @@ from ai_character_engine.vision.models import VisionFrame
 from loguru import logger
 
 from ...chat_history_manager import get_history
+from ...character_engine.factory import listen_to_mood
+from ...character_mood import mood_message
 from ...config_manager import TTSPreprocessorConfig
 from ...conversation_quality import (
     STREAM_FACT,
@@ -72,6 +74,13 @@ _TOOLS_REGISTERED_BY: "weakref.WeakKeyDictionary[Any, int]" = (
 )
 
 
+def _one_line(text: str) -> str:
+    """空白全部壓成一格。跟引擎 ContextBuilder 判斷「background 已經包含在
+    description 裡」用的規則一樣（它的 one_line 不是公開介面，所以不直接匯入）：
+    兩邊對「包含」的判斷一致，人設才不會被它另外印成一段 Background。"""
+    return " ".join(text.split())
+
+
 class CharacterEngineAgent(AgentInterface):
     # 她說出口的話由引擎把關（不重複、不講客服腔、不留只剩標點的碎片、主動開口
     # 不只是應一聲）。主機自己那一層過濾對這個 agent 跳過，不然兩邊各擋一次。
@@ -93,16 +102,27 @@ class CharacterEngineAgent(AgentInterface):
         conf_uid: str = "",
         character_name: str = "",
         now: Callable[[], datetime] = datetime.now,
+        persona: str = "",
+        mood_key: str = "",
     ):
         """companion 可以是 CharacterCompanion 本身，或是一個每次回傳「目前那一個」
         的函式。正式執行時給的是函式：設定變了引擎那一側會換一個，而舊的 agent
         還被別的連線拿著。
+
+        persona 是她的人設原文（逐字包在 system 裡面），用來讓
+        CharacterProfile.background 跟著 description 一起刷新，背景工作讀得到她是
+        誰、對話提示不會因此多一段 Background。
+
+        mood_key 是工廠查引擎那一側用的鍵；有它才能跟著她的心情（背景結果改了心情
+        時通知頁面）。
         """
         self._companion_source = companion
         self._player_language = player_language
         self._conf_uid = conf_uid
         self._character_name = character_name
         self._now = now
+        self._persona = persona
+        self._mood_key = mood_key
         self._tools = self._tool_definitions(tool_manager) if use_mcpp else []
         self._tool_executor = tool_executor
         self._conversation: Optional[str] = None
@@ -140,8 +160,19 @@ class CharacterEngineAgent(AgentInterface):
     def set_system(self, system: str) -> None:
         """主機組好的系統提示（人設與通用規則）。她記得對方什麼、她自己說過什麼，
         都由引擎記、寫進對話的備註。舊 agent 留下的記憶檔不搬：那是當下的話被記成
-        事實，搬進來她每一輪都會照著講。"""
+        事實，搬進來她每一輪都會照著講。
+
+        只換系統提示、不換人設原文（self._persona）：即時換人設（apply_persona）
+        要再呼叫 set_persona，不然 _bring_up_to_date 會發現新系統提示裡已經沒有
+        舊人設，自己把 background 清成 None（見那裡的防呆），不會印出講古的人設。
+        """
         self._system = f"{system}\n\n{MEMORY_RULE}\n\n{INTERRUPT_RULE}"
+
+    def set_persona(self, persona: str) -> None:
+        """她的人設原文換了（即時換人設預設、換角色以外的場合）。之後每一輪
+        _bring_up_to_date 都會拿這份跟系統提示核對，兩邊對得上才會寫進
+        background，讓背景工作（情緒、心情…）讀到的是現在這個人設。"""
+        self._persona = persona
 
     # --- 她記得對方什麼 -------------------------------------------------------
     # 記憶頁讀寫的是這一份。
@@ -212,6 +243,22 @@ class CharacterEngineAgent(AgentInterface):
                 label = "使用者" if message.role == "user" else "角色"
                 lines.append(f"{label}：{message.content.strip()[:500]}")
         return "\n".join(lines) or None
+
+    # --- 她的心情 -------------------------------------------------------------
+
+    def mood_message(self) -> Optional[dict]:
+        """給前端的 character-mood；引擎那一側還沒好（正在換）就是 None。"""
+        companion = self._companion()
+        if companion is None:
+            return None
+        return mood_message(companion.snapshot())
+
+    def listen_to_mood(self, listener: Callable[[dict], None]) -> Callable[[], None]:
+        """背景結果改了她的心情時呼叫 listener(訊息)。記在角色上：引擎那一側
+        換了一個也照樣收得到。回傳停止聽的函式。"""
+        if not self._mood_key:
+            return lambda: None
+        return listen_to_mood(self._mood_key, listener)
 
     def handle_interrupt(self, heard_response: str) -> None:
         """主機打斷的方式是取消等著回覆的那個 task，接著馬上呼叫這裡，不等它停。
@@ -453,8 +500,19 @@ class CharacterEngineAgent(AgentInterface):
         if take_back is not None:
             # 在引擎那一輪裡面做：這時沒有別的連線在講話，最新的那一則才拿得掉。
             companion.take_back(take_back)
-        if companion.character.description != self._system:
-            companion.character = replace(companion.character, description=self._system)
+        persona = self._persona or None
+        if persona is not None and _one_line(persona) not in _one_line(self._system):
+            # 人設跟系統提示對不上（通常是換人設時只叫了 set_system、忘了跟著
+            # 叫 set_persona）：background 寧可沒有，也不能印出跟對話提示矛盾的
+            # 舊人設——description 與 background 永遠不會各講各的。
+            persona = None
+        if (
+            companion.character.description != self._system
+            or companion.character.background != persona
+        ):
+            companion.character = replace(
+                companion.character, description=self._system, background=persona
+            )
         if _TOOLS_REGISTERED_BY.get(companion) == id(self):
             return
         for registered in list(companion.tools):

@@ -16,6 +16,7 @@ from .conversation_utils import (
 from .types import WebSocketSend
 from .tts_manager import TTSTaskManager
 from ..chat_history_manager import store_message
+from ..character_mood import send_character_mood
 from ..service_context import ServiceContext
 from ..conversation_quality import normalize_output_language_variant
 from ..proactive_context import (
@@ -274,6 +275,10 @@ async def process_single_conversation(
             websocket_send=websocket_send,
             client_uid=client_uid,
         )
+
+        # 講完了（也包括主動開口）：空檔的臉帶著她這一輪之後的心情。背景的判斷
+        # 晚一點才到，到了引擎會再通知（_follow_mood）。
+        await send_character_mood(context.agent_engine, websocket_send)
 
         if is_proactive and full_response:
             proactive_uid = str(

@@ -17,7 +17,7 @@ def _context_with(protected_names):
 def test_subtitle_translator_is_built_with_the_characters_names(monkeypatch):
     captured = {}
 
-    def _capture(provider, cfg, protected_names=None):
+    def _capture(provider, cfg, protected_names=None, catchphrases=None):
         captured["protected_names"] = protected_names
         return SimpleNamespace()
 
