@@ -229,3 +229,109 @@ def test_a_new_page_hears_her_mood_right_after_her_model(tmp_path, monkeypatch):
 
     kinds = [m["type"] for m in socket.sent]
     assert kinds[kinds.index("set-model-and-conf") + 1] == "character-mood"
+
+
+def _bare_handler():
+    from src.open_llm_vtuber.chat_group import ChatGroupManager
+    from src.open_llm_vtuber.websocket_handler import WebSocketHandler
+
+    handler = WebSocketHandler.__new__(WebSocketHandler)
+    handler.client_contexts = {}
+    handler.client_connections = {}
+    handler.client_last_active = {}
+    handler.current_conversation_tasks = {}
+    handler.received_data_buffers = {}
+    handler.chat_group_manager = ChatGroupManager()
+    handler.stream = None
+    return handler
+
+
+def _following_context(agent):
+    context = _context(agent)
+    context.send_text = Sent()
+    context.mcp_client = None
+    context._follow_mood()
+    return context
+
+
+def test_a_connection_that_fails_after_its_page_was_stored_stops_following():
+    """連線建到一半失敗：load_cache 已經開始跟著她的心情，不收掉的話那個監聽
+    會一直掛在 agent 上，直到伺服器關掉。"""
+    agent = Listening()
+    handler = _bare_handler()
+
+    async def init(_send_text, _client_uid):
+        return _following_context(agent)
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("socket gone")
+
+    handler._init_service_context = init
+    handler._send_initial_messages = broken
+
+    with pytest.raises(RuntimeError):
+        asyncio.run(handler.handle_new_connection(FakeSocket(), "me"))
+
+    assert agent.listeners == []
+    assert "me" not in handler.client_contexts
+
+
+def test_a_connection_that_fails_before_its_page_was_stored_stops_following():
+    agent = Listening()
+    handler = _bare_handler()
+
+    async def init(_send_text, _client_uid):
+        return _following_context(agent)
+
+    async def broken(*_args, **_kwargs):
+        raise RuntimeError("socket gone")
+
+    handler._init_service_context = init
+    handler._store_client_data = broken
+
+    with pytest.raises(RuntimeError):
+        asyncio.run(handler.handle_new_connection(FakeSocket(), "me"))
+
+    assert agent.listeners == []
+
+
+def test_a_page_that_fails_while_restoring_her_character_stops_following(
+    monkeypatch,
+):
+    """_init_service_context 在 load_cache 之後還會還原上次選的角色；那一步失敗時
+    context 還沒交出去，只有它自己收得掉。"""
+    import src.open_llm_vtuber.websocket_handler as websocket_handler
+
+    agent = Listening()
+    handler = _bare_handler()
+    from unittest.mock import MagicMock
+
+    handler.default_context_cache = MagicMock()
+    created = []
+
+    async def load_cache(self, **_kwargs):
+        self.agent_engine = agent
+        self.send_text = Sent()
+        self.mcp_client = None
+        self.active_config_file = "conf.yaml"
+        self._follow_mood()
+        created.append(self)
+
+    async def load_character_config(self, _name):
+        raise RuntimeError("broken character file")
+
+    monkeypatch.setattr(ServiceContext, "load_cache", load_cache)
+    monkeypatch.setattr(ServiceContext, "load_character_config", load_character_config)
+    monkeypatch.setattr(
+        websocket_handler, "get_active_character_filename", lambda: "frieren.yaml"
+    )
+    monkeypatch.setattr(
+        ServiceContext,
+        "__init__",
+        lambda self: setattr(self, "_stop_following_mood", None),
+    )
+
+    with pytest.raises(RuntimeError):
+        asyncio.run(handler._init_service_context(Sent(), "me"))
+
+    assert created and agent.listeners == []

@@ -62,6 +62,7 @@ agent_settings:
   character_engine_agent:
     emotion_every: 1      # 每輪分析對方的情緒；決定她下一句的心情
     memory_every: 2       # 每 2 輪擷取一次記憶
+    mood_every: 2         # 每 2 輪更新一次她自己的心情；空檔時的臉帶著它，隨時間慢慢淡掉
     summary_every: 0      # 摘要，預設停用
     reflection_every: 6   # 每 6 輪反思一次
     goal_every: 4         # 每 4 輪產生一次目標

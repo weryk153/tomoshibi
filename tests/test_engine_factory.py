@@ -232,6 +232,25 @@ def test_the_cognition_settings_reach_the_engine():
     assert settings.emotion_every == 1
 
 
+def test_her_mood_rhythm_from_the_config_file_reaches_the_engine():
+    """走一遍真正的路：conf.yaml 的區塊先過 config_manager 的模型再 model_dump()
+    交給工廠（service_context.init_agent 就是這樣做）。模型不認得的鍵在這一步就沒了。"""
+    from src.open_llm_vtuber.config_manager.agent import AgentSettings
+
+    arguments = factory_arguments()
+    dumped = AgentSettings(
+        conversation=arguments["agent_settings"]["conversation"],
+        character_engine_agent={"mood_every": 5},
+    ).model_dump()
+    arguments["agent_settings"]["character_engine_agent"] = dumped[
+        "character_engine_agent"
+    ]
+
+    settings = AgentFactory.create_agent(**arguments)._companion().settings
+
+    assert settings.mood_every == 5
+
+
 def test_how_much_she_keeps_in_mind_reaches_the_engine():
     arguments = factory_arguments()
     arguments["agent_settings"]["character_engine_agent"] = {

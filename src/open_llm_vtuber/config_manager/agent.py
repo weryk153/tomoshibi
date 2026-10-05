@@ -128,6 +128,8 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
     emotion_every: int = Field(1, alias="emotion_every", ge=0)
     memory_every: int = Field(2, alias="memory_every", ge=0)
     self_memory_every: int = Field(2, alias="self_memory_every", ge=0)
+    # 她自己的心情（引擎 CompanionSettings.mood_every）；空檔的臉跟著它。
+    mood_every: int = Field(2, alias="mood_every", ge=0)
     summary_every: int = Field(0, alias="summary_every", ge=0)
     reflection_every: int = Field(6, alias="reflection_every", ge=0)
     goal_every: int = Field(4, alias="goal_every", ge=0)
@@ -161,6 +163,10 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
         "self_memory_every": Description(
             en="Remember what she said about herself every N turns (0 disables)",
             zh="每幾輪記一次她自己說過的事（0 為停用）",
+        ),
+        "mood_every": Description(
+            en="Update her own mood every N turns; her resting face follows it (0 disables)",
+            zh="每幾輪更新一次她自己的心情，空檔的表情跟著它（0 為停用）",
         ),
         "background_base_url": Description(
             en="Another endpoint for the background jobs (empty: the one she talks with)",

@@ -27,6 +27,7 @@ def test_defaults_match_what_was_measured_on_a_local_model():
         "emotion_every": 1,
         "memory_every": 2,
         "self_memory_every": 2,
+        "mood_every": 2,
         "summary_every": 0,
         "reflection_every": 6,
         "goal_every": 4,
@@ -41,6 +42,16 @@ def test_defaults_match_what_was_measured_on_a_local_model():
         "background_model": "",
         "background_api_key": "",
     }
+
+
+def test_her_mood_rhythm_survives_the_config_round_trip():
+    """pydantic 會靜靜丟掉不認得的鍵：mood_every 沒列在模型上的話，寫在 conf.yaml
+    裡也到不了引擎，每個人都是每兩輪一次、關不掉。"""
+    settings = AgentSettings(character_engine_agent={"mood_every": 0})
+
+    dumped = settings.model_dump()["character_engine_agent"]
+    assert dumped["mood_every"] == 0
+    assert CharacterEngineAgentConfig(**dumped).mood_every == 0
 
 
 def test_zero_turns_a_worker_off():

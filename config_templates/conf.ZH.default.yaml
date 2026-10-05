@@ -100,6 +100,7 @@ character_config:
         emotion_every: 1
         memory_every: 2
         self_memory_every: 2
+        mood_every: 2 # 她自己的心情；空档时的表情跟着它
         summary_every: 0
         reflection_every: 6
         goal_every: 4

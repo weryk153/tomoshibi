@@ -1074,3 +1074,31 @@ def test_a_persona_left_behind_does_not_leave_a_stale_background(tmp_path):
 
     assert character.background is None
     assert "Background:" not in prompt
+
+
+def test_a_persona_whose_line_breaks_differ_still_counts_as_contained(tmp_path):
+    """主機自己判斷「人設包在系統提示裡」，規則要跟引擎 ContextBuilder 的一樣
+    （空白壓成一格再比）：換行不同不算矛盾，background 照留、也不另外印一段。"""
+    from ai_character_engine.context.builder import ContextBuilder
+
+    async def scenario():
+        engine = companion(tmp_path, EngineLLM())
+        current = agent(engine, persona="你是紅莉栖。\n\n喜歡實驗。")
+        current.set_system("規則。 你是紅莉栖。 喜歡實驗。")
+        await say(current, "你好")
+        return engine.character
+
+    character = asyncio.run(scenario())
+    prompt = ContextBuilder().build_system_prompt(character)
+
+    assert character.background == "你是紅莉栖。\n\n喜歡實驗。"
+    assert "Background:" not in prompt
+
+
+def test_the_agent_does_not_lean_on_the_engines_private_helpers():
+    """one_line 是引擎 context.builder 裡沒寫進文件的函式；換個名字主機就壞了。"""
+    import inspect
+
+    source = inspect.getsource(agent_module)
+    assert "ai_character_engine.context.builder" not in source
+    assert agent_module._one_line(" a\n\n b\tc ") == "a b c"

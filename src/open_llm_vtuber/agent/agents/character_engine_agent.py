@@ -22,7 +22,6 @@ from uuid import uuid4
 
 from ai_character_engine.host import HostBridgeError, image_from_host
 from ai_character_engine.companion import CompanionClosed, TurnInterrupted
-from ai_character_engine.context.builder import one_line
 from ai_character_engine.llm.models import Message
 from ai_character_engine.tools.models import ToolDefinition
 from ai_character_engine.vision.models import VisionFrame
@@ -73,6 +72,13 @@ _PICTURE_SOURCES = {"camera": "camera", "screen": "screenshot"}
 _TOOLS_REGISTERED_BY: "weakref.WeakKeyDictionary[Any, int]" = (
     weakref.WeakKeyDictionary()
 )
+
+
+def _one_line(text: str) -> str:
+    """空白全部壓成一格。跟引擎 ContextBuilder 判斷「background 已經包含在
+    description 裡」用的規則一樣（它的 one_line 不是公開介面，所以不直接匯入）：
+    兩邊對「包含」的判斷一致，人設才不會被它另外印成一段 Background。"""
+    return " ".join(text.split())
 
 
 class CharacterEngineAgent(AgentInterface):
@@ -495,7 +501,7 @@ class CharacterEngineAgent(AgentInterface):
             # 在引擎那一輪裡面做：這時沒有別的連線在講話，最新的那一則才拿得掉。
             companion.take_back(take_back)
         persona = self._persona or None
-        if persona is not None and one_line(persona) not in one_line(self._system):
+        if persona is not None and _one_line(persona) not in _one_line(self._system):
             # 人設跟系統提示對不上（通常是換人設時只叫了 set_system、忘了跟著
             # 叫 set_persona）：background 寧可沒有，也不能印出跟對話提示矛盾的
             # 舊人設——description 與 background 永遠不會各講各的。
