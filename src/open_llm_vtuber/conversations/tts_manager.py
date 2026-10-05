@@ -10,6 +10,7 @@ from ..agent.output_types import DisplayText, Actions
 from ..avatar_model import AvatarModel
 from ..tts.tts_interface import TTSInterface
 from ..utils.stream_audio import prepare_audio_payload
+from .laughter import is_laughter_only
 from .types import WebSocketSend
 
 
@@ -21,6 +22,16 @@ def _is_timeout(error: Optional[BaseException]) -> bool:
     if isinstance(error, TimeoutError):
         return True
     return any("Timeout" in cls.__name__ for cls in type(error).__mro__)
+
+
+def _mark_subtitle_hold(
+    payload: Dict, display_text: DisplayText, subtitle_text: Optional[str]
+) -> None:
+    """只有笑聲的句子（「哈↗哈↘哈↗！」）標 keep_subtitle：聲音照播、對話紀錄
+    照記，前端只是不把畫面字幕換成這一句，留著上一句。看的是畫面上會顯示的
+    那行（有字幕翻譯就看翻譯）。"""
+    visible = subtitle_text or getattr(display_text, "text", "") or ""
+    payload["keep_subtitle"] = is_laughter_only(visible)
 
 
 class TTSTaskManager:
@@ -166,6 +177,7 @@ class TTSTaskManager:
             actions=actions,
             subtitle_text=subtitle_text,
         )
+        _mark_subtitle_hold(audio_payload, display_text, subtitle_text)
         await self._payload_queue.put(([audio_payload], sequence_number))
 
     async def _process_tts(
@@ -225,6 +237,7 @@ class TTSTaskManager:
 
         # 字幕照常出現（靜音 payload），通知跟在同一句後面，順序不亂。
         # 被 clear() 取消時 CancelledError 會直接穿出去，不會走到這裡。
+        _mark_subtitle_hold(payload, display_text, subtitle_text)
         messages = [payload]
         if failure_notice:
             messages.append(failure_notice)

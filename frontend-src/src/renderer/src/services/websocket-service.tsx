@@ -27,6 +27,8 @@ export interface AudioPayload {
   slice_length?: number;
   display_text?: DisplayText;
   subtitle_text?: string;
+  // 只有笑聲的一句：畫面字幕留著上一句（後端 tts_manager._mark_subtitle_hold）。
+  keep_subtitle?: boolean;
   actions?: Actions;
 }
 
@@ -100,6 +102,7 @@ export interface MessageEvent {
   forwarded?: boolean;
   display_text?: DisplayText;
   subtitle_text?: string;
+  keep_subtitle?: boolean;
   live2d_model?: string;
   browser_view?: {
     debuggerFullscreenUrl: string;
