@@ -17,6 +17,19 @@
 這輪結束後存著的心情。
 
 只讀 chat_history/ 的對話檔，不寫任何東西回去；引擎狀態只在記憶體裡。
+
+現場對話模式（--live，可重複）：不重播紀錄，她的回覆由 companion 自己用同一顆模型
+生成（溫度 0.7，跟 Tomoshibi 預設講話的設定一樣）。每組兩個檔：
+
+    --live 人設.md 台詞.txt [--live 人設.md 台詞.txt ...]
+
+人設.md 整份當她的 description（跟 Tomoshibi 把系統提示放進 CharacterProfile 一樣），
+第一行若是「# 名字」就拿來當她的名字，否則用檔名；台詞.txt 一行是一輪使用者說的話，
+空行略過。--live 與重播的對話檔不能混用；現場模式不限段數。
+
+--mood-every N 是多少輪排一次 mood 判斷（預設 1，每輪）；N=2 時沒排的輪換規則動心情。
+--gap-seconds S 是每輪之間模擬經過的秒數（預設 0）：companion 的時鐘每輪往前撥 S 秒，
+心情的淡去不用真的等就看得到。這兩個值都寫在頁首。
 """
 
 import argparse
@@ -77,6 +90,19 @@ class Recording:
         return response
 
 
+class SimulatedClock:
+    """真實時間加上模擬經過的時間；每輪之間 advance() 一次。"""
+
+    def __init__(self):
+        self.offset = 0.0
+
+    def advance(self, seconds: float) -> None:
+        self.offset += seconds
+
+    def __call__(self) -> float:
+        return time.time() + self.offset
+
+
 def turns_of(path: Path, limit: int) -> tuple[str, list[tuple[str, str]]]:
     """(她的名字, [(使用者的話, 她的回覆)])，取前 limit 輪。"""
     name, pairs, pending = "", [], None
@@ -90,6 +116,19 @@ def turns_of(path: Path, limit: int) -> tuple[str, list[tuple[str, str]]]:
             pairs.append((pending, content))
             pending = None
     return name or "角色", pairs[:limit]
+
+
+def live_turns_of(persona: Path, script: Path) -> tuple[str, str, list[str]]:
+    """(她的名字, 人設全文, [使用者每輪的話])。"""
+    description = persona.read_text(encoding="utf-8").strip()
+    first = description.splitlines()[0].strip() if description else ""
+    name = first.removeprefix("#").strip() if first.startswith("#") else persona.stem
+    lines = [
+        line.strip()
+        for line in script.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    ]
+    return name or persona.stem, description, lines
 
 
 def parsed(text):
@@ -118,45 +157,63 @@ def canonical(answer) -> str | None:
 UNCHANGED = "unchanged"
 
 
-def rule_mood(observation):
+def rule_mood(observation, now: float):
     if not isinstance(observation, dict):
         return None
     patch = relationship_patch(
         CharacterState(custom={OBSERVATION_KEY: observation}).snapshot(),
         count_turn=False,
-        now=time.time(),
+        now=now,
     )
     if patch is None or patch.emotion is None:
         return UNCHANGED
     return patch.emotion, patch.mood_intensity
 
 
+def model(args, temperature=0.1, max_tokens=600):
+    return OpenAICompatibleChatClient(
+        model=args.model,
+        base_url=args.base_url,
+        api_key="not-needed",
+        timeout_seconds=None,
+        request_options={
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "extra_body": {"reasoning_effort": "none"},
+        },
+    )
+
+
 async def replay(path: Path, args) -> tuple[str, list[dict]]:
     name, pairs = turns_of(path, args.max_turns)
+    her = Replay()
+    return name, await converse(
+        name, "(replay)", [(user, line) for user, line in pairs], her, path.name, args
+    )
 
-    def model():
-        return OpenAICompatibleChatClient(
-            model=args.model,
-            base_url=args.base_url,
-            api_key="not-needed",
-            timeout_seconds=None,
-            request_options={
-                "temperature": 0.1,
-                "max_tokens": 600,
-                "extra_body": {"reasoning_effort": "none"},
-            },
-        )
 
-    her, emotion, mood = Replay(), Recording(model()), Recording(model())
+async def live(persona: Path, script: Path, args) -> tuple[str, list[dict]]:
+    name, description, lines = live_turns_of(persona, script)
+    her = model(args, temperature=0.7, max_tokens=400)
+    return name, await converse(
+        name, description, [(user, None) for user in lines], her, persona.name, args
+    )
+
+
+async def converse(name, description, turns, her, label, args) -> list[dict]:
+    """turns 是 [(使用者的話, 她的回覆或 None)]；None 就讓 her 現場生成。"""
+    emotion, mood = Recording(model(args)), Recording(model(args))
+    clock = SimulatedClock()
     companion = CharacterCompanion(
         character=CharacterProfile(
-            id="mood-compare", name=name, description="(replay)"
+            id="mood-compare", name=name, description=description
         ),
         llm=her,
         background_llm={"emotion": emotion, "mood": mood},
+        clock=clock,
         settings=CompanionSettings(
             emotion_every=1,
-            mood_every=1,
+            mood_every=args.mood_every,
             memory_every=0,
             self_memory_every=0,
             goal_every=0,
@@ -205,12 +262,17 @@ async def replay(path: Path, args) -> tuple[str, list[dict]]:
 
     rows, seen = [], None
     try:
-        for number, (user, line) in enumerate(pairs, 1):
-            her.line = line
+        for number, (user, line) in enumerate(turns, 1):
+            if number > 1:
+                clock.advance(args.gap_seconds)
+            if line is not None:
+                her.line = line
             emotion.last = mood.last = None
             worker_effects.clear()
             rule_effects.clear()
-            await companion.reply(user, conversation_id="replay")
+            result = await companion.reply(user, conversation_id="replay")
+            if line is None:
+                line = result.text
             await companion.settle()
             observation = companion.runtime.state.custom.get(OBSERVATION_KEY)
             fresh = (
@@ -220,26 +282,24 @@ async def replay(path: Path, args) -> tuple[str, list[dict]]:
                 seen = observation.get("proposal_id")
             answer = parsed(mood.last)
             word, strength, updated_at = stored()
-            _, now_strength = effective_mood(
-                word, strength, updated_at, now=time.time()
-            )
+            _, now_strength = effective_mood(word, strength, updated_at, now=clock())
             rows.append(
                 {
                     "number": number,
                     "user": user,
                     "her": line,
                     "observation": observation if fresh else None,
-                    "rule": rule_mood(observation) if fresh else None,
+                    "rule": rule_mood(observation, clock()) if fresh else None,
                     "rule_moved": any(rule_effects),
                     "answer": answer,
                     "worker": worker_effects[-1] if worker_effects else None,
                     "after": (word, strength, now_strength),
                 }
             )
-            print(f"{path.name} turn {number}/{len(pairs)}", file=sys.stderr)
+            print(f"{label} turn {number}/{len(turns)}", file=sys.stderr)
     finally:
         await companion.close()
-    return name, rows
+    return rows
 
 
 def cell(text) -> str:
@@ -269,6 +329,8 @@ def render_row(row: dict, name: str) -> str:
             "\n→ 改了她的心情"
             if row["rule_moved"]
             else "\n（這輪有 mood 判斷，規則不動心情）"
+            if row["answer"] is not None
+            else "\n（規則沒動她的心情）"
         )
 
     answer = row["answer"]
@@ -311,7 +373,7 @@ def render(sections: list[tuple[Path, str, list[dict]]], args) -> str:
                 "使用者",
                 name,
                 "使用者看起來（情緒分析）",
-                "規則會推出的心情（只在沒排 mood 判斷的輪生效；本頁每輪都排）",
+                "規則會推出的心情（只在沒排 mood 判斷的輪生效）",
                 "mood worker",
                 "這輪之後她的心情",
             )
@@ -327,16 +389,25 @@ def render(sections: list[tuple[Path, str, list[dict]]], args) -> str:
         "th{background:#f3f3f3;position:sticky;top:0}"
         "@media (prefers-color-scheme:dark){body{background:#1b1b1b;color:#ddd}th{background:#333}td,th{border-color:#555}}"
     )
-    meta = f"模型 {args.model} @ {args.base_url}　{datetime.now():%Y-%m-%d %H:%M}"
+    mode = "現場對話（她的回覆由模型生成）" if args.live else "重播紀錄"
+    meta = (
+        f"{mode}　模型 {args.model} @ {args.base_url}　mood_every={args.mood_every}"
+        f"　每輪間隔（模擬）{args.gap_seconds:g} 秒　{datetime.now():%Y-%m-%d %H:%M}"
+    )
+    every = (
+        "本頁每輪都排 mood 判斷（mood_every=1）。有 mood 判斷的輪，規則只動信任與好感，"
+        "不動她的心情；規則欄是沒排 mood 判斷的輪（預設 mood_every=2 的奇數輪）規則會推出的心情。"
+        if args.mood_every == 1
+        else f"本頁每 {args.mood_every} 輪排一次 mood 判斷（mood_every={args.mood_every}）。"
+        "有 mood 判斷的輪，規則只動信任與好感，不動她的心情；沒排的輪由規則決定，"
+        "規則欄會寫它有沒有改了她的心情。"
+    )
     return (
         "<!doctype html><html lang='zh-Hant'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         f"<title>心情判斷對照</title><style>{style}</style></head><body>"
         f"<h1>她的心情：規則（參考）與 mood worker 並排</h1><p>{cell(meta)}</p>"
-        "<p>本頁每輪都排 mood 判斷（mood_every=1）。有 mood 判斷的輪，規則只動信任與好感，"
-        "不動她的心情；規則欄是沒排 mood 判斷的輪（預設 mood_every=2 的奇數輪）規則會推出的心情。</p>"
-        + "".join(parts)
-        + "</body></html>"
+        f"<p>{cell(every)}</p>" + "".join(parts) + "</body></html>"
     )
 
 
@@ -346,6 +417,9 @@ async def main(args) -> None:
         path = Path(raw)
         name, rows = await replay(path, args)
         sections.append((path, name, rows))
+    for persona, script in args.live or ():
+        name, rows = await live(Path(persona), Path(script), args)
+        sections.append((Path(persona), name, rows))
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(render(sections, args), encoding="utf-8")
@@ -353,13 +427,36 @@ async def main(args) -> None:
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("conversations", nargs="+")
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    parser.add_argument("conversations", nargs="*", help="重播用的對話檔（至少三段）")
+    parser.add_argument(
+        "--live",
+        nargs=2,
+        action="append",
+        metavar=("PERSONA_MD", "SCRIPT_TXT"),
+        help="現場對話：人設檔與台詞檔（一行一輪），可重複",
+    )
+    parser.add_argument(
+        "--mood-every", type=int, default=1, help="幾輪排一次 mood 判斷（預設 1）"
+    )
+    parser.add_argument(
+        "--gap-seconds",
+        type=float,
+        default=0.0,
+        help="每輪之間模擬經過的秒數，撥 companion 的時鐘（預設 0）",
+    )
     parser.add_argument("--base-url", default="http://127.0.0.1:1234/v1")
     parser.add_argument("--model", required=True)
     parser.add_argument("--max-turns", type=int, default=12)
     parser.add_argument("--out", default="docs/superpowers/eval/2026-10-05-mood.html")
     arguments = parser.parse_args()
-    if len(arguments.conversations) < 3:
+    if arguments.live and arguments.conversations:
+        parser.error("--live 不能跟重播的對話檔混用")
+    if not arguments.live and len(arguments.conversations) < 3:
         parser.error("至少三段對話（人讀對照的慣例）")
+    if arguments.mood_every < 1:
+        parser.error("--mood-every 至少 1")
     asyncio.run(main(arguments))
