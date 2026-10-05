@@ -935,7 +935,9 @@
     "newConversation": "새 대화가 시작됐어요",
     "newChatHistory": "새 대화 기록이 생성됐어요",
     "historyDeleteSuccess": "기록을 삭제했어요",
-    "historyDeleteFail": "기록 삭제에 실패했어요"
+    "historyDeleteFail": "기록 삭제에 실패했어요",
+    "ttsTimedOut": "음성 합성 시간이 초과되어 이 문장은 소리가 없어요",
+    "ttsFailed": "음성 합성에 실패해서 이 문장은 소리가 없어요"
   },
   "error": {
     "notAnImage": "이미지 파일을 선택하세요.",

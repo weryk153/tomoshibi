@@ -935,7 +935,9 @@
     "newConversation": "新對話已開始",
     "newChatHistory": "新聊天歷史已建立",
     "historyDeleteSuccess": "歷史記錄刪除成功",
-    "historyDeleteFail": "刪除歷史記錄失敗"
+    "historyDeleteFail": "刪除歷史記錄失敗",
+    "ttsTimedOut": "語音合成失敗（逾時），這句沒有聲音",
+    "ttsFailed": "語音合成失敗，這句沒有聲音"
   },
   "error": {
     "notAnImage": "請選擇圖片檔案。",

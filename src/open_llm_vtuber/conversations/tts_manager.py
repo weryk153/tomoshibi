@@ -3,7 +3,7 @@ import json
 import re
 import uuid
 from datetime import datetime
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Tuple
 from loguru import logger
 
 from ..agent.output_types import DisplayText, Actions
@@ -11,6 +11,16 @@ from ..avatar_model import AvatarModel
 from ..tts.tts_interface import TTSInterface
 from ..utils.stream_audio import prepare_audio_payload
 from .types import WebSocketSend
+
+
+def _is_timeout(error: Optional[BaseException]) -> bool:
+    """各引擎用的 HTTP 套件不同（requests、httpx、aiohttp…），逾時例外沒有共同
+    父類別可以 isinstance，所以看內建 TimeoutError 或類別名稱裡的 Timeout。"""
+    if error is None:
+        return False
+    if isinstance(error, TimeoutError):
+        return True
+    return any("Timeout" in cls.__name__ for cls in type(error).__mro__)
 
 
 class TTSTaskManager:
@@ -28,11 +38,18 @@ class TTSTaskManager:
     # parallel. This is deliberately small, not a generic thread-pool-sized value.
     SYNTHESIS_CONCURRENCY = 2
 
+    # 合成失敗（丟例外或回 None）時總共試幾次。GPT-SoVITS 在記憶體吃緊時偶爾
+    # 一句超過 120 秒，第二次通常就過了；再失敗才放棄，送靜音 payload 並跳通知。
+    # 放在這裡而不是各引擎裡，所以每個 TTS 後端都有同樣的保護。
+    SYNTHESIS_ATTEMPTS = 2
+
     def __init__(self) -> None:
         self.task_list: List[asyncio.Task] = []
         self._lock = asyncio.Lock()
-        # Queue to store ordered payloads
-        self._payload_queue: asyncio.Queue[Dict] = asyncio.Queue()
+        # Queue of (messages, sequence_number). Each sequence number carries the
+        # list of websocket messages for that sentence (its audio payload, plus a
+        # failure notice when synthesis gave up), so they stay in sentence order.
+        self._payload_queue: asyncio.Queue = asyncio.Queue()
         # Task to handle sending payloads in order
         self._sender_task: Optional[asyncio.Task] = None
         # Counter for maintaining order
@@ -116,18 +133,18 @@ class TTSTaskManager:
         Process and send payloads in correct order.
         Runs continuously until all payloads are processed.
         """
-        buffered_payloads: Dict[int, Dict] = {}
+        buffered_payloads: Dict[int, List[Dict]] = {}
 
         while True:
             try:
-                # Get payload from queue
-                payload, sequence_number = await self._payload_queue.get()
-                buffered_payloads[sequence_number] = payload
+                # Get this sentence's messages from queue
+                messages, sequence_number = await self._payload_queue.get()
+                buffered_payloads[sequence_number] = messages
 
                 # Send payloads in order
                 while self._next_sequence_to_send in buffered_payloads:
-                    next_payload = buffered_payloads.pop(self._next_sequence_to_send)
-                    await websocket_send(json.dumps(next_payload))
+                    for message in buffered_payloads.pop(self._next_sequence_to_send):
+                        await websocket_send(json.dumps(message))
                     self._next_sequence_to_send += 1
 
                 self._payload_queue.task_done()
@@ -149,7 +166,7 @@ class TTSTaskManager:
             actions=actions,
             subtitle_text=subtitle_text,
         )
-        await self._payload_queue.put((audio_payload, sequence_number))
+        await self._payload_queue.put(([audio_payload], sequence_number))
 
     async def _process_tts(
         self,
@@ -163,11 +180,18 @@ class TTSTaskManager:
     ) -> None:
         """Process TTS generation and queue the result for ordered delivery"""
         audio_file_path = None
+        failure_notice: Optional[Dict] = None
         try:
             async with self._synthesis_semaphore:
-                audio_file_path = await self._generate_audio(
+                audio_file_path, error = await self._synthesize_with_retry(
                     tts_engine, tts_text, emotion=getattr(actions, "emotion", None)
                 )
+            if not audio_file_path:
+                logger.error(
+                    f"TTS synthesis failed after {self.SYNTHESIS_ATTEMPTS} attempts,"
+                    f" sending silent payload: {error!r} text='{tts_text[:30]}'"
+                )
+                failure_notice = self._synthesis_failed_notice(error)
             # prepare_audio_payload does pydub/ffmpeg decode+re-encode and base64
             # encoding synchronously (utils/stream_audio.py) — non-trivial CPU work
             # per sentence. Keep it off the event loop, same as synthesis itself.
@@ -182,8 +206,6 @@ class TTSTaskManager:
             logger.info(
                 f"Audio payload ready: has_audio={has_audio}, text='{tts_text[:30]}'"
             )
-            # Queue the payload with its sequence number
-            await self._payload_queue.put((payload, sequence_number))
 
         except Exception as e:
             logger.error(f"Error preparing audio payload: {e}")
@@ -194,12 +216,62 @@ class TTSTaskManager:
                 actions=actions,
                 subtitle_text=subtitle_text,
             )
-            await self._payload_queue.put((payload, sequence_number))
+            failure_notice = failure_notice or self._synthesis_failed_notice(e)
 
         finally:
             if audio_file_path:
                 tts_engine.remove_file(audio_file_path)
                 logger.debug("Audio cache file cleaned.")
+
+        # 字幕照常出現（靜音 payload），通知跟在同一句後面，順序不亂。
+        # 被 clear() 取消時 CancelledError 會直接穿出去，不會走到這裡。
+        messages = [payload]
+        if failure_notice:
+            messages.append(failure_notice)
+        await self._payload_queue.put((messages, sequence_number))
+
+    async def _synthesize_with_retry(
+        self, tts_engine: TTSInterface, text: str, emotion: Optional[str] = None
+    ) -> Tuple[Optional[str], Optional[Exception]]:
+        """合成一句；丟例外或回 None 都算失敗，最多試 SYNTHESIS_ATTEMPTS 次。
+
+        回傳 (檔案路徑, None) 或 (None, 最後一次的例外——回 None 時是 None)。
+        CancelledError 不是 Exception，不會被當成失敗重試。
+        """
+        error: Optional[Exception] = None
+        for attempt in range(1, self.SYNTHESIS_ATTEMPTS + 1):
+            try:
+                audio_file_path = await self._generate_audio(
+                    tts_engine, text, emotion=emotion
+                )
+            except Exception as e:
+                audio_file_path, error = None, e
+            else:
+                if audio_file_path:
+                    return audio_file_path, None
+                error = None
+            if attempt < self.SYNTHESIS_ATTEMPTS:
+                reason = repr(error) if error else "engine returned no audio"
+                logger.warning(
+                    f"TTS synthesis failed ({reason}), retrying"
+                    f" ({attempt}/{self.SYNTHESIS_ATTEMPTS}): '{text[:30]}'"
+                )
+        return None, error
+
+    @staticmethod
+    def _synthesis_failed_notice(error: Optional[BaseException]) -> Dict:
+        """前端會把 type=error 顯示成 toast；text_key 有翻譯就用翻譯，沒有就顯示 message。"""
+        if _is_timeout(error):
+            return {
+                "type": "error",
+                "message": "語音合成失敗（逾時），這句沒有聲音",
+                "text_key": "notification.ttsTimedOut",
+            }
+        return {
+            "type": "error",
+            "message": "語音合成失敗，這句沒有聲音",
+            "text_key": "notification.ttsFailed",
+        }
 
     async def _generate_audio(
         self, tts_engine: TTSInterface, text: str, emotion: Optional[str] = None

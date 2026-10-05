@@ -935,7 +935,9 @@
     "newConversation": "新しい会話を開始しました",
     "newChatHistory": "新しいチャット履歴を作成しました",
     "historyDeleteSuccess": "履歴を削除しました",
-    "historyDeleteFail": "履歴の削除に失敗しました"
+    "historyDeleteFail": "履歴の削除に失敗しました",
+    "ttsTimedOut": "音声合成がタイムアウトしました。この文は音声なしです",
+    "ttsFailed": "音声合成に失敗しました。この文は音声なしです"
   },
   "error": {
     "notAnImage": "画像ファイルを選んでください。",
