@@ -15,7 +15,7 @@ import {
   RESTING_REFRESH_MS,
   restingFor,
   shouldApplyResting,
-  type Resting,
+  type AppliedResting,
 } from "./mood";
 
 // three + three-vrm 只在真的掛 VRM 角色時才下載；靜態 import 會把它們塞進主 bundle，
@@ -38,17 +38,22 @@ export function Avatar(): JSX.Element {
   //
   // 重算不等於重套：設定頁試播、Live2D 點頭的隨機表情都是使用者剛叫出來的臉，
   // 每 10 秒一律 resetExpression() 會把它們蓋掉。所以記住上次真的套上去的值，
-  // 只有表情換了才重套（shouldApplyResting）；同一個表情只是淡了，交給
+  // 只有表情（或底下的模型）換了才重套（shouldApplyResting）；同一個表情只是淡了，交給
   // setRestingExpression（VRM 只在臉還是她的心情時更新濃淡，Live2D 沒有濃淡）。
   // 進 IDLE、心情真的來了、換了新 renderer 時一律套一次（applied 歸 null）。
   useEffect(() => {
     if (aiState !== AiStateEnum.IDLE) return undefined;
-    let applied: Resting | null = null;
+    let applied: AppliedResting | null = null;
     const refresh = () => {
       const renderer = getActiveRenderer();
       // 還沒註冊（VRM 是 lazy import）或模型還沒載完：不套也不記，等註冊通知或下一次 tick。
       if (!renderer || renderer.isReady?.() === false) return;
-      const next = restingFor(getCharacterMood(), modelInfo?.emotionMap, Date.now() / 1000);
+      // 模型身分也算進「換了沒」：Live2D 換角色是同一個 renderer 換底下的模型，
+      // 心情可能先套到還沒換掉的舊模型上，新模型載完要再套一次。
+      const next: AppliedResting = {
+        ...restingFor(getCharacterMood(), modelInfo?.emotionMap, Date.now() / 1000),
+        model: renderer.modelIdentity?.() ?? renderer,
+      };
       renderer.setRestingExpression(next.expression, next.intensity);
       if (shouldApplyResting(applied, next)) renderer.resetExpression();
       applied = next;

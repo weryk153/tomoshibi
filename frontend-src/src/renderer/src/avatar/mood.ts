@@ -117,10 +117,24 @@ export function restingFor(
  * 空檔重算時要不要整個重新套用（resetExpression）。previous 是上次「真的套用
  * 過」的值，null 代表這次效果掛載後還沒套用過（例如 renderer 剛註冊，還在補
  * 追進度）——這種情況一律要套一次。
+ *
+ * model 是「套在哪個模型上」的身分（avatar.tsx 傳 renderer.modelIdentity?.() ??
+ * renderer）。fix round 2：Live2D 換角色時模型是 500ms 後才換掉的，心情先到就會
+ * 套在舊模型上；新模型載完是素顏，但表情名沒變，只看 expression 就再也不會補。
+ * 模型換了就算換，頭部點擊不換模型，所以不會被蓋掉。
  */
-export function shouldApplyResting(previous: Resting | null, next: Resting): boolean {
+export function shouldApplyResting(
+  previous: AppliedResting | null,
+  next: AppliedResting,
+): boolean {
   if (previous === null) return true;
+  if (previous.model !== next.model) return true;
   return previous.expression !== next.expression;
+}
+
+/** 上次真的套上去的 resting，加上套在哪個模型上（沒給＝不分模型）。 */
+export interface AppliedResting extends Resting {
+  model?: unknown;
 }
 
 // 最新的心情。讀的人是 avatar.tsx 的空檔重算（不是元件 render），跟

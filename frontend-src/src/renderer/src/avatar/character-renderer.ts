@@ -58,6 +58,12 @@ export interface CharacterRenderer {
    * Live2D 是一掛上就註冊、模型之後才非同步載完，所以要這個。
    */
   isReady?(): boolean;
+  /**
+   * 畫面上現在是哪一個模型（只比身分，不看內容）。avatar.tsx 用它判斷「模型換了，
+   * 要重套空檔的臉」。沒實作＝renderer 本身就是身分（VRM 換模型會重新註冊）。
+   * Live2D 是同一個 renderer 底下換模型，所以要這個。
+   */
+  modelIdentity?(): unknown;
   /** AI 回到 IDLE：回到 resting 表情；沒有 resting 就清回素顏。 */
   resetExpression(): void;
   /** 設定頁試播：套一個表情（VRM 是 preset／自訂名）。沒實作＝這個 renderer 不支援試播。 */

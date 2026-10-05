@@ -154,6 +154,12 @@ export function createLive2DRenderer(): CharacterRenderer {
       return !!getAdapter() && !!model && model.isLoadComplete?.() === true;
     },
 
+    modelIdentity() {
+      // 換角色時 live2d.tsx 不會重新註冊，只是換掉底下的 LAppModel；拿實例本身
+      // 當身分，換了模型 avatar.tsx 就會重套一次空檔的臉。
+      return getModel();
+    },
+
     resetExpression() {
       const adapter = getAdapter();
       // fix round 1：模型沒有這個表情（存檔後角色換了模型、表情名對不上）時要清回

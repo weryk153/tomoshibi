@@ -134,6 +134,37 @@ test("shouldApplyResting：表情換了（含跟 null 之間切換）才要套",
   );
 });
 
+// fix round 2：Live2D 換角色是同一個 renderer 換底下的模型；表情名沒變也要重套。
+test("shouldApplyResting：模型換了就要重套，即使表情沒變", () => {
+  const oldModel = {};
+  const newModel = {};
+  assert.equal(
+    shouldApplyResting(
+      { expression: "sad", intensity: 0.4, model: oldModel },
+      { expression: "sad", intensity: 0.4, model: newModel },
+    ),
+    true,
+  );
+});
+
+test("shouldApplyResting：同一個模型、同一個表情（頭部點擊之後的 tick）不重套", () => {
+  const model = {};
+  assert.equal(
+    shouldApplyResting(
+      { expression: "sad", intensity: 0.4, model },
+      { expression: "sad", intensity: 0.2, model },
+    ),
+    false,
+  );
+  assert.equal(
+    shouldApplyResting(
+      { expression: null, intensity: 0, model },
+      { expression: null, intensity: 0, model },
+    ),
+    false,
+  );
+});
+
 test("心情倉庫：存、取、通知、取消通知", () => {
   let told = 0;
   const stop = onCharacterMoodChange(() => { told += 1; });
