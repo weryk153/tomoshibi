@@ -18,6 +18,8 @@
 - YouTube 방송을 할 수 있어요. 채팅창을 직접 읽고 답할 댓글을 골라요. OBS용 스테이지 페이지도 있어요.
 - 로컬 모델과 로컬 음성(GPT-SoVITS)을 함께 쓰면 완전히 오프라인으로 돌아가고, 대화는 내 컴퓨터에만 남아요.
 
+대화, 기억, 기분은 AI 캐릭터용 오픈소스 Python SDK인 [AI Character Engine](https://github.com/weryk153/ai-character-engine)으로 돌아가요.
+
 ## 설치
 
 [Releases](https://github.com/weryk153/tomoshibi/releases/latest)에서 내려받으세요.

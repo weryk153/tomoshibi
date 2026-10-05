@@ -18,6 +18,8 @@
 - YouTube で配信できます。チャット欄を自分で読んでコメントを選んで返し、OBS 用のステージページもあります。
 - ローカルモデルとローカル音声（GPT-SoVITS）を組み合わせれば完全にオフラインで動き、会話はあなたのパソコンの中だけに残ります。
 
+会話・記憶・気分は、AI キャラクター向けのオープンソース Python SDK [AI Character Engine](https://github.com/weryk153/ai-character-engine) で動いています。
+
 ## インストール
 
 [Releases](https://github.com/weryk153/tomoshibi/releases/latest) からダウンロードします。

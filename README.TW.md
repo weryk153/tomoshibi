@@ -18,6 +18,8 @@
 - 可以開 YouTube 直播：它自己讀聊天室、挑留言回，還有給 OBS 用的舞台頁。
 - 搭配本機模型和本機語音（GPT-SoVITS）可以完全離線，對話只留在你的電腦裡。
 
+對話、記憶和心情由 [AI Character Engine](https://github.com/weryk153/ai-character-engine) 驅動，這是一個開源的 AI 角色 Python SDK。
+
 ## 安裝
 
 到 [Releases](https://github.com/weryk153/tomoshibi/releases/latest) 下載：

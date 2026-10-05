@@ -18,6 +18,8 @@ Chat and hang out with your favorite anime characters. Free and open source, for
 - It can stream on YouTube: it reads your live chat, picks comments to answer, and gives you a stage page for OBS.
 - With a local model and local voice (GPT-SoVITS) it runs fully offline, and your conversations stay on your computer.
 
+The conversation, memory and moods run on [AI Character Engine](https://github.com/weryk153/ai-character-engine), an open-source Python SDK for AI characters.
+
 ## Install
 
 Download from [Releases](https://github.com/weryk153/tomoshibi/releases/latest):
