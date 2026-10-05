@@ -11,6 +11,7 @@ export const useSubtitleDisplay = () => {
 
   return {
     subtitleText,
+    subtitleSpoken: context?.subtitleSpoken ?? null,
     isLoaded: !!context,
   };
 };

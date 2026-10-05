@@ -102,6 +102,8 @@ export interface MessageEvent {
   forwarded?: boolean;
   display_text?: DisplayText;
   subtitle_text?: string;
+  // 雙語字幕開著時她實際唸的那句（後端 conversations/bilingual.py）。
+  spoken_text?: string;
   keep_subtitle?: boolean;
   live2d_model?: string;
   browser_view?: {

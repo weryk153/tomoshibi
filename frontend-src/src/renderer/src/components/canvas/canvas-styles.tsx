@@ -51,6 +51,15 @@ export const canvasStyles = {
       lineHeight: '1.4',
       whiteSpace: 'pre-wrap',
     },
+    // 雙語字幕的上行（她唸的原文）：小一號、淡一點，視線先落在下行的字幕。
+    spoken: {
+      color: 'whiteAlpha.700',
+      fontSize: '1.15rem',
+      textAlign: 'center',
+      lineHeight: '1.4',
+      whiteSpace: 'pre-wrap',
+      marginBottom: '4px',
+    },
   },
   wsStatus: {
     container: {

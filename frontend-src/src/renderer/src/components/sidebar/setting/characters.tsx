@@ -57,6 +57,7 @@ import {
   validateAvatarFile,
   saveCharacterSettings,
   type CharacterRecord,
+  type CharacterToggleName,
   type CharacterEdits,
   type CharacterCreate,
   type OptionalCharacterFields,
@@ -420,10 +421,10 @@ function Characters(): JSX.Element {
     [characters, selectedFilename],
   );
 
-  // 這個角色自己的開關（字幕翻成你看的語言、可以寫動作描寫、長期記憶）：切了就
+  // 這個角色自己的開關（字幕翻成你看的語言、雙語字幕、可以寫動作描寫、長期記憶）：切了就
   // 存，不跟整份表單一起存。正在用的角色要重新載入才生效，由抽屜頂端的提示處理。
   const toggleSaver = useAutosave(async (change: {
-    filename: string; name: 'translate_subtitle' | 'actions_enabled' | 'long_term_memory_enabled'; checked: boolean;
+    filename: string; name: CharacterToggleName; checked: boolean;
   }) => {
     const result = await saveCharacterSettings(baseUrl, change.filename, { [change.name]: change.checked });
     if (!result.ok) return { ok: false, error: result.error } as const;
@@ -434,7 +435,7 @@ function Characters(): JSX.Element {
   }, { delayMs: 0 });
 
   const handleToggle = useCallback((
-    name: 'translate_subtitle' | 'actions_enabled' | 'long_term_memory_enabled',
+    name: CharacterToggleName,
     checked: boolean,
   ) => {
     if (!selectedRecord) return;
@@ -1510,6 +1511,12 @@ function Characters(): JSX.Element {
             checked={Boolean(record.translate_subtitle)}
             onChange={(checked) => handleToggle('translate_subtitle', checked)}
             help={t('settings.characters.translateSubtitleHelp')}
+          />
+          <SwitchField
+            label={t('settings.characters.bilingualSubtitle')}
+            checked={Boolean(record.bilingual_subtitle)}
+            onChange={(checked) => handleToggle('bilingual_subtitle', checked)}
+            help={t('settings.characters.bilingualSubtitleHelp')}
           />
           <SaveStatus state={toggleSaver.state} />
         </SettingSection>

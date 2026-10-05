@@ -290,6 +290,8 @@
       "refAudioInherit": "기본 캐릭터와 같게",
       "translateSubtitle": "자막을 당신이 읽는 언어로 번역",
       "translateSubtitleHelp": "그녀의 대사를 당신이 읽는 언어(「당신」에서 설정)로 번역해 보여 줍니다. 말하는 내용과 기억은 그녀의 언어 그대로입니다.",
+      "bilingualSubtitle": "이중 언어 자막",
+      "bilingualSubtitleHelp": "그녀가 실제로 말하는 원문과 번역을 두 줄로 보여 줍니다. 위가 실제로 말하는 문장, 아래가 자막입니다. 두 줄이 같으면 한 줄만 보여 줍니다.",
       "actionsEnabled": "동작 묘사 허용",
       "actionsEnabledHelp": "*시선을 돌린다* 처럼 별표로 감싼 짧은 동작을 하나 덧붙일 수 있습니다. 자막에만 나오고 읽지 않습니다. 끄면 동작에 대해 아예 알려 주지 않아, 멈춤과 단어 선택으로만 표현합니다."
     },

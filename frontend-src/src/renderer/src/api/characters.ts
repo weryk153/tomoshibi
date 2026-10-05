@@ -13,6 +13,8 @@ export interface CharacterRecord {
   translate_subtitle?: boolean
   long_term_memory_enabled?: boolean
   actions_enabled?: boolean
+  // 雙語字幕：字幕多一行她實際唸的原文。
+  bilingual_subtitle?: boolean
   slug: string
   is_base: boolean
   conf_name: string | null
@@ -226,7 +228,11 @@ export interface CharacterToggles {
   long_term_memory_enabled: boolean
   // 可不可以在台詞裡搭配一句星號動作。關著時提示裡完全不提動作。
   actions_enabled: boolean
+  // 雙語字幕：字幕上面多一行她實際唸的那句（語音翻譯後的原文）。只影響畫面。
+  bilingual_subtitle: boolean
 }
+
+export type CharacterToggleName = keyof CharacterToggles
 
 export function characterSettingsPath(filename: string): string {
   return `/api/characters/${encodeURIComponent(filename)}/settings`
