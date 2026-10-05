@@ -26,7 +26,18 @@ export const useFooter = () => {
 
   const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     handleChange({ target: { value: e.target.value } } as ChangeEvent<HTMLInputElement>);
-    setAiState(AiStateEnum.WAITING);
+    // WAITING's only effect is pausing the proactive-speak idle timer, which
+    // only ever runs while aiState === IDLE (see proactive-speak-context.tsx).
+    // So the per-keystroke call is only meaningful from idle; calling it
+    // unconditionally used to also fire while she's speaking/listening/etc.,
+    // which did nothing harmful today (the context already refuses to let
+    // WAITING override THINKING_SPEAKING) but needlessly yanked the aiState
+    // away from other states too. Scoping it to idle keeps the "don't
+    // proactively speak while the user is mid-typing" behaviour and removes
+    // every other no-op/unwanted transition.
+    if (aiState === AiStateEnum.IDLE) {
+      setAiState(AiStateEnum.WAITING);
+    }
   };
 
   const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
