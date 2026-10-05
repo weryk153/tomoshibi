@@ -31,8 +31,31 @@ from src.open_llm_vtuber.agent.output_types import Actions, DisplayText
 from src.open_llm_vtuber.conversations.conversation_utils import (
     handle_sentence_output,
 )
+from src.open_llm_vtuber.conversations import tts_manager as tts_manager_module
 from src.open_llm_vtuber.conversations.tts_manager import TTSTaskManager
 from src.open_llm_vtuber.tts.tts_interface import TTSInterface
+
+
+def _fake_prepare_audio_payload(
+    audio_path, display_text=None, actions=None, subtitle_text=None, **_
+):
+    """不跑 ffmpeg 的替身：這些測試只看順序與並行，不看音訊內容。"""
+    if isinstance(display_text, DisplayText):
+        display_text = display_text.to_dict()
+    return {
+        "type": "audio",
+        "audio": f"AUDIO:{audio_path}" if audio_path else None,
+        "display_text": display_text,
+        "subtitle_text": subtitle_text,
+        "actions": None,
+    }
+
+
+@pytest.fixture(autouse=True)
+def _no_ffmpeg(monkeypatch):
+    monkeypatch.setattr(
+        tts_manager_module, "prepare_audio_payload", _fake_prepare_audio_payload
+    )
 
 
 class _FakeTTSEngine(TTSInterface):
@@ -63,7 +86,12 @@ class _FakeTTSEngine(TTSInterface):
         finally:
             self.active -= 1
         self.finished_order.append(text)
-        return None  # no real audio file -> prepare_audio_payload takes the silent path
+        # 回一個假檔名（prepare_audio_payload 已換成替身）。回 None 會被當成
+        # 合成失敗而重試並跳通知，見 test_tts_retry.py。
+        return f"{text}.wav"
+
+    def remove_file(self, filepath, verbose=True):
+        pass
 
 
 class _RecordingWebsocketSend:

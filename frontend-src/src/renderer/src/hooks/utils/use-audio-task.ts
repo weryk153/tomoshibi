@@ -13,6 +13,7 @@ import { getSharedAudio } from '@/utils/shared-audio';
 import { attachVoiceGain } from '@/utils/voice-gain';
 import { toaster } from '@/components/ui/tw/toaster';
 import { classifyMediaError } from '@/utils/media-error';
+import { nextSpeechSubtitle } from '@/utils/subtitle-hold';
 import { useWebSocket } from '@/context/websocket-context';
 import { DisplayText } from '@/services/websocket-service';
 import { getActiveRenderer } from '@/avatar/character-renderer';
@@ -24,6 +25,8 @@ interface AudioTaskOptions {
   sliceLength: number
   displayText?: DisplayText | null
   subtitleText?: string
+  // 只有笑聲的一句：聲音照播、聊天泡泡照記，畫面字幕留著上一句（見 utils/subtitle-hold.ts）。
+  keepSubtitle?: boolean
   expressions?: string[] | number[] | null
   expressionIntensities?: number[] | null
   motions?: MotionRequest[] | null
@@ -41,22 +44,27 @@ let playGeneration = 0;
 export const useAudioTask = () => {
   const { t } = useTranslation();
   const { aiState, backendSynthComplete, setBackendSynthComplete } = useAiState();
-  const { setSubtitleText } = useSubtitle();
+  const { subtitleText: currentSubtitle, setSubtitleText } = useSubtitle();
   const { appendResponse, appendAIMessage } = useChatHistory();
   const { sendMessage } = useWebSocket();
 
   // State refs to avoid stale closures
   const stateRef = useRef({
     aiState,
+    currentSubtitle,
     setSubtitleText,
     appendResponse,
     appendAIMessage,
   });
 
+  // 上一個語音段放上字幕的文字。畫面上還是它，才算「她剛說的那句」可以留著。
+  const lastSpokenSubtitleRef = useRef<string | null>(null);
+
   // Note: currentAudioRef and currentModelRef are now managed by the global audioManager
 
   stateRef.current = {
     aiState,
+    currentSubtitle,
     setSubtitleText,
     appendResponse,
     appendAIMessage,
@@ -75,6 +83,7 @@ export const useAudioTask = () => {
   const handleAudioPlayback = (options: AudioTaskOptions): Promise<void> => new Promise((resolve) => {
     const {
       aiState: currentAiState,
+      currentSubtitle: subtitleOnScreen,
       setSubtitleText: updateSubtitle,
       appendResponse: appendText,
       appendAIMessage: appendAI,
@@ -88,7 +97,8 @@ export const useAudioTask = () => {
     }
 
     const {
-      audioBase64, displayText, subtitleText, expressions, expressionIntensities, motions, forwarded,
+      audioBase64, displayText, subtitleText, keepSubtitle, expressions, expressionIntensities, motions,
+      forwarded,
     } = options;
 
     // Update display text
@@ -98,8 +108,16 @@ export const useAudioTask = () => {
       // but use the translated subtitle for every user-visible text surface.
       appendText(displayText.text);
       appendAI(visibleText, displayText.name, displayText.avatar);
-      if (audioBase64) {
-        updateSubtitle(visibleText);
+      const nextSubtitle = nextSpeechSubtitle({
+        hasAudio: Boolean(audioBase64),
+        visibleText,
+        keepSubtitle: Boolean(keepSubtitle),
+        current: subtitleOnScreen,
+        lastSpoken: lastSpokenSubtitleRef.current,
+      });
+      if (nextSubtitle !== null) {
+        updateSubtitle(nextSubtitle);
+        lastSpokenSubtitleRef.current = nextSubtitle;
       }
       if (!forwarded) {
         sendMessage({

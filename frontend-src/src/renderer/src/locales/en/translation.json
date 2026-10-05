@@ -935,7 +935,9 @@
     "newConversation": "New Conversation Started",
     "newChatHistory": "New chat history created",
     "historyDeleteSuccess": "History deleted successfully",
-    "historyDeleteFail": "Failed to delete history"
+    "historyDeleteFail": "Failed to delete history",
+    "ttsTimedOut": "Speech synthesis timed out — this line has no voice",
+    "ttsFailed": "Speech synthesis failed — this line has no voice"
   },
   "error": {
     "notAnImage": "Please choose an image file.",
