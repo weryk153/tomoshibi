@@ -12,9 +12,11 @@ Chat and hang out with your favorite anime characters. Free and open source, for
 
 - The character picks its own expressions and gestures as it talks. Live2D and VRM (3D) models both work.
 - You choose what language the character speaks. If its voice uses a different language, lines are translated before they're read out.
-- It remembers what you've talked about, and starts a conversation if you've been quiet for a while.
+- It has its own moods, remembers what you've talked about and things about itself, and starts a conversation if you've been quiet for a while.
 - You can talk to it out loud, and cut in while it's speaking.
 - Add your own model and write a persona, and it's your character.
+- It can stream on YouTube: it reads your live chat, picks comments to answer, and gives you a stage page for OBS.
+- With a local model and local voice (GPT-SoVITS) it runs fully offline, and your conversations stay on your computer.
 
 ## Install
 
