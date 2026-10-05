@@ -22,8 +22,8 @@ must be added by hand.
 Same auto-scanner pattern as Live2D, implemented in
 `src/open_llm_vtuber/vrm_models.py` (`scan_and_register_vrm`):
 
-- Whenever the **Character Manager** loads the skin list (`GET /api/live2d-skins`),
-  Tomoshibi also scans the `vrm-models/` folder.
+- Whenever the **Characters** tab in Settings loads the model list
+  (`GET /api/live2d-skins`), Tomoshibi also scans the `vrm-models/` folder.
 - For every **top-level sub-folder** of `vrm-models/` that has a `*.vrm` file directly
   inside it (not nested), that folder is a usable model — **the folder name is the model
   name**, exactly like Live2D.
@@ -34,7 +34,7 @@ Same auto-scanner pattern as Live2D, implemented in
   scanning `motions/*.vrma` to build a default motion map (see below). This write is
   automatic and only happens when something new is found.
 
-So: drop a folder in, open the Character Manager, and it appears in the skin dropdown —
+So: drop a folder in, open **Settings → Characters**, and it appears in the model dropdown —
 no hand-editing required to get started. `vrm-models/` itself is gitignored, so nothing
 you put there gets committed to the repo.
 
@@ -69,10 +69,11 @@ vrm-models/
 
 ### 2. Let Tomoshibi scan it (automatic)
 
-Open Tomoshibi → **Settings → Character Manager**, and open the **Appearance** dropdown
-when creating or editing a character — opening the manager triggers the scan, which
-auto-registers your new folder. Your model appears in the same dropdown as Live2D
-skins, listed by its folder name.
+Open Tomoshibi → **Settings → Characters**. Loading that tab triggers the scan, which
+auto-registers your new folder. If the app was already open when you added the folder,
+reload the page (or restart the app) first. Your model appears in the
+**Appearance (model)** dropdown, in a character's **Appearance** section, alongside the
+Live2D models, listed by its folder name.
 
 The auto-registered `model_dict.json` entry looks like this (this is a real example, not
 a template — the shape is fixed):
@@ -98,10 +99,11 @@ Live2D entry shape for type-compatibility but are not used for VRM models.)
 
 ### 3. Create or edit a character that uses it
 
-Same as Live2D: in the Character Manager, set **Appearance** to your VRM model (its
-folder name) — the field is still called `live2d_model_name` in the character YAML, it
-just now also accepts VRM model names. Set persona and voice, save, and switch to that
-character to apply it.
+Same as Live2D: in **Settings → Characters**, pick a character from the list (or
+**New character**), and set **Appearance (model)** to your VRM model (its folder name) —
+the field is still called `live2d_model_name` in the character YAML, it just now also
+accepts VRM model names. An existing character saves as you change it; a new one saves
+when you press **Save**. Press **Use** to switch to that character.
 
 ## Expression and motion mapping
 
@@ -120,8 +122,9 @@ the matching standard preset:
 | `surprise` | `surprised` |
 
 `relaxed` has no common preset counterpart and is never auto-filled. Any custom
-expression your `.vrm` file defines (beyond the five standard presets) can be mapped by
-hand by editing `emotionMap` in `model_dict.json` — use the expression name exactly as
+expression your `.vrm` file defines (beyond the five standard presets) is listed in the
+[settings page](#settings-page) editor, so you can give it a keyword there. You can also
+edit `emotionMap` in `model_dict.json` by hand — use the expression name exactly as
 authored in the file.
 
 ### `motionMap` — one-shot motion clips
@@ -133,22 +136,21 @@ leaves `label` as `null`.
 **Add a label.** The LLM is shown every keyword regardless of whether it has a label, but
 a keyword with `label: null` is listed bare — which reads to the LLM as "unspecified,"
 not as a description — so it has nothing to go on when choosing between clips. The label
-is what makes a deliberate choice possible. Watch the clip, then edit `model_dict.json`:
+is what makes a deliberate choice possible. Watch the clip (the settings editor has a
+**Preview** button), then fill in its **Display name** on the
+[settings page](#settings-page) — or edit `model_dict.json`:
 
 ```json
 "motionMap": { "wave": { "clip": "wave", "label": "揮手打招呼" } }
 ```
 
 The keyword itself is what the LLM writes as `[keyword]` in its reply to trigger the
-clip — same mechanism as Live2D's `[keyword]` motions. To change a clip's keyword,
-rename the `.vrma` file (the scanner keys new entries off the filename); to relabel an
-existing mapping, edit the JSON directly.
+clip — same mechanism as Live2D's `[keyword]` motions. To change a clip's keyword or
+label, edit it on the [settings page](#settings-page), or edit the JSON directly.
 
 `PUT /api/live2d/model-config/{name}` validates both maps against what the `.vrm` file
 and `motions/` folder actually contain — an unknown clip or expression name is rejected.
-The settings page never calls it for a VRM model (that page is read-only, see
-[Settings page](#settings-page) below); the endpoint is there to validate hand-edited
-mappings if something does call it, e.g. tooling.
+The settings page saves through this endpoint, so its edits get the same check.
 
 ## Camera
 
@@ -176,19 +178,36 @@ in `model_dict.json` if the model is framed too close/far or too high/low.
 
 ## Settings page
 
-For a VRM model, the **Appearance** tab in the Character Manager's model settings shows a
-**read-only summary** of the model's clips, expressions, and current keyword mappings
-(there is no VRM equivalent of Live2D's motion/hit-area editor UI). To change something:
+Open **Settings → Characters**, pick a character that uses the VRM model, and go to its
+**Appearance** section. Below the **Appearance (model)** dropdown is the **Motion list**
+editor for that model. It edits `motionMap` and `emotionMap` in `model_dict.json`, so a
+change applies to every character that uses this model.
 
-- **Rename a `.vrma` file** to change which keyword triggers it.
-- **Edit `model_dict.json` by hand** to change a motion's label or an expression's
-  keyword mapping.
+- **Motions**: one row per `motions/*.vrma` clip except `idle`, with the clip name and
+  file. **Keyword** is what the LLM writes as `[keyword]`; **Display name** is the
+  `label`. **Preview** plays the clip. A `.vrma` you add later shows up here with an
+  empty keyword.
+- **Expressions & emotion keywords**: one row per expression in the `.vrm` file, custom
+  ones included, with an **Emotion keyword** field and **Preview**. Mouth shapes, blink,
+  look-at and `neutral` are not listed; **Reset face** returns to neutral. Leave a
+  keyword empty to keep that expression unused.
+- Keywords that point at a clip or expression that no longer exists are listed in a
+  warning, with a **Clear these broken keywords** button.
+- A missing `motions/idle.vrma` is flagged at the top.
+
+It saves as you change it, about 0.8 s after you stop typing. A keyword that repeats
+another one (case-insensitive) or contains `[` or `]` is marked, and nothing is saved
+until it is fixed. **Preview** and **Reset face** only work when this model is the one on
+screen — switch to a character that uses it first.
+
+Not in the editor: the camera (`camera.distance` / `camera.height`) — edit those in
+`model_dict.json`.
 
 ## Give your character a skin-picker thumbnail (optional)
 
 Same backend mechanism as Live2D: drop `thumbnail.png` / `.jpg` / `.jpeg` / `.webp` into
-the model's folder (alongside the `.vrm` file), reopen the Character Manager to rescan,
-and the scan records its URL in the skins list it returns. **The picker does not display
+the model's folder (alongside the `.vrm` file), reload the page and open
+**Settings → Characters** to rescan, and the scan records its URL in the skins list it returns. **The picker does not display
 it yet** — no frontend code reads that field today, so adding a thumbnail changes nothing
 on screen for now. Skipping it costs you nothing either; everything else works the same.
 
@@ -230,8 +249,6 @@ recommends is still undecided** — a spike is planned to settle it. Both produc
   If you try it, expect rough edges.
 - **No tap/hit areas** — clicking on the character does nothing (Live2D's tap-triggered
   reactions have no VRM equivalent yet).
-- **Settings are read-only** — see [Settings page](#settings-page) above; there is no
-  in-app editor for clips or expression mappings, only `model_dict.json`.
 - **No shadows or image-based lighting** — the VRM canvas renders without a shadow pass
   or environment lighting.
 
@@ -267,8 +284,8 @@ VRoid Studio 或 Blender VRM 匯出的檔案都能用。另外可以選配一個
 跟 Live2D 一樣的自動掃描模式，實作在 `src/open_llm_vtuber/vrm_models.py`
 （`scan_and_register_vrm`）：
 
-- 每當**角色管理器**載入皮膚清單（打 `GET /api/live2d-skins`）時，Tomoshibi 也會掃描
-  `vrm-models/` 資料夾。
+- 每當設定的**「角色」頁**載入模型清單（打 `GET /api/live2d-skins`）時，Tomoshibi 也會
+  掃描 `vrm-models/` 資料夾。
 - `vrm-models/` 底下每個**最上層子資料夾**，只要它的頂層（不是巢狀更深處）直接放了一個
   `*.vrm` 檔，就會被當成可用模型——**資料夾名稱就是模型名稱**，跟 Live2D 一樣。
 - 如果一個資料夾頂層有一個以上的 `.vrm` 檔，Tomoshibi 會挑**依字母排序後排第一個**的那個。
@@ -276,8 +293,8 @@ VRoid Studio 或 Blender VRM 匯出的檔案都能用。另外可以選配一個
   預設的表情對應，掃 `motions/*.vrma` 算出預設的動作對應（見下方）。這個寫入是自動的，
   只有發現新模型時才會發生。
 
-所以：把資料夾丟進去，打開角色管理器，它就會出現在皮膚下拉選單裡——一開始不用手改任何
-東西。`vrm-models/` 本身有被 gitignore，你放進去的東西不會被提交進版控。
+所以：把資料夾丟進去，打開**設定 →「角色」**，它就會出現在模型下拉選單裡——一開始不用
+手改任何東西。`vrm-models/` 本身有被 gitignore，你放進去的東西不會被提交進版控。
 
 ### 操作步驟
 
@@ -307,9 +324,9 @@ vrm-models/
 
 **2. 讓 Tomoshibi 掃描它（自動）**
 
-打開 Tomoshibi →**設定 → 角色管理器**，在新增或編輯角色時打開**外觀**下拉選單——打開
-管理器就會觸發掃描，自動註冊你的新資料夾。你的模型會以資料夾名稱，出現在跟 Live2D 皮膚
-同一個下拉選單裡。
+打開 Tomoshibi →**設定 →「角色」**——載入這一頁就會觸發掃描，自動註冊你的新資料夾。
+放資料夾時 App 已經開著的話，先重新載入頁面（或重開 App）。你的模型會以資料夾名稱，
+出現在角色「外觀」區的**「外觀（角色模型）」**下拉選單裡，跟 Live2D 模型列在一起。
 
 自動註冊出來的 `model_dict.json` 條目長這樣（這是一個真實範例，不是模板——這個形狀是
 固定的）：
@@ -335,18 +352,19 @@ vrm-models/
 
 **3. 建立或編輯一個用它的角色**
 
-跟 Live2D 一樣：在角色管理器裡，把**外觀**設成你的 VRM 模型（它的資料夾名）——這個欄位
-在角色 YAML 裡的名字還是 `live2d_model_name`，只是現在它也接受 VRM 模型名稱了。設定
-人設與聲音、儲存，再切換到那個角色套用即可。
+跟 Live2D 一樣：在**設定 →「角色」**左邊選一個角色（或按「新增角色」），把
+**「外觀（角色模型）」**設成你的 VRM 模型（它的資料夾名）——這個欄位在角色 YAML 裡的
+名字還是 `live2d_model_name`，只是現在它也接受 VRM 模型名稱了。既有角色改了就存；新增
+角色要按「儲存」。再按「切換」改用那個角色。
 
 ### 對應設定
 
-> **不一定要手改 JSON。** 設定 →「角色外觀」分頁最下面有「動作與表情對應（VRM
-> 專屬）」，會列出這個模型**真的有**的每個動作與表情，可以直接編輯關鍵字與顯示
-> 名稱，動作還能當場試播確認長什麼樣子。指向已經不存在的動作或表情的關鍵字會被
-> 標成失效並可一鍵清除。
+> **不一定要手改 JSON。** 設定 →「角色」→ 角色的「外觀」區有「動作清單」，會列出
+> 這個模型**真的有**的每個動作與表情，可以直接編輯關鍵字與顯示名稱，還能當場試播
+> 確認長什麼樣子。指向已經不存在的動作或表情的關鍵字會被標成失效並可一鍵清除。
+> 詳見下方[設定頁](#設定頁)。
 >
-> 那個面板**不會自動存檔**——改完要按最下面的「儲存」。
+> 改了就存，不用按儲存。
 >
 > 下面講的是同一份 `model_dict.json` 的欄位語意，手改或用 UI 改都適用；想知道
 > 某個欄位到底代表什麼、或是要批次處理時再往下看。
@@ -371,7 +389,7 @@ Live2D 那樣的索引）。掃描器只有在檔案裡真的有對應的標準 
 
 **換過 `.vrm` 檔之後要檢查一次。** 如果新檔案把某個表情改了名字（例如 `happy` 變成
 `joy`），舊 `emotionMap` 裡指向舊名字的關鍵字就失效了。對應面板會把它們列在失效清單
-裡，按「清除失效的關鍵字」會連同那些條目一起從 `model_dict.json` 移除——所以清除之前
+裡，按「清除這些失效的關鍵字」會連同那些條目一起從 `model_dict.json` 移除——所以清除之前
 先確認你不是想把它們改指到新名字。
 
 **`motionMap`——一次性動作片段**
@@ -383,20 +401,19 @@ Live2D 那樣的索引）。掃描器只有在檔案裡真的有對應的標準 
 **記得補上 label。** 不管有沒有 label，LLM 都看得到每個關鍵字；但沒有 label 的關鍵字
 只會被裸列出來——對 LLM 來說讀起來就是「未指定」，不是一句描述——所以它在片段之間根本
 沒有依據可以選。label 才是讓它能有意識地做選擇的東西。先看過那段動畫，再去改
-`model_dict.json`：
+`model_dict.json`（或在[設定頁](#設定頁)的「顯示名稱」填）：
 
 ```json
 "motionMap": { "wave": { "clip": "wave", "label": "揮手打招呼" } }
 ```
 
 關鍵字本身就是 LLM 在回覆裡寫 `[關鍵字]` 用來觸發這個片段的東西——機制跟 Live2D 的
-`[關鍵字]` 動作一樣。要換某個片段的關鍵字，重新命名那個 `.vrma` 檔即可（掃描器是用檔名
-來產生新條目的 key）；要改既有對應的 label，直接編輯 JSON 就好。
+`[關鍵字]` 動作一樣。要換某個片段的關鍵字或 label，在[設定頁](#設定頁)改，或直接編輯
+JSON。
 
 `PUT /api/live2d/model-config/{name}` 會拿這兩份對應表去比對 `.vrm` 檔與 `motions/`
-資料夾裡實際存在的內容——指到不存在的片段或表情名稱會被拒絕。設定頁對 VRM 模型不會呼叫
-它（那一頁是唯讀的，見下方[設定頁](#設定頁)）；這個端點的用途是：如果有東西（例如工具腳本）
-去呼叫它，手改的對應表會先被驗過一遍。
+資料夾裡實際存在的內容——指到不存在的片段或表情名稱會被拒絕。設定頁存檔走的就是這個
+端點，所以在設定頁改的也會被驗過一遍。
 
 ### 相機
 
@@ -419,16 +436,29 @@ Live2D 那樣的索引）。掃描器只有在檔案裡真的有對應的標準 
 
 ### 設定頁
 
-對 VRM 模型來說，角色管理器模型設定裡的**外觀**分頁顯示的是模型的片段、表情、目前關鍵字
-對應的**唯讀摘要**（沒有 Live2D 那種動作／點擊區編輯器的 VRM 版本）。要改東西的話：
+打開**設定 →「角色」**，選一個用這個 VRM 模型的角色，到她的「外觀」區。
+「外觀（角色模型）」下拉選單底下就是這個模型的「動作清單」。它改的是
+`model_dict.json` 裡的 `motionMap` 與 `emotionMap`，所以會套用到用這個模型的所有角色。
 
-- **重新命名 `.vrma` 檔**來改變觸發它的關鍵字。
-- **手動編輯 `model_dict.json`**來改動作的 label 或表情的關鍵字對應。
+- **動作**：`motions/*.vrma` 每個片段一列（`idle` 除外），寫著片段名與檔名。
+  「關鍵字」就是 LLM 寫 `[關鍵字]` 的那個字；「顯示名稱」就是 `label`。按「試播」
+  播一次。之後才放進去的 `.vrma` 也會出現在這裡，關鍵字是空的。
+- **表情與情緒關鍵字**：`.vrm` 檔裡的每個表情一列（含自訂表情），有「情緒關鍵字」欄位
+  和「試播」。嘴型、眨眼、視線與 `neutral` 不列在這裡；「回到原樣」會回到中性表情。
+  關鍵字留空就是這個表情不給角色用。
+- 指向已經不存在的動作或表情的關鍵字，會列在警告裡，按「清除這些失效的關鍵字」移除。
+- 沒有 `motions/idle.vrma` 時，最上面會提示。
+
+改了就存，停手約 0.8 秒送出。關鍵字跟別的重複（不分大小寫）或含 `[`、`]` 會標出來，
+改好之前都不會存。「試播」與「回到原樣」只對畫面上正在顯示的模型有用——先切換到用這個
+模型的角色。
+
+相機（`camera.distance`／`camera.height`）不在這裡，要改 `model_dict.json`。
 
 ### 給你的角色一張選皮縮圖（選用）
 
 後端的機制跟 Live2D 完全一樣：把 `thumbnail.png` / `.jpg` / `.jpeg` / `.webp` 放進模型
-資料夾（跟 `.vrm` 檔同一層），重開角色管理器讓它重掃，掃描結果的皮膚清單裡就會帶上這張圖
+資料夾（跟 `.vrm` 檔同一層），重新載入頁面再打開設定的「角色」頁讓它重掃，掃描結果的皮膚清單裡就會帶上這張圖
 的網址。**但選皮的地方目前還不會顯示它**——前端沒有任何程式讀這個欄位，所以現在放了縮圖，
 畫面上不會有任何變化。不放也一樣沒差，其他功能都不受影響。
 
@@ -465,8 +495,6 @@ spike 計畫要來釐清這件事。兩條路都能產出合法的 `.vrm` 檔，
   模式，但 pet 模式需要的透明視窗合成，在 VRM renderer 上還沒驗證過畫面是否正常。如果
   你試了，要有心理準備會有粗糙的地方。
 - **沒有點擊區**——點角色本身沒有反應（Live2D 的點擊觸發反應，VRM 目前還沒有對應功能）。
-- **設定唯讀**——見上方[設定頁](#設定頁)；沒有應用內編輯器可以改片段或表情對應，只能
-  改 `model_dict.json`。
 - **沒有陰影或環境光照（IBL）**——VRM 畫布渲染時沒有陰影通道，也沒有環境光照。
 
 ### 授權提醒（務必看）

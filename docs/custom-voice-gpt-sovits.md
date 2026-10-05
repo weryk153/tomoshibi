@@ -6,7 +6,8 @@ Tomoshibi can do this through **GPT-SoVITS**, a separate voice-synthesis service
 run yourself.
 
 > **Easiest way:** on macOS (Apple Silicon) or 64-bit Windows, Tomoshibi installs GPT-SoVITS
-> for you — it's offered at first launch and in the voice settings. That sets up everything
+> for you — it's offered at first launch, and in **Settings → Models** under
+> **Text-to-speech engine (TTS)** while it isn't installed yet. That sets up everything
 > below with a default voice, running on the CPU. Read on to run GPT-SoVITS yourself, use a
 > GPU, or load your own voice pack.
 
@@ -27,7 +28,7 @@ This is the part people get wrong, so read it first. The voice setup is split ac
 | Thing | Lives in | Why |
 |------|----------|-----|
 | **Voice model weights** — the GPT model (`.ckpt`) and the SoVITS model (`.pth`) | **GPT-SoVITS** | They are the actual neural model; GPT-SoVITS is the program that loads and runs them. |
-| **Reference audio file + its transcript** | **Tomoshibi** (`conf.yaml`) | Every time it needs speech, Tomoshibi calls GPT-SoVITS and has to tell it *which short reference clip to imitate* and *what that clip says*. So those go in Tomoshibi's config. |
+| **Reference audio file + its transcript** | **Tomoshibi** — each character's own file (`characters/<name>.yaml`; the base character's is `conf.yaml`) | Every time it needs speech, Tomoshibi calls GPT-SoVITS and has to tell it *which short reference clip to imitate* and *what that clip says*. So those go in Tomoshibi's config, per character. |
 
 In short: **load the voice-pack weights into GPT-SoVITS; tell Tomoshibi the reference clip
 and its transcript.** Tomoshibi is the *client* that asks GPT-SoVITS for audio on each
@@ -47,60 +48,65 @@ reply.
    (Refer to the GPT-SoVITS docs for the exact endpoint/config details — those belong to
    that project, not to Tomoshibi.)
 
-### 2. In Tomoshibi: pick GPT-SoVITS and fill the two panel fields
+### 2. In Tomoshibi: tell it where GPT-SoVITS is
 
-Open Tomoshibi → **Settings → Performance / Hardware (效能/硬體)** → **TTS engine**:
+Open **Settings → Models** → **Text-to-speech engine (TTS)** and fill
+**GPT-SoVITS service URL** (`api_url`). It saves as you type. This one address is shared
+by every character. Default is:
 
-1. Set the **TTS engine** to **GPT-SoVITS** (`gpt_sovits_tts`). The other choice is the
-   default `edge_tts`.
-2. Fill **Service address** (`api_url`) — where GPT-SoVITS is reachable. Default is:
+```
+http://localhost:9880/tts
+```
 
-   ```
-   http://localhost:9880/tts
-   ```
+If GPT-SoVITS runs on another computer on your network, use that machine's address
+instead of `localhost`, e.g. `http://192.168.1.50:9880/tts`.
 
-   If GPT-SoVITS runs on another computer on your network, use that machine's IP instead
-   of `localhost`, e.g. `http://192.168.1.50:9880/tts`.
-3. Fill **Reference audio path** (`ref_audio_path`) — the path to the short reference clip
-   whose voice you want copied. This path must be valid **from GPT-SoVITS's point of
-   view** (it's the program that reads the file).
+### 3. In Tomoshibi: give a character the voice
 
-> The settings panel exposes **only** these GPT-SoVITS fields: the engine selector,
-> `api_url`, and `ref_audio_path`. The remaining required fields are not in the panel yet
-> — set them in `conf.yaml` (next step).
+Which engine and which reference clip are set **per character**. Open
+**Settings → Characters**, pick the character from the list, and go to her **Voice**
+section:
 
-### 3. Fill the remaining required fields in `conf.yaml`
+1. Set **TTS engine** to **GPT-SoVITS** (`gpt_sovits_tts`). The other choice is the
+   default **Edge TTS** (`edge_tts`). **Same as the base character** copies the base
+   character's current choice.
+2. Pick **Reference audio** (`ref_audio_path`) — the short clip whose voice you want
+   copied. The list shows the audio files in every folder that `conf.yaml` or a
+   character file already points `ref_audio_path` at, plus the clip that the one-click
+   install ships. To add a voice, drop its `.wav` into one of those folders. A `.txt`
+   with the same name is read as its transcript.
+3. Check **Reference transcript** (`prompt_text`) — **word for word**, exactly what is
+   said in the clip. Picking a clip with a `.txt` next to it fills this in for you.
+4. Set **Reference language** (`prompt_lang`) — the language spoken in the clip.
 
-Open `conf.yaml`, find the `gpt_sovits_tts` block (under `character_config` →
-`tts_config`), and fill these. They are **required** for GPT-SoVITS to produce sound:
+Then, in her **Language** section, set **Voice language** (`text_lang`) — the language
+she actually *speaks*. If it differs from her reply language, Tomoshibi translates each
+reply before sending it to TTS, which adds a few seconds per sentence.
+
+Each field saves as you change it, into that character's file, under
+`character_config` → `tts_config` (`conf.yaml` for the base character,
+`characters/<name>.yaml` for the others). `api_url` is only written to `conf.yaml`;
+the other characters use that one. The block looks like this:
 
 ```yaml
 gpt_sovits_tts:
-  api_url: 'http://localhost:9880/tts'   # also settable in the panel
-  text_lang: 'all_ja'                    # language of the text being spoken
-  ref_audio_path: ''                     # also settable in the panel
-  prompt_lang: 'ja'                      # language spoken in your reference clip
-  prompt_text: ''                        # the exact words spoken in your reference clip
-  text_split_method: 'cut5'              # leave as-is unless you know otherwise
+  api_url: 'http://localhost:9880/tts'   # Settings → Models (shared)
+  text_lang: 'ja'                        # Voice language
+  ref_audio_path: ''                     # Reference audio
+  prompt_lang: 'ja'                      # Reference language
+  prompt_text: ''                        # Reference transcript
+  text_split_method: 'cut5'              # not in the UI; leave as-is unless you know otherwise
   batch_size: '1'
   media_type: 'wav'
   streaming_mode: 'false'
 ```
 
-The three you almost always need to set yourself:
+### 4. Apply it
 
-- **`prompt_text`** — type out, **word for word**, exactly what is said in your reference
-  audio clip. This is **required**; GPT-SoVITS uses it to align the reference voice.
-- **`prompt_lang`** — the language spoken in the reference clip (e.g. `ja`, `zh`, `en`).
-- **`text_lang`** — the language the character will actually *speak*. (Note: Tomoshibi
-  translates replies before sending them to TTS, so this is the language of the text that
-  finally reaches GPT-SoVITS — the default value is `all_ja`.)
-
-### 4. Restart Tomoshibi
-
-Engine and TTS changes are read when Tomoshibi starts, so **restart it** (close and reopen)
-for the new voice to take effect. The settings panel itself also tells you a restart is
-required after a TTS change.
+If you changed the character you are talking to, the top of the settings drawer says
+some changes haven't taken effect yet — press **Reload**. The service URL works the same
+way. For any other character, the new voice is used the next time you switch to her.
+No restart needed.
 
 ## FAQ / troubleshooting
 
@@ -113,8 +119,11 @@ required after a TTS change.
 - **Wrong-sounding language?** Make sure `prompt_lang` matches your reference clip and
   `text_lang` matches what you want spoken.
 - **GPT-SoVITS on another PC?** Put that PC's IP in `api_url`, and remember
-  `ref_audio_path` is resolved **on that PC**, not on the Tomoshibi machine.
-- **Want to go back to free voices?** Set the TTS engine back to **edge-tts** and restart.
+  `ref_audio_path` is resolved **on that PC**, not on the Tomoshibi machine. The
+  **Reference audio** list only shows files on the Tomoshibi machine, so for a path that
+  only exists on the other PC, edit `ref_audio_path` in the character's file by hand.
+- **Want to go back to free voices?** Set that character's TTS engine back to
+  **Edge TTS** and press **Reload**.
 - **Legal note:** cloning a real person's voice is **your** legal responsibility — only
   use voices you have the right to use.
 
@@ -125,6 +134,11 @@ required after a TTS change.
 **情境：** 你想讓角色用**自訂或克隆的聲音**（例如某個角色的聲音）說話，取代預設免費的
 **edge-tts**。Tomoshibi 可以透過 **GPT-SoVITS** 做到——那是一個**你自己另外安裝、自己跑**的
 語音合成服務。
+
+> **最簡單的做法：** 在 macOS（Apple Silicon）或 64 位元 Windows 上，Tomoshibi 可以幫你裝
+> GPT-SoVITS——首次啟動時會問，也可以在**設定 →「模型」→「語音合成引擎（TTS）」**按「安裝」
+> （還沒裝時才會出現）。裝好就有預設聲音，用 CPU 跑。要自己跑 GPT-SoVITS、用 GPU、或換成
+> 自己的聲音包，再往下看。
 
 ### 前提
 
@@ -142,7 +156,7 @@ required after a TTS change.
 | 東西 | 放在 | 為什麼 |
 |------|------|--------|
 | **聲線「模型權重」**——GPT 模型（`.ckpt`）與 SoVITS 模型（`.pth`） | **GPT-SoVITS 那邊** | 它們就是真正的神經網路模型，GPT-SoVITS 才是負責載入與運算的程式。 |
-| **參考音檔 + 逐字稿** | **Tomoshibi 這邊**（`conf.yaml`） | Tomoshibi 每次要語音時都會去呼叫 GPT-SoVITS，必須告訴它「**模仿哪一段短參考音色**」以及「**那段在講什麼**」，所以這些填在 Tomoshibi 的設定裡。 |
+| **參考音檔 + 逐字稿** | **Tomoshibi 這邊**——每個角色自己的檔案（`characters/<名稱>.yaml`；底稿角色是 `conf.yaml`） | Tomoshibi 每次要語音時都會去呼叫 GPT-SoVITS，必須告訴它「**模仿哪一段短參考音色**」以及「**那段在講什麼**」，所以這些填在 Tomoshibi 的設定裡，每個角色各自一份。 |
 
 一句話：**聲音包的權重載進 GPT-SoVITS；參考音檔和逐字稿填在 Tomoshibi。** Tomoshibi 是每次回覆時
 去跟 GPT-SoVITS 要語音的「客戶端」。
@@ -156,29 +170,44 @@ required after a TTS change.
      （`.pth` SoVITS 模型），或改它自己的 `tts_infer.yaml` 讓它開機就載入。
      （確切的端點/設定細節請查 GPT-SoVITS 的文件，那是它的範疇，不是 Tomoshibi。）
 
-2. **在 Tomoshibi：選 GPT-SoVITS，填面板上的兩個欄位。** 打開 Tomoshibi →
-   **設定 → 效能/硬體 → TTS 引擎**：
-   - 把 **TTS 引擎**設成 **GPT-SoVITS**（`gpt_sovits_tts`），另一個選項是預設的 `edge_tts`。
-   - 填**服務位址**（`api_url`）——GPT-SoVITS 在哪裡。預設是 `http://localhost:9880/tts`；
-     若 GPT-SoVITS 跑在同網路的另一台機器，把 `localhost` 換成那台的 IP，例如
-     `http://192.168.1.50:9880/tts`。
-   - 填**參考音檔路徑**（`ref_audio_path`）——你想被模仿的那段短參考音檔的路徑。這個路徑要從
-     **GPT-SoVITS 的角度**看是有效的（讀檔的是它）。
+2. **在 Tomoshibi：告訴它 GPT-SoVITS 在哪。** 打開**設定 →「模型」→「語音合成引擎（TTS）」**，
+   填 **「GPT-SoVITS 服務位址」**（`api_url`），改了就存。這個位址所有角色共用。預設是
+   `http://localhost:9880/tts`；若 GPT-SoVITS 跑在同網路的另一台機器，把 `localhost` 換成
+   那台的位址，例如 `http://192.168.1.50:9880/tts`。
 
-   > 面板上**只有**這幾個 GPT-SoVITS 欄位：引擎選擇、`api_url`、`ref_audio_path`。其餘必填欄位
-   > 目前面板沒有，要到 `conf.yaml` 填（下一步）。
+3. **在 Tomoshibi：讓角色用這副嗓子。** 用哪個引擎、哪段參考音是**每個角色各自**設定。
+   打開**設定 →「角色」**，左邊選角色，到她的「聲音」區：
+   - **「語音合成引擎」**設成 **GPT-SoVITS**（`gpt_sovits_tts`），另一個選項是預設的
+     **Edge TTS**（`edge_tts`）。選「跟底稿角色一樣」會把底稿角色現在的選擇存成她自己的。
+   - **「參考音檔」**（`ref_audio_path`）選你想被模仿的那段短參考音。清單列的是
+     `conf.yaml` 與各角色檔的 `ref_audio_path` 用到的資料夾裡的音檔，加上一鍵安裝附的參考音。
+     要加新聲線，把 `.wav` 放進其中一個資料夾；同名的 `.txt` 會當成它的逐字稿。
+   - **「參考音逐字稿」**（`prompt_text`）——參考音檔裡**一字不差**講的那句話。選的音檔旁邊有
+     同名 `.txt` 的話會自動填好。
+   - **「參考音語言」**（`prompt_lang`）——參考音檔講的語言。
 
-3. **在 `conf.yaml` 填其餘必填欄位。** 打開 `conf.yaml`，找到 `gpt_sovits_tts` 區塊
-   （在 `character_config` → `tts_config` 底下），這些是 GPT-SoVITS 出聲的**必填**項：
+   再到她的「語言」區設 **「發聲語言」**（`text_lang`）——她實際要**說出來**的語言。跟回覆語言
+   不同時，Tomoshibi 會先把回覆翻譯過再送進 TTS，每句多花數秒。
 
-   - **`prompt_text`**——把參考音檔裡**一字不差**講的那句話打出來。**必填**，GPT-SoVITS 靠它對齊
-     參考聲音。空白是最常見的失敗原因。
-   - **`prompt_lang`**——參考音檔講的語言（如 `ja`、`zh`、`en`）。
-   - **`text_lang`**——角色實際要**說出來**的語言。（注意：Tomoshibi 會先把回覆翻譯過再送進 TTS，
-     所以這是最後到達 GPT-SoVITS 的文字語言，預設值是 `all_ja`。）
+   每一欄改了就存，寫進那個角色檔案的 `character_config` → `tts_config` 底下（底稿角色是
+   `conf.yaml`，其他角色是 `characters/<名稱>.yaml`）。`api_url` 只寫在 `conf.yaml`，其他角色
+   共用那一份。區塊長這樣：
 
-4. **重啟 Tomoshibi。** 引擎與 TTS 變更是在 Tomoshibi 啟動時讀取的，所以要**關掉再開**才會生效；
-   面板在你改完 TTS 後也會提示需要重啟。
+   ```yaml
+   gpt_sovits_tts:
+     api_url: 'http://localhost:9880/tts'   # 設定 →「模型」（共用）
+     text_lang: 'ja'                        # 發聲語言
+     ref_audio_path: ''                     # 參考音檔
+     prompt_lang: 'ja'                      # 參考音語言
+     prompt_text: ''                        # 參考音逐字稿
+     text_split_method: 'cut5'              # 介面上沒有；不清楚就別動
+     batch_size: '1'
+     media_type: 'wav'
+     streaming_mode: 'false'
+   ```
+
+4. **套用。** 改的是正在聊天的角色時，設定抽屜頂端會寫有變更還沒生效，按 **「重新載入」**。
+   服務位址也一樣。其他角色下次切換到她時就會用新聲音。不用重啟。
 
 ### 常見問題
 
@@ -188,6 +217,7 @@ required after a TTS change.
 - **關鍵限制——`prompt_text` 必填。** 留空是最常見的失敗原因。
 - **語言聽起來不對？** 確認 `prompt_lang` 跟參考音檔一致、`text_lang` 跟你想說的語言一致。
 - **GPT-SoVITS 在另一台電腦？** `api_url` 填那台的 IP，並記得 `ref_audio_path` 是在**那台**上
-  解析，不是 Tomoshibi 這台。
-- **想換回免費聲音？** TTS 引擎切回 **edge-tts** 再重啟即可。
+  解析，不是 Tomoshibi 這台。「參考音檔」清單只列 Tomoshibi 這台上的檔案，只存在那台的路徑
+  要手改角色檔的 `ref_audio_path`。
+- **想換回免費聲音？** 把那個角色的「語音合成引擎」切回 **Edge TTS**，再按「重新載入」。
 - **法律提醒：** 克隆真人聲音的法律責任由**你自己**承擔，只用你有權使用的聲音。
