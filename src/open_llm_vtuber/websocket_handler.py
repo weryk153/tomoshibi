@@ -8,6 +8,7 @@ import numpy as np
 from loguru import logger
 
 from .service_context import ServiceContext
+from .character_mood import send_character_mood
 from . import pending_changes
 from .chat_group import (
     ChatGroupManager,
@@ -307,6 +308,10 @@ class WebSocketHandler:
                     "client_uid": client_uid,
                 }
             )
+        )
+        # 剛連上就帶著她現在的心情（重新整理頁面不會讓她面無表情）。
+        await send_character_mood(
+            session_service_context.agent_engine, websocket.send_text
         )
 
         # Send initial group status

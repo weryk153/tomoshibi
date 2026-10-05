@@ -2,6 +2,7 @@ import os
 import json
 from typing import Callable
 from loguru import logger
+from .character_mood import follow_mood, send_character_mood
 from fastapi import WebSocket
 
 from prompts import prompt_loader
@@ -87,6 +88,9 @@ class ServiceContext:
 
         self.send_text: Callable = None
         self.client_uid: str = None
+
+        # 停止把她的心情送給這個頁面（見 _follow_mood）。
+        self._stop_following_mood: Callable | None = None
 
     def __str__(self):
         return (
@@ -206,6 +210,7 @@ class ServiceContext:
     async def close(self):
         """Clean up resources, especially the MCPClient."""
         logger.info("Closing ServiceContext resources...")
+        self._unfollow_mood()
         if self.mcp_client:
             logger.info(f"Closing MCPClient for context instance {id(self)}...")
             await self.mcp_client.aclose()
@@ -213,6 +218,22 @@ class ServiceContext:
         if self.agent_engine and hasattr(self.agent_engine, "close"):
             await self.agent_engine.close()  # Ensure agent resources are also closed
         logger.info("ServiceContext closed.")
+
+    def _unfollow_mood(self) -> None:
+        """停止把她的心情送給這個頁面，如果正在跟著的話。_follow_mood 換到新的
+        agent 之前、close() 整個收掉之前都要做，寫一次兩邊共用。"""
+        stop = getattr(self, "_stop_following_mood", None)
+        if stop is not None:
+            stop()
+            self._stop_following_mood = None
+
+    def _follow_mood(self) -> None:
+        """背景結果改了她的心情時送給這個頁面。agent 換了（換角色、存設定）就
+        改跟新的那一個；舊的停掉，不然換走的角色還會送心情過來。"""
+        self._unfollow_mood()
+        self._stop_following_mood = follow_mood(
+            self.agent_engine, getattr(self, "send_text", None)
+        )
 
     async def load_cache(
         self,
@@ -274,6 +295,8 @@ class ServiceContext:
             self.character_config.agent_config.agent_settings.conversation.use_mcpp,
             self.character_config.agent_config.agent_settings.conversation.mcp_enabled_servers,
         )
+        # 這個頁面現在拿的是這個 agent。
+        self._follow_mood()
 
         logger.debug(f"Loaded service context with cache: {character_config}")
 
@@ -633,6 +656,10 @@ class ServiceContext:
                 character_name=target_character.character_name,
                 # 記憶頁的開關：關掉時引擎也不再抽記憶、不再把記憶帶進對話。
                 long_term_memory_enabled=target_character.long_term_memory_enabled,
+                # 她的人設原文（逐字包在 system_prompt 裡）；給引擎的
+                # CharacterProfile.background 讀，背景工作（情緒、心情…）才拿得到
+                # 人設摘要，而不用讀整份系統提示。
+                persona_prompt=persona_prompt,
             )
 
             logger.debug(f"Agent choice: {agent_config.conversation_agent_choice}")
@@ -652,6 +679,9 @@ class ServiceContext:
                 "still open — open Settings to set up your AI brain."
             )
             self.agent_engine = None
+
+        # 這個頁面現在拿的是這個 agent。
+        self._follow_mood()
 
     def init_translate(
         self,
@@ -1061,6 +1091,10 @@ class ServiceContext:
                     "conf_uid": self.character_config.conf_uid,
                 }
             )
+        )
+        # 換角色、重新載入之後，臉馬上帶著她現在的心情。
+        await send_character_mood(
+            getattr(self, "agent_engine", None), websocket.send_text
         )
 
     async def handle_config_reload(self, websocket: WebSocket) -> bool:

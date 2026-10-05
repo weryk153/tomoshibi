@@ -28,6 +28,8 @@ from ai_character_engine.vision.models import VisionFrame
 from loguru import logger
 
 from ...chat_history_manager import get_history
+from ...character_engine.factory import listen_to_mood
+from ...character_mood import mood_message
 from ...config_manager import TTSPreprocessorConfig
 from ...conversation_quality import (
     STREAM_FACT,
@@ -93,16 +95,27 @@ class CharacterEngineAgent(AgentInterface):
         conf_uid: str = "",
         character_name: str = "",
         now: Callable[[], datetime] = datetime.now,
+        persona: str = "",
+        mood_key: str = "",
     ):
         """companion 可以是 CharacterCompanion 本身，或是一個每次回傳「目前那一個」
         的函式。正式執行時給的是函式：設定變了引擎那一側會換一個，而舊的 agent
         還被別的連線拿著。
+
+        persona 是她的人設原文（逐字包在 system 裡面），用來讓
+        CharacterProfile.background 跟著 description 一起刷新，背景工作讀得到她是
+        誰、對話提示不會因此多一段 Background。
+
+        mood_key 是工廠查引擎那一側用的鍵；有它才能跟著她的心情（背景結果改了心情
+        時通知頁面）。
         """
         self._companion_source = companion
         self._player_language = player_language
         self._conf_uid = conf_uid
         self._character_name = character_name
         self._now = now
+        self._persona = persona
+        self._mood_key = mood_key
         self._tools = self._tool_definitions(tool_manager) if use_mcpp else []
         self._tool_executor = tool_executor
         self._conversation: Optional[str] = None
@@ -212,6 +225,22 @@ class CharacterEngineAgent(AgentInterface):
                 label = "使用者" if message.role == "user" else "角色"
                 lines.append(f"{label}：{message.content.strip()[:500]}")
         return "\n".join(lines) or None
+
+    # --- 她的心情 -------------------------------------------------------------
+
+    def mood_message(self) -> Optional[dict]:
+        """給前端的 character-mood；引擎那一側還沒好（正在換）就是 None。"""
+        companion = self._companion()
+        if companion is None:
+            return None
+        return mood_message(companion.snapshot())
+
+    def listen_to_mood(self, listener: Callable[[dict], None]) -> Callable[[], None]:
+        """背景結果改了她的心情時呼叫 listener(訊息)。記在角色上：引擎那一側
+        換了一個也照樣收得到。回傳停止聽的函式。"""
+        if not self._mood_key:
+            return lambda: None
+        return listen_to_mood(self._mood_key, listener)
 
     def handle_interrupt(self, heard_response: str) -> None:
         """主機打斷的方式是取消等著回覆的那個 task，接著馬上呼叫這裡，不等它停。
@@ -453,8 +482,14 @@ class CharacterEngineAgent(AgentInterface):
         if take_back is not None:
             # 在引擎那一輪裡面做：這時沒有別的連線在講話，最新的那一則才拿得掉。
             companion.take_back(take_back)
-        if companion.character.description != self._system:
-            companion.character = replace(companion.character, description=self._system)
+        persona = self._persona or None
+        if (
+            companion.character.description != self._system
+            or companion.character.background != persona
+        ):
+            companion.character = replace(
+                companion.character, description=self._system, background=persona
+            )
         if _TOOLS_REGISTERED_BY.get(companion) == id(self):
             return
         for registered in list(companion.tools):

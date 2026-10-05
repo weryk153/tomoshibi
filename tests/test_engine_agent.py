@@ -988,3 +988,44 @@ def test_she_speaks_up_through_the_engine_with_the_hosts_material(tmp_path):
     later = "\n".join(message.content for message in afterwards)
     assert "請你自然地開口" not in later
     assert "- 天文" not in later
+
+
+# --- 她的心情 ---------------------------------------------------------------------
+
+
+def test_her_mood_is_read_from_the_engine(tmp_path):
+    async def scenario():
+        return agent(companion(tmp_path, EngineLLM())).mood_message()
+
+    message = asyncio.run(scenario())
+
+    assert message["type"] == "character-mood"
+    assert (message["mood"], message["intensity"], message["half_life"]) == (
+        "neutral",
+        0.0,
+        300.0,
+    )
+    assert isinstance(message["updated_at"], float)
+
+
+def test_no_mood_while_the_engine_side_is_being_replaced():
+    assert agent(lambda: None).mood_message() is None
+
+
+def test_an_agent_that_does_not_know_its_character_has_nothing_to_follow(
+    tmp_path, monkeypatch
+):
+    def must_not_be_called(key, listener):
+        raise AssertionError(
+            "listen_to_mood must not reach the factory without a mood_key"
+        )
+
+    monkeypatch.setattr(agent_module, "listen_to_mood", must_not_be_called)
+
+    async def scenario():
+        stop = agent(companion(tmp_path, EngineLLM())).listen_to_mood(
+            lambda message: None
+        )
+        stop()
+
+    asyncio.run(scenario())

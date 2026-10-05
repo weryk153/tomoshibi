@@ -6,16 +6,18 @@ character_engine_agent 的人不該因為沒裝它而受任何影響，所以匯
 """
 
 import asyncio
+import functools
 import json
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping, Optional
+from typing import Any, Callable, Mapping, Optional
 
 from loguru import logger
 
 from ..context_window import cooling_down, detect_context_window
 from ..utils.path_safety import safe_join
+from ..character_mood import mood_message
 
 # 背景工作要的是穩定的 JSON，不是有個性的對話。只帶「關掉思考模式」這類欄位：
 # 沒帶的話每個背景工作都會先思考到逾時（舊的記憶整理出過同一件事）；
@@ -60,7 +62,8 @@ NOT_COMPATIBLE = (
 )
 TOO_OLD = (
     "安裝的 AI Character Engine 太舊：這版 Tomoshibi 要引擎自己記得她說過的話"
-    "（ai_character_engine.companion.SELF_MEMORY_LINE）。\n"
+    "（ai_character_engine.companion.SELF_MEMORY_LINE），也要她的心情會淡掉"
+    "（ai_character_engine.companion.CHARACTER_MOODS，引擎 1.1.0 起）。\n"
     "做法：在專案目錄執行 uv sync 換回 pyproject.toml 釘的那一版。"
 )
 # 背景工作（情緒、記憶、目標…）另外用的端點。不是引擎的設定，先從設定裡拿出來。
@@ -208,6 +211,34 @@ def _fit_the_window(live: _Live) -> None:
 _LIVE: dict[str, _Live] = {}
 _CLOSING: set = set()
 
+# 誰在聽哪個角色的心情（鍵同 _LIVE）。記在鍵上而不是 companion 上：存設定會換一個
+# companion，頁面不必因此重新連線。
+_MOOD_LISTENERS: dict[str, list] = {}
+
+
+def listen_to_mood(key: str, listener: Callable[[dict], None]) -> Callable[[], None]:
+    """背景結果改了這個角色的心情時呼叫 listener(訊息)。回傳停止聽的函式。"""
+    listeners = _MOOD_LISTENERS.setdefault(key, [])
+    listeners.append(listener)
+
+    def stop() -> None:
+        if listener in listeners:
+            listeners.remove(listener)
+
+    return stop
+
+
+def _tell_mood(key: str, snapshot: Any) -> None:
+    message = mood_message(snapshot)
+    if message is None:
+        return
+    for listener in list(_MOOD_LISTENERS.get(key, ())):
+        try:
+            listener(message)
+        except Exception as error:
+            # 一個關掉的頁面不能讓其他頁面收不到。
+            logger.debug(f"[mood] listener failed ({type(error).__name__}: {error})")
+
 
 def current_companion(key: str) -> Optional[Any]:
     live = _LIVE.get(key)
@@ -252,11 +283,18 @@ def build_companion(
     llm_config: Mapping[str, Any],
     settings: Optional[Mapping[str, Any]] = None,
     language: str = "",
+    persona: str = "",
 ) -> str:
     """確保這個角色有一個符合目前設定的 companion，回傳用來查它的鍵。
 
     language 是她回話用的語言。記憶、目標、體會也用它寫：不講的話模型得自己從
     對話看出來，而它不一定看得出來。
+
+    persona 是她的人設原文（character_config.persona_prompt，逐字，不含共用規則
+    與其他附加內容），一字不差地包在 system／description 裡面。放進
+    CharacterProfile.background 讓背景工作（情緒、心情…）讀得到她是誰；description
+    已經包含它，引擎的 ContextBuilder 看到 background 是 description 的子字串就不會
+    另外印一段 Background，她自己的對話提示不會因此多出東西。
 
     人設（system）不算在「設定」裡：它每輪都可能刷新，由 agent 直接改她的描述。
     """
@@ -275,10 +313,13 @@ def build_companion(
         ) from exc
     # 舊版引擎收到它不認得的設定（self_memory_every）只會丟一個看不懂的 TypeError，
     # 或少了主機已經不再自己做的檢查。SELF_MEMORY_LINE 跟這裡用到的其他新東西
-    # （speak_up 的 statement_only、from_before、引擎那一側的輸出檢查）同一版起才有。
+    # （speak_up 的 statement_only、from_before、引擎那一側的輸出檢查）同一版起才有；
+    # CHARACTER_MOODS（1.1.0 起，她的心情）也一樣。
     import ai_character_engine.companion as engine_companion
 
-    if not hasattr(engine_companion, "SELF_MEMORY_LINE"):
+    if not hasattr(engine_companion, "SELF_MEMORY_LINE") or not hasattr(
+        engine_companion, "CHARACTER_MOODS"
+    ):
         raise RuntimeError(TOO_OLD)
 
     settings = dict(settings or {})
@@ -320,29 +361,35 @@ def build_companion(
     talking, thinking, eyes = _clients(provider, llm_config, background)
     if live:
         _let_go(live.companion)
+    companion = CharacterCompanion(
+        character=CharacterProfile(
+            id=conf_uid,
+            name=character_name or conf_uid,
+            description=system,
+            background=persona or None,
+        ),
+        llm=talking,
+        background_llm=thinking,
+        storage_dir=directory,
+        settings=CompanionSettings(
+            **{
+                "max_history_messages": HISTORY_MESSAGES,
+                "language": language,
+                **{
+                    _RENAMED_SETTINGS.get(name, name): value
+                    for name, value in settings.items()
+                },
+            }
+        ),
+        context_builder=ContextBuilder(budget=budget),
+        vision=eyes,
+        bridge_config=HostBridgeConfig(turn_timeout_seconds=TURN_TIMEOUT_SECONDS),
+    )
+    # 背景結果改了她的心情：告訴正在看這個角色的每個頁面。
+    companion.on_mood_change = functools.partial(_tell_mood, key)
     _LIVE[key] = _Live(
         signature,
-        CharacterCompanion(
-            character=CharacterProfile(
-                id=conf_uid, name=character_name or conf_uid, description=system
-            ),
-            llm=talking,
-            background_llm=thinking,
-            storage_dir=directory,
-            settings=CompanionSettings(
-                **{
-                    "max_history_messages": HISTORY_MESSAGES,
-                    "language": language,
-                    **{
-                        _RENAMED_SETTINGS.get(name, name): value
-                        for name, value in settings.items()
-                    },
-                }
-            ),
-            context_builder=ContextBuilder(budget=budget),
-            vision=eyes,
-            bridge_config=HostBridgeConfig(turn_timeout_seconds=TURN_TIMEOUT_SECONDS),
-        ),
+        companion,
         base_url=str(llm_config.get("base_url") or ""),
         model=str(llm_config.get("model") or ""),
         window=window,
