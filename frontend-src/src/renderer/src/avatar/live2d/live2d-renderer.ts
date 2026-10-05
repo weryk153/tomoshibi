@@ -21,6 +21,10 @@ function getAdapter(): any | null {
 }
 
 export function createLive2DRenderer(): CharacterRenderer {
+  // 空檔時的臉：她的心情。Live2D 的表情沒有濃淡——有就整張套上；淡到門檻以下
+  // 時 avatar 會傳 null 進來，回到素顏。
+  let resting: string | number | null = null;
+
   return {
     beginSegment(audio, cues: SpeakCues, firstOfResponse) {
       // Get Live2D manager and model
@@ -138,8 +142,17 @@ export function createLive2DRenderer(): CharacterRenderer {
       }
     },
 
+    setRestingExpression(expression, intensity) {
+      resting = expression !== null && intensity > 0 ? expression : null;
+    },
+
     resetExpression() {
-      clearLive2DExpression(getAdapter());
+      const adapter = getAdapter();
+      if (resting !== null && adapter && getModel()) {
+        setLive2DExpression(resting, adapter);
+        return;
+      }
+      clearLive2DExpression(adapter);
     },
   };
 }

@@ -28,6 +28,7 @@ import type { StagePerformanceTrigger } from '@/effects/stage-performance';
 import { shouldHonourStartMic } from '@/services/mic-mode';
 import { useStream } from '@/context/stream-context';
 import { IS_STAGE, withStageParam } from '@/services/stage-mode';
+import { parseCharacterMood, setCharacterMood } from '@/avatar/mood';
 
 function WebSocketHandler({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
@@ -147,6 +148,8 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
         break;
       case 'set-model-and-conf':
         setAiState('loading');
+        // 換角色或重新載入：先忘掉上一個的心情，後端接著會送這一個的。
+        setCharacterMood(null);
         if (message.conf_name) {
           setConfName(message.conf_name);
         }
@@ -216,6 +219,16 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
           duration: 2000,
         });
         break;
+      case 'character-mood': {
+        // 她的心情（設下時的強度與時間）；空檔的臉由 avatar.tsx 照它算。
+        const mood = parseCharacterMood(message);
+        if (mood) {
+          setCharacterMood(mood);
+        } else {
+          console.warn('Malformed character-mood:', message);
+        }
+        break;
+      }
       case 'stage-effect':
         if (isStageEffectId(message.effect)) {
           playEffect(message.effect, message.effect_options);

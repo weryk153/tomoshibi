@@ -8,7 +8,9 @@ import {
 } from "./character-renderer.ts";
 
 function fake(): CharacterRenderer {
-  return { beginSegment() {}, stop() {}, resetExpression() {} };
+  return {
+    beginSegment() {}, stop() {}, resetExpression() {}, setRestingExpression() {},
+  };
 }
 
 test("註冊後可取得，註銷後為 null", () => {

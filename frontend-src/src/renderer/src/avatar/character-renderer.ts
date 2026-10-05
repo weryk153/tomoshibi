@@ -45,7 +45,13 @@ export interface CharacterRenderer {
   ): void;
   /** 打斷或整輪播完：停 lipsync、回 idle。 */
   stop(): void;
-  /** AI 回到 IDLE：清表情回素顏。 */
+  /**
+   * 空檔時的臉（她的心情）。expression 是這個模型的表情（Live2D 名字或索引、
+   * VRM preset，見 avatar/mood.ts 的 restingFor），null＝沒有心情；intensity 是
+   * 淡掉之後的強度 0..1。只記下來，resetExpression() 才套用。
+   */
+  setRestingExpression(expression: string | number | null, intensity: number): void;
+  /** AI 回到 IDLE：回到 resting 表情；沒有 resting 就清回素顏。 */
   resetExpression(): void;
   /** 設定頁試播：套一個表情（VRM 是 preset／自訂名）。沒實作＝這個 renderer 不支援試播。 */
   previewExpression?(name: string): void;

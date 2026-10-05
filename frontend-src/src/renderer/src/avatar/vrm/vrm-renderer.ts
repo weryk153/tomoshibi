@@ -16,6 +16,8 @@ export class VRMRenderer implements CharacterRenderer {
   private elapsed = 0;
   // 試播的世代號，見 previewMotion。只在那一個方法裡讀寫。
   private previewGeneration = 0;
+  // 空檔時的臉：她的心情。見 CharacterRenderer.setRestingExpression。
+  private resting: { name: string; intensity: number } | null = null;
 
   // 明確欄位指派而不是 constructor parameter property：node --experimental-strip-types
   // 只剝型別、不轉譯這個語法（見 frontend-node-test-constraints），這個檔案要能被
@@ -41,7 +43,19 @@ export class VRMRenderer implements CharacterRenderer {
     this.motions.stop();
   }
 
+  setRestingExpression(expression: string | number | null, intensity: number): void {
+    this.resting =
+      expression === null || !(intensity > 0)
+        ? null
+        : { name: String(expression), intensity: Math.min(1, intensity) };
+  }
+
   resetExpression(): void {
+    // 權重是 EMOTION_MAX（0.7）× 強度，淡入沿用 0.2 秒（ExpressionController）。
+    // 模型沒有這個表情時 setEmotion 回 false，那就清回素顏，不留著講話時的臉。
+    if (this.resting && this.expressions.setEmotion(this.resting.name, this.resting.intensity)) {
+      return;
+    }
     this.expressions.clear();
   }
 

@@ -108,3 +108,47 @@ test("ensureMotionLoaded 轉呼叫 MotionPlayer.ensureLoaded，不觸發 playOnc
   assert.deepEqual(motionCalls, []);
   assert.equal(result, true);
 });
+
+// 空檔時的臉：resetExpression 回到她的心情（resting），不再一律清空。
+function restingRenderer(modelHasIt: boolean) {
+  const calls: unknown[][] = [];
+  const expressions = {
+    setEmotion: (name: string, intensity: number): boolean => {
+      calls.push(["set", name, intensity]);
+      return modelHasIt;
+    },
+    clear: (): void => {
+      calls.push(["clear"]);
+    },
+  } as unknown as ExpressionController;
+  const renderer = new VRMRenderer({} as unknown as VRM, {} as unknown as MotionPlayer, expressions);
+  return { renderer, calls };
+}
+
+test("resting 表情：resetExpression 回到她的心情，強度照給（權重 0.7×強度在 ExpressionController）", () => {
+  const { renderer, calls } = restingRenderer(true);
+  renderer.setRestingExpression("sad", 0.4);
+  renderer.resetExpression();
+  assert.deepEqual(calls, [["set", "sad", 0.4]]);
+});
+
+test("沒有 resting：resetExpression 清回素顏（跟以前一樣）", () => {
+  const { renderer, calls } = restingRenderer(true);
+  renderer.setRestingExpression(null, 0);
+  renderer.resetExpression();
+  assert.deepEqual(calls, [["clear"]]);
+});
+
+test("強度 0 等於沒有 resting", () => {
+  const { renderer, calls } = restingRenderer(true);
+  renderer.setRestingExpression("sad", 0);
+  renderer.resetExpression();
+  assert.deepEqual(calls, [["clear"]]);
+});
+
+test("模型沒有那個表情：退回清空", () => {
+  const { renderer, calls } = restingRenderer(false);
+  renderer.setRestingExpression("sad", 0.4);
+  renderer.resetExpression();
+  assert.deepEqual(calls, [["set", "sad", 0.4], ["clear"]]);
+});

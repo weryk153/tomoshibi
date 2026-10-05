@@ -30,6 +30,7 @@ test("stop 會停音訊、叫 renderer.stop、且 settle 只叫一次", () => {
     beginSegment() {},
     stop() { stopped += 1; },
     resetExpression() {},
+    setRestingExpression() {},
   };
   const unregister = registerRenderer(r);
   m.setCurrentAudio(audio, () => { settled += 1; });
@@ -52,6 +53,7 @@ test("沒音訊也沒開講時，stop 不會叫 renderer.stop", () => {
     beginSegment() {},
     stop() { stopped += 1; },
     resetExpression() {},
+    setRestingExpression() {},
   };
   const unregister = registerRenderer(r);
   m.stopCurrentAudioAndLipSync();
@@ -65,6 +67,7 @@ test("renderer.stop 丟例外不會讓 settle 漏掉", () => {
     beginSegment() {},
     stop() { throw new Error("boom"); },
     resetExpression() {},
+    setRestingExpression() {},
   };
   const unregister = registerRenderer(r);
   let settled = 0;
