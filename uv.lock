@@ -13,50 +13,15 @@ resolution-markers = [
 [[package]]
 name = "ai-character-engine"
 version = "1.0.0"
-source = { url = "https://github.com/weryk153/ai-character-engine/archive/a7f1dacc86da950d6f05a2304261efee5f1a2126.tar.gz" }
+source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "openai" },
     { name = "python-dotenv" },
 ]
-sdist = { hash = "sha256:5db093d405f961c20a4970aa9dd302c3750789c3ca910fe5d03eb2453509e47e" }
-
-[package.metadata]
-requires-dist = [
-    { name = "accelerate", marker = "extra == 'training'", specifier = ">=1,<2" },
-    { name = "accelerate", marker = "extra == 'training-qlora'", specifier = ">=1,<2" },
-    { name = "bitsandbytes", marker = "extra == 'training-qlora'", specifier = ">=0.45,<1" },
-    { name = "datasets", marker = "extra == 'training'", specifier = ">=3,<5" },
-    { name = "datasets", marker = "extra == 'training-qlora'", specifier = ">=3,<5" },
-    { name = "fastapi", marker = "extra == 'service'", specifier = ">=0.115,<1" },
-    { name = "faster-whisper", marker = "extra == 'voice-mac'", specifier = ">=1.1,<2" },
-    { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.27,<1" },
-    { name = "httpx", marker = "extra == 'local'", specifier = ">=0.27,<1" },
-    { name = "httpx", marker = "extra == 'voice-audio'", specifier = ">=0.27,<1" },
-    { name = "httpx", marker = "extra == 'voice-mac'", specifier = ">=0.27,<1" },
-    { name = "httpx", marker = "extra == 'voice-sherpa'", specifier = ">=0.27,<1" },
-    { name = "numpy", marker = "extra == 'voice-mac'", specifier = ">=1.26,<3" },
-    { name = "numpy", marker = "extra == 'voice-sherpa'", specifier = ">=1.26,<3" },
-    { name = "openai", specifier = ">=1.0.0" },
-    { name = "peft", marker = "extra == 'training'", specifier = ">=0.14,<1" },
-    { name = "peft", marker = "extra == 'training-qlora'", specifier = ">=0.14,<1" },
-    { name = "pydantic", marker = "extra == 'service'", specifier = ">=2.7,<3" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.0" },
-    { name = "pytest-asyncio", marker = "extra == 'dev'", specifier = ">=0.23" },
-    { name = "python-dotenv", specifier = ">=1.0.0" },
-    { name = "qdrant-client", marker = "extra == 'qdrant'", specifier = ">=1.10,<2" },
-    { name = "sherpa-onnx", marker = "extra == 'voice-sherpa'", specifier = "==1.13.8" },
-    { name = "sherpa-onnx-core", marker = "sys_platform == 'darwin' and extra == 'voice-sherpa'", specifier = "==1.13.8" },
-    { name = "sounddevice", marker = "extra == 'voice-audio'", specifier = ">=0.5,<0.6" },
-    { name = "sounddevice", marker = "extra == 'voice-mac'", specifier = ">=0.5,<0.6" },
-    { name = "sounddevice", marker = "extra == 'voice-sherpa'", specifier = ">=0.5,<0.6" },
-    { name = "transformers", marker = "extra == 'training'", specifier = ">=4.48,<6" },
-    { name = "transformers", marker = "extra == 'training-qlora'", specifier = ">=4.48,<6" },
-    { name = "trl", marker = "extra == 'training'", specifier = ">=0.15,<2" },
-    { name = "trl", marker = "extra == 'training-qlora'", specifier = ">=0.15,<2" },
-    { name = "tzdata", marker = "sys_platform == 'win32' and extra == 'dev'", specifier = ">=2024.1" },
-    { name = "uvicorn", marker = "extra == 'service'", specifier = ">=0.30,<1" },
+sdist = { url = "https://files.pythonhosted.org/packages/f4/a6/bd99dfbd4b15bf7862dae0df3e5c55a71b8e91c73779920f9effec9ca54e/ai_character_engine-1.0.0.tar.gz", hash = "sha256:03e35e9196594b8406bec5fe26e791a4615083c2ab0c716960319714a8927893", size = 376934, upload-time = "2026-10-05T07:19:38.915Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d3/97/a6d6fda21e1e692ea56192af91de51e3981a9b08ca8c60d248e92f873f50/ai_character_engine-1.0.0-py3-none-any.whl", hash = "sha256:c6956c2d434b827c469c3526eb561ea7553468c1f1b9a912ddd24f3021ddb503", size = 432243, upload-time = "2026-10-05T07:19:37.01Z" },
 ]
-provides-extras = ["dev", "service", "qdrant", "local", "voice-audio", "voice-sherpa", "voice-mac", "training", "training-qlora"]
 
 [[package]]
 name = "aiohappyeyeballs"
@@ -4664,7 +4629,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ai-character-engine", url = "https://github.com/weryk153/ai-character-engine/archive/a7f1dacc86da950d6f05a2304261efee5f1a2126.tar.gz" },
+    { name = "ai-character-engine", specifier = "==1.0.0" },
     { name = "aiohttp", marker = "extra == 'bilibili'", specifier = ">=3.10.0" },
     { name = "anthropic", specifier = ">=0.40.0" },
     { name = "azure-cognitiveservices-speech", specifier = ">=1.41.1" },
