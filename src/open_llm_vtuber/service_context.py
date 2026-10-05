@@ -802,6 +802,7 @@ class ServiceContext:
                 provider,
                 audio_cfg,
                 protected_names=getattr(self.character_config, "protected_names", None),
+                catchphrases=getattr(self.character_config, "catchphrases", None),
             )
             self._audio_translate_voice_lang = voice_lang
         else:
@@ -876,11 +877,27 @@ class ServiceContext:
             cfg["deeplx_target_lang"] = resolve_deepl_target_lang(target)
         else:  # llm / tencent both use 'target_lang'
             cfg["target_lang"] = target
+        # catchphrases 的「目標寫法」是為聲音語言寫的（見 init_translate 建 AUDIO
+        # engine 那段），不是為字幕語言寫的。字幕目標是玩家語言，通常跟聲音語言
+        # 不同，硬塞同一份對照表會把聲音語言的寫法誤植進不相干語言的字幕。只有
+        # 字幕目標跟角色來源語言（reply_language，沒設就退回 player_language，
+        # 跟 _effective_output_language 同一套退回規則）同屬一個語言桶時才無害：
+        # conversation_utils 逐句翻譯前會比較來源語言跟字幕目標，相同就整句跳過
+        # 翻譯，口頭禪規則根本不會被送進模型。
+        from .conversations.conversation_utils import _normalize_lang
+
+        reply_language = (
+            getattr(self.character_config, "reply_language", "") or player_language
+        )
+        catchphrases = None
+        if _normalize_lang(reply_language) == _normalize_lang(target):
+            catchphrases = getattr(self.character_config, "catchphrases", None)
         try:
             return TranslateFactory.get_translator(
                 provider,
                 cfg,
                 protected_names=getattr(self.character_config, "protected_names", None),
+                catchphrases=catchphrases,
             )
         except Exception as e:
             logger.warning(

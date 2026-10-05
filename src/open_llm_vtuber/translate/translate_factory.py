@@ -10,11 +10,13 @@ class TranslateFactory:
         translate_provider: str,
         translate_provider_config: dict,
         protected_names: dict[str, list[str]] | None = None,
+        catchphrases: dict[str, str] | None = None,
     ) -> TranslateInterface:
         """`protected_names` 是角色的專有名詞名單（正式寫法 → 錯誤寫法）。
+        `catchphrases` 是角色的口頭禪名單（來源寫法 → 翻譯目標要用的寫法）。
 
-        只有 llm provider 用得到：deeplx / tencent 是外部服務，改不了它們的
-        輸出。沒帶就是不保護任何名字，行為與過去相同。
+        兩者都只有 llm provider 用得到：deeplx / tencent 是外部服務，改不了它們的
+        輸出。沒帶就是不保護名字／不保留口頭禪，行為與過去相同。
         """
         translate_provider = translate_provider.lower()
         if translate_provider == "deeplx":
@@ -40,6 +42,7 @@ class TranslateFactory:
                 extra_body=translate_provider_config.get("extra_body"),
                 timeout=translate_provider_config.get("timeout") or 30,
                 protected_names=protected_names,
+                catchphrases=catchphrases,
             )
         else:
             raise ValueError(f"Unsupported translate provider: {translate_provider}")
