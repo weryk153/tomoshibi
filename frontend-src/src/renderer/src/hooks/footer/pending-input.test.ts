@@ -6,6 +6,7 @@ import {
   hasPendingInput,
   joinPendingInput,
   clearPendingInput,
+  mergeQueuedWithImmediate,
   shouldQueueInsteadOfSending,
   shouldFlushOnStateChange,
 } from './pending-input.ts';
@@ -76,4 +77,27 @@ test('does not flush on transient states like listening/waiting/loading', () => 
   assert.equal(shouldFlushOnStateChange('listening'), false);
   assert.equal(shouldFlushOnStateChange('waiting'), false);
   assert.equal(shouldFlushOnStateChange('loading'), false);
+});
+
+test('immediate send with nothing queued goes out unchanged', () => {
+  assert.equal(mergeQueuedWithImmediate(EMPTY_PENDING_INPUT, 'hello'), 'hello');
+});
+
+test('immediate send after interrupt prepends anything still queued, in order', () => {
+  // Typed while she was speaking (queued), then the user hit interrupt and
+  // immediately sent another message before the queue had a chance to
+  // auto-flush: the older queued text must go out ahead of the new one, not
+  // after — chat history already shows it first.
+  let state = EMPTY_PENDING_INPUT;
+  state = enqueuePendingInput(state, 'typed while she was speaking');
+  assert.equal(
+    mergeQueuedWithImmediate(state, 'sent right after interrupt'),
+    'typed while she was speaking\nsent right after interrupt',
+  );
+});
+
+test('merging an immediate send does not mutate the queued state', () => {
+  const state = enqueuePendingInput(EMPTY_PENDING_INPUT, 'queued');
+  mergeQueuedWithImmediate(state, 'new');
+  assert.equal(joinPendingInput(state), 'queued');
 });

@@ -41,20 +41,40 @@ export function clearPendingInput(): PendingInputState {
   return EMPTY_PENDING_INPUT;
 }
 
+/**
+ * What to actually send for an immediate (non-queued) send, given whatever
+ * is already queued from while she was speaking.
+ *
+ * Needed for: user types while she's speaking (queued) → user presses the
+ * interrupt button → before the queue has a chance to auto-flush, the user
+ * sends another message. That new message is sent immediately (state is no
+ * longer `thinking-speaking`), but the older queued text must go out ahead
+ * of it, not after — chat history already shows the older message first.
+ */
+export function mergeQueuedWithImmediate(state: PendingInputState, text: string): string {
+  if (!hasPendingInput(state)) return text;
+  return `${joinPendingInput(state)}\n${text}`;
+}
+
 /** Send now, or hold it for when she's done talking? */
 export function shouldQueueInsteadOfSending(aiState: string): boolean {
   return aiState === 'thinking-speaking';
 }
 
 /**
- * Whether reaching `nextAiState` is the signal to flush the queue.
+ * Whether reaching `nextAiState` is the signal to automatically flush the
+ * queue.
  *
  * Deliberately narrow: only a genuine return to `idle` (normally
- * conversation-chain-end, but also e.g. config-switched/set-model-and-conf
- * after a character switch) counts. `interrupted` does NOT flush — the user
- * explicitly cut her off, which is a different action from "she finished",
- * and the queue should wait for the next real idle rather than firing
- * immediately off the back of an interrupt.
+ * conversation-chain-end) counts. `interrupted` is NOT included here on
+ * purpose, for two reasons:
+ *  - VAD's own interrupt-on-speech-detected passes through `interrupted` on
+ *    its way to `listening`; flushing there would race the voice turn that
+ *    is about to start.
+ *  - An explicit interrupt-button press is a distinct user action ("cut her
+ *    off now") from "she finished talking" — it gets its own direct flush
+ *    call (see the hook) right after `interrupt()`, rather than being
+ *    inferred from the state transition alone.
  */
 export function shouldFlushOnStateChange(nextAiState: string): boolean {
   return nextAiState === 'idle';

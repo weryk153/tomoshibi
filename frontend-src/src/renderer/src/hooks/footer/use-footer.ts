@@ -15,6 +15,7 @@ export const useFooter = () => {
     handleCompositionStart,
     handleCompositionEnd,
     handleSend,
+    flushPending,
   } = useTextInput();
 
   const { interrupt } = useInterrupt();
@@ -26,18 +27,15 @@ export const useFooter = () => {
 
   const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
     handleChange({ target: { value: e.target.value } } as ChangeEvent<HTMLInputElement>);
-    // WAITING's only effect is pausing the proactive-speak idle timer, which
-    // only ever runs while aiState === IDLE (see proactive-speak-context.tsx).
-    // So the per-keystroke call is only meaningful from idle; calling it
-    // unconditionally used to also fire while she's speaking/listening/etc.,
-    // which did nothing harmful today (the context already refuses to let
-    // WAITING override THINKING_SPEAKING) but needlessly yanked the aiState
-    // away from other states too. Scoping it to idle keeps the "don't
-    // proactively speak while the user is mid-typing" behaviour and removes
-    // every other no-op/unwanted transition.
-    if (aiState === AiStateEnum.IDLE) {
-      setAiState(AiStateEnum.WAITING);
-    }
+    // Unconditional on purpose (reverted from a tighter idle-only guard):
+    // the ai-state-context reducer already refuses to let WAITING override
+    // THINKING_SPEAKING, so this never touches a speaking state. But it also
+    // doubles as the recovery path out of 'interrupted' — after the
+    // interrupt button, typing here moves interrupted -> waiting -> (2s
+    // later, idle), which is what lets a queued pending-input message
+    // (pending-input.ts) flush automatically if the user doesn't explicitly
+    // trigger it. Gating this to idle-only broke that recovery.
+    setAiState(AiStateEnum.WAITING);
   };
 
   const handleKeyPress = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -47,6 +45,12 @@ export const useFooter = () => {
   const handleInterrupt = () => {
     if (aiState === AiStateEnum.THINKING_SPEAKING) {
       interrupt();
+      // The user explicitly cut her off — send anything queued from while
+      // she was talking right away, rather than waiting on the idle-only
+      // auto-flush (which 'interrupted' deliberately doesn't trigger; see
+      // shouldFlushOnStateChange's doc comment) or on the typing-driven
+      // interrupted -> waiting -> idle recovery above.
+      flushPending();
       if (autoStartMicOn) {
         startMic();
       }
