@@ -107,6 +107,22 @@ export function restingFor(
   return expression === null ? { expression: null, intensity: 0 } : { expression, intensity: now.intensity };
 }
 
+// review 空檔重算：10 秒的 interval 不管有沒有變都呼叫 resetExpression()，會把
+// 設定頁試播、Live2D 頭部點擊的隨機表情之類「使用者剛剛自己叫出來的臉」在
+// 0～10 秒內蓋掉。真正需要整個重套（resetExpression）的只有「表情本身換了」
+// ——跟 null 之間的切換也算換。同一個表情只是強度隨時間淡掉不算換，renderer
+// 自己決定要不要悄悄更新濃淡（見 VRMRenderer.setRestingExpression；Live2D 沒有
+// 濃淡，不會有動作）。
+/**
+ * 空檔重算時要不要整個重新套用（resetExpression）。previous 是上次「真的套用
+ * 過」的值，null 代表這次效果掛載後還沒套用過（例如 renderer 剛註冊，還在補
+ * 追進度）——這種情況一律要套一次。
+ */
+export function shouldApplyResting(previous: Resting | null, next: Resting): boolean {
+  if (previous === null) return true;
+  return previous.expression !== next.expression;
+}
+
 // 最新的心情。讀的人是 avatar.tsx 的空檔重算（不是元件 render），跟
 // character-renderer.ts 的註冊表同一種做法。
 let latest: CharacterMood | null = null;

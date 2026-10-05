@@ -8,6 +8,7 @@ import { isClipMotion } from "../character-renderer.ts";
 import {
   setLive2DExpression,
   clearLive2DExpression,
+  hasLive2DExpression,
 } from "@/hooks/canvas/use-live2d-expression";
 import { playLive2DMotion } from "@/hooks/canvas/use-live2d-motion";
 
@@ -146,9 +147,19 @@ export function createLive2DRenderer(): CharacterRenderer {
       resting = expression !== null && intensity > 0 ? expression : null;
     },
 
+    isReady() {
+      // 一掛上就註冊了，模型（連同表情清單）是之後才非同步載完。載完之前套表情
+      // 會靜靜失敗，avatar.tsx 卻會以為套過了，之後就不再補——所以要問。
+      const model = getModel();
+      return !!getAdapter() && !!model && model.isLoadComplete?.() === true;
+    },
+
     resetExpression() {
       const adapter = getAdapter();
-      if (resting !== null && adapter && getModel()) {
+      // fix round 1：模型沒有這個表情（存檔後角色換了模型、表情名對不上）時要清回
+      // 素顏，不然會卡在上一句話講完時的臉——跟 VRM 的 setEmotion 回 false 時退回
+      // clear() 是同一個道理，只是 Live2D 沒有這個訊號，得先自己查表情清單。
+      if (resting !== null && adapter && getModel() && hasLive2DExpression(resting, adapter)) {
         setLive2DExpression(resting, adapter);
         return;
       }

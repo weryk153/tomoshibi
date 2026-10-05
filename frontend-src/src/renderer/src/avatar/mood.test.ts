@@ -10,7 +10,9 @@ import {
   restingExpression,
   restingFor,
   setCharacterMood,
+  shouldApplyResting,
   type CharacterMood,
+  type Resting,
 } from "./mood.ts";
 
 const SAD: CharacterMood = { mood: "sad", intensity: 0.8, updatedAt: 1000, halfLife: 300 };
@@ -93,6 +95,43 @@ test("restingFor：淡掉的強度跟著表情走；跌破門檻就沒有表情"
   assert.ok(close(half.intensity, 0.4));
   assert.deepEqual(restingFor(SAD, VRM_MAP, 1900), { expression: null, intensity: 0 });
   assert.deepEqual(restingFor({ ...SAD, mood: "angry" }, FRIEREN_MAP, 1000), { expression: null, intensity: 0 });
+});
+
+// fix round 1：10 秒重算不該把試播／頭部點擊接管的臉搶回來，只有表情本身換了
+// 才值得整個重套（resetExpression）。
+test("shouldApplyResting：還沒套用過（previous 是 null）一律要套一次", () => {
+  const next: Resting = { expression: "sad", intensity: 0.4 };
+  assert.equal(shouldApplyResting(null, next), true);
+  assert.equal(shouldApplyResting(null, { expression: null, intensity: 0 }), true);
+});
+
+test("shouldApplyResting：null → null 不算換，不用套", () => {
+  assert.equal(
+    shouldApplyResting({ expression: null, intensity: 0 }, { expression: null, intensity: 0 }),
+    false,
+  );
+});
+
+test("shouldApplyResting：同一個表情只是強度淡掉，不算換", () => {
+  assert.equal(
+    shouldApplyResting({ expression: "sad", intensity: 0.4 }, { expression: "sad", intensity: 0.1 }),
+    false,
+  );
+});
+
+test("shouldApplyResting：表情換了（含跟 null 之間切換）才要套", () => {
+  assert.equal(
+    shouldApplyResting({ expression: "sad", intensity: 0.4 }, { expression: "happy", intensity: 0.4 }),
+    true,
+  );
+  assert.equal(
+    shouldApplyResting({ expression: "sad", intensity: 0.1 }, { expression: null, intensity: 0 }),
+    true,
+  );
+  assert.equal(
+    shouldApplyResting({ expression: null, intensity: 0 }, { expression: "sad", intensity: 0.3 }),
+    true,
+  );
 });
 
 test("心情倉庫：存、取、通知、取消通知", () => {

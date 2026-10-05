@@ -31,6 +31,32 @@ export function setLive2DExpression(
 }
 
 /**
+ * これから setLive2DExpression(expressionValue, …) が本当に何か設定できるか
+ * どうか。setExpression / setLive2DExpression 自体は失敗しても例外を投げず
+ * 黙って何もしない（見つからない式のモーションは null のまま）ので、呼ぶ前に
+ * 確かめないと「最後に喋っていた時の表情のまま」になってしまう
+ * （fix round 1：VRM は setEmotion が false を返すので区別できるが、Live2D には
+ * その合図がない——事前にモデルの表情一覧を見て確かめる）。
+ */
+export function hasLive2DExpression(expressionValue: string | number, lappAdapter: any): boolean {
+  if (!lappAdapter) return false;
+  try {
+    const count: number = lappAdapter.getExpressionCount?.() ?? 0;
+    if (typeof expressionValue === 'number') {
+      return expressionValue >= 0 && expressionValue < count
+        && !!lappAdapter.getExpressionName(expressionValue);
+    }
+    for (let i = 0; i < count; i += 1) {
+      if (lappAdapter.getExpressionName(i) === expressionValue) return true;
+    }
+    return false;
+  } catch (error) {
+    console.log('Failed to check expression availability:', error);
+    return false;
+  }
+}
+
+/**
  * 表情を解除して素の顔に戻す。
  *
  * 「中立の表情を一つ選んで被せる」のではなく、再生中の表情モーションを

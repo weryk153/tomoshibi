@@ -65,6 +65,14 @@ export class ExpressionController {
     this.setEmotion(null);
   }
 
+  /**
+   * 目前套用中的情緒名字，null 代表素顏。VRMRenderer.setRestingExpression 用這個
+   * 判斷臉有沒有被試播或別的東西接管——接管了就不要把淡掉後的新強度搶推回去。
+   */
+  get currentEmotion(): string | null {
+    return this.current;
+  }
+
   setMouth(v: number): void {
     this.mouth = v;
   }

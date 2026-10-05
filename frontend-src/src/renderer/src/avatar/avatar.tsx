@@ -8,12 +8,14 @@ import { useIpcHandlers } from "@/hooks/utils/use-ipc-handlers";
 import { useInterrupt } from "@/hooks/utils/use-interrupt";
 import { useAudioTask } from "@/hooks/utils/use-audio-task";
 import { Live2D } from "@/components/canvas/live2d";
-import { getActiveRenderer } from "./character-renderer";
+import { getActiveRenderer, onRendererRegistered } from "./character-renderer";
 import {
   getCharacterMood,
   onCharacterMoodChange,
   RESTING_REFRESH_MS,
   restingFor,
+  shouldApplyResting,
+  type Resting,
 } from "./mood";
 
 // three + three-vrm 只在真的掛 VRM 角色時才下載；靜態 import 會把它們塞進主 bundle，
@@ -33,21 +35,36 @@ export function Avatar(): JSX.Element {
   // 回到 IDLE（講完、等你打字）時，臉帶著她現在的心情；心情隨時間淡掉，所以
   // 空檔時每 RESTING_REFRESH_MS 重算一次，新的心情到了也馬上重算。講話中不動：
   // 句子的表情標籤優先。
+  //
+  // 重算不等於重套：設定頁試播、Live2D 點頭的隨機表情都是使用者剛叫出來的臉，
+  // 每 10 秒一律 resetExpression() 會把它們蓋掉。所以記住上次真的套上去的值，
+  // 只有表情換了才重套（shouldApplyResting）；同一個表情只是淡了，交給
+  // setRestingExpression（VRM 只在臉還是她的心情時更新濃淡，Live2D 沒有濃淡）。
+  // 進 IDLE、心情真的來了、換了新 renderer 時一律套一次（applied 歸 null）。
   useEffect(() => {
     if (aiState !== AiStateEnum.IDLE) return undefined;
-    const apply = () => {
+    let applied: Resting | null = null;
+    const refresh = () => {
       const renderer = getActiveRenderer();
-      if (!renderer) return;
-      const resting = restingFor(getCharacterMood(), modelInfo?.emotionMap, Date.now() / 1000);
-      renderer.setRestingExpression(resting.expression, resting.intensity);
-      renderer.resetExpression();
+      // 還沒註冊（VRM 是 lazy import）或模型還沒載完：不套也不記，等註冊通知或下一次 tick。
+      if (!renderer || renderer.isReady?.() === false) return;
+      const next = restingFor(getCharacterMood(), modelInfo?.emotionMap, Date.now() / 1000);
+      renderer.setRestingExpression(next.expression, next.intensity);
+      if (shouldApplyResting(applied, next)) renderer.resetExpression();
+      applied = next;
     };
-    apply();
-    const timer = window.setInterval(apply, RESTING_REFRESH_MS);
-    const stop = onCharacterMoodChange(apply);
+    const applyAgain = () => {
+      applied = null;
+      refresh();
+    };
+    refresh();
+    const timer = window.setInterval(refresh, RESTING_REFRESH_MS);
+    const stopMood = onCharacterMoodChange(applyAgain);
+    const stopRegistered = onRendererRegistered(applyAgain);
     return () => {
       window.clearInterval(timer);
-      stop();
+      stopMood();
+      stopRegistered();
     };
   }, [aiState, modelInfo]);
 

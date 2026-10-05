@@ -48,6 +48,15 @@ export class VRMRenderer implements CharacterRenderer {
       expression === null || !(intensity > 0)
         ? null
         : { name: String(expression), intensity: Math.min(1, intensity) };
+    // fix round 1：空檔每 10 秒重算只是強度淡掉、表情沒換時，avatar.tsx 不會再
+    // 呼叫 resetExpression()（見 mood.ts 的 shouldApplyResting），所以新強度要
+    // 在這裡悄悄推進去——但只有「目前顯示的臉確實還是 resting 本人」才推，不然
+    // 會把被試播或頭部點擊接管的臉搶回來。被接管時就不動，等下次表情真的換了、
+    // 或重新進 IDLE／心情真的變了（這兩種情況一定會呼叫 resetExpression()）才
+    // 蓋回去。
+    if (this.resting && this.expressions.currentEmotion === this.resting.name) {
+      this.expressions.setEmotion(this.resting.name, this.resting.intensity);
+    }
   }
 
   resetExpression(): void {
