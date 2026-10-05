@@ -7,7 +7,13 @@ Bug: pekora.yaml 的聲音語言是日文（gpt_sovits_tts text_lang='ja'），�
 
 規則：角色聲音語言 V（conversation_utils.derive_voice_lang）有設定，且跟玩家語言
 推導出來的不一樣時，改用 'auto'；否則維持原本 clamp 行為不變。
+
+'yue'（廣東話）桶要特別處理：derive_voice_lang 沒有獨立的 yue bucket，廣東話聲音
+一律算進 'zh'；但玩家語言 zh-HK / yue-* 會被 clamp 成 'yue'。比較時要把 'yue' 併回
+'zh' 的桶，不然廣東話玩家對廣東話角色會被誤判成語言不同而跳成 auto。
 """
+
+import pytest
 
 from types import SimpleNamespace
 
@@ -77,6 +83,19 @@ def test_no_voice_language_keeps_old_clamp_behaviour():
     context.init_asr(asr_config, _character_config(None))
 
     assert asr_config.sherpa_onnx_asr.language == "zh"
+
+
+@pytest.mark.parametrize("text_lang", ["yue", "all_zh"])
+def test_cantonese_player_with_cantonese_or_mandarin_voice_stays_yue(text_lang):
+    """(e) 玩家語言是廣東話（zh-HK -> clamp 'yue'），角色聲音是廣東話或國語
+    （都算進 'zh' bucket）-> 維持 'yue'，不要被誤判成語言不同而跳成 'auto'。"""
+    context = _context("zh-HK")
+    asr_config = _sherpa_asr_config()
+    context.character_config.asr_config = asr_config
+
+    context.init_asr(asr_config, _character_config(text_lang))
+
+    assert asr_config.sherpa_onnx_asr.language == "yue"
 
 
 def test_switching_back_to_chinese_voice_character_resets_to_zh(monkeypatch):

@@ -482,7 +482,7 @@ class ServiceContext:
             logger.critical("Try to proceed without Live2D...")
 
     def init_asr(
-        self, asr_config: ASRConfig, character_config: CharacterConfig = None
+        self, asr_config: ASRConfig, character_config: CharacterConfig | None = None
     ) -> None:
         # 系統層級「玩家語言」推導 ASR 辨識語言（best-effort）。目前 active 模型
         # sense_voice 只支援 zh/en/ja/ko/yue；clamp 後落在這個集合才覆寫 sherpa 的
@@ -492,9 +492,18 @@ class ServiceContext:
         # 角色聲音的語言 V 跟玩家語言推導出來的不一樣時（例：角色講日文、玩家語言是
         # 中文），不能把辨識鎖死在玩家語言——短句會被硬聽成玩家語言的諧音（實測：
         # pekora 講「おやすみなさい」被鎖中文的 SenseVoice 聽成「歐亞蘇明納賽」）。
-        # 這種情況改成 'auto' 讓它自己偵測語言；V 沒設定或跟玩家語言相同時，維持原本
-        # clamp 行為不變。character_config 沒傳進來時退回 self.character_config，
-        # 跟改動前行為一致。
+        # 這種情況改成 'auto' 讓它自己偵測語言；V 沒設定、玩家語言本來就推不出明確
+        # 語言（derived 已經是 'auto'）、或兩邊相同時，維持原本 clamp 行為不變。
+        # character_config 沒傳進來時退回 self.character_config，跟改動前行為一致。
+        #
+        # 這段只對 sense_voice 模型生效：language 這個 leaf 只有 from_sense_voice
+        # 會讀（sherpa_onnx_asr.py），其他 model_type 讀了也沒作用。
+        #
+        # 'yue'（廣東話）比較特殊：derive_voice_lang／_normalize_lang 沒有獨立的
+        # yue bucket，廣東話聲音（GPT-SoVITS text_lang='yue'、edge zh-HK-*）一律
+        # 算進 'zh'；但 _clamp_sense_voice_language 對 zh-HK / yue-* 玩家語言會回
+        # 'yue'，跟 bucket 後的 'zh' 是同一件事。比較時把 'yue' 併回 'zh' 的桶，
+        # 不然廣東話玩家對廣東話角色會被誤判成「語言不同」而跳成 auto。
         player_language = (
             getattr(self.system_config, "player_language", "") or ""
         ).strip()
@@ -505,19 +514,25 @@ class ServiceContext:
 
                 derived = _SherpaASR._clamp_sense_voice_language(player_language)
 
-                from .conversations.conversation_utils import derive_voice_lang
+                if getattr(sherpa_block, "model_type", None) == "sense_voice":
+                    from .conversations.conversation_utils import derive_voice_lang
 
-                voice_lang = derive_voice_lang(
-                    character_config
-                    if character_config is not None
-                    else self.character_config
-                )
-                if voice_lang and voice_lang != derived:
-                    logger.info(
-                        f"ASR 語言：角色聲音語言 '{voice_lang}' 跟玩家語言推導出的 "
-                        f"'{derived}' 不同，SenseVoice 改用 'auto' 自動偵測語言。"
+                    voice_lang = derive_voice_lang(
+                        character_config
+                        if character_config is not None
+                        else self.character_config
                     )
-                    derived = "auto"
+                    derived_bucket = "zh" if derived == "yue" else derived
+                    if (
+                        voice_lang
+                        and derived != "auto"
+                        and voice_lang != derived_bucket
+                    ):
+                        logger.info(
+                            f"ASR 語言：角色聲音語言 '{voice_lang}' 跟玩家語言推導出的 "
+                            f"'{derived}' 不同，SenseVoice 改用 'auto' 自動偵測語言。"
+                        )
+                        derived = "auto"
 
                 if derived != getattr(sherpa_block, "language", "auto"):
                     sherpa_block.language = derived
