@@ -20,10 +20,10 @@ def test_llm_translator_receives_the_supplied_catchphrases():
     translator = TranslateFactory.get_translator(
         "llm",
         _llm_config(),
-        catchphrases={"peko": "ぺこ"},
+        catchphrases={"nya": "にゃ"},
     )
 
-    assert translator.catchphrases == {"peko": "ぺこ"}
+    assert translator.catchphrases == {"nya": "にゃ"}
 
 
 def test_llm_translator_defaults_to_no_catchphrases():
@@ -38,8 +38,8 @@ def test_catchphrases_and_protected_names_are_independent():
         "llm",
         _llm_config(),
         protected_names={"愛徠": ["愛萊"]},
-        catchphrases={"peko": "ぺこ"},
+        catchphrases={"nya": "にゃ"},
     )
 
     assert translator.protected_names == {"愛徠": ["愛萊"]}
-    assert translator.catchphrases == {"peko": "ぺこ"}
+    assert translator.catchphrases == {"nya": "にゃ"}

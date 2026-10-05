@@ -60,6 +60,9 @@ class ServiceContext:
         # Tracked so the audio engine is rebuilt when V changes on a character switch
         # even if the translator_config block itself is unchanged.
         self._audio_translate_voice_lang: str | None = None
+        # 引擎建立時帶的角色名單（專有名詞、口頭禪）；換角色時名單不同就重建。
+        self._audio_translate_terms: tuple[dict, dict] | None = None
+        self._subtitle_protected_names: dict | None = None
         # display-only subtitle translation engine; None when disabled
         self.subtitle_translate_engine: TranslateInterface | None = None
 
@@ -381,6 +384,8 @@ class ServiceContext:
         self.init_translate(
             config.character_config.tts_preprocessor_config.translator_config,
             voice_lang=derive_voice_lang(config.character_config),
+            # 名單（口頭禪、專有名詞）也要讀這次載入的角色，理由同上。
+            character_config=config.character_config,
             # self.system_config 要到這個函式最後才換成新的；字幕翻成這次載入的
             # 「你看的語言」，不是上一份的。
             player_language=(
@@ -735,8 +740,13 @@ class ServiceContext:
         translator_config: TranslatorConfig,
         voice_lang: str | None = None,
         player_language: str | None = None,
+        character_config: CharacterConfig | None = None,
     ) -> None:
         """依設定建立或更新翻譯引擎。
+
+        ``character_config`` 是這次要用的角色（換角色時是「新」角色；
+        self.character_config 那時還是舊的）。沒給就用 self.character_config。
+        翻譯器帶的口頭禪、專有名詞都從它讀，名單換了就重建引擎。
 
         Two independent engines are built from the SAME translator_config:
         - ``translate_engine``: AUDIO path (translates tts_text for the spoken voice).
@@ -769,6 +779,18 @@ class ServiceContext:
         player_language_changed = player_language != getattr(
             self, "_subtitle_player_language", None
         )
+        # 角色的名單：兩個角色共用同一份翻譯設定、同一種語音語言時，只有名單
+        # 不同——不比對它，上一個角色的引擎就會原封不動留下來。
+        character = character_config or self.character_config
+        protected_names = dict(getattr(character, "protected_names", None) or {})
+        catchphrases = dict(getattr(character, "catchphrases", None) or {})
+        audio_terms = (protected_names, catchphrases)
+        audio_terms_changed = audio_terms != getattr(
+            self, "_audio_translate_terms", None
+        )
+        subtitle_names_changed = protected_names != getattr(
+            self, "_subtitle_protected_names", None
+        )
 
         # --- AUDIO translation engine (now ALWAYS built; gate is per-sentence) ---
         # translate_audio is kept as an internal auto-on flag (always True in conf), so
@@ -778,7 +800,13 @@ class ServiceContext:
             logger.debug("Audio translation engine disabled (translate_audio=False).")
             self.translate_engine = None
             self._audio_translate_voice_lang = None
-        elif not self.translate_engine or config_changed or voice_lang_changed:
+            self._audio_translate_terms = None
+        elif (
+            not self.translate_engine
+            or config_changed
+            or voice_lang_changed
+            or audio_terms_changed
+        ):
             provider = translator_config.translate_provider
             # Copy the provider block and override its target leaf with V (mapped per
             # provider). If V can't be derived/mapped, keep the conf's global target.
@@ -801,10 +829,12 @@ class ServiceContext:
             self.translate_engine = TranslateFactory.get_translator(
                 provider,
                 audio_cfg,
-                protected_names=getattr(self.character_config, "protected_names", None),
-                catchphrases=getattr(self.character_config, "catchphrases", None),
+                protected_names=protected_names,
+                # 口頭禪的目標寫法是為語音語言寫的，只有這個引擎帶。
+                catchphrases=catchphrases,
             )
             self._audio_translate_voice_lang = voice_lang
+            self._audio_translate_terms = audio_terms
         else:
             logger.info("Audio translation already initialized with the same config.")
 
@@ -816,15 +846,17 @@ class ServiceContext:
             not self.subtitle_translate_engine
             or config_changed
             or player_language_changed
+            or subtitle_names_changed
         ):
             logger.info(
                 "Initializing subtitle Translator: "
                 f"{translator_config.translate_provider} -> {player_language}"
             )
             self.subtitle_translate_engine = self._build_subtitle_translator(
-                translator_config, player_language or ""
+                translator_config, player_language or "", protected_names
             )
             self._subtitle_player_language = player_language
+            self._subtitle_protected_names = protected_names
         else:
             logger.info(
                 "Subtitle translation already initialized with the same config."
@@ -836,9 +868,16 @@ class ServiceContext:
         )
 
     def _build_subtitle_translator(
-        self, translator_config: TranslatorConfig, player_language: str
+        self,
+        translator_config: TranslatorConfig,
+        player_language: str,
+        protected_names: dict[str, list[str]] | None = None,
     ) -> TranslateInterface | None:
         """給字幕另外建一個翻譯引擎。
+
+        ``protected_names`` 是這次要用的角色的專有名詞（呼叫端從正在載入的角色
+        讀出來）；沒給就讀 self.character_config。字幕不帶口頭禪：口頭禪的目標
+        寫法是為角色的語音語言寫的，字幕翻成的是玩家看的語言。
 
         Reuses the SAME provider as the audio path but overrides only the target
         language with the one you read (``player_language``) so the subtitle can differ from the
@@ -877,27 +916,13 @@ class ServiceContext:
             cfg["deeplx_target_lang"] = resolve_deepl_target_lang(target)
         else:  # llm / tencent both use 'target_lang'
             cfg["target_lang"] = target
-        # catchphrases 的「目標寫法」是為聲音語言寫的（見 init_translate 建 AUDIO
-        # engine 那段），不是為字幕語言寫的。字幕目標是玩家語言，通常跟聲音語言
-        # 不同，硬塞同一份對照表會把聲音語言的寫法誤植進不相干語言的字幕。只有
-        # 字幕目標跟角色來源語言（reply_language，沒設就退回 player_language，
-        # 跟 _effective_output_language 同一套退回規則）同屬一個語言桶時才無害：
-        # conversation_utils 逐句翻譯前會比較來源語言跟字幕目標，相同就整句跳過
-        # 翻譯，口頭禪規則根本不會被送進模型。
-        from .conversations.conversation_utils import _normalize_lang
-
-        reply_language = (
-            getattr(self.character_config, "reply_language", "") or player_language
-        )
-        catchphrases = None
-        if _normalize_lang(reply_language) == _normalize_lang(target):
-            catchphrases = getattr(self.character_config, "catchphrases", None)
+        if protected_names is None:
+            protected_names = getattr(self.character_config, "protected_names", None)
         try:
             return TranslateFactory.get_translator(
                 provider,
                 cfg,
-                protected_names=getattr(self.character_config, "protected_names", None),
-                catchphrases=catchphrases,
+                protected_names=protected_names,
             )
         except Exception as e:
             logger.warning(

@@ -10,16 +10,14 @@ from src.open_llm_vtuber.service_context import ServiceContext
 
 def _context_with(protected_names):
     context = ServiceContext.__new__(ServiceContext)
-    context.character_config = SimpleNamespace(
-        protected_names=protected_names, reply_language="", catchphrases={}
-    )
+    context.character_config = SimpleNamespace(protected_names=protected_names)
     return context
 
 
 def test_subtitle_translator_is_built_with_the_characters_names(monkeypatch):
     captured = {}
 
-    def _capture(provider, cfg, protected_names=None, catchphrases=None):
+    def _capture(provider, cfg, protected_names=None):
         captured["protected_names"] = protected_names
         return SimpleNamespace()
 

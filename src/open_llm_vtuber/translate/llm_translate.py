@@ -86,7 +86,7 @@ class LLMTranslate(TranslateInterface):
         # 口頭禪是角色資料，不是翻譯引擎的知識。沒設就完全不提，連一個字都不加，
         # 確保沒有設定口頭禪的角色的 prompt 跟加這個功能之前逐 byte 相同。
         if self.catchphrases:
-            pairs = "、".join(
+            pairs = ", ".join(
                 f"{source} → {target}" for source, target in self.catchphrases.items()
             )
             prompt += (

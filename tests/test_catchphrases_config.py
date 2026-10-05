@@ -27,18 +27,8 @@ def test_shipped_default_keeps_no_catchphrases():
 def test_catchphrases_round_trips_from_the_character_file():
     """角色檔寫了對照表就原樣讀出來，供翻譯器使用。"""
     payload = _character_payload()
-    payload["catchphrases"] = {"peko": "ぺこ"}
+    payload["catchphrases"] = {"nya": "にゃ"}
 
     character = CharacterConfig.model_validate(payload)
 
-    assert character.catchphrases == {"peko": "ぺこ"}
-
-
-def test_pekora_character_file_keeps_her_catchphrase():
-    """pekora.yaml 只存她自己覆寫的那幾欄（跟角色檔共通的合併機制一樣），
-    不是完整的 CharacterConfig，所以這裡只驗證 YAML 層級的欄位，不整份
-    model_validate。"""
-    with open("characters/pekora.yaml", "r", encoding="utf-8") as f:
-        payload = yaml.safe_load(f)["character_config"]
-
-    assert payload["catchphrases"] == {"peko": "ぺこ"}
+    assert character.catchphrases == {"nya": "にゃ"}

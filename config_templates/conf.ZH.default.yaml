@@ -57,7 +57,7 @@ character_config:
   # 会写进那个翻译器的 system prompt，交代照样保留，不要丢掉。
   # 例：
   # catchphrases:
-  #   peko: ぺこ
+  #   nya: にゃ
 
   # ============== 提示词 ==============
 

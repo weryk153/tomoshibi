@@ -69,7 +69,7 @@ def test_the_subtitle_translator_targets_the_language_being_loaded(monkeypatch):
 
     captured = {}
 
-    def capture(provider, cfg, protected_names=None, catchphrases=None):
+    def capture(provider, cfg, protected_names=None):
         captured.update(cfg)
         return SimpleNamespace()
 
@@ -77,9 +77,7 @@ def test_the_subtitle_translator_targets_the_language_being_loaded(monkeypatch):
         "src.open_llm_vtuber.service_context.TranslateFactory.get_translator", capture
     )
     context = ServiceContext.__new__(ServiceContext)
-    context.character_config = SimpleNamespace(
-        protected_names={}, reply_language="", catchphrases={}
-    )
+    context.character_config = SimpleNamespace(protected_names={})
     context.system_config = SimpleNamespace(player_language="ja")
     translator_config = SimpleNamespace(
         translate_provider="llm",
