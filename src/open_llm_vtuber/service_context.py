@@ -62,7 +62,7 @@ class ServiceContext:
         self._audio_translate_voice_lang: str | None = None
         # 引擎建立時帶的角色名單（專有名詞、口頭禪）；換角色時名單不同就重建。
         self._audio_translate_terms: tuple[dict, dict] | None = None
-        self._subtitle_protected_names: dict | None = None
+        self._subtitle_terms: tuple[dict, dict] | None = None
         # display-only subtitle translation engine; None when disabled
         self.subtitle_translate_engine: TranslateInterface | None = None
 
@@ -788,8 +788,12 @@ class ServiceContext:
         audio_terms_changed = audio_terms != getattr(
             self, "_audio_translate_terms", None
         )
-        subtitle_names_changed = protected_names != getattr(
-            self, "_subtitle_protected_names", None
+        # 字幕翻譯器也帶口頭禪，但寫法不換：來源寫法 → 來源寫法，原樣保留。
+        # 目標寫法是為語音語言寫的，字幕翻成的是玩家看的語言。
+        subtitle_catchphrases = {source: source for source in catchphrases}
+        subtitle_terms = (protected_names, subtitle_catchphrases)
+        subtitle_terms_changed = subtitle_terms != getattr(
+            self, "_subtitle_terms", None
         )
 
         # --- AUDIO translation engine (now ALWAYS built; gate is per-sentence) ---
@@ -846,17 +850,20 @@ class ServiceContext:
             not self.subtitle_translate_engine
             or config_changed
             or player_language_changed
-            or subtitle_names_changed
+            or subtitle_terms_changed
         ):
             logger.info(
                 "Initializing subtitle Translator: "
                 f"{translator_config.translate_provider} -> {player_language}"
             )
             self.subtitle_translate_engine = self._build_subtitle_translator(
-                translator_config, player_language or "", protected_names
+                translator_config,
+                player_language or "",
+                protected_names,
+                subtitle_catchphrases,
             )
             self._subtitle_player_language = player_language
-            self._subtitle_protected_names = protected_names
+            self._subtitle_terms = subtitle_terms
         else:
             logger.info(
                 "Subtitle translation already initialized with the same config."
@@ -872,12 +879,14 @@ class ServiceContext:
         translator_config: TranslatorConfig,
         player_language: str,
         protected_names: dict[str, list[str]] | None = None,
+        catchphrases: dict[str, str] | None = None,
     ) -> TranslateInterface | None:
         """給字幕另外建一個翻譯引擎。
 
         ``protected_names`` 是這次要用的角色的專有名詞（呼叫端從正在載入的角色
-        讀出來）；沒給就讀 self.character_config。字幕不帶口頭禪：口頭禪的目標
-        寫法是為角色的語音語言寫的，字幕翻成的是玩家看的語言。
+        讀出來）；沒給就讀 self.character_config。``catchphrases`` 是字幕要原樣
+        保留的口頭禪（來源寫法 → 來源寫法）：口頭禪的目標寫法是為角色的語音語言
+        寫的，字幕翻成的是玩家看的語言，但口頭禪本身不能被翻掉或音譯。
 
         Reuses the SAME provider as the audio path but overrides only the target
         language with the one you read (``player_language``) so the subtitle can differ from the
@@ -918,11 +927,17 @@ class ServiceContext:
             cfg["target_lang"] = target
         if protected_names is None:
             protected_names = getattr(self.character_config, "protected_names", None)
+        if catchphrases is None:
+            catchphrases = {
+                source: source
+                for source in getattr(self.character_config, "catchphrases", None) or {}
+            }
         try:
             return TranslateFactory.get_translator(
                 provider,
                 cfg,
                 protected_names=protected_names,
+                catchphrases=catchphrases,
             )
         except Exception as e:
             logger.warning(

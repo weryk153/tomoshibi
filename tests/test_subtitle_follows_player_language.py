@@ -69,7 +69,7 @@ def test_the_subtitle_translator_targets_the_language_being_loaded(monkeypatch):
 
     captured = {}
 
-    def capture(provider, cfg, protected_names=None):
+    def capture(provider, cfg, protected_names=None, catchphrases=None):
         captured.update(cfg)
         return SimpleNamespace()
 

@@ -69,3 +69,23 @@ def test_multiple_catchphrases_all_appear():
     prompt = _translator({"nya": "にゃ", "desu": "です"})._system_prompt()
 
     assert "nya → にゃ, desu → です." in prompt
+
+
+def test_identity_catchphrases_are_listed_as_words_to_keep():
+    """來源與目標相同（字幕翻譯器）時不寫成「a → a」，而是列成照原樣保留。"""
+    prompt = _translator(
+        {"konpeko": "konpeko", "peko": "peko"}, target_lang="繁體中文"
+    )._system_prompt()
+
+    assert "konpeko, peko" in prompt
+    assert "→" not in prompt
+    assert "exactly as written" in prompt
+
+
+def test_mixed_identity_and_renamed_catchphrases_use_both_sentences():
+    prompt = _translator({"nya": "にゃ", "peko": "peko"})._system_prompt()
+
+    assert "written as: nya → にゃ." in prompt
+    assert "peko → peko" not in prompt
+    assert "exactly as written" in prompt
+    assert prompt.index("peko") > prompt.index("nya → にゃ")

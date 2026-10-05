@@ -38,6 +38,7 @@ class LLMTranslate(TranslateInterface):
         self.protected_names = dict(protected_names or {})
         # 這個角色的口頭禪：來源寫法 → 翻譯目標要用的寫法。同樣由角色設定提供，
         # 這個模組不認得任何具體角色。見 CharacterConfig.catchphrases。
+        # 字幕翻譯器帶的是「來源寫法 → 來源寫法」：原樣保留。
         self.catchphrases = dict(catchphrases or {})
 
     @property
@@ -85,13 +86,25 @@ class LLMTranslate(TranslateInterface):
         )
         # 口頭禪是角色資料，不是翻譯引擎的知識。沒設就完全不提，連一個字都不加，
         # 確保沒有設定口頭禪的角色的 prompt 跟加這個功能之前逐 byte 相同。
-        if self.catchphrases:
+        #
+        # 寫法相同的（字幕翻譯器帶的是「來源 → 來源」）不寫成「a → a」，而是列成
+        # 照原樣保留；寫法不同的才給對照表。只有寫法不同的口頭禪時，句子跟以前
+        # 一樣。
+        renamed = {s: t for s, t in self.catchphrases.items() if s != t}
+        kept = [s for s, t in self.catchphrases.items() if s == t]
+        if renamed:
             pairs = ", ".join(
-                f"{source} → {target}" for source, target in self.catchphrases.items()
+                f"{source} → {target}" for source, target in renamed.items()
             )
             prompt += (
                 " Keep the speaker's catchphrases where they occur in the source, "
                 f"written as: {pairs}. Do not drop or translate them."
+            )
+        if kept:
+            prompt += (
+                " Keep the speaker's catchphrases exactly as written, in the same "
+                f"letters, where they occur in the source: {', '.join(kept)}. Do not "
+                "drop, translate, or transliterate them."
             )
         return prompt
 

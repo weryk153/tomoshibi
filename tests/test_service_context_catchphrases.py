@@ -1,8 +1,9 @@
-"""service_context 建立翻譯器時，口頭禪只交給音訊翻譯器。
+"""service_context 建立翻譯器時，兩個翻譯器都帶口頭禪，但寫法不同。
 
 音訊翻譯器把回覆轉成角色的語音語言，口頭禪的「目標寫法」正是為它寫的（見
 CharacterConfig.catchphrases 的註解）。字幕翻譯器翻成玩家看的語言，跟那個
-寫法無關，所以不帶。換角色時讀新角色的名單，見
+寫法無關，但口頭禪也不能被翻掉（實際發生過 konpeko → 孔佩可），所以帶
+「來源寫法 → 來源寫法」，原樣保留。換角色時讀新角色的名單，見
 test_translate_follows_character_switch.py。
 """
 
@@ -56,7 +57,7 @@ def test_audio_translator_gets_the_characters_catchphrases(monkeypatch):
     assert captured["catchphrases"] == {"nya": "にゃ"}
 
 
-def test_subtitle_translator_does_not_get_catchphrases(monkeypatch):
+def test_subtitle_translator_keeps_catchphrases_as_written(monkeypatch):
     captured = _capture(monkeypatch)
     context = _context_with({"nya": "にゃ"})
 
@@ -65,4 +66,4 @@ def test_subtitle_translator_does_not_get_catchphrases(monkeypatch):
         player_language="zh-TW",
     )
 
-    assert captured["catchphrases"] is None
+    assert captured["catchphrases"] == {"nya": "nya"}

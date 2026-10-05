@@ -12,6 +12,7 @@ from ..agent.output_types import SentenceOutput, AudioOutput
 from ..agent.input_types import BatchInput, TextData, ImageData, TextSource, ImageSource
 from ..asr.asr_interface import ASRInterface
 from ..avatar_model import AvatarModel
+from ..translate.catchphrases import only_catchphrases, replace_catchphrases
 from ..tts.tts_interface import TTSInterface
 from ..utils.stream_audio import prepare_audio_payload
 
@@ -203,6 +204,8 @@ async def process_agent_output(
     # 聲音的語言每則算一次就好，不必逐句算——它只跟角色設定有關。
     # 算不出來就不做語言判斷，原文唸出去。
     voice_lang = derive_voice_lang(character_config)
+    # 口頭禪也是這個角色的設定：每則從正在用的角色讀，換角色後就是新角色的。
+    catchphrases = dict(getattr(character_config, "catchphrases", None) or {})
 
     full_response = ""
     try:
@@ -217,6 +220,7 @@ async def process_agent_output(
                 subtitle_translate_engine,
                 voice_lang,
                 subtitle_collector,
+                catchphrases=catchphrases,
             )
         elif isinstance(output, AudioOutput):
             full_response = await handle_audio_output(output, websocket_send)
@@ -243,8 +247,13 @@ async def handle_sentence_output(
     subtitle_translate_engine: Optional[Any] = None,
     voice_lang: Optional[str] = None,
     subtitle_collector: Optional[List[str]] = None,
+    catchphrases: Optional[Dict[str, str]] = None,
 ) -> str:
     """處理一句輸出：需要時翻譯，然後交給語音合成。
+
+    一句話只有角色的口頭禪（``catchphrases`` 的鍵，加上標點空白）時，兩個翻譯
+    都不經模型：語音直接換成口頭禪的目標寫法，字幕原樣顯示。模型會把它音譯成
+    別的寫法（實際發生過 konpeko → 孔佩可、コンペコ）。
 
     Two INDEPENDENT translations may happen per sentence:
     - AUDIO: ``translate_engine`` rewrites ``tts_text`` for the spoken voice. This is
@@ -273,7 +282,19 @@ async def handle_sentence_output(
             # 兩者相同時直接唸，省下一次往返。
             if len(re.sub(r'[\s.,!?，。！？\'"』」）】\s]+', "", tts_text)):
                 reply_lang = _detect_lang(tts_text)
-                if voice_lang and reply_lang and reply_lang != voice_lang:
+                translate_audio = voice_lang and reply_lang and reply_lang != voice_lang
+                if (
+                    translate_audio
+                    and catchphrases
+                    and only_catchphrases(tts_text, catchphrases)
+                ):
+                    # 只有口頭禪：答案是確定的，照角色設定的寫法換掉，不問模型。
+                    tts_text = replace_catchphrases(tts_text, catchphrases)
+                    logger.info(
+                        "🏃 Audio is catchphrases only, replaced without translating: "
+                        f"'''{tts_text}'''..."
+                    )
+                elif translate_audio:
                     # 翻譯是同步阻塞的（每一個實作都是），直接在事件迴圈上跑
                     # 會把 WebSocket 的送出、語音合成的完成回呼、LLM 串流的讀取
                     # 全部卡住一到四秒。丟到執行緒。
@@ -307,7 +328,10 @@ async def handle_sentence_output(
                 subtitle_lang = _normalize_lang(
                     getattr(subtitle_translate_engine, "target_lang", None)
                 )
-                if subtitle_lang and reply_lang == subtitle_lang:
+                if catchphrases and only_catchphrases(display_text.text, catchphrases):
+                    # 只有口頭禪：字幕原樣顯示，不讓模型音譯。
+                    logger.debug("🚫 Subtitle is catchphrases only; kept as written.")
+                elif subtitle_lang and reply_lang == subtitle_lang:
                     logger.debug(
                         f"🚫 Subtitle translation skipped "
                         f"(R={reply_lang}, target={subtitle_lang})."

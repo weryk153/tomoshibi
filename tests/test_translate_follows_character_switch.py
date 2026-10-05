@@ -84,6 +84,18 @@ def _assert_translators_belong_to(context, mine, other):
     for source in other.character_config.catchphrases:
         assert source not in audio_prompt
 
+    # 字幕翻譯器帶的是同一份口頭禪，但原樣保留：來源寫法 → 來源寫法。
+    subtitle = context.subtitle_translate_engine
+    assert subtitle.catchphrases == {
+        source: source for source in mine.character_config.catchphrases
+    }
+    subtitle_prompt = subtitle._system_prompt()
+    for source, target in mine.character_config.catchphrases.items():
+        assert source in subtitle_prompt
+        assert target not in subtitle_prompt
+    for source in other.character_config.catchphrases:
+        assert source not in subtitle_prompt
+
     for engine in (context.translate_engine, context.subtitle_translate_engine):
         assert engine.protected_names == mine.character_config.protected_names
 
@@ -101,11 +113,19 @@ def test_each_switch_rebuilds_translators_for_the_incoming_character(monkeypatch
         _assert_translators_belong_to(context, mine, other)
 
 
-def test_the_subtitle_translator_never_carries_catchphrases(monkeypatch):
-    """口頭禪的目標寫法是為語音語言寫的；字幕翻成玩家看的語言，不帶它。"""
+def test_the_subtitle_translator_keeps_catchphrases_unchanged(monkeypatch):
+    """口頭禪的目標寫法是為語音語言寫的；字幕不換寫法，原樣保留來源寫法。
+
+    實際發生過：字幕翻譯器把「konpeko！」翻成「孔佩可！」。
+    """
     context = _context(monkeypatch)
 
     asyncio.run(context.load_from_config(CHARACTER_A))
 
-    assert context.subtitle_translate_engine.catchphrases == {}
-    assert "catchphrase" not in context.subtitle_translate_engine._system_prompt()
+    assert context.subtitle_translate_engine.catchphrases == {"nya": "nya"}
+    prompt = context.subtitle_translate_engine._system_prompt()
+    assert "nya" in prompt
+    assert "にゃ" not in prompt
+    assert "→" not in prompt
+    # 音訊翻譯器照舊帶真正的對照表。
+    assert context.translate_engine.catchphrases == {"nya": "にゃ"}
