@@ -338,7 +338,7 @@ class ServiceContext:
         self.init_live2d(config.character_config.live2d_model_name)
 
         # init asr from character config
-        self.init_asr(config.character_config.asr_config)
+        self.init_asr(config.character_config.asr_config, config.character_config)
 
         # init tts from character config
         self.init_tts(config.character_config.tts_config)
@@ -481,11 +481,20 @@ class ServiceContext:
             logger.critical(f"Error initializing Live2D: {e}")
             logger.critical("Try to proceed without Live2D...")
 
-    def init_asr(self, asr_config: ASRConfig) -> None:
+    def init_asr(
+        self, asr_config: ASRConfig, character_config: CharacterConfig = None
+    ) -> None:
         # 系統層級「玩家語言」推導 ASR 辨識語言（best-effort）。目前 active 模型
         # sense_voice 只支援 zh/en/ja/ko/yue；clamp 後落在這個集合才覆寫 sherpa 的
         # language leaf，集合外（如法/德/西）回 'auto'，等於不強制 ＝ 維持原本辨識行為。
         # 語音路徑（translate_audio）完全不動。只動 sherpa_onnx_asr 這一個 engine。
+        #
+        # 角色聲音的語言 V 跟玩家語言推導出來的不一樣時（例：角色講日文、玩家語言是
+        # 中文），不能把辨識鎖死在玩家語言——短句會被硬聽成玩家語言的諧音（實測：
+        # pekora 講「おやすみなさい」被鎖中文的 SenseVoice 聽成「歐亞蘇明納賽」）。
+        # 這種情況改成 'auto' 讓它自己偵測語言；V 沒設定或跟玩家語言相同時，維持原本
+        # clamp 行為不變。character_config 沒傳進來時退回 self.character_config，
+        # 跟改動前行為一致。
         player_language = (
             getattr(self.system_config, "player_language", "") or ""
         ).strip()
@@ -495,6 +504,21 @@ class ServiceContext:
                 from .asr.sherpa_onnx_asr import VoiceRecognition as _SherpaASR
 
                 derived = _SherpaASR._clamp_sense_voice_language(player_language)
+
+                from .conversations.conversation_utils import derive_voice_lang
+
+                voice_lang = derive_voice_lang(
+                    character_config
+                    if character_config is not None
+                    else self.character_config
+                )
+                if voice_lang and voice_lang != derived:
+                    logger.info(
+                        f"ASR 語言：角色聲音語言 '{voice_lang}' 跟玩家語言推導出的 "
+                        f"'{derived}' 不同，SenseVoice 改用 'auto' 自動偵測語言。"
+                    )
+                    derived = "auto"
+
                 if derived != getattr(sherpa_block, "language", "auto"):
                     sherpa_block.language = derived
         if not self.asr_engine or (self.character_config.asr_config != asr_config):
