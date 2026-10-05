@@ -196,17 +196,28 @@ async def live(persona: Path, script: Path, args) -> tuple[str, list[dict]]:
     name, description, lines = live_turns_of(persona, script)
     her = model(args, temperature=0.7, max_tokens=400)
     return name, await converse(
-        name, description, [(user, None) for user in lines], her, persona.name, args
+        name,
+        description,
+        [(user, None) for user in lines],
+        her,
+        persona.name,
+        args,
+        background=description,
     )
 
 
-async def converse(name, description, turns, her, label, args) -> list[dict]:
-    """turns 是 [(使用者的話, 她的回覆或 None)]；None 就讓 her 現場生成。"""
+async def converse(name, description, turns, her, label, args, *, background=None) -> list[dict]:
+    """turns 是 [(使用者的話, 她的回覆或 None)]；None 就讓 her 現場生成。
+
+    background 給現場模式用：mood worker 讀 CharacterProfile.background
+    （不是 description）當她是誰，跟 Tomoshibi 會送的一樣；重播模式不傳，
+    保留原本的行為。
+    """
     emotion, mood = Recording(model(args)), Recording(model(args))
     clock = SimulatedClock()
     companion = CharacterCompanion(
         character=CharacterProfile(
-            id="mood-compare", name=name, description=description
+            id="mood-compare", name=name, description=description, background=background
         ),
         llm=her,
         background_llm={"emotion": emotion, "mood": mood},
