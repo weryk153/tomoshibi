@@ -56,9 +56,23 @@ export function mergeQueuedWithImmediate(state: PendingInputState, text: string)
   return `${joinPendingInput(state)}\n${text}`;
 }
 
-/** Send now, or hold it for when she's done talking? */
-export function shouldQueueInsteadOfSending(aiState: string): boolean {
-  return aiState === 'thinking-speaking';
+export type SendDecision = 'send' | 'queue' | 'interrupt-then-send';
+
+/**
+ * Send now, hold it for when she's done talking, or cut her off and send?
+ *
+ * `groupSize` is how many clients are in this client's group (0 or 1 when not
+ * in one). In a group of more than one the queue is NOT used: the backend runs
+ * the whole round as one group task (conversation_handler.py, keyed by
+ * group_id, same `> 1` rule) and ignores text-input while it is running, yet
+ * `conversation-chain-end` reaches this client after EACH member's turn — so a
+ * queue would flush between members, mid-task, and the message would show in
+ * history but never be answered. Groups keep the pre-queue behaviour instead:
+ * interrupt her, then send right away.
+ */
+export function decideSend(aiState: string, groupSize: number): SendDecision {
+  if (aiState !== 'thinking-speaking') return 'send';
+  return groupSize > 1 ? 'interrupt-then-send' : 'queue';
 }
 
 /**

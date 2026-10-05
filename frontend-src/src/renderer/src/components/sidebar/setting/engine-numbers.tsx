@@ -1,4 +1,4 @@
-// 效能頁的「背景工作頻率」：情緒、記憶、她自己的事、目標、反思每幾輪跑一次，
+// 效能頁的「背景工作頻率」：情緒、記憶、她自己的事、她的心情、目標、反思每幾輪跑一次，
 // 以及放在心上的目標／想法數量。從原本的「一般」分頁搬來。停手才存，打到一半
 // 的值不存也不彈回；要重新載入才生效，由抽屜頂端的提示處理。
 import { useState, useEffect, useRef } from 'react';
@@ -14,7 +14,9 @@ import {
 import { NumberField } from './common';
 
 const EVERY_BOUNDS: Bounds = { min: 0, max: 99, integer: true };
-const EVERY_KEYS: EngineEvery[] = ['emotion_every', 'memory_every', 'self_memory_every', 'goal_every', 'reflection_every'];
+const EVERY_KEYS: EngineEvery[] = [
+  'emotion_every', 'memory_every', 'self_memory_every', 'mood_every', 'goal_every', 'reflection_every',
+];
 const SHOWN_KEYS: EngineEvery[] = ['goals_shown', 'thoughts_shown'];
 
 function EngineNumbers(): JSX.Element {
@@ -35,6 +37,7 @@ function EngineNumbers(): JSX.Element {
           emotion_every: String(result.data.emotion_every),
           memory_every: String(result.data.memory_every),
           self_memory_every: String(result.data.self_memory_every),
+          mood_every: String(result.data.mood_every),
           goal_every: String(result.data.goal_every),
           reflection_every: String(result.data.reflection_every),
           goals_shown: String(result.data.goals_shown),

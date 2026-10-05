@@ -7,7 +7,7 @@ import {
   joinPendingInput,
   clearPendingInput,
   mergeQueuedWithImmediate,
-  shouldQueueInsteadOfSending,
+  decideSend,
   shouldFlushOnStateChange,
 } from './pending-input.ts';
 
@@ -50,15 +50,24 @@ test('clearPendingInput empties the queue', () => {
 });
 
 test('thinking-speaking queues instead of sending immediately', () => {
-  assert.equal(shouldQueueInsteadOfSending('thinking-speaking'), true);
+  assert.equal(decideSend('thinking-speaking', 0), 'queue');
+  assert.equal(decideSend('thinking-speaking', 1), 'queue');
 });
 
 test('idle (and every other state) sends immediately, no queueing', () => {
-  assert.equal(shouldQueueInsteadOfSending('idle'), false);
-  assert.equal(shouldQueueInsteadOfSending('listening'), false);
-  assert.equal(shouldQueueInsteadOfSending('waiting'), false);
-  assert.equal(shouldQueueInsteadOfSending('interrupted'), false);
-  assert.equal(shouldQueueInsteadOfSending('loading'), false);
+  for (const state of ['idle', 'listening', 'waiting', 'interrupted', 'loading']) {
+    assert.equal(decideSend(state, 0), 'send', state);
+    assert.equal(decideSend(state, 3), 'send', state);
+  }
+});
+
+test('in a group she is cut off and the text goes out now, as before the queue', () => {
+  // conversation-chain-end arrives after EACH member's turn, so a queue would
+  // flush between members — while the backend's group task is still running
+  // and ignores text-input (conversation_handler.py). The message would show
+  // in history and never be answered.
+  assert.equal(decideSend('thinking-speaking', 2), 'interrupt-then-send');
+  assert.equal(decideSend('thinking-speaking', 5), 'interrupt-then-send');
 });
 
 test('flushes on reaching idle', () => {

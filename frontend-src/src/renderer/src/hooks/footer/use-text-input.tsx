@@ -4,6 +4,8 @@ import { useAiState } from '@/context/ai-state-context';
 import { useChatHistory } from '@/context/chat-history-context';
 import { useVAD } from '@/context/vad-context';
 import { useConfig } from '@/context/character-config-context';
+import { useGroup } from '@/context/group-context';
+import { useInterrupt } from '@/hooks/utils/use-interrupt';
 import { useMediaCapture } from '@/hooks/utils/use-media-capture';
 import {
   EMPTY_PENDING_INPUT,
@@ -13,7 +15,7 @@ import {
   joinPendingInput,
   clearPendingInput,
   mergeQueuedWithImmediate,
-  shouldQueueInsteadOfSending,
+  decideSend,
   shouldFlushOnStateChange,
 } from '@/hooks/footer/pending-input';
 
@@ -26,6 +28,8 @@ export function useTextInput() {
   const { stopMic, autoStopMic } = useVAD();
   const { confUid } = useConfig();
   const { captureAllMedia } = useMediaCapture();
+  const { groupMembers } = useGroup();
+  const { interrupt } = useInterrupt();
 
   // Messages typed/sent while she's speaking. A ref, not state: it's only
   // ever read inside callbacks/effects, and putting it in state would cause
@@ -120,12 +124,19 @@ export function useTextInput() {
     setInputText('');
     if (autoStopMic) stopMic();
 
-    if (shouldQueueInsteadOfSending(aiState)) {
+    const decision = decideSend(aiState, groupMembers.length);
+    if (decision === 'queue') {
       // Do NOT interrupt her. Hold the message; it's sent (joined with
       // anything else queued meanwhile) once she's done, or sooner if the
       // user explicitly hits interrupt.
       pendingRef.current = enqueuePendingInput(pendingRef.current, text);
       return;
+    }
+    if (decision === 'interrupt-then-send') {
+      // Group chat: a queue would flush between members while the group
+      // task is still running, and the backend drops that text (see
+      // decideSend). Cut the round off and send now, as before the queue.
+      interrupt();
     }
 
     // Anything still queued (e.g. typed while she was speaking, then the
