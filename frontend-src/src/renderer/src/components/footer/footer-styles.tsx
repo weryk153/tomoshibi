@@ -30,7 +30,9 @@ export const footerStyles: { footer: FooterStyles } = {
   footer: {
     container: (isCollapsed) => ({
       bg: isCollapsed ? 'transparent' : 'gray.900',
-      borderTop: isCollapsed ? 'none' : `1px solid ${LINE}`,
+      // 上緣的分隔線用 inset 陰影畫，不用 border：border 會讓面板比 footer 那格
+      // 多 1px，--footer-extra（字幕讓開的高度）在一行時就變成 1 而不是 0。
+      boxShadow: isCollapsed ? 'none' : `inset 0 1px 0 ${LINE}`,
       transform: isCollapsed ? 'translateY(calc(100% - 28px))' : 'translateY(0)',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       // 貼著底部、至少佔滿 footer 那一格，內容變高就往上長：輸入框長到第二、

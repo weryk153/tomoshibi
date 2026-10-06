@@ -6,11 +6,12 @@ import { BsMicFill, BsMicMuteFill } from 'react-icons/bs';
 import { IoHandRightSharp } from 'react-icons/io5';
 import { FiChevronDown } from 'react-icons/fi';
 import { LuSend } from 'react-icons/lu';
-import { memo } from 'react';
+import { memo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { footerStyles } from './footer-styles';
 import CharacterChip from './character-chip';
 import { useFooter } from '@/hooks/footer/use-footer';
+import { footerExtra } from '@/hooks/footer/footer-extra';
 import { useAiState, AiStateEnum } from '@/context/ai-state-context';
 import { useStream } from '@/context/stream-context';
 import { useProactiveSpeak } from '@/context/proactive-speak-context';
@@ -158,6 +159,37 @@ const MessageInput = memo(({
 
 MessageInput.displayName = 'MessageInput';
 
+/**
+ * 把面板往上長出來的高度寫進根節點的 --footer-extra，讓字幕（App.tsx）跟著
+ * 往上讓開。寫在根節點而不是共同祖先：只有一個 footer，跟 App.tsx 的 --vh 同一種做法。
+ */
+function useFooterExtraVar(isCollapsed: boolean) {
+  const panelRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const panel = panelRef.current;
+    const slot = panel?.parentElement;
+    if (!panel || !slot) return undefined;
+    const root = document.documentElement;
+    const update = () => {
+      const extra = footerExtra({
+        panelHeight: panel.offsetHeight,
+        slotHeight: slot.offsetHeight,
+        collapsed: isCollapsed,
+      });
+      root.style.setProperty('--footer-extra', `${extra}px`);
+    };
+    update();
+    const observer = new ResizeObserver(update);
+    observer.observe(panel);
+    observer.observe(slot);
+    return () => {
+      observer.disconnect();
+      root.style.removeProperty('--footer-extra');
+    };
+  }, [isCollapsed]);
+  return panelRef;
+}
+
 // Main component
 function Footer({ isCollapsed = false, onToggle }: FooterProps): JSX.Element {
   const {
@@ -174,9 +206,10 @@ function Footer({ isCollapsed = false, onToggle }: FooterProps): JSX.Element {
   const { aiState } = useAiState();
   const { live } = useStream();
   const { settings } = useProactiveSpeak();
+  const panelRef = useFooterExtraVar(isCollapsed);
 
   return (
-    <Box {...footerStyles.footer.container(isCollapsed)}>
+    <Box ref={panelRef} {...footerStyles.footer.container(isCollapsed)}>
       <ToggleButton isCollapsed={isCollapsed} onToggle={onToggle} />
 
       <Box {...footerStyles.footer.row}>

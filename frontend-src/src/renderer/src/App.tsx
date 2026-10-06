@@ -158,7 +158,10 @@ function AppContent(): JSX.Element {
               </Box>
               <Box
                 position="absolute"
-                bottom={`calc(${isFooterCollapsed ? FOOTER_COLLAPSED_HEIGHT : FOOTER_HEIGHT} + 15px)`}
+                // --footer-extra：輸入框長到第二、三行時底部列面板往上多長出來的
+                // 高度（footer.tsx 量了寫進來，收合時是 0），字幕跟著讓開不被蓋住。
+                bottom={`calc(${isFooterCollapsed ? FOOTER_COLLAPSED_HEIGHT : FOOTER_HEIGHT} + 15px + var(--footer-extra, 0px))`}
+                transition="bottom 0.12s ease-out"
                 left="50%"
                 transform="translateX(-50%)"
                 zIndex={10}
