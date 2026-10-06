@@ -5,7 +5,7 @@ import re
 from loguru import logger
 
 from ..conversation_quality import normalize_output_language_variant
-from .translate_interface import TranslateInterface
+from .translate_interface import TranslateInterface, UnspeakableTranslation
 
 
 class LLMTranslate(TranslateInterface):
@@ -210,7 +210,8 @@ class LLMTranslate(TranslateInterface):
                     res = retry
 
             # 中→日時本機模型偶爾整句用英文答（實測 395 句有 3 句），語音就會用
-            # 日文聲線唸英文。重試一次；還是不行就退回原文，跟其他失敗一樣。
+            # 日文聲線唸英文。重試一次；還是不行就告訴呼叫端這句沒得念——退回
+            # 中文原文讓日文聲線唸，跟唸英文一樣不對。
             if self._is_japanese_target and self._left_japanese_for_english(text, res):
                 retry = self._request(text, retry=True)
                 if retry and not self._left_japanese_for_english(text, retry):
@@ -218,9 +219,9 @@ class LLMTranslate(TranslateInterface):
                 else:
                     logger.warning(
                         f"LLM translate answered in English twice for '{text}', "
-                        "using original"
+                        "nothing to speak"
                     )
-                    return text
+                    raise UnspeakableTranslation(text)
 
             if self._is_traditional_chinese_target:
                 res = normalize_output_language_variant(
@@ -240,6 +241,8 @@ class LLMTranslate(TranslateInterface):
                 # here — the list comes from the character, via self.protected_names.
             logger.info(f"LLM translate: '{text}' -> '{res}'")
             return res
+        except UnspeakableTranslation:
+            raise
         except Exception as e:
             logger.critical(f"LLM translate error '{text}'. Error: {e}")
             # fallback: 回原文，避免對話中斷

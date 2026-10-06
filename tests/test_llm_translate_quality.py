@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+import pytest
+
 from src.open_llm_vtuber.translate.llm_translate import LLMTranslate
+from src.open_llm_vtuber.translate.translate_interface import UnspeakableTranslation
 
 
 @dataclass
@@ -123,9 +126,10 @@ def test_japanese_target_that_came_back_in_english_retries_once(monkeypatch):
     assert "既然你這麼隨便" in calls[1]["messages"][1]["content"]
 
 
-def test_japanese_target_still_not_japanese_after_retry_falls_back_to_source(
+def test_japanese_target_still_not_japanese_after_retry_is_unspeakable(
     monkeypatch,
 ):
+    # 用日文聲線唸中文原文或英文都不對：告訴呼叫端這句沒有可念的譯文，讓它靜音。
     responses = iter(
         [
             _Response("Shall we talk about something relaxing?"),
@@ -138,8 +142,17 @@ def test_japanese_target_still_not_japanese_after_retry_falls_back_to_source(
         lambda url, json, timeout: next(responses),
     )
 
-    source = "那我們聊點輕鬆的？"
-    assert _translator("日文").translate(source) == source
+    with pytest.raises(UnspeakableTranslation):
+        _translator("日文").translate("那我們聊點輕鬆的？")
+
+
+def test_a_connection_error_still_falls_back_to_the_source(monkeypatch):
+    def boom(url, json, timeout):
+        raise RuntimeError("connection refused")
+
+    monkeypatch.setattr("src.open_llm_vtuber.translate.llm_translate.httpx.post", boom)
+
+    assert _translator("日文").translate("那我們聊點輕鬆的？") == "那我們聊點輕鬆的？"
 
 
 def test_japanese_without_kana_is_not_mistaken_for_a_failure(monkeypatch):

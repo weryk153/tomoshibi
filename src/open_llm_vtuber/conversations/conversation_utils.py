@@ -14,6 +14,7 @@ from ..agent.input_types import BatchInput, TextData, ImageData, TextSource, Ima
 from ..asr.asr_interface import ASRInterface
 from ..avatar_model import AvatarModel
 from ..translate.catchphrases import only_catchphrases, replace_catchphrases
+from ..translate.translate_interface import UnspeakableTranslation
 from ..tts.tts_interface import TTSInterface
 from ..utils.stream_audio import prepare_audio_payload
 
@@ -310,9 +311,18 @@ async def handle_sentence_output(
                     #
                     # 但還是在這裡 await：句子必須照順序交給 tts_manager，
                     # 它的排隊機制靠的就是這個順序。
-                    tts_text = await asyncio.to_thread(
-                        translate_engine.translate, tts_text
-                    )
+                    try:
+                        tts_text = await asyncio.to_thread(
+                            translate_engine.translate, tts_text
+                        )
+                    except UnspeakableTranslation:
+                        # 翻譯器重試過還是別的語言：這句不送合成（空字串走靜音
+                        # payload），字幕照顯示，比用她的聲線唸錯的語言好。
+                        logger.warning(
+                            f"🔇 Audio translation unusable, speaking nothing for: "
+                            f"'''{tts_text}'''"
+                        )
+                        tts_text = ""
                     logger.info(
                         f"🏃 Audio translated (R={reply_lang} != V={voice_lang}): "
                         f"'''{tts_text}'''..."
