@@ -110,6 +110,7 @@ character_config:
         # Run each background job every N turns; 0 turns it off. Every job is an
         # extra LLM call, so raise these numbers on a slow machine.
         emotion_every: 1
+        reply_check_every: 1 # read her reply back for slips; a slip is pointed out on her next reply (engine 1.2.0+)
         memory_every: 2
         self_memory_every: 2
         mood_every: 2 # her own mood; her resting face follows it

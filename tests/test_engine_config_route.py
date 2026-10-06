@@ -41,6 +41,7 @@ def test_reading_gives_the_numbers_and_the_engine_is_always_on():
     assert route.read_engine_settings() == {
         "enabled": True,
         "emotion_every": 1,
+        "reply_check_every": 1,
         "memory_every": 2,
         "self_memory_every": 2,
         "mood_every": 2,
@@ -80,6 +81,17 @@ def test_her_mood_rhythm_can_be_set_like_the_other_jobs(conf_file):
     assert route.read_engine_settings()["mood_every"] == 0
 
 
+def test_the_reply_check_rhythm_is_written_and_read_back(conf_file):
+    """引擎 1.2.0 的回話自檢：0 關掉，其他跟別的背景工作一樣是每幾輪。"""
+    route.write_engine_settings({"reply_check_every": 0})
+
+    assert "        reply_check_every: 0\n" in conf_file.read_text(encoding="utf-8")
+    assert route.read_engine_settings()["reply_check_every"] == 0
+
+    route.write_engine_settings({"reply_check_every": 3})
+    assert route.read_engine_settings()["reply_check_every"] == 3
+
+
 def test_a_conf_without_the_engine_block_gets_one(conf_file):
     conf_file.write_text(
         "character_config:\n"
@@ -96,6 +108,7 @@ def test_a_conf_without_the_engine_block_gets_one(conf_file):
     assert route.read_engine_settings() == {
         "enabled": True,
         "emotion_every": 1,
+        "reply_check_every": 1,
         "memory_every": 3,
         "self_memory_every": 2,
         "mood_every": 2,

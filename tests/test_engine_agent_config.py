@@ -25,6 +25,7 @@ def test_defaults_match_what_was_measured_on_a_local_model():
 
     assert config.model_dump() == {
         "emotion_every": 1,
+        "reply_check_every": 1,
         "memory_every": 2,
         "self_memory_every": 2,
         "mood_every": 2,

@@ -173,6 +173,7 @@
       "enableMcppHelp": "Lets the AI use tools like web search. NOT every model supports this — it needs a model with tool-calling (function calling), e.g. GPT-4o / Claude / Gemini or a capable local build. Small local models often can't and will simply ignore it.",
       "engineEveryHelp": "Run each background job every N turns; 0 turns it off. Every job is an extra model call, so raise these on a slow machine.",
       "engine_emotion_every": "Your mood every",
+      "engine_reply_check_every": "Reply check every",
       "engine_memory_every": "Memory every",
       "engine_self_memory_every": "About herself every",
       "engine_mood_every": "Her mood every",

@@ -94,3 +94,14 @@ def test_the_presets_are_listed_from_light_to_high(conf, monkeypatch):
         "standard",
         "high",
     ]
+
+
+def test_the_light_preset_checks_her_reply_every_second_turn(conf):
+    perf_route._apply_preset_bundle(perf_route.PRESETS["light"])
+
+    assert engine_config_route.read_engine_settings()["reply_check_every"] == 2
+
+
+def test_the_other_presets_check_every_reply():
+    assert perf_route.PRESETS["standard"]["reply_check_every"] == 1
+    assert perf_route.PRESETS["high"]["reply_check_every"] == 1

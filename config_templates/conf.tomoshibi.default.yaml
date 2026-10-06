@@ -91,6 +91,7 @@ character_config:
         # 每種背景工作每幾輪跑一次；0 為停用。每一種都是一次額外的 LLM 呼叫，
         # 機器慢的話把數字調大。
         emotion_every: 1
+        reply_check_every: 1 # 她的回話事後讀一遍（講到提示、重複、語言不對…），有就在下一則提醒她（引擎 1.2.0 起）
         memory_every: 2
         self_memory_every: 2
         mood_every: 2 # 她自己的心情；空檔時的表情跟著它
