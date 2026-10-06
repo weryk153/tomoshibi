@@ -179,25 +179,111 @@ def test_only_suggestions_the_audit_made_can_be_added(tmp_path, monkeypatch):
         {"kind": "catchphrases", "source": "hello", "target": "やあ"},
         {"kind": "persona_prompt", "source": "peko", "target": "ぺこ"},
         {"kind": "catchphrases", "source": "peko"},
+        {"kind": "catchphrases", "source": "nya", "target": "にゃ"},  # 只出現一次
         [],
     ):
         assert http.post(URL + "/accept", json=body).status_code == 400
     assert _saved(tmp_path)["catchphrases"] == {"konpeko": "こんぺこ"}
 
 
-def test_adding_to_the_base_character_keeps_the_conf_comments(tmp_path, monkeypatch):
+RICH_BASE = """\
+system_config:
+  player_language: 'zh-TW'
+character_config:
+  conf_name: '底稿'
+  conf_uid: 'base_uid'
+  persona_prompt: |
+    你是底稿。
+  bilingual_subtitle: True # 手寫的註解
+  protected_names:
+    # 名字的註解
+    岡部倫太郎:
+    - 岡部
+    - 鳳凰院
+    牧瀨紅莉栖: [紅莉栖]
+  tts_config:
+    tts_model: 'edge_tts' # 預設引擎
+
+  # 下一段的標題
+live_config:
+  enabled: False
+"""
+
+
+def _accept_on_base(tmp_path, monkeypatch, base, kind, source, target):
     http = _client(tmp_path, monkeypatch)
+    (tmp_path / "conf.yaml").write_text(base, encoding="utf-8")
     AuditStore(tmp_path / "chat_history" / "base_uid" / "translation_audit").record(
-        [_entry(phrases={"peko": "ぺこ"})] * 2
+        [
+            _entry(
+                {source: target} if kind == "protected_names" else None,
+                {source: target} if kind == "catchphrases" else None,
+            )
+        ]
+        * 2
     )
     response = http.post(
         "/api/characters/conf.yaml/translation-audit/accept",
-        json={"kind": "catchphrases", "source": "peko", "target": "ぺこ"},
+        json={"kind": kind, "source": source, "target": target},
     )
     assert response.status_code == 200, response.text
     text = (tmp_path / "conf.yaml").read_text("utf-8")
-    assert "# 手寫的註解" in text
-    assert yaml.safe_load(text)["character_config"]["catchphrases"] == {"peko": "ぺこ"}
+    return text, yaml.safe_load(text)["character_config"]
+
+
+def _without(text, added):
+    lines = text.splitlines(keepends=True)
+    for line in added:
+        lines.remove(line)
+    return "".join(lines)
+
+
+def test_a_new_catchphrase_on_the_base_character_only_adds_lines(tmp_path, monkeypatch):
+    text, cc = _accept_on_base(
+        tmp_path, monkeypatch, RICH_BASE, "catchphrases", "peko", "ぺこ"
+    )
+    assert cc["catchphrases"] == {"peko": "ぺこ"}
+    assert _without(text, ["  catchphrases:\n", "    'peko': 'ぺこ'\n"]) == RICH_BASE
+
+
+def test_a_misspelling_for_a_protected_name_on_the_base_character(
+    tmp_path, monkeypatch
+):
+    text, cc = _accept_on_base(
+        tmp_path, monkeypatch, RICH_BASE, "protected_names", "岡辺", "岡部倫太郎"
+    )
+    assert cc["protected_names"] == {
+        "岡部倫太郎": ["岡部", "鳳凰院", "岡辺"],
+        "牧瀨紅莉栖": ["紅莉栖"],
+    }
+    # 只有那一筆換成一行，其他一個位元組都不動（True 還是 True、註解都在）。
+    assert text == RICH_BASE.replace(
+        "    岡部倫太郎:\n    - 岡部\n    - 鳳凰院\n",
+        "    '岡部倫太郎': ['岡部', '鳳凰院', '岡辺']\n",
+    )
+
+
+def test_a_new_protected_name_on_the_base_character(tmp_path, monkeypatch):
+    text, cc = _accept_on_base(
+        tmp_path, monkeypatch, RICH_BASE, "protected_names", "ペコラ", "ぺこら"
+    )
+    assert cc["protected_names"]["ぺこら"] == ["ペコラ"]
+    assert _without(text, ["    'ぺこら': ['ペコラ']\n"]) == RICH_BASE
+
+
+def test_an_inline_table_on_the_base_character(tmp_path, monkeypatch):
+    base = RICH_BASE.replace(
+        "  bilingual_subtitle: True # 手寫的註解\n",
+        "  bilingual_subtitle: True # 手寫的註解\n  catchphrases: {nya: にゃ}\n",
+    )
+    text, cc = _accept_on_base(
+        tmp_path, monkeypatch, base, "catchphrases", "peko", "ぺこ"
+    )
+    assert cc["catchphrases"] == {"nya": "にゃ", "peko": "ぺこ"}
+    assert text == base.replace(
+        "  catchphrases: {nya: にゃ}\n",
+        "  catchphrases:\n    'nya': 'にゃ'\n    'peko': 'ぺこ'\n",
+    )
 
 
 def test_the_switch_is_a_character_setting(tmp_path, monkeypatch):

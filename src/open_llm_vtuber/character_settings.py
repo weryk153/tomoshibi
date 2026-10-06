@@ -200,8 +200,9 @@ def terms(filename: str) -> dict[str, dict]:
 def add_term(filename: str, kind: str, source: str, target: str) -> None:
     """加一筆：口頭禪是「來源 → 目標寫法」；名字是正確寫法底下多一個錯誤寫法。
 
-    round-trip 就地改，註解與其他欄位原樣留著。角色自己還沒有這張表時，先抄
-    一份底稿的再加（跟開機升級「她有自己的一份」同一條規則）。
+    角色檔用 round-trip 就地改；底稿角色（conf.yaml）逐行改，只動那一筆
+    （_write_conf_term）。角色自己還沒有這張表時，先抄一份底稿的再加（跟開機
+    升級「她有自己的一份」同一條規則）。
     """
     if kind not in TERMS:
         raise ValueError(kind)
@@ -224,11 +225,121 @@ def add_term(filename: str, kind: str, source: str, target: str) -> None:
         if source not in wrongs:
             wrongs.append(source)
     if filename == "conf.yaml":
-        from .conf_editor import write_conf_document
-
-        write_conf_document(lambda f: yaml.dump(data, f))
+        key = source if kind == "catchphrases" else target
+        _write_conf_term(kind, key, table, table[key])
         return
     tmp = os.path.join(os.path.dirname(path), "." + os.path.basename(path) + ".tmp")
     with open(tmp, "w", encoding="utf-8") as f:
         yaml.dump(data, f)
     os.replace(tmp, path)
+
+
+def _quoted(value: Any) -> str:
+    return "'" + str(value).replace("'", "''") + "'"
+
+
+def _term_line(key: str, value: Any) -> str:
+    if isinstance(value, list):
+        return f"{_quoted(key)}: [{', '.join(_quoted(v) for v in value)}]"
+    return f"{_quoted(key)}: {_quoted(value)}"
+
+
+def _indent(line: str) -> int:
+    return len(line) - len(line.lstrip())
+
+
+def _entry_key(line: str) -> Any:
+    """一行 ``key: ...`` 的鍵（照 YAML 讀，引號寫法不同也認得）；不是就 None。"""
+    import yaml as pyyaml
+
+    try:
+        parsed = pyyaml.safe_load(line.strip())
+    except Exception:
+        return None
+    if isinstance(parsed, dict) and len(parsed) == 1:
+        return next(iter(parsed))
+    return None
+
+
+def _write_conf_term(kind: str, key: str, table: dict, value: Any) -> None:
+    """conf.yaml 逐行改：只換（或插入）那一筆，其他行一個位元組都不動。
+
+    整份 round-trip 會把 True 改寫成 true、搬動註解（見 _write_conf_lines）。
+    那一筆原本是多行（區塊序列）時換成一行 flow 寫法；整張表寫成一行
+    （``catchphrases: {...}``）時，只把那一行換成區塊。
+    """
+    from .conf_editor import (
+        _block_indent,
+        character_config_extent,
+        read_conf_lines,
+        sub_block_extent,
+        upsert_nested_block,
+        write_conf,
+    )
+
+    lines = read_conf_lines()
+    start, end = character_config_extent(lines)
+    newline = "\r\n" if lines and lines[0].endswith("\r\n") else "\n"
+    child = _block_indent(lines, start, end)
+    inline = next(
+        (
+            i
+            for i in range(start, end)
+            if _indent(lines[i]) == len(child)
+            and lines[i].lstrip().startswith(kind + ":")
+            and lines[i].split(":", 1)[1].split("#", 1)[0].strip()
+        ),
+        None,
+    )
+    if inline is not None:
+        inner = child + "  "
+        lines[inline : inline + 1] = [f"{child}{kind}:{newline}"] + [
+            f"{inner}{_term_line(k, v)}{newline}" for k, v in table.items()
+        ]
+        write_conf(lines)
+        return
+    inner_start, inner_end = sub_block_extent(lines, start, end, kind)
+    if inner_start is None:
+        upsert_nested_block(
+            lines,
+            start,
+            end,
+            kind,
+            {_quoted(key): _term_line(key, value).split(": ", 1)[1]},
+        )
+        write_conf(lines)
+        return
+    inner = _block_indent(lines, inner_start, inner_end)
+    rendered = f"{inner}{_term_line(key, value)}{newline}"
+    for i in range(inner_start, inner_end):
+        line = lines[i]
+        if _indent(line) != len(inner) or line.lstrip().startswith(("#", "-")):
+            continue
+        if _entry_key(line) != key:
+            continue
+        # 這一筆的範圍：到下一個同層的鍵或更淺的行為止（PyYAML 的序列項目跟鍵
+        # 同一層縮排，以 "- " 開頭，也算這一筆）。
+        stop = i + 1
+        while stop < inner_end:
+            nxt = lines[stop]
+            if nxt.strip() and not nxt.lstrip().startswith("#"):
+                if _indent(nxt) < len(inner) or (
+                    _indent(nxt) == len(inner) and not nxt.lstrip().startswith("-")
+                ):
+                    break
+            stop += 1
+        while stop > i + 1 and (
+            not lines[stop - 1].strip() or lines[stop - 1].lstrip().startswith("#")
+        ):
+            stop -= 1
+        lines[i:stop] = [rendered]
+        write_conf(lines)
+        return
+    insert_at = inner_end
+    while insert_at > inner_start and (
+        not lines[insert_at - 1].strip()
+        or lines[insert_at - 1].lstrip().startswith("#")
+    ):
+        insert_at -= 1
+    lines.insert(insert_at, rendered)
+    write_conf(lines)

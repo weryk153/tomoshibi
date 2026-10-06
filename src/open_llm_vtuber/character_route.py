@@ -1097,9 +1097,13 @@ def init_character_route() -> APIRouter:
                 "Send kind (protected_names or catchphrases), source and target."
             )
         summary = await asyncio.to_thread(_audit_summary, filename)
+        from .translate.audit import MIN_SUGGESTION_COUNT
+
+        # 跟角色頁列出來的同一條門檻：只出現一次的不收。
         targets = (summary.get(kind) or {}).get(source)
-        if not isinstance(targets, dict) or not targets.get(target):
-            return _bad_request("The translation audit never suggested that.")
+        count = targets.get(target) if isinstance(targets, dict) else None
+        if not isinstance(count, int) or count < MIN_SUGGESTION_COUNT:
+            return _bad_request("The translation audit has not suggested that enough.")
         try:
             await asyncio.to_thread(
                 character_settings.add_term, filename, kind, source, target
