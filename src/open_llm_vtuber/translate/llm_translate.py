@@ -53,6 +53,32 @@ class LLMTranslate(TranslateInterface):
             or "zh-hant" in target
         )
 
+    @property
+    def _is_japanese_target(self) -> bool:
+        target = str(self.target_lang or "").strip().lower()
+        return target in {
+            "ja",
+            "ja-jp",
+            "jp",
+            "japanese",
+            "日文",
+            "日本語",
+            "日语",
+        } or ("japan" in target)
+
+    @staticmethod
+    def _left_japanese_for_english(text: str, res: str) -> bool:
+        """譯文該是日文卻沒有半個假名、而且英文字母佔了多數——模型用英文答了。
+
+        全漢字的短句（「了解。」）沒有假名也是日文，所以還要看拉丁字母的比例；
+        只有口頭禪或符號的句子則沒有字母可比。
+        """
+        if re.search(r"[぀-ヿ]", res):
+            return False
+        latin = len(re.findall(r"[A-Za-z]", res))
+        letters = len(re.findall(r"[^\W\d_]", res))
+        return letters > 0 and latin * 2 >= letters
+
     def _system_prompt(self) -> str:
         variant_rule = ""
         if self._is_traditional_chinese_target:
@@ -127,7 +153,13 @@ class LLMTranslate(TranslateInterface):
             ]
         else:
             user_text = text
-            if retry:
+            if retry and self._is_japanese_target:
+                user_text = (
+                    "The previous attempt answered in English, not Japanese. "
+                    "Translate the source into Japanese only, written in kana and "
+                    "kanji, while preserving its exact meaning.\n\n" + text
+                )
+            elif retry:
                 user_text = (
                     "The previous attempt left source-language text untranslated. "
                     "Translate every part of the source, while preserving its exact "
@@ -170,6 +202,19 @@ class LLMTranslate(TranslateInterface):
                 retry = self._request(text, retry=True)
                 if retry:
                     res = retry
+
+            # 中→日時本機模型偶爾整句用英文答（實測 395 句有 3 句），語音就會用
+            # 日文聲線唸英文。重試一次；還是不行就退回原文，跟其他失敗一樣。
+            if self._is_japanese_target and self._left_japanese_for_english(text, res):
+                retry = self._request(text, retry=True)
+                if retry and not self._left_japanese_for_english(text, retry):
+                    res = retry
+                else:
+                    logger.warning(
+                        f"LLM translate answered in English twice for '{text}', "
+                        "using original"
+                    )
+                    return text
 
             if self._is_traditional_chinese_target:
                 res = normalize_output_language_variant(
