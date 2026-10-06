@@ -17,10 +17,9 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Any, Awaitable, Callable, Iterable, Optional, Sequence
 
-import httpx
 from loguru import logger
 
-from .character_engine.factory import REASONING_KEYS
+from .background_llm import ChatClient, background_client
 from .chat_history_manager import get_history
 from .conversations.conversation_utils import derive_voice_lang
 from .translate.catchphrases import only_catchphrases
@@ -308,33 +307,6 @@ async def repair(
     return RepairResult(fixed, True, confidence, note)
 
 
-@dataclass
-class ChatClient:
-    """OpenAI 相容的 /chat/completions，一次一句、不串流。"""
-
-    base_url: str
-    model: str
-    api_key: str = ""
-    request_options: Optional[dict] = None
-    # 正式流程由 repair() 的 wait_for 管上限；這只是連線層的保險。
-    timeout_seconds: float = TIMEOUT_SECONDS + 1
-
-    async def complete(self, messages: list[dict]) -> str:
-        headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
-        async with httpx.AsyncClient(timeout=self.timeout_seconds) as http:
-            response = await http.post(
-                f"{self.base_url.rstrip('/')}/chat/completions",
-                json={
-                    "model": self.model,
-                    "messages": messages,
-                    **(self.request_options or {}),
-                },
-                headers=headers,
-            )
-            response.raise_for_status()
-            return response.json()["choices"][0]["message"]["content"] or ""
-
-
 def transcript_from(
     messages: Iterable[dict], human_name: str, character_name: str
 ) -> list[tuple[str, str]]:
@@ -410,26 +382,8 @@ def _languages(context: Any) -> tuple[str, ...]:
 
 def _client(character: Any) -> Optional[ChatClient]:
     """引擎的背景模型；網址和模型都有才用。"""
-    agent = getattr(character, "agent_config", None)
-    settings = getattr(agent, "agent_settings", None)
-    engine = getattr(settings, "character_engine_agent", None)
-    base_url = str(getattr(engine, "background_base_url", "") or "").strip()
-    model = str(getattr(engine, "background_model", "") or "").strip()
-    if not base_url or not model:
-        return None
-    provider = getattr(getattr(settings, "conversation", None), "llm_provider", "")
-    llm = getattr(getattr(agent, "llm_configs", None), str(provider or ""), None)
-    extra_body = dict(getattr(llm, "extra_body", None) or {})
-    return ChatClient(
-        base_url=base_url,
-        model=model,
-        api_key=str(getattr(engine, "background_api_key", "") or "")
-        or str(getattr(llm, "llm_api_key", "") or ""),
-        request_options={
-            "temperature": 0,
-            "max_tokens": MAX_TOKENS,
-            **{k: v for k, v in extra_body.items() if k in REASONING_KEYS},
-        },
+    return background_client(
+        character, max_tokens=MAX_TOKENS, timeout_seconds=TIMEOUT_SECONDS + 1
     )
 
 

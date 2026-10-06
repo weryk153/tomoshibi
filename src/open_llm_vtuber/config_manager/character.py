@@ -43,6 +43,9 @@ class CharacterConfig(I18nMixin):
     # 雙語字幕：畫面字幕多一行她實際唸出來的那句（語音翻譯後的原文），原本的
     # 字幕在下一行。只影響畫面；對話紀錄與記憶照舊只存回覆原文。預設關。
     bilingual_subtitle: bool = Field(default=False, alias="bilingual_subtitle")
+    # 翻譯審核：她每句語音翻譯事後由引擎的背景模型審一遍，累積成建議清單
+    # （角色頁「語言」區）。不改當下輸出、不加延遲；預設關，關著完全不跑。
+    translation_audit: bool = Field(default=False, alias="translation_audit")
     # 這個角色說話用的語言。留空＝沿用 system_config.player_language。
     #
     # 為什麼要在角色層級：player_language 是全域的，設成日文會讓每一個角色都
@@ -86,6 +89,10 @@ class CharacterConfig(I18nMixin):
         "bilingual_subtitle": Description(
             en="Show the line she actually speaks above the subtitle (two lines)",
             zh="字幕顯示兩行：上行是她實際唸的原文，下行是原本的字幕",
+        ),
+        "translation_audit": Description(
+            en="Review each voice translation in the background and collect suggestions",
+            zh="背景審核每句語音翻譯，累積成建議清單",
         ),
         "conf_name": Description(
             en="Name of the character configuration", zh="角色配置名称"

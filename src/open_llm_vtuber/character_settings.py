@@ -28,16 +28,19 @@ OWNED: dict[str, tuple[str, ...]] = {
     "long_term_memory_enabled": ("long_term_memory_enabled",),
     "actions_enabled": ("actions_enabled",),
     "bilingual_subtitle": ("bilingual_subtitle",),
+    "translation_audit": ("translation_audit",),
 }
 TOGGLES = (
     "translate_subtitle",
     "long_term_memory_enabled",
     "actions_enabled",
     "bilingual_subtitle",
+    "translation_audit",
 )
 DEFAULTS: dict[str, Any] = {
     "translate_subtitle": False,
     "bilingual_subtitle": False,
+    "translation_audit": False,
     "long_term_memory_enabled": True,
     "actions_enabled": False,
 }
@@ -163,6 +166,66 @@ def _write_document(path: str, changes: dict[str, Any], *, is_conf: bool) -> Non
     for name, value in changes.items():
         _set(cc, OWNED[name], value)
     if is_conf:
+        write_conf_document(lambda f: yaml.dump(data, f))
+        return
+    tmp = os.path.join(os.path.dirname(path), "." + os.path.basename(path) + ".tmp")
+    with open(tmp, "w", encoding="utf-8") as f:
+        yaml.dump(data, f)
+    os.replace(tmp, path)
+
+
+# ---------------------------------------------------------------- 名詞與口頭禪
+#
+# 翻譯審核的建議（translate/audit.py）一筆一筆加進角色設定。這兩個是對照表，
+# 不在 OWNED 裡：開機升級不替角色補，角色頁表單也不寫，只有這裡會加。
+TERMS = ("protected_names", "catchphrases")
+
+
+def terms(filename: str) -> dict[str, dict]:
+    """角色實際用的 protected_names／catchphrases（自己沒有就是底稿的）。"""
+    base = (_load(CONF_PATH).get("character_config")) or {}
+    own: dict = base
+    if filename != "conf.yaml":
+        path = file_for(filename)
+        own = ((_load(path).get("character_config")) or {}) if path else {}
+    values = {}
+    for name in TERMS:
+        value = own.get(name)
+        if not isinstance(value, dict):
+            value = base.get(name)
+        values[name] = dict(value) if isinstance(value, dict) else {}
+    return values
+
+
+def add_term(filename: str, kind: str, source: str, target: str) -> None:
+    """加一筆：口頭禪是「來源 → 目標寫法」；名字是正確寫法底下多一個錯誤寫法。
+
+    round-trip 就地改，註解與其他欄位原樣留著。角色自己還沒有這張表時，先抄
+    一份底稿的再加（跟開機升級「她有自己的一份」同一條規則）。
+    """
+    if kind not in TERMS:
+        raise ValueError(kind)
+    path = file_for(filename)
+    if path is None:
+        raise FileNotFoundError(filename)
+    yaml = make_yaml()
+    yaml.allow_unicode = True
+    data = _load(path)
+    cc = data.setdefault("character_config", {})
+    table = cc.get(kind)
+    if not isinstance(table, dict):
+        cc[kind] = table = terms(filename)[kind]
+    if kind == "catchphrases":
+        table[source] = target
+    else:
+        wrongs = table.get(target)
+        if not isinstance(wrongs, list):
+            table[target] = wrongs = []
+        if source not in wrongs:
+            wrongs.append(source)
+    if filename == "conf.yaml":
+        from .conf_editor import write_conf_document
+
         write_conf_document(lambda f: yaml.dump(data, f))
         return
     tmp = os.path.join(os.path.dirname(path), "." + os.path.basename(path) + ".tmp")

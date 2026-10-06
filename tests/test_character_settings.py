@@ -98,6 +98,7 @@ def test_settings_endpoint_reads_and_writes(tmp_path, monkeypatch):
         "long_term_memory_enabled": True,
         "actions_enabled": False,
         "bilingual_subtitle": False,
+        "translation_audit": False,
     }
     saved = http.post(
         "/api/characters/kurisu.yaml/settings", json={"translate_subtitle": True}

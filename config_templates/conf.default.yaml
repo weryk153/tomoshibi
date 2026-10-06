@@ -41,6 +41,7 @@ character_config:
   avatar: 'mao.png' # Suggest using a square image for the avatar. Save it in the avatars folder. Leave blank to use the first letter of the character name as the avatar.
   human_name: 'Human' # Will be used in the group conversation and the display name of the human.
   bilingual_subtitle: False # True shows two subtitle lines: what she actually speaks (after voice translation) above the usual subtitle. Display only; history and memory keep the reply text
+  translation_audit: False # True reviews each voice translation afterwards with the engine's background_model and collects suggestions (character page, Language). Never changes what she says; adds no delay
 
   # Protected proper nouns: official spelling -> misspellings to fold back into it.
   # Empty (the default) means no name is protected.

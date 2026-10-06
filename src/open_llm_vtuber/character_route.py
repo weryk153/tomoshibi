@@ -333,6 +333,7 @@ def _read_character_fields(path: str, *, is_base: bool) -> Optional[dict]:
         "long_term_memory_enabled": bool(cc.get("long_term_memory_enabled", True)),
         "actions_enabled": bool(cc.get("actions_enabled", False)),
         "bilingual_subtitle": bool(cc.get("bilingual_subtitle", False)),
+        "translation_audit": bool(cc.get("translation_audit", False)),
     }
 
 
@@ -1007,8 +1008,8 @@ def init_character_route() -> APIRouter:
         unknown = set(body) - set(character_settings.TOGGLES)
         if unknown or not all(isinstance(v, bool) for v in body.values()):
             return _bad_request(
-                "Only translate_subtitle, long_term_memory_enabled, actions_enabled"
-                " and bilingual_subtitle, as true/false."
+                "Only translate_subtitle, long_term_memory_enabled, actions_enabled,"
+                " bilingual_subtitle and translation_audit, as true/false."
             )
         try:
             await asyncio.to_thread(character_settings.write, filename, body)
@@ -1030,6 +1031,90 @@ def init_character_route() -> APIRouter:
                 "reload_required": True,
             }
         )
+
+    # ------------------------------------------------------------------ #
+    # 翻譯審核的建議（translate/audit.py 在背景累積的）。只讀建議、一筆一筆加；
+    # 審核本身從不改角色檔。
+    def _audit_summary(filename: str) -> dict:
+        from .translate import audit
+
+        conf_uid = _conf_uid_of(character_settings.file_for(filename) or "")
+        if not conf_uid:
+            return audit.load_summary(os.devnull)
+        try:
+            return audit.load_summary(audit.audit_dir(conf_uid))
+        except ValueError:
+            return audit.load_summary(os.devnull)
+
+    def _audit_view(filename: str) -> dict:
+        from .translate import audit
+
+        summary = _audit_summary(filename)
+        current = character_settings.terms(filename)
+        return {
+            "ok": True,
+            "enabled": bool(
+                character_settings.effective(filename).get("translation_audit")
+            ),
+            "audited": summary["audited"],
+            "flagged": summary["flagged"],
+            "suggestions": audit.suggestions(
+                summary, current["protected_names"], current["catchphrases"]
+            ),
+            "suspicious": summary["suspicious"],
+        }
+
+    @router.get("/api/characters/{filename}/translation-audit")
+    async def read_translation_audit(filename: str, request: Request):
+        if not _is_local_request(request):
+            return _forbidden()
+        if character_settings.file_for(filename) is None:
+            return JSONResponse(
+                status_code=404, content={"ok": False, "error": "Character not found."}
+            )
+        return JSONResponse(await asyncio.to_thread(_audit_view, filename))
+
+    @router.post("/api/characters/{filename}/translation-audit/accept")
+    async def accept_translation_audit(filename: str, request: Request):
+        """把一筆建議加進角色設定。只收審核真的提過的建議。"""
+        if not _is_local_request(request):
+            return _forbidden()
+        if character_settings.file_for(filename) is None:
+            return JSONResponse(
+                status_code=404, content={"ok": False, "error": "Character not found."}
+            )
+        try:
+            body = await request.json()
+        except Exception:
+            return _bad_request("Invalid JSON body.")
+        if not isinstance(body, dict):
+            return _bad_request("Invalid JSON body.")
+        kind, source, target = (body.get(k) for k in ("kind", "source", "target"))
+        if kind not in character_settings.TERMS or not all(
+            isinstance(v, str) and v for v in (source, target)
+        ):
+            return _bad_request(
+                "Send kind (protected_names or catchphrases), source and target."
+            )
+        summary = await asyncio.to_thread(_audit_summary, filename)
+        targets = (summary.get(kind) or {}).get(source)
+        if not isinstance(targets, dict) or not targets.get(target):
+            return _bad_request("The translation audit never suggested that.")
+        try:
+            await asyncio.to_thread(
+                character_settings.add_term, filename, kind, source, target
+            )
+            view = await asyncio.to_thread(_audit_view, filename)
+        except Exception as e:
+            logger.error(
+                f"translation audit accept failed ({filename}): {type(e).__name__}"
+            )
+            return JSONResponse(
+                status_code=500,
+                content={"ok": False, "error": "Could not write character file."},
+            )
+        _mark_if_active(filename)
+        return JSONResponse({**view, "reload_required": True})
 
     # ------------------------------------------------------------------ #
     @router.put("/api/characters/{filename}")
