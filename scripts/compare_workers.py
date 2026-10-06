@@ -192,19 +192,40 @@ def live_of(persona: Path, script: Path) -> tuple[str, str, list[str]]:
     return name or persona.stem, description, lines
 
 
+def reason(exc: BaseException) -> str:
+    if isinstance(exc, (asyncio.CancelledError, TimeoutError)):
+        return f"{type(exc).__name__}（逾時或被取消）"
+    text = str(exc).strip()
+    return f"{type(exc).__name__}：{text}" if text else type(exc).__name__
+
+
 async def converse(variant, name, description, earlier, turns, her, args) -> dict:
     """跑一個 variant。turns 是 [(使用者, 她或 None)]；None 由 her 現場生成。"""
     seen: list[tuple] = []
     original = background.StructuredBackgroundWorker._normalize
+    original_call = background.StructuredBackgroundWorker.__call__
+    recorded: set[int] = set()
 
     def recording(worker, context, data):
         try:
             out = original(worker, context, data)
         except Exception as exc:
-            seen.append((worker.spec.kind, context, dict(data), None, worker, str(exc)))
+            recorded.add(id(exc))
+            seen.append(
+                (worker.spec.kind, context, dict(data), None, worker, reason(exc))
+            )
             raise
         seen.append((worker.spec.kind, context, dict(data), out, worker, None))
         return out
+
+    async def calling(worker, context):
+        """呼叫本身失敗（逾時、取消、回的不是 JSON）也記下來，不然看起來像沒跑。"""
+        try:
+            return await original_call(worker, context)
+        except BaseException as exc:
+            if id(exc) not in recorded:
+                seen.append((worker.spec.kind, context, {}, None, worker, reason(exc)))
+            raise
 
     worker = model(args)
     clients = {
@@ -255,6 +276,7 @@ async def converse(variant, name, description, earlier, turns, her, args) -> dic
         )
     rows = []
     background.StructuredBackgroundWorker._normalize = recording
+    background.StructuredBackgroundWorker.__call__ = calling
     try:
         with prompts(variant):
             for number, (user, line) in turns:
@@ -280,6 +302,7 @@ async def converse(variant, name, description, earlier, turns, her, args) -> dic
             fresh = in_mind(her.calls[-1], companion)
     finally:
         background.StructuredBackgroundWorker._normalize = original
+        background.StructuredBackgroundWorker.__call__ = original_call
         await companion.close()
     return {"rows": rows, "fresh": fresh}
 
@@ -315,7 +338,7 @@ def committed(commits, target, key, value) -> str:
 def memory_items(reading, commits, variant) -> list[str]:
     _, context, data, _, worker, error = reading
     if error:
-        return [f"讀不懂：{error}"]
+        return [f"這輪呼叫失敗：{error}"]
     users = _user_lines(context, turns=worker.spec.every_n_revisions)
     hers = _her_lines(context, worker.history_messages)
     out = []
@@ -349,7 +372,7 @@ def memory_items(reading, commits, variant) -> list[str]:
 def self_memory_items(reading, commits, variant) -> list[str]:
     _, context, data, _, worker, error = reading
     if error:
-        return [f"讀不懂：{error}"]
+        return [f"這輪呼叫失敗：{error}"]
     out = []
     for raw in data.get("items") or []:
         if not isinstance(raw, dict):
@@ -377,7 +400,7 @@ def self_memory_items(reading, commits, variant) -> list[str]:
 def reflection_items(reading, commits, variant) -> list[str]:
     _, context, data, _, worker, error = reading
     if error:
-        return [f"讀不懂：{error}"]
+        return [f"這輪呼叫失敗：{error}"]
     users = _lines_the_user_said(context, worker.history_messages)
     hers = _her_lines(context, worker.history_messages)
     latest_type = context.request.payload.get("memory_evidence_type")
@@ -397,12 +420,18 @@ def reflection_items(reading, commits, variant) -> list[str]:
     insight = str(data.get("insight", ""))
     status = committed(commits, "cognition.reflection_candidate", "insight", insight)
     proposed = any(p.target == "cognition.reflection_candidate" for p, _ in commits)
+    if status:
+        done = f"commit：{status}"
+    elif not proposed:
+        done = "沒提案（沒有使用者原話）"
+    else:
+        done = "提案了但沒提交"
+    # 舊欄的處置是 1.2 的程式對這份（1.1 提示的）回答做的事；1.1 的程式不查引文，
+    # 照樣提案。
     verdict = (
-        f"commit：{status}"
-        if status
-        else "沒提案（沒有使用者原話）"
-        if variant == "new" and not proposed
-        else "沒提交"
+        done
+        if variant == "new"
+        else f"1.2 的程式會：{done}／1.1 的程式會：照樣提案（不查引文）"
     )
     return [
         f"{insight}\n　belief：{json.dumps(data.get('belief_candidate'), ensure_ascii=False)}"
@@ -413,7 +442,7 @@ def reflection_items(reading, commits, variant) -> list[str]:
 def emotion_items(reading, commits, variant) -> list[str]:
     _, _, data, _, _, error = reading
     if error:
-        return [f"讀不懂：{error}"]
+        return [f"這輪呼叫失敗：{error}"]
     return [
         f"{data.get('emotion')}　強度 {data.get('intensity')}　valence {data.get('valence')}"
         f"　stance {data.get('stance')}　信心 {data.get('confidence')}\n"
