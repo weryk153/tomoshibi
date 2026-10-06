@@ -20,6 +20,13 @@
 第五頁是回話自檢（reply_check，1.2.0 新增）：只有新欄，舊欄留空（1.1 沒有這個
 工作）；列出每輪找到的問題、引擎收了哪些，與這一輪她收到的上一句提醒。
 --pages 只跑指定的頁（例如只看 reply-check 時，舊的那一次與其他工作都不跑）。
+第六、七頁是她的日記（diary）與使用者狀態摘要（user-state），也只有新欄：
+user-state 每 --user-state-every 輪一列（她讀到的使用者原句、情緒序列、模型的回答
+與引擎收了什麼）；diary 是每段對話重播完後 write_diary() 一篇，列出她那天的材料
+（摘要、使用者告訴她的、她自己說的、她對使用者的看法、心情、目標）、模型的回答、
+引擎的處置，與下一段新對話時系統提示裡的那兩句。跑 diary 時其他工作照 Tomoshibi
+的預設開（emotion 1、memory 2、self_memory 2、mood 2、goal 4），summary 每
+--summary-every 輪（Tomoshibi 預設 0，日記才有摘要可讀）。
 重播的紀錄若在 characters/<conf_uid>.yaml 找得到人設（persona_prompt），就跟
 Tomoshibi 一樣當 background 給引擎（回話自檢拿它對照人設）。
 
@@ -47,7 +54,11 @@ from ai_character_engine.cognition.background import (
     REPLY_CHECK_KINDS,
     REPLY_FIX_CHARS,
     REPLY_NOTE_TARGET,
+    USER_STATE_TARGET,
     BackgroundCognitionKind,
+    _diary_sections,
+    _diary_text,
+    _not_of_the_day,
     _echoes,
     _her_lines,
     _line_quoted,
@@ -72,6 +83,8 @@ KINDS = {
     "reflection": BackgroundCognitionKind.REFLECTION,
     "emotion": BackgroundCognitionKind.EMOTION_ANALYSIS,
     "reply-check": BackgroundCognitionKind.REPLY_CHECK,
+    "user-state": BackgroundCognitionKind.USER_STATE,
+    "diary": BackgroundCognitionKind.DIARY,
 }
 # 每頁要開的工作（CompanionSettings 的 *_every）。
 SETTING_OF = {
@@ -81,6 +94,8 @@ SETTING_OF = {
     "emotion": "emotion_every",
     "reply-check": "reply_check_every",
 }
+# 只有新欄的頁（1.1 沒有這些工作）。
+NEW_ONLY = ("reply-check", "user-state", "diary")
 # 1.1 也有的工作；只要這些頁才需要跑舊的那一次。
 OLD_PAGES = ("memory", "self-memory", "reflection", "emotion")
 TITLES = {
@@ -89,6 +104,8 @@ TITLES = {
     "reflection": "她的想法（reflection）",
     "emotion": "使用者的情緒（emotion）",
     "reply-check": "回話自檢（reply_check）",
+    "user-state": "使用者狀態摘要（user_state）",
+    "diary": "她的日記（diary）",
 }
 # 1.1.1 的提示長度；跟引擎 tests/test_background_cognition.py 的 PROMPTS_OF_1_1 同一組。
 LENGTH_IN_1_1 = {
@@ -246,7 +263,15 @@ async def converse(
     seen: list[tuple] = []
     original = background.StructuredBackgroundWorker._normalize
     original_call = background.StructuredBackgroundWorker.__call__
+    original_again = background.StructuredBackgroundWorker._diary_again
     recorded: set[int] = set()
+    asked_again: list[tuple[dict, dict]] = []
+
+    async def again(worker, context, messages, answered, data):
+        """日記：第一次的回答，與再問一次之後的回答（沒再問就是同一份）。"""
+        out = await original_again(worker, context, messages, answered, data)
+        asked_again.append((dict(data), dict(out)))
+        return out
 
     def recording(worker, context, data):
         try:
@@ -277,12 +302,33 @@ async def converse(
         "reflection": worker,
         "goal": worker,
         "reply_check": worker,
+        "mood": worker,
+        "summary": worker,
+        "user_state": worker,
+        "diary": worker,
     }
     wanted = set(args.pages)
     every = {
         setting: int(page in wanted and (variant == "new" or page in OLD_PAGES))
         for page, setting in SETTING_OF.items()
     }
+    diary = "diary" in wanted and variant == "new"
+    extra = {
+        "mood_every": 0,
+        "summary_every": 0,
+        "user_state_every": args.user_state_every
+        if "user-state" in wanted and variant == "new"
+        else 0,
+        # 日記只在重播完後手動寫一篇。
+        "diary_every_hours": 0,
+    }
+    if "user-state" in wanted and variant == "new":
+        # 使用者狀態要讀情緒序列。
+        every["emotion_every"] = 1
+    if diary:
+        # 日記的材料：照 Tomoshibi 的預設開，再加摘要。
+        every.update(emotion_every=1, memory_every=2, self_memory_every=2)
+        extra.update(mood_every=2, summary_every=args.summary_every)
     companion = CharacterCompanion(
         character=CharacterProfile(
             id="workers-compare",
@@ -294,9 +340,8 @@ async def converse(
         background_llm=clients,
         settings=CompanionSettings(
             **every,
-            mood_every=0,
-            goal_every=args.goal_every if wanted & set(OLD_PAGES) else 0,
-            summary_every=0,
+            **extra,
+            goal_every=args.goal_every if wanted & set(OLD_PAGES) or diary else 0,
             call_timeout_seconds=180.0,
             plans_stay_in_conversation=variant == "new",
             language=args.language,
@@ -323,6 +368,7 @@ async def converse(
     rows = []
     background.StructuredBackgroundWorker._normalize = recording
     background.StructuredBackgroundWorker.__call__ = calling
+    background.StructuredBackgroundWorker._diary_again = again
     try:
         with prompts(variant):
             for number, (user, line) in turns:
@@ -344,15 +390,31 @@ async def converse(
                     }
                 )
                 print(f"{variant} {name} turn {number}", file=sys.stderr)
+            written = None
+            if diary:
+                seen.clear()
+                asked_again.clear()
+                entry = await companion.write_diary()
+                written = {
+                    "entry": entry,
+                    "reading": next(
+                        (r for r in seen if r[0] is BackgroundCognitionKind.DIARY), None
+                    ),
+                    "first": asked_again[0][0] if asked_again else None,
+                }
+                print(f"{variant} {name} diary", file=sys.stderr)
             if isinstance(her, Replay):
                 her.line = "嗨。"
             await companion.reply(FRESH, conversation_id="fresh", skip_memory=True)
             fresh = in_mind(her.calls[-1], companion)
+            if written is not None:
+                written["in_prompt"] = fresh.get("diary", [])
     finally:
         background.StructuredBackgroundWorker._normalize = original
         background.StructuredBackgroundWorker.__call__ = original_call
+        background.StructuredBackgroundWorker._diary_again = original_again
         await companion.close()
-    return {"rows": rows, "fresh": fresh}
+    return {"rows": rows, "fresh": fresh, "diary": written}
 
 
 def told(calls, asked) -> list[str]:
@@ -383,7 +445,17 @@ def in_mind(messages, companion) -> dict:
         "thoughts": [line for line in lines if line.startswith("- thought: ")],
         "snapshot_goals": list(snapshot.goals),
         "snapshot_thoughts": list(snapshot.thoughts),
+        "diary": _diary_in(messages),
     }
+
+
+def _diary_in(messages) -> list[str]:
+    """系統提示裡她的日記那一段（標題與那兩句）。"""
+    system = next((m.content for m in messages if m.role == "system"), "")
+    for part in system.split("\n\n"):
+        if part.startswith("From your diary"):
+            return part.splitlines()
+    return []
 
 
 # --- 判讀：一筆模型回答在新舊程式下收不收 ----------------------------------------
@@ -564,12 +636,62 @@ def reply_check_items(reading, commits, variant) -> list[str]:
     return out or ["（沒有問題）"]
 
 
+def user_state_items(reading, commits, variant) -> list[str]:
+    _, context, data, normalized, worker, error = reading
+    if error:
+        return [f"這輪呼叫失敗：{error}"]
+    payload = context.request.payload
+    said = background._state_lines(context, turns=worker.spec.every_n_revisions)
+    hers = _her_lines(context, worker.history_messages)
+    emotions = [
+        f"{e.get('emotion')}（valence {e.get('valence')}，stance {e.get('stance')}）"
+        for e in payload.get("user_emotions") or ()
+    ]
+    out = [
+        "讀到的使用者原句：\n" + "\n".join(f"　{line}" for line in said),
+        "情緒序列：" + ("、".join(emotions) or "（無）"),
+        f"模型：energy {data.get('energy')}　trend {data.get('mood_trend')}",
+    ]
+    kept = normalized[0] if normalized and normalized[0] else {}
+    for raw in data.get("concerns") or []:
+        if not isinstance(raw, dict):
+            continue
+        concern = str(raw.get("concern") or "")
+        quote = str(raw.get("evidence") or "")
+        if concern[:30].strip() in (kept.get("concerns") or []):
+            verdict = "收"
+        elif _line_quoted(quote, said) is None:
+            verdict = "丟：引文不是使用者這段的原句"
+        elif _echoes(quote, hers):
+            verdict = "丟：跟著她念的"
+        else:
+            verdict = "丟：診斷字眼、語言不對或超過三項"
+        out.append(f"concern：{concern}\n　「{quote}」\n　{verdict}")
+    for quote in data.get("evidence") or []:
+        mark = "原句" if _line_quoted(str(quote), said) is not None else "改寫或沒出現"
+        out.append(f"evidence：「{quote}」（{mark}）")
+    if kept:
+        lately = f"energy {kept['energy']}, mood {kept['mood_trend']}" + (
+            f"; concerns: {', '.join(kept['concerns'])}" if kept["concerns"] else ""
+        )
+        out.append(f"引擎收下：{lately}")
+    else:
+        out.append("引擎沒收（energy／trend 不在詞彙裡）")
+    status = next(
+        (o.status.value for p, o in commits if p.target == USER_STATE_TARGET), ""
+    )
+    if status:
+        out.append(f"commit：{status}")
+    return out
+
+
 ITEMS = {
     "memory": memory_items,
     "self-memory": self_memory_items,
     "reflection": reflection_items,
     "emotion": emotion_items,
     "reply-check": reply_check_items,
+    "user-state": user_state_items,
 }
 
 
@@ -598,7 +720,7 @@ def cell(text) -> str:
 
 
 def column(row, page, variant) -> str:
-    if page == "reply-check" and variant == "old":
+    if page in NEW_ONLY and variant == "old":
         return "（1.1 沒有這個工作）"
     reading = reading_of(row, KINDS[page])
     if reading is None:
@@ -611,10 +733,83 @@ def column(row, page, variant) -> str:
     return text
 
 
+def diary_section(label, name, runs) -> str:
+    written = runs["new"].get("diary") or {}
+    reading = written.get("reading")
+    entry = written.get("entry")
+    if reading is None:
+        happened, answer, verdict = "（沒有材料：這段沒有對話？）", "（沒跑）", ""
+    else:
+        _, context, data, normalized, _, error = reading
+        day = context.request.payload.get("diary") or {}
+        happened = "\n\n".join(
+            f"{title}：\n" + "\n".join(f"・{line}" for line in lines)
+            for title, lines in _diary_sections(day)
+        )
+        lines = [line for _, ls in _diary_sections(day) for line in ls]
+
+        def shown(answer_data) -> str:
+            text = _diary_text(str(answer_data.get("text") or ""))
+            off = _not_of_the_day(text, lines)
+            return (
+                f"{answer_data.get('text')}\n\nevidence：\n"
+                + "\n".join(
+                    f"「{quote}」"
+                    + (
+                        ""
+                        if _line_quoted(str(quote), lines) is not None
+                        else "（不在材料裡）"
+                    )
+                    for quote in answer_data.get("evidence") or []
+                )
+                + (
+                    "\n\n跟材料對不上的句子：\n" + "\n".join(f"・{x}" for x in off)
+                    if off
+                    else ""
+                )
+            )
+
+        first = written.get("first")
+        if error:
+            answer, verdict = f"這次呼叫失敗：{error}", ""
+        else:
+            answer = shown(data)
+            if first is not None and first != data:
+                answer = (
+                    f"第一次：\n{shown(first)}\n\n（再問一次）\n\n第二次：\n{answer}"
+                )
+            verdict = (
+                f"收下（{entry.date}）：\n{entry.text}\n\n依據：\n"
+                + "\n".join(f"「{quote}」" for quote in entry.evidence)
+                if entry is not None
+                else "沒收：依據不在材料裡、對得上材料的句子不到兩句、寫成清單或語言不對"
+            )
+    prompt = "\n".join(written.get("in_prompt") or []) or "（無）"
+    cells = [happened, "（1.1 沒有這個工作）", f"{answer}\n——\n{verdict}", prompt]
+    head = "".join(
+        f"<th>{cell(h)}</th>"
+        for h in (
+            "她那天的材料",
+            "舊（1.1）",
+            f"新：{name} 的日記（模型的回答——引擎的處置）",
+            "下一段新對話時她的系統提示裡",
+        )
+    )
+    body = "<tr>" + "".join(f"<td>{cell(c)}</td>" for c in cells) + "</tr>"
+    return (
+        f"<h2>{cell(label)}</h2><table><thead><tr>{head}</tr></thead>"
+        f"<tbody>{body}</tbody></table>"
+    )
+
+
 def section(page, label, name, runs) -> str:
+    if page == "diary":
+        return diary_section(label, name, runs)
     new_rows, old_rows = runs["new"]["rows"], runs["old"]["rows"]
     body = []
     for index, (new, old) in enumerate(zip(new_rows, old_rows)):
+        if page == "user-state" and reading_of(new, KINDS[page]) is None:
+            continue  # 每 --user-state-every 輪才跑一次
         mark = ""
         if page == "emotion" and index > 0:
             before = [
@@ -682,6 +877,18 @@ def render(page, sections, args) -> str:
         "舊欄：1.1.1 的提示（截掉 1.2 追加的句子）在 1.2 的引擎上跑，跨對話行為照 1.1；"
         "每個項目另標 1.1 的程式會不會收。新欄：1.2 的提示與程式，標的是引擎實際的處置。"
     )
+    if page == "user-state":
+        note = (
+            "使用者狀態摘要是新工作，舊欄留空；只列有跑的那幾輪。每列：這一段她讀到的"
+            "使用者原句、情緒工作給的序列、模型的回答，每個 concern 有沒有使用者原句"
+            "與引擎的處置，最後是她提示裡那一行（user lately）。"
+        )
+    if page == "diary":
+        note = (
+            "她的日記是新工作，舊欄留空。每段對話重播完，write_diary() 寫一篇："
+            "左邊是引擎給模型的材料（只有這些可以寫），中間是模型的回答與引擎的處置，"
+            "右邊是之後新對話時她系統提示裡的那兩句。判讀：每句對得到左邊的材料嗎？語氣像她嗎？"
+        )
     if page == "reply-check":
         note = (
             "回話自檢是 1.2.0 新增的工作，舊欄留空。新欄：模型回報的每個問題（kind／她的原句／"
@@ -710,6 +917,7 @@ def skipped(new) -> dict:
 
 async def main(args) -> None:
     sections = []
+    old_needed = set(args.pages) & set(OLD_PAGES)
     for raw in args.conversations:
         path, start, end = conversation_arg(raw)
         name, pairs = pairs_of(path)
@@ -718,7 +926,7 @@ async def main(args) -> None:
         turns = [(n, pairs[n - 1]) for n in range(start, end + 1)]
         runs = {}
         for variant in ("new", "old"):
-            if variant == "old" and not set(args.pages) & set(OLD_PAGES):
+            if variant == "old" and not old_needed:
                 runs["old"] = skipped(runs["new"])
                 continue
             runs[variant] = await converse(
@@ -775,6 +983,15 @@ if __name__ == "__main__":
         default="",
         help="CompanionSettings.language，跟 Tomoshibi 一樣用角色的回話語言"
         "（例如 Traditional Chinese (Taiwan)）；預設空",
+    )
+    parser.add_argument(
+        "--user-state-every", type=int, default=6, help="使用者狀態幾輪讀一次"
+    )
+    parser.add_argument(
+        "--summary-every",
+        type=int,
+        default=6,
+        help="跑 diary 時摘要幾輪一次（Tomoshibi 預設 0；0 就沒有摘要可讀）",
     )
     parser.add_argument(
         "--pages",
