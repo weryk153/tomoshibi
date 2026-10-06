@@ -605,6 +605,7 @@
       "testFail_unchanged": "번역이 적용되지 않았습니다 — 원문이 그대로 돌아왔습니다. 대개 추론 모델(답이 reasoning_content에 들어가고 content가 비어 있음)이거나 타임아웃입니다. 둘 다 아직 UI에서 설정할 수 없습니다. conf.yaml의 translator_config.llm에 extra_body.reasoning_effort: none과 timeout: 60을 추가하세요.",
       "testFail_disabled": "번역이 현재 꺼져 있어 테스트할 것이 없습니다.",
       "testFail_config": "설정을 읽을 수 없습니다: {{error}}",
+      "testFail_wrong_language": "테스트 실패: 모델이 목표 언어가 아닌 영어로 답했고, 재시도해도 같았습니다. 다른 모델을 쓰거나 이 모델이 쓸 수 있는 언어를 목표로 하세요.",
       "testFail_error": "테스트 실패: {{error}}",
       "endpointEmpty": "주소는 비워 둘 수 없습니다"
     },

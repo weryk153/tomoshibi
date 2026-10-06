@@ -605,6 +605,7 @@
       "testFail_unchanged": "翻译没有生效——回来的跟原文一样。常见原因：选到的是推理模型（答案被放进 reasoning_content、content 是空的），或超过超时。目前 UI 还不能设置这两项，需要手动改 conf.yaml 的 translator_config.llm（加 extra_body.reasoning_effort: none 与 timeout: 60）。",
       "testFail_disabled": "翻译目前是关闭的，没有东西可以测。",
       "testFail_config": "配置读不起来：{{error}}",
+      "testFail_wrong_language": "测试失败：模型回来的不是目标语言（答成英文），重试一次仍然如此。换一个模型、或把目标语言改成模型会写的语言。",
       "testFail_error": "测试失败：{{error}}",
       "endpointEmpty": "地址不能为空"
     },

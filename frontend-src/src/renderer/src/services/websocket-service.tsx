@@ -29,6 +29,8 @@ export interface AudioPayload {
   subtitle_text?: string;
   // 只有笑聲的一句：畫面字幕留著上一句（後端 tts_manager._mark_subtitle_hold）。
   keep_subtitle?: boolean;
+  // 沒聲音但有字的一句：畫面字幕照換（後端 tts_manager._mark_silent_sentence）。
+  show_subtitle?: boolean;
   actions?: Actions;
 }
 
@@ -105,6 +107,7 @@ export interface MessageEvent {
   // 雙語字幕開著時她實際唸的那句（後端 conversations/bilingual.py）。
   spoken_text?: string;
   keep_subtitle?: boolean;
+  show_subtitle?: boolean;
   live2d_model?: string;
   browser_view?: {
     debuggerFullscreenUrl: string;

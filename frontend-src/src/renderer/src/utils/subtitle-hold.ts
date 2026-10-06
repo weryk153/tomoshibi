@@ -28,6 +28,11 @@ export interface SubtitleLine {
  * `spokenText` is the payload's `spoken_text`, present only when the character
  * has bilingual subtitles on.
  *
+ * A silent segment (「……」, ♪, an *action*) leaves the subtitle alone. The
+ * backend flags `show_subtitle` on a silent segment that is a real sentence
+ * with nothing to voice — voice translation failed twice and she says nothing
+ * rather than the wrong language — so that sentence still comes up on screen.
+ *
  * Extracted from use-audio-task so it is testable under plain `node --test`.
  */
 export function nextSpeechSubtitle(options: {
@@ -35,14 +40,15 @@ export function nextSpeechSubtitle(options: {
   visibleText: string
   spokenText?: string | null
   keepSubtitle: boolean
+  showSubtitle?: boolean
   current: string
   lastSpoken: string | null
 }): SubtitleLine | null {
   const {
-    hasAudio, visibleText, spokenText, keepSubtitle, current, lastSpoken,
+    hasAudio, visibleText, spokenText, keepSubtitle, showSubtitle, current, lastSpoken,
   } = options;
   // Silent segments never touched the subtitle; that stays as it was.
-  if (!hasAudio) return null;
+  if (!hasAudio && !showSubtitle) return null;
   if (keepSubtitle && current !== '' && current === lastSpoken) return null;
   const spoken = spokenText?.trim() ?? '';
   return {

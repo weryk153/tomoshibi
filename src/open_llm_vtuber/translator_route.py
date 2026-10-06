@@ -36,6 +36,7 @@ from loguru import logger
 
 from . import pending_changes
 from .config_manager.agent import conversation_block
+from .translate.translate_interface import UnspeakableTranslation
 
 from .api_guard import (
     is_trusted_request as _is_local_request,
@@ -461,6 +462,13 @@ def init_translator_route() -> APIRouter:
             # translate() is blocking (httpx.post) — same reason conversation_utils
             # wraps it in to_thread. Never block the event loop from a route.
             result = await asyncio.to_thread(engine.translate, sample)
+        except UnspeakableTranslation as e:
+            # 模型答了兩次都不是目標語言：這不是連線錯誤，給一個看得懂的理由。
+            logger.warning(f"translator test: {e}")
+            return JSONResponse(
+                status_code=200,
+                content={"ok": False, "reason": "wrong_language"},
+            )
         except Exception as e:
             logger.error(f"translator test raised: {type(e).__name__}")
             return JSONResponse(

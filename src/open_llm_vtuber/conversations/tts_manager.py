@@ -34,6 +34,18 @@ def _mark_subtitle_hold(
     payload["keep_subtitle"] = is_laughter_only(visible)
 
 
+def _mark_silent_sentence(
+    payload: Dict, display_text: DisplayText, subtitle_text: Optional[str]
+) -> None:
+    """靜音 payload 的畫面字幕本來不動（「……」「♪」沒必要上字幕）。但一句有字
+    的話沒聲音——語音翻譯兩次都不是她的語言（conversation_utils）——字幕還是
+    要換到這句，不然畫面停在上一句。有字才標 show_subtitle，沒字的 payload
+    跟以前逐 byte 相同。"""
+    visible = subtitle_text or getattr(display_text, "text", "") or ""
+    if has_speakable_text(visible):
+        payload["show_subtitle"] = True
+
+
 class TTSTaskManager:
     """Manages TTS tasks and ensures ordered delivery to frontend while allowing parallel TTS generation"""
 
@@ -187,6 +199,7 @@ class TTSTaskManager:
             subtitle_text=subtitle_text,
         )
         _mark_subtitle_hold(audio_payload, display_text, subtitle_text)
+        _mark_silent_sentence(audio_payload, display_text, subtitle_text)
         await self._payload_queue.put(([audio_payload], sequence_number))
 
     async def _process_tts(

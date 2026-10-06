@@ -111,3 +111,19 @@ test('when something else replaces the text, the spoken line goes with it', () =
   // 文字沒變（例如清除規則決定留著）就原封不動，上行也留著。
   assert.equal(replaceSubtitleText(twoLines, '今天好嗎？'), twoLines);
 });
+
+test('a silent segment leaves the subtitle alone', () => {
+  assert.equal(
+    nextSpeechSubtitle({ ...base, hasAudio: false, visibleText: '……' }),
+    null,
+  );
+});
+
+test('a silent segment flagged show_subtitle still puts its sentence up', () => {
+  assert.deepEqual(
+    nextSpeechSubtitle({
+      ...base, hasAudio: false, showSubtitle: true, visibleText: '那我們聊點輕鬆的？',
+    }),
+    { text: '那我們聊點輕鬆的？', spoken: null },
+  );
+});

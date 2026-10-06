@@ -323,10 +323,11 @@ async def handle_sentence_output(
                             f"'''{tts_text}'''"
                         )
                         tts_text = ""
-                    logger.info(
-                        f"🏃 Audio translated (R={reply_lang} != V={voice_lang}): "
-                        f"'''{tts_text}'''..."
-                    )
+                    else:
+                        logger.info(
+                            f"🏃 Audio translated (R={reply_lang} != V={voice_lang}): "
+                            f"'''{tts_text}'''..."
+                        )
                 else:
                     logger.debug(
                         f"🚫 Audio translation skipped (R={reply_lang}, V={voice_lang}); "
@@ -358,9 +359,18 @@ async def handle_sentence_output(
                 else:
                     # Same reasoning as the audio-translate call above: keep the
                     # blocking call off the event loop, but still await it in order.
-                    subtitle_text = await asyncio.to_thread(
-                        subtitle_translate_engine.translate, display_text.text
-                    )
+                    try:
+                        subtitle_text = await asyncio.to_thread(
+                            subtitle_translate_engine.translate, display_text.text
+                        )
+                    except UnspeakableTranslation:
+                        # 字幕的目標也可能是日文（玩家語言選日文）：翻不出來就
+                        # 顯示原文，跟其他翻譯失敗一樣；不能讓整段回覆因此中斷。
+                        logger.warning(
+                            "🔇 Subtitle translation unusable, showing the reply "
+                            f"as written: '''{display_text.text}'''"
+                        )
+                        subtitle_text = display_text.text
             logger.info(f"🏃 Subtitle after translation: '''{subtitle_text}'''...")
 
         if subtitle_collector is not None:

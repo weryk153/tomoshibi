@@ -83,3 +83,20 @@ def test_bilingual_subtitle_shows_no_spoken_line_for_an_unspeakable_sentence():
     _, spoken = _run(["那我們聊點輕鬆的？"], {"那我們聊點輕鬆的？"}, bilingual=True)
 
     assert spoken == [("", "那我們聊點輕鬆的？", None)]
+
+
+def test_the_silent_payload_of_a_real_sentence_is_flagged_show_subtitle():
+    """前端對靜音 payload 不換畫面字幕（「……」沒必要）；有字的句子要標起來。"""
+    from src.open_llm_vtuber.conversations.tts_manager import _mark_silent_sentence
+
+    sentence = {}
+    _mark_silent_sentence(sentence, DisplayText(text="那我們聊點輕鬆的？"), None)
+    assert sentence == {"show_subtitle": True}
+
+    translated = {}
+    _mark_silent_sentence(translated, DisplayText(text="……"), "那我們聊點輕鬆的？")
+    assert translated == {"show_subtitle": True}
+
+    dots = {}
+    _mark_silent_sentence(dots, DisplayText(text="……"), None)
+    assert dots == {}

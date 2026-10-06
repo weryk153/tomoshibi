@@ -29,6 +29,8 @@ interface AudioTaskOptions {
   spokenText?: string
   // 只有笑聲的一句：聲音照播、聊天泡泡照記，畫面字幕留著上一句（見 utils/subtitle-hold.ts）。
   keepSubtitle?: boolean
+  // 沒聲音但有字的一句（語音翻譯兩次都不是她的語言）：畫面字幕照換（見 utils/subtitle-hold.ts）。
+  showSubtitle?: boolean
   expressions?: string[] | number[] | null
   expressionIntensities?: number[] | null
   motions?: MotionRequest[] | null
@@ -99,8 +101,8 @@ export const useAudioTask = () => {
     }
 
     const {
-      audioBase64, displayText, subtitleText, spokenText, keepSubtitle, expressions, expressionIntensities, motions,
-      forwarded,
+      audioBase64, displayText, subtitleText, spokenText, keepSubtitle, showSubtitle, expressions,
+      expressionIntensities, motions, forwarded,
     } = options;
 
     // Update display text
@@ -115,6 +117,7 @@ export const useAudioTask = () => {
         visibleText,
         spokenText,
         keepSubtitle: Boolean(keepSubtitle),
+        showSubtitle: Boolean(showSubtitle),
         current: subtitleOnScreen,
         lastSpoken: lastSpokenSubtitleRef.current,
       });

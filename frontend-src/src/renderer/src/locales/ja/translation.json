@@ -605,6 +605,7 @@
       "testFail_unchanged": "翻訳が効いていません——原文がそのまま返ってきました。多くは推論モデル（答えが reasoning_content に入り content が空）かタイムアウトです。どちらもまだ UI から設定できません。conf.yaml の translator_config.llm に extra_body.reasoning_effort: none と timeout: 60 を追加してください。",
       "testFail_disabled": "翻訳は現在オフです。テストするものがありません。",
       "testFail_config": "設定を読み込めません：{{error}}",
+      "testFail_wrong_language": "テスト失敗：モデルが目標言語ではなく英語で答え、再試行でも同じでした。別のモデルにするか、このモデルが書ける言語を目標にしてください。",
       "testFail_error": "テスト失敗：{{error}}",
       "endpointEmpty": "アドレスを空にはできません"
     },

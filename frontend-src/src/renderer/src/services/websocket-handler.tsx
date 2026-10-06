@@ -272,6 +272,7 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
             subtitleText: message.subtitle_text,
             spokenText: message.spoken_text,
             keepSubtitle: message.keep_subtitle || false,
+            showSubtitle: message.show_subtitle || false,
             expressions: message.actions?.expressions || null,
             expressionIntensities: message.actions?.expression_intensities || null,
             motions: message.actions?.motions || null,

@@ -605,6 +605,7 @@
       "testFail_unchanged": "Translation did not take effect — the text came back unchanged. Usually this means a reasoning model (the answer lands in reasoning_content while content stays empty) or a timeout. Neither is configurable from the UI yet; edit translator_config.llm in conf.yaml and add extra_body.reasoning_effort: none and timeout: 60.",
       "testFail_disabled": "Translation is currently off — nothing to test.",
       "testFail_config": "Could not read the configuration: {{error}}",
+      "testFail_wrong_language": "Test failed: the model answered in English instead of the target language, and again on retry. Try another model, or a target language this model can write.",
       "testFail_error": "Test failed: {{error}}",
       "endpointEmpty": "The address can't be empty"
     },

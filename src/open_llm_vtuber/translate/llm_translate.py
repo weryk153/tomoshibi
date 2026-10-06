@@ -221,7 +221,10 @@ class LLMTranslate(TranslateInterface):
                         f"LLM translate answered in English twice for '{text}', "
                         "nothing to speak"
                     )
-                    raise UnspeakableTranslation(text)
+                    raise UnspeakableTranslation(
+                        f"answered in English twice, no {self.target_lang} "
+                        f"translation for {text!r}"
+                    )
 
             if self._is_traditional_chinese_target:
                 res = normalize_output_language_variant(
