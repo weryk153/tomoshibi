@@ -14,6 +14,7 @@ import asyncio
 import json
 import re
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Any, Awaitable, Callable, Iterable, Optional, Sequence
 
 import httpx
@@ -31,9 +32,14 @@ MIN_CONFIDENCE = 0.7
 MIN_RATIO = 0.5
 MAX_RATIO = 2.0
 MIN_RAW_LENGTH = 2
+# 中文諧音換成假名時，每拿掉一個漢字最多多幾個假名（長音、拗音會多一點）。
+KANA_PER_HAN = 1.5
 # 給模型看的上下文：最近幾輪（她一句＋使用者一句算一輪）、每一句最多幾個字。
+# 模型讀提示的速度約每秒三四百 token，而且快取用不上：上下文越長越慢。最後兩句
+# （通常是她要對方念的那句）留長一點，更早的只留結尾。
 ROUNDS = 6
-LINE_CHARS = 160
+LINE_CHARS = 80
+OLDER_LINE_CHARS = 30
 # 只帶思考開關（同 character_engine/factory.py 的背景工作），取樣參數不帶。
 _REASONING_KEYS = (
     "reasoning_effort",
@@ -44,18 +50,14 @@ _REASONING_KEYS = (
 _LANG_NAMES = {"ja": "Japanese", "zh": "Chinese", "en": "English", "ko": "Korean"}
 
 SYSTEM_PROMPT = """\
-You fix speech-recognition (ASR) errors in one line the user just SAID out loud.
-The recogniser often writes a word that sounds the same but is wrong:
-- Chinese homophones or near-homophones (wrong characters, same sound)
-- a foreign phrase written as Chinese sound-alike characters (e.g. 阿里嘎多 -> ありがとう)
-- misspelled kana or romaji
-Use the recent conversation to tell what the user most likely said.
-Rules:
-- Only replace words that sound like what was recognised. Do not change the meaning.
-- Do not add or remove words, do not fix grammar or punctuation, do not rephrase, do not translate, do not reply to the user.
-- Keep names, catchphrases and every word that already makes sense exactly as written.
-- If the line already makes sense, or you are not sure, return it unchanged with low confidence.
-Reply with JSON only: {"text": "<the line, repaired>", "confidence": <0 to 1, how sure the repaired line is what was said>, "note": "<one short reason>"}"""
+Speech recognition (ASR) wrote down a line the user just said out loud. It may contain sound-alike errors:
+- wrong Chinese characters with the same or a similar sound
+- a foreign phrase written as Chinese sound-alike characters: write the phrase itself in its own script, never its meaning (e.g. 阿里嘎多 -> ありがとう, not 謝謝)
+- kana or romaji that is not a real word
+If the character just asked the user to say a phrase and the line sounds like that phrase, the line is that phrase.
+Most lines are fine: if the line makes sense here, return it unchanged.
+Otherwise replace only the mis-heard words with what they sound like. Keep everything else exactly: other words, names, numbers, punctuation, character forms. Casual or short forms are real words. Never rephrase, add or drop words, translate, answer the user, or copy an earlier line.
+Reply with JSON only: {"text": "<the line>", "confidence": <0 to 1, how sure this is what was said>, "note": "<at most 6 words>"}"""
 
 
 @dataclass(frozen=True)
@@ -66,10 +68,43 @@ class RepairResult:
     reason: str
 
 
+_FILLER = re.compile(r"[\s\W_]+", re.UNICODE)
+_HAN = re.compile(r"[一-鿿㐀-䶿]")
+_KANA = re.compile(r"[぀-ゟ゠-ヿ]")
+_KANA_RUN = re.compile(r"[぀-ゟ゠-ヿ]+")
+_DIGITS = re.compile(r"[0-9０-９]+")
+_KANA_OR_LATIN = re.compile(r"[぀-ゟ゠-ヿA-Za-z]")
+
+
+@lru_cache(maxsize=1)
+def _simplified() -> Callable[[str], str]:
+    """把字形統一（日文新字體→繁體→簡體），只拿來比較。"""
+    from opencc import OpenCC
+
+    japanese, simplified = OpenCC("jp2t"), OpenCC("t2s")
+    return lambda text: simplified.convert(japanese.convert(text))
+
+
+def _bare(text: str) -> str:
+    """拿掉空白與標點，只比字。"""
+    return _FILLER.sub("", text or "")
+
+
 def accept(
-    raw: str, fixed: str, confidence: float, *, catchphrases: Iterable[str] = ()
+    raw: str,
+    fixed: str,
+    confidence: float,
+    *,
+    catchphrases: Iterable[str] = (),
+    earlier: Iterable[str] = (),
+    context: Optional[str] = None,
 ) -> bool:
-    """模型的還原要不要採用。不過就用原文。"""
+    """模型的還原要不要採用。不過就用原文。
+
+    earlier 是使用者前面講過的話：模型有時把上一句整句抄過來當「還原」。
+    context 是模型看到的對話；給了的話，中文諧音換成的假名要是她剛講過的
+    （沒上下文時模型會把「哈囉」翻成「ハロー」）。
+    """
     raw = (raw or "").strip()
     fixed = (fixed or "").strip()
     if len(raw) < MIN_RAW_LENGTH or not fixed:
@@ -79,6 +114,31 @@ def accept(
     if not MIN_RATIO <= len(fixed) / len(raw) <= MAX_RATIO:
         return False
     if only_catchphrases(raw, list(catchphrases)):
+        return False
+    bare_raw, bare_fixed = _bare(raw), _bare(fixed)
+    # 只差標點、空白：不算還原。
+    if bare_raw == bare_fixed:
+        return False
+    # 中文換中文：同音字是一個字換一個字，字數變了就是潤飾或改寫。
+    if not _KANA_OR_LATIN.search(raw + fixed) and len(bare_raw) != len(bare_fixed):
+        return False
+    # 只換了字形（繁簡、日文新字體）：不是還原，是改了使用者的寫法。
+    simplified = _simplified()
+    if simplified(bare_raw) == simplified(bare_fixed):
+        return False
+    # 中文諧音換成假名：一個字大約一個音節。假名多出一大截就是翻譯，不是還原。
+    han_removed = len(_HAN.findall(raw)) - len(_HAN.findall(fixed))
+    kana_added = len(_KANA.findall(fixed)) - len(_KANA.findall(raw))
+    if kana_added > 0 and kana_added > KANA_PER_HAN * max(han_removed, 0):
+        return False
+    if context is not None and kana_added > 0 and han_removed > 0:
+        new_kana = set(_KANA_RUN.findall(fixed)) - set(_KANA_RUN.findall(raw))
+        if any(run not in context for run in new_kana):
+            return False
+    # 數字照原樣（50音 不是 五十音）。
+    if _DIGITS.findall(raw) != _DIGITS.findall(fixed):
+        return False
+    if any(_bare(line) == bare_fixed for line in earlier):
         return False
     return True
 
@@ -98,26 +158,47 @@ def _messages(
             )
         lines.append(speaks)
     if transcript:
-        lines.append("Recent conversation:")
+        lines.append("")
+        lines.append("Conversation so far (context only):")
         lines.extend(f"{who}: {said}" for who, said in transcript)
     lines.append("")
-    lines.append(f"Line recognised by ASR: {text}")
+    lines.append("New line from ASR:")
+    lines.append(text)
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": "\n".join(lines)},
     ]
 
 
+_QUOTES = ("「」", "『』", '""', "“”")
+
+
+def _unquote(fixed: str, raw: str) -> str:
+    """模型有時把整句包在引號裡回來；原句沒有引號就拿掉。"""
+    for pair in _QUOTES:
+        if (
+            len(fixed) > 2
+            and fixed[0] == pair[0]
+            and fixed[-1] == pair[1]
+            and not raw.strip().startswith(pair[0])
+        ):
+            return fixed[1:-1].strip()
+    return fixed
+
+
 _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$")
 
 
 def _parse(reply: str) -> Optional[tuple[str, float, str]]:
+    """(還原後的字, 信心, 理由)。"""
     body = _FENCE.sub("", (reply or "").strip())
     try:
         data = json.loads(body)
     except ValueError:
         return None
-    if not isinstance(data, dict) or not isinstance(data.get("text"), str):
+    if not isinstance(data, dict):
+        return None
+    if not isinstance(data.get("text"), str):
         return None
     try:
         confidence = float(data.get("confidence"))
@@ -134,9 +215,13 @@ async def repair(
     client: Any,
     languages: Sequence[str],
     catchphrases: Iterable[str] = (),
+    user: str = "",
     timeout: float = TIMEOUT_SECONDS,
 ) -> RepairResult:
-    """把一句語音辨識的字還原。client 要有 async complete(messages) -> str。"""
+    """把一句語音辨識的字還原。client 要有 async complete(messages) -> str。
+
+    user 是逐字稿裡使用者的名字；他前面講過的話不能被當成這一句的還原。
+    """
     raw = text or ""
     catchphrases = list(catchphrases)
     if len(raw.strip()) < MIN_RAW_LENGTH or only_catchphrases(raw, catchphrases):
@@ -156,12 +241,21 @@ async def repair(
         logger.warning(f"ASR repair: unreadable reply {reply!r}; keeping '{raw}'")
         return RepairResult(raw, False, 0.0, "bad reply")
     fixed, confidence, note = parsed
-    taken = accept(raw, fixed, confidence, catchphrases=catchphrases)
+    fixed = _unquote(fixed, raw)
+    earlier = [said for who, said in transcript if user and who == user]
+    taken = accept(
+        raw,
+        fixed,
+        confidence,
+        catchphrases=catchphrases,
+        earlier=earlier,
+        context="\n".join(said for _, said in transcript),
+    )
     logger.info(
         f"ASR repair: '{raw}' -> '{fixed}' ({confidence})"
         + ("" if taken else " — kept original")
     )
-    if not taken or fixed == raw.strip():
+    if not taken:
         return RepairResult(raw, False, confidence, note)
     return RepairResult(fixed, True, confidence, note)
 
@@ -174,10 +268,12 @@ class ChatClient:
     model: str
     api_key: str = ""
     request_options: Optional[dict] = None
+    # 正式流程由 repair() 的 wait_for 管上限；這只是連線層的保險。
+    timeout_seconds: float = TIMEOUT_SECONDS + 1
 
     async def complete(self, messages: list[dict]) -> str:
         headers = {"Authorization": f"Bearer {self.api_key}"} if self.api_key else {}
-        async with httpx.AsyncClient(timeout=TIMEOUT_SECONDS + 1) as http:
+        async with httpx.AsyncClient(timeout=self.timeout_seconds) as http:
             response = await http.post(
                 f"{self.base_url.rstrip('/')}/chat/completions",
                 json={
@@ -191,23 +287,35 @@ class ChatClient:
             return response.json()["choices"][0]["message"]["content"] or ""
 
 
-def recent_transcript(context: Any) -> list[tuple[str, str]]:
-    """這段對話最近 ROUNDS 輪（使用者與她的話；系統訊息、空回覆不算）。"""
-    character = context.character_config
+def transcript_from(
+    messages: Iterable[dict], human_name: str, character_name: str
+) -> list[tuple[str, str]]:
+    """對話紀錄的最後 ROUNDS 輪（使用者與她的話；系統訊息、空回覆不算）。"""
     lines = []
-    for message in get_history(character.conf_uid, context.history_uid or ""):
+    for message in messages:
         content = str(message.get("content") or "").strip()
         if message.get("role") not in ("human", "ai") or not content:
             continue
-        if len(content) > LINE_CHARS:
-            content = "…" + content[-LINE_CHARS:]
         who = message.get("name") or (
-            character.human_name
-            if message.get("role") == "human"
-            else character.character_name
+            human_name if message.get("role") == "human" else character_name
         )
         lines.append((str(who), content))
-    return lines[-2 * ROUNDS :]
+    lines = lines[-2 * ROUNDS :]
+    for index, (who, content) in enumerate(lines):
+        limit = LINE_CHARS if index >= len(lines) - 2 else OLDER_LINE_CHARS
+        if len(content) > limit:
+            lines[index] = (who, "…" + content[-limit:])
+    return lines
+
+
+def recent_transcript(context: Any) -> list[tuple[str, str]]:
+    """這段對話（chat_history 裡的逐字稿）最近 ROUNDS 輪。"""
+    character = context.character_config
+    return transcript_from(
+        get_history(character.conf_uid, context.history_uid or ""),
+        character.human_name,
+        character.character_name,
+    )
 
 
 def _languages(context: Any) -> tuple[str, ...]:
@@ -264,6 +372,7 @@ def repairer(context: Any) -> Optional[Callable[[str], Awaitable[str]]]:
                 client=client,
                 languages=_languages(context),
                 catchphrases=(getattr(character, "catchphrases", None) or {}).keys(),
+                user=str(getattr(character, "human_name", "") or ""),
             )
             return result.text
         except Exception as e:

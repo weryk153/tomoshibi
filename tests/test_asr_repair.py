@@ -85,6 +85,60 @@ def test_rejects_a_catchphrase_only_input():
     assert accept("空尼七哇", "こんにちは", 0.95, catchphrases=["konpeko"])
 
 
+def test_rejects_a_punctuation_only_change():
+    assert not accept("繼續。", "繼續", 0.95)
+    assert not accept("お願い。", "お願い", 0.95)
+
+
+def test_a_chinese_to_chinese_fix_keeps_one_character_per_syllable():
+    # 同音字是一個字換一個字；字數變了就是潤飾或改寫。
+    assert accept("我說用降的不是打字", "我說用講的不是打字", 0.95)
+    assert accept("太暖的，從簡單的開始。", "太難的，從簡單的開始。", 0.95)
+    assert not accept(
+        "你哪時候在女僕咖啡廳打工？", "你什麼時候在女僕咖啡廳打工？", 0.95
+    )
+    assert not accept("什麼聽不懂。", "什麼都聽不懂。", 0.95)
+    # 寫成假名的外語不受這條限制。
+    assert accept("歐嗨唷狗紮伊媽斯", "おはようございます", 0.95)
+
+
+def test_rejects_a_fix_that_changes_the_numbers():
+    assert not accept("先從50音", "先從五十音", 0.95)
+    assert accept("給我3個空尼七哇", "給我3個こんにちは", 0.95)
+
+
+def test_rejects_a_change_of_character_form_only():
+    # 繁簡／日文字形的換字不是還原，是改了使用者的寫法。
+    assert not accept("私は人參が好きです。", "私は人参が好きです。", 0.95)
+    assert not accept("歐嗨唷狗紮伊媽斯", "歐嗨唷狗扎伊媽斯", 0.95)
+    assert not accept("無職轉生", "無職転生", 0.95)
+
+
+def test_kana_must_sound_like_the_characters_it_replaces():
+    # 中文諧音換成假名：一個字一個音節，假名不會多出一大截。多出來的是翻譯。
+    assert accept("空尼七哇", "こんにちは", 0.95)
+    assert accept("咋嬌娜娜", "さようなら", 0.95)
+    assert accept("歐嗨唷狗紮伊媽斯", "おはようございます", 0.95)
+    assert not accept("你是 AI 嗎？", "あなたは AI ですか？", 0.95)
+    assert not accept("謝謝你", "ありがとうございます", 0.95)
+
+
+def test_kana_for_chinese_sound_alikes_must_come_from_the_conversation():
+    # 中文諧音換成假名，只在她剛講過那句日文時才算（教學、跟讀）。
+    said = "打招呼的時候說「こんにちは」，跟著本小姐念一次！"
+    assert accept("空尼七哇", "こんにちは", 0.95, context=said)
+    assert not accept("哈囉", "ハロー", 0.95, context="")
+    assert not accept("哈囉", "ハロー", 0.95, context=said)
+    # 假名換假名不受這條限制。
+    assert accept("こんめんには。", "こんにちは。", 0.95, context="")
+
+
+def test_rejects_a_fix_that_copies_an_earlier_user_line():
+    earlier = ["什麼甜點", "那你會煮了嗎"]
+    assert not accept("等下班", "什麼甜點", 0.95, earlier=earlier)
+    assert accept("太暖的", "太難的", 0.95, earlier=earlier)
+
+
 # --- repair() --------------------------------------------------------------------
 
 
@@ -98,6 +152,31 @@ def test_repair_uses_the_fix_when_it_passes():
     assert "空尼七哇" in prompt
     assert "教我日文" in prompt and "Pekora" in prompt
     assert "Japanese" in prompt
+
+
+def test_the_new_line_is_marked_apart_from_the_conversation():
+    client = FakeClient(_reply("空尼七哇", 0.2))
+    _run("空尼七哇", client)
+    user = client.calls[0][-1]["content"]
+    assert user.rstrip().endswith("New line from ASR:\n空尼七哇")
+    assert user.index("教我日文") < user.index("空尼七哇")
+
+
+def test_quotes_the_model_put_around_the_line_are_dropped():
+    assert (
+        _run("空尼七哇", FakeClient(_reply("「こんにちは」", 0.9))).text == "こんにちは"
+    )
+    kept = _run("他說「好」", FakeClient(_reply("他說「好」", 0.9)))
+    assert kept.text == "他說「好」"
+
+
+def test_repair_will_not_copy_an_earlier_user_line():
+    client = FakeClient(_reply("教我日文", 0.95))
+    result = asyncio.run(
+        repair("叫我日文", TRANSCRIPT, client=client, languages=LANGS, user="User")
+    )
+    assert result.text == "叫我日文"
+    assert not result.changed
 
 
 def test_repair_keeps_the_original_on_low_confidence():
@@ -206,8 +285,9 @@ def test_no_repairer_without_a_background_model():
 def test_the_repairer_reads_the_conversation_and_languages(monkeypatch):
     seen = {}
 
-    async def fake_repair(text, transcript, *, client, languages, catchphrases):
+    async def fake_repair(text, transcript, *, client, languages, catchphrases, user):
         seen.update(
+            user=user,
             text=text,
             transcript=transcript,
             client=client,
@@ -232,6 +312,7 @@ def test_the_repairer_reads_the_conversation_and_languages(monkeypatch):
     assert seen["transcript"] == [("me", "教我日文"), ("Pekora", "跟著我念")]
     assert seen["languages"] == ("Traditional Chinese (Taiwan)", "Japanese")
     assert seen["catchphrases"] == ["konpeko"]
+    assert seen["user"] == "me"
     assert seen["client"].base_url == "http://127.0.0.1:1234/v1"
     assert seen["client"].model == "qwen"
     assert seen["client"].api_key == "key"
@@ -253,6 +334,21 @@ def test_the_transcript_keeps_only_the_last_six_rounds(monkeypatch):
     assert len(lines) == 12
     assert lines[0] == ("me", "u4")
     assert lines[-1] == ("Pekora", "a9")
+
+
+def test_older_lines_are_cut_shorter_than_the_last_two():
+    long = "あ" * 200
+    history = [
+        {"role": "human", "content": "u0", "name": "me"},
+        {"role": "ai", "content": long, "name": "Pekora"},
+        {"role": "human", "content": "u1", "name": "me"},
+        {"role": "ai", "content": long + "跟著我念", "name": "Pekora"},
+    ]
+    lines = asr_repair.transcript_from(history, "me", "Pekora")
+    assert lines[1][1] == "…" + "あ" * asr_repair.OLDER_LINE_CHARS
+    # 她最後一句的結尾（通常是要對方念的那句）留得比較長。
+    assert lines[3][1].endswith("跟著我念")
+    assert len(lines[3][1]) == asr_repair.LINE_CHARS + 1
 
 
 # --- process_user_input -----------------------------------------------------------
