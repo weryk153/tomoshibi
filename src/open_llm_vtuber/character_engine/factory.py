@@ -6,6 +6,7 @@ character_engine_agent 的人不該因為沒裝它而受任何影響，所以匯
 """
 
 import asyncio
+import dataclasses
 import functools
 import json
 import sys
@@ -73,6 +74,23 @@ _RENAMED_SETTINGS = {
     "timeout_seconds": "call_timeout_seconds",
     "max_rebase_turns": "max_turns_late",
 }
+
+
+def _known_settings(settings_class: Any, settings: Mapping[str, Any]) -> dict:
+    """換成引擎的名字，只留裝的這版引擎認得的。
+
+    conf.yaml 可以比引擎新（reply_check_every 是 1.2.0 才有的）；照傳的話
+    CompanionSettings 丟 TypeError，她整個開不起來。少一項設定只是那項沒作用。
+    """
+    known = {field.name for field in dataclasses.fields(settings_class)}
+    out = {}
+    for name, value in settings.items():
+        name = _RENAMED_SETTINGS.get(name, name)
+        if name in known:
+            out[name] = value
+        else:
+            logger.warning(f"[engine] this engine has no setting {name}; left out")
+    return out
 
 
 def _engine_client(**options):
@@ -375,10 +393,7 @@ def build_companion(
             **{
                 "max_history_messages": HISTORY_MESSAGES,
                 "language": language,
-                **{
-                    _RENAMED_SETTINGS.get(name, name): value
-                    for name, value in settings.items()
-                },
+                **_known_settings(CompanionSettings, settings),
             }
         ),
         context_builder=ContextBuilder(budget=budget),

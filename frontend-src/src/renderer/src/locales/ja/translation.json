@@ -173,6 +173,7 @@
       "enableMcppHelp": "AIがウェブ検索などのツールを使えるようにします。すべてのモデルが対応しているわけではありません。ツール呼び出し（関数呼び出し）に対応したモデル（GPT-4o / Claude / Gemini や能力のあるローカルビルドなど）が必要です。小さなローカルモデルは多くの場合使えず、単に無視します。",
       "engineEveryHelp": "バックグラウンド処理を何ターンごとに行うか。0 で無効。どれもモデル呼び出しが一回増えるので、遅いマシンでは数を大きくしてください。",
       "engine_emotion_every": "相手の気分　毎",
+      "engine_reply_check_every": "返事の見直し　毎",
       "engine_memory_every": "記憶　毎",
       "engine_self_memory_every": "自分のこと　毎",
       "engine_mood_every": "自分の気分　毎",

@@ -173,6 +173,7 @@
       "enableMcppHelp": "让 AI 能使用网络搜索等工具。并非每个模型都支持——需要支持工具调用（function calling）的模型，例如 GPT-4o / Claude / Gemini 或够强的本地版本。小型本地模型通常做不到，会直接忽略。",
       "engineEveryHelp": "每几轮跑一次后台工作；0 代表关闭。每一项都是多一次模型调用，机器慢的话把数字调大。",
       "engine_emotion_every": "情绪　每",
+      "engine_reply_check_every": "回话自检　每",
       "engine_memory_every": "记忆　每",
       "engine_self_memory_every": "她自己的事　每",
       "engine_mood_every": "她的心情　每",

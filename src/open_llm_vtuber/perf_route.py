@@ -79,10 +79,14 @@ GPT_SOVITS_LANGS = {"zh", "en", "ja", "ko", "yue", "auto"}
 # 只寫這幾個數字。語音辨識、聲音不歸效能預設管：以前三個預設都寫死 edge-tts，
 # 選一次「高效能」就把訓練好的聲音打回內建語音。標準＝出廠預設
 # （engine_config_route.EVERY_DEFAULTS）。
+# TODO(engine): 輕量預設還要 user_state_every 12、diary_every_hours 0（關），等
+# 引擎 main 有了這兩個再加（見 config_manager/agent.py）。
 PRESETS: dict[str, dict[str, Any]] = {
     # 輕量：弱機 / 共用機。每一項背景工作都是多一次模型呼叫。
     "light": {
         "emotion_every": 2,
+        # 回話自檢的提醒只給下一則，隔一輪查一次還是抓得到大部分。
+        "reply_check_every": 2,
         "memory_every": 3,
         "self_memory_every": 3,
         "mood_every": 3,
@@ -93,6 +97,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     },
     "standard": {
         "emotion_every": 1,
+        "reply_check_every": 1,
         "memory_every": 2,
         "self_memory_every": 2,
         "mood_every": 2,
@@ -104,6 +109,7 @@ PRESETS: dict[str, dict[str, Any]] = {
     # 高效能：強機，或背景工作另外交給一台電腦的模型。
     "high": {
         "emotion_every": 1,
+        "reply_check_every": 1,
         "memory_every": 1,
         "self_memory_every": 1,
         "mood_every": 1,

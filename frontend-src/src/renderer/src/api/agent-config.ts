@@ -58,7 +58,8 @@ export async function setUseMcpp(
 // 引擎裝不起來時旁邊說明為什麼。
 
 export type EngineEvery =
-  | 'emotion_every' | 'memory_every' | 'self_memory_every' | 'mood_every' | 'goal_every'
+  | 'emotion_every' | 'reply_check_every' | 'memory_every' | 'self_memory_every' | 'mood_every'
+  | 'goal_every'
   | 'reflection_every'
   | 'goals_shown' | 'thoughts_shown'
 
@@ -66,6 +67,8 @@ export interface EngineSettings {
   available: boolean
   reason: string
   emotion_every: number
+  // 她的回話事後讀一遍，有失誤就在下一則提醒她（引擎 1.2.0 起；舊引擎不用它）。
+  reply_check_every: number
   memory_every: number
   self_memory_every: number
   // 她自己的心情；空檔時的表情跟著它。

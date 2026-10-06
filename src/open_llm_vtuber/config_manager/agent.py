@@ -126,6 +126,14 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
     """
 
     emotion_every: int = Field(1, alias="emotion_every", ge=0)
+    # 她的回話事後讀一遍（講到提示、念出標記、重複上一則、語言不對…），有就在
+    # 下一則提醒她（引擎 1.2.0 起 CompanionSettings.reply_check_every；舊引擎不認得，
+    # character_engine/factory.py 不傳）。
+    reply_check_every: int = Field(1, alias="reply_check_every", ge=0)
+    # TODO(engine): diary_every_hours、user_state_every、user_state_ttl_hours、
+    # memory_conflicts 還沒進引擎 main（日記與使用者近況在 feat/diary-and-user-state
+    # 分支，memory_conflicts 還沒有）；進了再照 reply_check_every 加在這裡、
+    # engine_config_route 的 EVERY_KEYS 與 perf_route 的預設。
     memory_every: int = Field(2, alias="memory_every", ge=0)
     self_memory_every: int = Field(2, alias="self_memory_every", ge=0)
     # 她自己的心情（引擎 CompanionSettings.mood_every）；空檔的臉跟著它。
@@ -155,6 +163,10 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
         "emotion_every": Description(
             en="Analyse the user's emotion every N turns (0 disables)",
             zh="每幾輪分析一次對方的情緒（0 為停用）",
+        ),
+        "reply_check_every": Description(
+            en="Read her reply back for slips every N turns; a slip is pointed out on her next reply (0 disables)",
+            zh="每幾輪檢查一次她的回話（講到提示、重複、語言不對…），有就在下一則提醒她（0 為停用）",
         ),
         "memory_every": Description(
             en="Extract engine memories every N turns (0 disables)",

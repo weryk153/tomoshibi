@@ -263,6 +263,49 @@ def test_how_much_she_keeps_in_mind_reaches_the_engine():
     assert (settings.goals_shown, settings.thoughts_shown) == (1, 0)
 
 
+def test_a_setting_the_installed_engine_does_not_have_is_left_out():
+    """conf.yaml 可以比裝的引擎新（reply_check_every 是 1.2.0 才有的）：認不得的
+    設定不傳，不能讓 CompanionSettings 丟 TypeError、她整個開不起來。"""
+    arguments = factory_arguments()
+    arguments["agent_settings"]["character_engine_agent"] = {
+        "goal_every": 9,
+        "an_engine_setting_from_the_future_every": 3,
+    }
+
+    settings = AgentFactory.create_agent(**arguments)._companion().settings
+
+    assert settings.goal_every == 9
+    assert not hasattr(settings, "an_engine_setting_from_the_future_every")
+
+
+def _engine_has(name):
+    from dataclasses import fields
+
+    from ai_character_engine.companion import CompanionSettings
+
+    return name in {field.name for field in fields(CompanionSettings)}
+
+
+@pytest.mark.skipif(
+    not _engine_has("reply_check_every"), reason="installed engine predates 1.2.0"
+)
+def test_the_reply_check_rhythm_reaches_the_engine():
+    from src.open_llm_vtuber.config_manager.agent import AgentSettings
+
+    arguments = factory_arguments()
+    dumped = AgentSettings(
+        conversation=arguments["agent_settings"]["conversation"],
+        character_engine_agent={"reply_check_every": 2},
+    ).model_dump()
+    arguments["agent_settings"]["character_engine_agent"] = dumped[
+        "character_engine_agent"
+    ]
+
+    settings = AgentFactory.create_agent(**arguments)._companion().settings
+
+    assert settings.reply_check_every == 2
+
+
 def test_until_the_window_is_known_she_is_given_room_for_a_real_persona(monkeypatch):
     """實機：伺服器比模型早起來，問不到 window，引擎預設 8192 裝不下 Mao 的人設，
     主動發話那一輪直接失敗（Character context exceeds the configured context

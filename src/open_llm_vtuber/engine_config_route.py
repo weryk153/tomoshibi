@@ -33,8 +33,11 @@ from .conf_editor import (
 
 ENGINE_CHOICE = "character_engine_agent"
 # 畫面開得出來的幾個；其餘（timeout、goal_max_age_days…）留在 YAML。
+# TODO(engine): diary_every_hours、user_state_every、user_state_ttl_hours、
+# memory_conflicts 還在引擎分支上（見 config_manager/agent.py）。
 EVERY_KEYS = (
     "emotion_every",
+    "reply_check_every",
     "memory_every",
     "self_memory_every",
     "mood_every",
@@ -45,6 +48,7 @@ EVERY_KEYS = (
 )
 EVERY_DEFAULTS = {
     "emotion_every": 1,
+    "reply_check_every": 1,
     "memory_every": 2,
     "self_memory_every": 2,
     "mood_every": 2,
