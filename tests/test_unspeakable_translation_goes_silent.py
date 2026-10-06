@@ -7,6 +7,7 @@
 """
 
 import asyncio
+import json
 
 from src.open_llm_vtuber.agent.output_types import Actions, DisplayText
 from src.open_llm_vtuber.conversations.conversation_utils import (
@@ -44,13 +45,36 @@ class _TTSManager:
         self.spoken.append(
             (kwargs["tts_text"], kwargs["subtitle_text"], kwargs.get("spoken_text"))
         )
+        self.kwargs = kwargs
 
 
 async def _noop_send(_data):
     return None
 
 
-def _run(texts, unspeakable, bilingual=False):
+class _SubtitleTranslator:
+    target_lang = "日文"
+
+    def __init__(self, unspeakable):
+        self.unspeakable = set(unspeakable)
+
+    def translate(self, text):
+        if text in self.unspeakable:
+            raise UnspeakableTranslation(text)
+        return f"[字幕]{text}"
+
+
+class _SilentTTSManager:
+    """只記每句送出的 kwargs；靜音與否交給真的 TTSTaskManager 另外測。"""
+
+    def __init__(self):
+        self.calls = []
+
+    async def speak(self, **kwargs):
+        self.calls.append(kwargs)
+
+
+def _run(texts, unspeakable, bilingual=False, subtitle_unspeakable=None):
     tts_manager = _TTSManager()
     full = asyncio.run(
         handle_sentence_output(
@@ -60,7 +84,11 @@ def _run(texts, unspeakable, bilingual=False):
             websocket_send=_noop_send,
             tts_manager=tts_manager,
             translate_engine=_AudioTranslator(unspeakable),
-            subtitle_translate_engine=None,
+            subtitle_translate_engine=(
+                _SubtitleTranslator(subtitle_unspeakable)
+                if subtitle_unspeakable is not None
+                else None
+            ),
             voice_lang="ja",
             bilingual_subtitle=bilingual,
         )
@@ -85,18 +113,73 @@ def test_bilingual_subtitle_shows_no_spoken_line_for_an_unspeakable_sentence():
     assert spoken == [("", "那我們聊點輕鬆的？", None)]
 
 
-def test_the_silent_payload_of_a_real_sentence_is_flagged_show_subtitle():
-    """前端對靜音 payload 不換畫面字幕（「……」沒必要）；有字的句子要標起來。"""
-    from src.open_llm_vtuber.conversations.tts_manager import _mark_silent_sentence
+def test_the_silenced_sentence_is_marked_so_the_subtitle_still_changes():
+    """靜音 payload 的畫面字幕本來不動；這種句子要帶 silenced 讓 tts_manager 標
+    show_subtitle。有聲的句子不帶。"""
+    tts_manager = _SilentTTSManager()
+    asyncio.run(
+        handle_sentence_output(
+            _Sentences(["那我們聊點輕鬆的？", "好啊！"]),
+            live2d_model=None,
+            tts_engine=None,
+            websocket_send=_noop_send,
+            tts_manager=tts_manager,
+            translate_engine=_AudioTranslator({"那我們聊點輕鬆的？"}),
+            subtitle_translate_engine=None,
+            voice_lang="ja",
+        )
+    )
+    silenced, spoken = tts_manager.calls
+    assert silenced["tts_text"] == "" and silenced["silenced"] is True
+    assert "silenced" not in spoken
 
-    sentence = {}
-    _mark_silent_sentence(sentence, DisplayText(text="那我們聊點輕鬆的？"), None)
-    assert sentence == {"show_subtitle": True}
 
-    translated = {}
-    _mark_silent_sentence(translated, DisplayText(text="……"), "那我們聊點輕鬆的？")
-    assert translated == {"show_subtitle": True}
+def test_a_subtitle_that_cannot_be_translated_shows_the_reply_and_goes_on():
+    """玩家語言選日文時字幕翻譯器的目標也是日文：翻不出來就顯示原文，後面的句子
+    照常，正典文字完整——不能讓整段回覆因此中斷。"""
+    full, spoken = _run(
+        ["那我們聊點輕鬆的？", "好啊！"],
+        unspeakable=set(),
+        subtitle_unspeakable={"那我們聊點輕鬆的？"},
+    )
 
-    dots = {}
-    _mark_silent_sentence(dots, DisplayText(text="……"), None)
-    assert dots == {}
+    assert spoken == [
+        ("[日文]那我們聊點輕鬆的？", "那我們聊點輕鬆的？", None),
+        ("[日文]好啊！", "[字幕]好啊！", None),
+    ]
+    assert full == "那我們聊點輕鬆的？好啊！"
+
+
+def _payload_for(display, tts_text, **speak_kwargs):
+    """走真的 TTSTaskManager，拿它送到前端的那個 payload。"""
+    from src.open_llm_vtuber.conversations.tts_manager import TTSTaskManager
+
+    sent = []
+
+    async def send(data):
+        sent.append(data)
+
+    async def run():
+        manager = TTSTaskManager()
+        await manager.speak(
+            tts_text=tts_text,
+            display_text=DisplayText(text=display),
+            actions=None,
+            live2d_model=None,
+            tts_engine=None,
+            websocket_send=send,
+            **speak_kwargs,
+        )
+        await manager._payload_queue.join()
+
+    asyncio.run(run())
+    return json.loads(sent[0]) if isinstance(sent[0], str) else sent[0]
+
+
+def test_only_the_silenced_sentence_gets_show_subtitle():
+    """「（笑）」「……」這種本來就沒話念的句子，靜音 payload 跟以前一樣不帶旗標。"""
+    assert (
+        _payload_for("那我們聊點輕鬆的？", "", silenced=True)["show_subtitle"] is True
+    )
+    assert "show_subtitle" not in _payload_for("（笑）", "")
+    assert "show_subtitle" not in _payload_for("……", "")

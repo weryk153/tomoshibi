@@ -111,7 +111,7 @@ export const saveTranslatorConfig = (
 // 長得一模一樣。這支端點跑一次真的翻譯並回報結果，把沉默的失敗變成看得見的。
 export interface TranslatorTestResult {
   ok: boolean
-  reason: 'ok' | 'unchanged' | 'disabled' | 'config' | 'error'
+  reason: 'ok' | 'unchanged' | 'wrong_language' | 'disabled' | 'config' | 'error'
   sample?: string
   result?: string
   seconds?: number

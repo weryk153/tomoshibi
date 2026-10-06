@@ -34,18 +34,6 @@ def _mark_subtitle_hold(
     payload["keep_subtitle"] = is_laughter_only(visible)
 
 
-def _mark_silent_sentence(
-    payload: Dict, display_text: DisplayText, subtitle_text: Optional[str]
-) -> None:
-    """靜音 payload 的畫面字幕本來不動（「……」「♪」沒必要上字幕）。但一句有字
-    的話沒聲音——語音翻譯兩次都不是她的語言（conversation_utils）——字幕還是
-    要換到這句，不然畫面停在上一句。有字才標 show_subtitle，沒字的 payload
-    跟以前逐 byte 相同。"""
-    visible = subtitle_text or getattr(display_text, "text", "") or ""
-    if has_speakable_text(visible):
-        payload["show_subtitle"] = True
-
-
 class TTSTaskManager:
     """Manages TTS tasks and ensures ordered delivery to frontend while allowing parallel TTS generation"""
 
@@ -92,6 +80,7 @@ class TTSTaskManager:
         websocket_send: WebSocketSend,
         subtitle_text: Optional[str] = None,
         spoken_text: Optional[str] = None,
+        silenced: bool = False,
     ) -> None:
         """
         Queue a TTS task while maintaining order of delivery.
@@ -109,6 +98,10 @@ class TTSTaskManager:
             spoken_text: 雙語字幕開著時她念的那句（見 conversations/bilingual.py）。
                 None＝不帶，payload 跟沒有這個功能時一樣。沒東西可念、走靜音
                 payload 的句子本來就不換字幕，不帶。
+            silenced: 這句本來有話要念，是語音翻譯兩次都不是她的語言才被清空的
+                （conversation_utils）。靜音 payload 的畫面字幕本來不動（「……」
+                「（笑）」沒必要上字幕），這種句子例外：標 show_subtitle 讓前端
+                把字幕換到這句，不然畫面停在上一句。
         """
         # 沒有字母／文字／數字可念（「……」「♪」、表情符號、*動作*）就不送去合成：
         # 引擎對這種輸入多半回錯（GPT-SoVITS 回 400），會被當成失敗重試再跳通知。
@@ -127,7 +120,7 @@ class TTSTaskManager:
                 )
 
             await self._send_silent_payload(
-                display_text, actions, current_sequence, subtitle_text
+                display_text, actions, current_sequence, subtitle_text, silenced
             )
             return
 
@@ -190,6 +183,7 @@ class TTSTaskManager:
         actions: Optional[Actions],
         sequence_number: int,
         subtitle_text: Optional[str] = None,
+        silenced: bool = False,
     ) -> None:
         """Queue a silent audio payload"""
         audio_payload = prepare_audio_payload(
@@ -199,7 +193,9 @@ class TTSTaskManager:
             subtitle_text=subtitle_text,
         )
         _mark_subtitle_hold(audio_payload, display_text, subtitle_text)
-        _mark_silent_sentence(audio_payload, display_text, subtitle_text)
+        if silenced:
+            # 只有這種句子才標；其他靜音 payload 跟以前逐 byte 相同。
+            audio_payload["show_subtitle"] = True
         await self._payload_queue.put(([audio_payload], sequence_number))
 
     async def _process_tts(

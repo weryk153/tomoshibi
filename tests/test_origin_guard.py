@@ -26,12 +26,7 @@ from src.open_llm_vtuber.origin_guard import install_origin_guard, websocket_ori
         ("https://evil.example", "127.0.0.1:12393", False, False),
         ("null", "127.0.0.1:12393", False, False),  # 沙箱 iframe
         ("http://127.0.0.1.evil.example", "127.0.0.1:12393", False, False),
-        (
-            "https://me.tail1234.ts.net",
-            "127.0.0.1:12393",
-            True,
-            True,
-        ),  # Tailscale Serve
+        ("https://me.tail1234.ts.net", "127.0.0.1:12393", True, True),  # Tailscale Serve
         ("https://me.tail1234.ts.net", "127.0.0.1:12393", False, False),
     ],
 )
@@ -81,9 +76,7 @@ def test_the_apps_own_page_and_scripts_can_still_write():
 
 
 def test_reads_are_not_blocked():
-    response = _app().get(
-        "/api/network-info", headers={"Origin": "https://evil.example"}
-    )
+    response = _app().get("/api/network-info", headers={"Origin": "https://evil.example"})
     assert response.status_code == 200
 
 
@@ -94,7 +87,5 @@ def test_a_cross_site_websocket_is_refused():
             "/client-ws", headers={"Origin": "https://evil.example"}
         ) as ws:
             ws.receive_text()
-    with client.websocket_connect(
-        "/client-ws", headers={"Origin": "http://testserver"}
-    ) as ws:
+    with client.websocket_connect("/client-ws", headers={"Origin": "http://testserver"}) as ws:
         assert ws.receive_text() == "hi"

@@ -286,6 +286,7 @@ async def handle_sentence_output(
     async for display_text, tts_text, actions in output:
         logger.debug(f"🏃 Processing output: '''{tts_text}'''...")
         original_tts = tts_text
+        silenced = False
 
         if translate_engine:
             # 逐句判斷：有實際內容、而且聲音的語言跟這句話的語言不同，才翻譯。
@@ -323,6 +324,7 @@ async def handle_sentence_output(
                             f"'''{tts_text}'''"
                         )
                         tts_text = ""
+                        silenced = True
                     else:
                         logger.info(
                             f"🏃 Audio translated (R={reply_lang} != V={voice_lang}): "
@@ -386,6 +388,8 @@ async def handle_sentence_output(
         )
         if spoken_text is not None:
             speak_kwargs["spoken_text"] = spoken_text
+        if silenced:
+            speak_kwargs["silenced"] = True
 
         await tts_manager.speak(
             tts_text=tts_text,
