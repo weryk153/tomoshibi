@@ -5,6 +5,7 @@ from loguru import logger
 from fastapi import WebSocket
 import numpy as np
 
+from .. import asr_repair
 from ..agent.input_types import TextSource
 from ..agent.output_types import AudioOutput, SentenceOutput
 
@@ -212,7 +213,10 @@ async def process_group_input(
     所以這個 bug 只有從另一台看得到。
     """
     input_text = await process_user_input(
-        user_input, initiator_context.asr_engine, initiator_ws_send
+        user_input,
+        initiator_context.asr_engine,
+        initiator_ws_send,
+        repair=asr_repair.repairer(initiator_context) if is_user_speech else None,
     )
     if is_user_speech:
         await broadcast_transcription(

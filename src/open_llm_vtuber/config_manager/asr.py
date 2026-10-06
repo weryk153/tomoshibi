@@ -343,6 +343,9 @@ class ASRConfig(I18nMixin):
     sherpa_onnx_asr: Optional[SherpaOnnxASRConfig] = Field(
         None, alias="sherpa_onnx_asr"
     )
+    # 語音那一輪先用最近的對話把同音錯字還原再交給她（asr_repair.py）；用引擎的
+    # 背景模型，沒設背景模型就不跑。
+    repair_with_context: bool = Field(True, alias="repair_with_context")
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "asr_model": Description(
@@ -362,6 +365,10 @@ class ASRConfig(I18nMixin):
         ),
         "sherpa_onnx_asr": Description(
             en="Configuration for Sherpa Onnx ASR", zh="Sherpa Onnx ASR 配置"
+        ),
+        "repair_with_context": Description(
+            en="Repair speech-recognition homophone errors from the recent conversation (uses the engine's background model)",
+            zh="用最近的對話還原語音辨識的同音錯字（用引擎的背景模型）",
         ),
     }
 

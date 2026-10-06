@@ -227,6 +227,7 @@ character_config:
   asr_config:
     # speech to text model options: 'faster_whisper', 'whisper_cpp', 'whisper', 'azure_asr', 'fun_asr', 'groq_whisper_asr', 'sherpa_onnx_asr'
     asr_model: 'sherpa_onnx_asr'
+    repair_with_context: true # fix homophone errors in spoken lines from the recent conversation (needs the engine's background_model)
 
     azure_asr:
       api_key: 'azure_api_key'

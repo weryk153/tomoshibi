@@ -48,7 +48,7 @@ class _Stop(Exception):
 def _single_turn(monkeypatch, user_input, metadata=None):
     made = []
 
-    async def transcribe(user_input, asr_engine, websocket_send):
+    async def transcribe(user_input, asr_engine, websocket_send, **_kwargs):
         return "歐嗨唷" if isinstance(user_input, np.ndarray) else user_input
 
     async def nothing(*_args, **_kwargs):
@@ -101,7 +101,7 @@ def _group_chain(monkeypatch, user_input, turns=4):
     """跑一段群組對話：兩個成員輪流講，收到 turns 輪就停。"""
     made = []
 
-    async def transcribe(user_input, asr_engine, websocket_send):
+    async def transcribe(user_input, asr_engine, websocket_send, **_kwargs):
         return "空尼七哇" if isinstance(user_input, np.ndarray) else user_input
 
     async def broadcast(*_args, **_kwargs):

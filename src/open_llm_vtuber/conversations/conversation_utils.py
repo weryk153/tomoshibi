@@ -1,6 +1,6 @@
 import asyncio
 import re
-from typing import Optional, Union, Any, List, Dict
+from typing import Awaitable, Callable, Optional, Union, Any, List, Dict
 import numpy as np
 import json
 from loguru import logger
@@ -442,8 +442,14 @@ async def process_user_input(
     user_input: Union[str, np.ndarray],
     asr_engine: ASRInterface,
     websocket_send: WebSocketSend,
+    *,
+    repair: Optional[Callable[[str], Awaitable[str]]] = None,
 ) -> str:
-    """Process user input, converting audio to text if needed"""
+    """Process user input, converting audio to text if needed
+
+    repair 是 ASR 還原（asr_repair.repairer）：只用在語音辨識出來的字，打的字不碰。
+    畫面上的轉寫、她讀到的、記下來的都是還原後的字。
+    """
     if isinstance(user_input, np.ndarray):
         if asr_engine is None:
             # Voice input is disabled (no speech engine could be loaded). Don't
@@ -463,6 +469,8 @@ async def process_user_input(
             return ""
         logger.info("Transcribing audio input...")
         input_text = await asr_engine.async_transcribe_np(user_input)
+        if repair is not None and input_text:
+            input_text = await repair(input_text)
         await websocket_send(
             json.dumps({"type": "user-input-transcription", "text": input_text})
         )

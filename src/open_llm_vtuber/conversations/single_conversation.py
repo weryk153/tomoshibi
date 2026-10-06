@@ -15,6 +15,7 @@ from .conversation_utils import (
 )
 from .types import WebSocketSend
 from .tts_manager import TTSTaskManager
+from .. import asr_repair
 from ..agent.input_types import TextSource
 from ..chat_history_manager import store_message
 from ..character_mood import send_character_mood
@@ -138,7 +139,10 @@ async def process_single_conversation(
 
         # Process user input
         input_text = await process_user_input(
-            user_input, context.asr_engine, websocket_send
+            user_input,
+            context.asr_engine,
+            websocket_send,
+            repair=asr_repair.repairer(context) if spoken else None,
         )
 
         # 給 agent 的兩件它自己分不出來的事：這一輪屬於哪段對話（agent 是所有連線
