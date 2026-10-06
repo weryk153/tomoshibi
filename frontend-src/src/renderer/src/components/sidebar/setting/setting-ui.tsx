@@ -70,10 +70,10 @@ const RENDERS: Record<SettingsTabId, (a: TabRenderArgs) => JSX.Element> = {
   ),
   stage: ({ t }) => (
     <Stack gap={6}>
+      <SettingSection title={t('settings.stage.canvas')}><CanvasInteraction /></SettingSection>
       <SettingSection><Scenes /></SettingSection>
       <SettingSection><Performances /></SettingSection>
       <SettingSection><StageEffects /></SettingSection>
-      <SettingSection title={t('settings.stage.canvas')}><CanvasInteraction /></SettingSection>
     </Stack>
   ),
   stream: ({ active }) => <Stream active={active} />,
