@@ -134,35 +134,31 @@ def test_issues_make_a_line_not_ok():
 # ---------------------------------------------------------------- 批次與佇列
 
 
-def test_batches_every_four_lines(tmp_path):
-    client = FakeClient(_ok(4))
+def test_submit_only_queues_and_flush_sends_batches_of_four(tmp_path):
+    """句子一句一句進來時不問模型（主模型還在講）；一輪結束才一批一批審。"""
+    client = FakeClient(_ok(4), _ok(2))
     auditor = _auditor(tmp_path, client)
+    for n in range(6):
+        auditor.submit(f"句{n}", f"文{n}", "ja")
+    assert client.calls == []
 
-    async def run():
-        for n in range(3):
-            await auditor.submit(f"句{n}", f"文{n}", "ja")
-        assert client.calls == []
-        await auditor.submit("句3", "文3", "ja")
-
-    asyncio.run(run())
-    assert len(client.calls) == 1
-    prompt = client.calls[0][-1]["content"]
-    assert all(f"句{n}" in prompt and f"文{n}" in prompt for n in range(4))
+    asyncio.run(auditor.flush())
+    assert len(client.calls) == 2
+    first = client.calls[0][-1]["content"]
+    assert all(f"句{n}" in first and f"文{n}" in first for n in range(4))
+    assert "句4" not in first
     assert [line["original"] for line in _lines(tmp_path)] == [
-        "句0",
-        "句1",
-        "句2",
-        "句3",
+        f"句{n}" for n in range(6)
     ]
 
 
-def test_flush_sends_what_is_left(tmp_path):
+def test_flush_with_nothing_queued_does_not_call(tmp_path):
     client = FakeClient(_ok(2))
     auditor = _auditor(tmp_path, client)
 
     async def run():
-        await auditor.submit("句0", "文0", "ja")
-        await auditor.submit("句1", "文1", "ja")
+        auditor.submit("句0", "文0", "ja")
+        auditor.submit("句1", "文1", "ja")
         await auditor.flush()
         await auditor.flush()  # 空的佇列不呼叫
 
@@ -171,23 +167,20 @@ def test_flush_sends_what_is_left(tmp_path):
     assert len(_lines(tmp_path)) == 2
 
 
-def test_queue_keeps_the_newest_eight(tmp_path):
+def test_lines_queued_during_a_slow_flush_keep_the_newest_eight(tmp_path):
     """模型還在審上一批時進來的句子排隊；超過上限丟最舊的。"""
     client = FakeClient(_ok(4), delay=0.05)
     auditor = _auditor(tmp_path, client)
 
     async def run():
-        first = [
-            asyncio.create_task(auditor.submit(f"前{n}", f"x{n}", "ja"))
-            for n in range(4)
-        ]
+        for n in range(4):
+            auditor.submit(f"前{n}", f"x{n}", "ja")
+        busy = asyncio.create_task(auditor.flush())
         await asyncio.sleep(0.01)  # 第一批已經送出去，模型還沒回
         assert len(client.calls) == 1
-        late = [
-            asyncio.create_task(auditor.submit(f"後{n}", f"y{n}", "ja"))
-            for n in range(12)
-        ]
-        await asyncio.gather(*first, *late)
+        for n in range(12):
+            auditor.submit(f"後{n}", f"y{n}", "ja")
+        await busy
         await auditor.flush()
 
     asyncio.run(run())
@@ -197,14 +190,9 @@ def test_queue_keeps_the_newest_eight(tmp_path):
 
 
 def test_submit_drops_the_oldest_when_full(tmp_path):
-    client = FakeClient(_ok(4))
-    auditor = _auditor(tmp_path, client, batch_size=100)
-
-    async def run():
-        for n in range(10):
-            await auditor.submit(f"句{n}", f"文{n}", "ja")
-
-    asyncio.run(run())
+    auditor = _auditor(tmp_path, FakeClient(_ok(4)))
+    for n in range(10):
+        auditor.submit(f"句{n}", f"文{n}", "ja")
     assert [item.original for item in auditor._queue] == [
         f"句{n}" for n in range(2, 10)
     ]
@@ -225,7 +213,7 @@ def test_bad_replies_and_errors_are_dropped_quietly(tmp_path, client):
     auditor = _auditor(tmp_path, client)
 
     async def run():
-        await auditor.submit("句", "文", "ja")
+        auditor.submit("句", "文", "ja")
         await auditor.flush()
 
     asyncio.run(run())
@@ -238,7 +226,7 @@ def test_timeout_is_dropped_quietly(tmp_path):
     auditor = _auditor(tmp_path, client, timeout=0.01)
 
     async def run():
-        await auditor.submit("句", "文", "ja")
+        auditor.submit("句", "文", "ja")
         await auditor.flush()
 
     asyncio.run(run())
@@ -276,8 +264,8 @@ def test_summary_counts_suggestions_and_keeps_suspicious_lines(tmp_path):
 
     async def run():
         for _ in range(2):
-            await auditor.submit("佩克拉今天也很好peko", "ペコラは今日も元気", "ja")
-            await auditor.submit("你好", "こんにちは", "ja")
+            auditor.submit("佩克拉今天也很好peko", "ペコラは今日も元気", "ja")
+            auditor.submit("你好", "こんにちは", "ja")
             await auditor.flush()
 
     asyncio.run(run())
@@ -316,7 +304,7 @@ def test_suggestions_must_point_at_the_lines(tmp_path):
     auditor = _auditor(tmp_path, FakeClient(reply))
 
     async def run():
-        await auditor.submit("今天天氣很好", "今日はいい天気", "ja")
+        auditor.submit("今天天氣很好", "今日はいい天気", "ja")
         await auditor.flush()
 
     asyncio.run(run())
@@ -357,7 +345,7 @@ def test_the_prompt_carries_the_characters_terms(tmp_path):
     )
 
     async def run():
-        await auditor.submit("句", "文", "ja")
+        auditor.submit("句", "文", "ja")
         await auditor.flush()
 
     asyncio.run(run())
@@ -467,7 +455,8 @@ PAIRS = [
 ]
 
 
-def _pipeline(monkeypatch, auditor):
+def _pipeline(monkeypatch, auditor, *, after=None):
+    """照正式流程：handle_sentence_output 每句呼叫一次，一輪結束跑 after。"""
     monkeypatch.setattr(
         tts_manager_module, "prepare_audio_payload", _fake_prepare_audio_payload
     )
@@ -476,34 +465,66 @@ def _pipeline(monkeypatch, auditor):
         manager = TTSTaskManager()
         send = _Send()
         kwargs = {} if auditor is None else {"translation_auditor": auditor}
-        await handle_sentence_output(
-            _Sentences(PAIRS),
-            live2d_model=None,
-            tts_engine=_OkEngine(),
-            websocket_send=send,
-            tts_manager=manager,
-            translate_engine=_Translator(),
-            voice_lang="ja",
-            catchphrases={"peko": "ぺこ"},
-            **kwargs,
-        )
+        for pair in PAIRS:
+            await handle_sentence_output(
+                _Sentences([pair]),
+                live2d_model=None,
+                tts_engine=_OkEngine(),
+                websocket_send=send,
+                tts_manager=manager,
+                translate_engine=_Translator(),
+                voice_lang="ja",
+                catchphrases={"peko": "ぺこ"},
+                **kwargs,
+            )
         await asyncio.gather(*manager.task_list)
         await manager._payload_queue.join()
         await audit.wait_background()
+        if after is not None:
+            after()
+            await audit.wait_background()
         return send.messages
 
     return asyncio.run(run())
 
 
-def test_translated_lines_are_audited_and_flushed_at_the_end(tmp_path, monkeypatch):
+def test_one_batched_call_after_the_turn_not_per_sentence(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    audit.reset()
+    character = _character()
+    auditor = audit.auditor_for(character)
     client = FakeClient(_ok(2))
-    auditor = _auditor(tmp_path, client)
-    _pipeline(monkeypatch, auditor)
-    assert len(client.calls) == 1  # 兩句沒到門檻，回覆結束時 flush
-    assert [(line["original"], line["translated"]) for line in _lines(tmp_path)] == [
+    auditor.client = client
+    seen_during_turn = []
+
+    def end_of_turn():
+        seen_during_turn.append(len(client.calls))
+        audit.flush_for(character)
+
+    _pipeline(monkeypatch, auditor, after=end_of_turn)
+    assert seen_during_turn == [0]  # 講話途中一次都沒問
+    assert len(client.calls) == 1
+    log = tmp_path / "chat_history" / "pekora" / "translation_audit" / "audit.jsonl"
+    lines = [json.loads(line) for line in log.read_text("utf-8").splitlines()]
+    assert [(line["original"], line["translated"]) for line in lines] == [
         ("今天好嗎？", "今日は元気？"),
         ("再見。", "またね。"),
     ]
+    audit.reset()
+
+
+def test_flush_for_does_nothing_when_switched_off_or_never_used(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    audit.reset()
+
+    async def run():
+        audit.flush_for(_character(enabled=False))
+        audit.flush_for(_character(uid="nobody"))
+        audit.flush_for(None)
+        await audit.wait_background()
+
+    asyncio.run(run())
+    assert not (tmp_path / "chat_history").exists()
 
 
 def test_switched_off_the_payloads_are_the_same(tmp_path, monkeypatch):
@@ -608,7 +629,7 @@ def test_plain_issues_are_recorded_even_when_the_model_says_ok(tmp_path):
     auditor = _auditor(tmp_path, FakeClient(_ok(1)))
 
     async def run():
-        await auditor.submit("懂了嗎?", "理解了吗？", "ja")
+        auditor.submit("懂了嗎?", "理解了吗？", "ja")
         await auditor.flush()
 
     asyncio.run(run())
@@ -635,7 +656,7 @@ def test_suggestions_need_an_issue_of_their_kind(tmp_path):
     auditor = _auditor(tmp_path, FakeClient(reply))
 
     async def run():
-        await auditor.submit("哈哈哈佩克拉", "哈哈哈ペコラ", "ja")
+        auditor.submit("哈哈哈佩克拉", "哈哈哈ペコラ", "ja")
         await auditor.flush()
 
     asyncio.run(run())
@@ -659,11 +680,187 @@ def test_foreign_words_copied_from_the_source_are_not_wrong_language(tmp_path):
     auditor = _auditor(tmp_path, FakeClient(flagged))
 
     async def run():
-        await auditor.submit("哈哈哈,「The」?", "ハハハ、「The」？", "ja")
-        await auditor.submit("你那邊現在是凌晨喔?", "君の那边は夜明け前だ？", "ja")
+        auditor.submit("哈哈哈,「The」?", "ハハハ、「The」？", "ja")
+        auditor.submit("你那邊現在是凌晨喔?", "君の那边は夜明け前だ？", "ja")
         await auditor.flush()
 
     asyncio.run(run())
     copied, drifted = _lines(tmp_path)
     assert copied["issues"] == []
     assert [issue["kind"] for issue in drifted["issues"]] == ["wrong_language"]
+
+
+# ---------------------------------------------------------------- 一輪結束才審
+
+
+class _Engine:
+    """agent.chat：兩句，記下每一句被取走時已經 flush 幾次。"""
+
+    def __init__(self, events):
+        self.events = events
+
+    async def chat(self, batch_input):
+        from src.open_llm_vtuber.agent.output_types import SentenceOutput
+
+        for text in ("今天好嗎？", "再見。"):
+            self.events.append("sentence")
+            yield SentenceOutput(
+                display_text=DisplayText(text=text), tts_text=text, actions=Actions()
+            )
+
+
+def _record_flushes(monkeypatch, events):
+    monkeypatch.setattr(
+        audit, "flush_for", lambda character: events.append(("flush", character))
+    )
+
+
+def test_a_single_conversation_turn_flushes_once_after_the_stream(monkeypatch):
+    from src.open_llm_vtuber.conversations import single_conversation
+
+    events = []
+    _record_flushes(monkeypatch, events)
+
+    async def nothing(*_args, **_kwargs):
+        return None
+
+    async def spoken(output_item, **_kwargs):
+        return output_item.display_text.text
+
+    async def typed(user_input, *_args, **_kwargs):
+        return user_input
+
+    monkeypatch.setattr(single_conversation, "process_user_input", typed)
+    monkeypatch.setattr(single_conversation, "send_conversation_start_signals", nothing)
+    monkeypatch.setattr(single_conversation, "create_batch_input", lambda **kw: None)
+    monkeypatch.setattr(single_conversation, "_speak", spoken)
+    monkeypatch.setattr(single_conversation, "finalize_conversation_turn", nothing)
+    monkeypatch.setattr(single_conversation, "send_character_mood", nothing)
+    monkeypatch.setattr(single_conversation, "cleanup_conversation", lambda *a: None)
+    character = SimpleNamespace(
+        human_name="me", character_name="佩克拉", conf_uid="pekora", reply_language=""
+    )
+    context = SimpleNamespace(
+        agent_engine=_Engine(events),
+        asr_engine=None,
+        history_uid="",
+        character_config=character,
+        system_config=None,
+    )
+    reply = asyncio.run(
+        single_conversation.process_single_conversation(
+            context, nothing, "client", "你好"
+        )
+    )
+    assert reply == "今天好嗎？再見。"
+    assert events == ["sentence", "sentence", ("flush", character)]
+
+
+def test_a_group_member_turn_flushes_once_after_the_stream(monkeypatch):
+    from src.open_llm_vtuber.conversations import group_conversation
+
+    events = []
+    _record_flushes(monkeypatch, events)
+
+    async def spoken(output, **_kwargs):
+        return output.display_text.text
+
+    monkeypatch.setattr(group_conversation, "process_agent_output", spoken)
+    character = SimpleNamespace(character_name="佩克拉", conf_uid="pekora")
+    context = SimpleNamespace(
+        agent_engine=_Engine(events),
+        character_config=character,
+        live2d_model=None,
+        tts_engine=None,
+        translate_engine=None,
+        subtitle_translate_engine=None,
+    )
+    reply = asyncio.run(
+        group_conversation.process_member_response(context, None, None, None)
+    )
+    assert reply == "今天好嗎？再見。"
+    assert events == ["sentence", "sentence", ("flush", character)]
+
+
+# ---------------------------------------------------------------- 存檔上限與壞檔
+
+
+def _entry(n):
+    return {
+        "time": "t",
+        "original": f"句{n}",
+        "translated": "x",
+        "target_lang": "ja",
+        "issues": [],
+        "suggest": {},
+    }
+
+
+def test_the_log_keeps_the_last_lines_when_too_long(tmp_path, monkeypatch):
+    monkeypatch.setattr(audit, "MAX_LOG_LINES", 5)
+    store = AuditStore(tmp_path / "audit")
+    for n in range(4):
+        store.record([_entry(n)])
+    assert len(_lines(tmp_path)) == 4
+    store.record([_entry(n) for n in range(4, 9)])
+    assert [line["original"] for line in _lines(tmp_path)] == [
+        f"句{n}" for n in range(4, 9)
+    ]
+    assert not list((tmp_path / "audit").glob(".*.tmp"))
+    assert _summary(tmp_path)["audited"] == 9
+
+
+def test_the_log_keeps_the_last_lines_when_too_big(tmp_path, monkeypatch):
+    monkeypatch.setattr(audit, "MAX_LOG_BYTES", 300)
+    monkeypatch.setattr(audit, "MAX_LOG_LINES", 3)
+    store = AuditStore(tmp_path / "audit")
+    store.record([_entry(n) for n in range(3)])
+    assert len(_lines(tmp_path)) == 3  # 剛好上限，沒超過大小
+    store.record([_entry(3)])
+    assert [line["original"] for line in _lines(tmp_path)] == ["句1", "句2", "句3"]
+
+
+def test_default_log_cap():
+    assert audit.MAX_LOG_LINES == 2000
+    assert audit.MAX_LOG_BYTES == 1_000_000
+
+
+def test_summary_fields_of_the_wrong_type_are_reset(tmp_path):
+    directory = tmp_path / "audit"
+    directory.mkdir()
+    (directory / "summary.json").write_text(
+        json.dumps(
+            {
+                "audited": "many",
+                "flagged": True,
+                "protected_names": [],
+                "catchphrases": {"peko": {"ぺこ": 2}},
+                "suspicious": {},
+            }
+        ),
+        "utf-8",
+    )
+    summary = audit.load_summary(directory)
+    assert summary["audited"] == 0
+    assert summary["flagged"] == 0
+    assert summary["protected_names"] == {}
+    assert summary["catchphrases"] == {"peko": {"ぺこ": 2}}
+    assert summary["suspicious"] == []
+    AuditStore(directory).record([_entry(0)])  # 不炸
+    assert audit.load_summary(directory)["audited"] == 1
+
+
+def test_a_failed_background_task_is_logged(monkeypatch):
+    warnings = []
+    monkeypatch.setattr(audit.logger, "warning", warnings.append)
+
+    async def boom():
+        raise RuntimeError("disk full")
+
+    async def run():
+        audit.spawn(boom())
+        await audit.wait_background()
+        await asyncio.sleep(0)
+
+    asyncio.run(run())
+    assert any("disk full" in w for w in warnings)

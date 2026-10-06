@@ -13,7 +13,6 @@ from ..agent.output_types import SentenceOutput, AudioOutput
 from ..agent.input_types import BatchInput, TextData, ImageData, TextSource, ImageSource
 from ..asr.asr_interface import ASRInterface
 from ..avatar_model import AvatarModel
-from ..translate import audit as translation_audit
 from ..translate.audit import auditor_for as translation_auditor
 from ..translate.catchphrases import only_catchphrases, replace_catchphrases
 from ..translate.translate_interface import UnspeakableTranslation
@@ -273,7 +272,8 @@ async def handle_sentence_output(
     conversations/bilingual.py）；關著時送出去的 payload 跟以前一樣。
 
     ``translation_auditor``（translate/audit.py）有給時，經過翻譯模型的那幾句
-    丟到背景審核，回覆結束時把剩下的一起審；不等它、不改任何輸出。
+    排進它的佇列；一輪結束時呼叫端用 translation_audit.flush_for 在背景審。
+    不改任何輸出。
 
     一句話只有角色的口頭禪（``catchphrases`` 的鍵，加上標點空白）時，兩個翻譯
     都不經模型：語音直接換成口頭禪的目標寫法，字幕原樣顯示。模型會把它音譯成
@@ -396,9 +396,8 @@ async def handle_sentence_output(
             subtitle_collector.append(subtitle_text)
 
         if translation_auditor and model_translated and tts_text != original_tts:
-            translation_audit.spawn(
-                translation_auditor.submit(original_tts, tts_text, voice_lang or "")
-            )
+            # 只排進佇列：她還在講，一輪結束才審（translation_audit.flush_for）。
+            translation_auditor.submit(original_tts, tts_text, voice_lang or "")
 
         speak_kwargs = {}
         spoken_text = spoken_line(
@@ -423,8 +422,6 @@ async def handle_sentence_output(
             subtitle_text=subtitle_text,
             **speak_kwargs,
         )
-    if translation_auditor:
-        translation_audit.spawn(translation_auditor.flush())
     return full_response
 
 

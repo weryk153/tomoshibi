@@ -5,13 +5,16 @@
 不要加進角色設定。**不改當下的輸出、不加延遲、不自動改角色檔。**
 
 角色設定 translation_audit 開著、而且引擎有背景模型才跑。逐句輸出那裡
-（conversation_utils.handle_sentence_output）把有經過翻譯模型的句子丟進來
-（背景 task，不等）；滿 BATCH_SIZE 句或一則回覆結束時一次問模型。模型慢的時候
-後面的句子排隊，最多 MAX_QUEUE 句，滿了丟最舊的。逾時、壞 JSON、任何例外：
-那一批丟掉，不重試。
+（conversation_utils.handle_sentence_output）把有經過翻譯模型的句子排進佇列，
+只排、不問模型——她還在講，主模型正忙。一輪結束（single／group_conversation
+的串流迴圈跑完）才由 flush_for 在背景一次審完，每 BATCH_SIZE 句問一次。佇列
+最多 MAX_QUEUE 句，滿了丟最舊的。逾時、壞 JSON、任何例外：那一批丟掉，不重試。
+
+盡力而為：還沒審的句子只在記憶體裡，斷線、關掉程式、伺服器重啟就沒了。
 
 存在 chat_history/<conf_uid>/translation_audit/：
-- audit.jsonl：每審一句一行（時間、原句、譯句、目標語言、issues、suggest）
+- audit.jsonl：每審一句一行（時間、原句、譯句、目標語言、issues、suggest），
+  只留最近 MAX_LOG_LINES 行
 - summary.json：總數、每個建議出現幾次、最近 SUSPICIOUS_KEPT 句可疑句
 """
 
@@ -37,6 +40,9 @@ MAX_QUEUE = 8
 TIMEOUT_SECONDS = 90.0
 MAX_TOKENS = 1200
 SUSPICIOUS_KEPT = 50
+# audit.jsonl 的上限：超過行數或大小就只留最後 MAX_LOG_LINES 行。
+MAX_LOG_LINES = 2000
+MAX_LOG_BYTES = 1_000_000
 # 角色頁只列出現過這麼多次的建議：一次的多半是模型一時興起。
 MIN_SUGGESTION_COUNT = 2
 # 建議的字串上限：名字、口頭禪都很短，長的是模型把整句塞進來。
@@ -258,7 +264,16 @@ def load_summary(directory: os.PathLike | str) -> dict:
         return _empty_summary()
     summary = _empty_summary()
     if isinstance(data, dict):
-        summary.update({k: data[k] for k in summary if k in data})
+        # 型別不對的欄位（手改壞、舊格式）用空的，不讓加總時炸掉。
+        summary.update(
+            {
+                k: data[k]
+                for k, empty in summary.items()
+                if k in data
+                and type(data[k]) is type(empty)
+                and not isinstance(data[k], bool)
+            }
+        )
     return summary
 
 
@@ -268,13 +283,27 @@ class AuditStore:
     def __init__(self, directory: os.PathLike | str):
         self.directory = Path(directory)
 
+    @staticmethod
+    def _cap(log: Path) -> None:
+        """超過 MAX_LOG_BYTES 或 MAX_LOG_LINES 行：只留最後 MAX_LOG_LINES 行。"""
+        if log.stat().st_size <= MAX_LOG_BYTES:
+            with open(log, "rb") as f:
+                if sum(1 for _ in f) <= MAX_LOG_LINES:
+                    return
+        lines = log.read_text("utf-8").splitlines(keepends=True)
+        tmp = log.with_name(".audit.jsonl.tmp")
+        tmp.write_text("".join(lines[-MAX_LOG_LINES:]), "utf-8")
+        os.replace(tmp, log)
+
     def record(self, entries: list[dict]) -> None:
         if not entries:
             return
         self.directory.mkdir(parents=True, exist_ok=True)
-        with open(self.directory / "audit.jsonl", "a", encoding="utf-8") as f:
+        log = self.directory / "audit.jsonl"
+        with open(log, "a", encoding="utf-8") as f:
             for entry in entries:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        self._cap(log)
         summary = load_summary(self.directory)
         for entry in entries:
             summary["audited"] += 1
@@ -366,31 +395,26 @@ class TranslationAuditor:
         self._queue: deque[AuditItem] = deque(maxlen=max_queue)
         self._lock: Optional[asyncio.Lock] = None
 
-    async def submit(
+    def submit(
         self,
         original: str,
         translated: str,
         target_lang: str,
         character: Optional[str] = None,
     ) -> None:
-        """排一句；滿一批就審。佇列滿了，最舊的那句被擠掉。"""
+        """排一句，不問模型。佇列滿了，最舊的那句被擠掉。"""
         self._queue.append(
             AuditItem(
                 original, translated, target_lang or "", character or self.character
             )
         )
-        if len(self._queue) >= self.batch_size:
-            await self._drain(everything=False)
 
     async def flush(self) -> None:
-        """一則回覆結束：剩下的不等湊滿，現在審。"""
-        await self._drain(everything=True)
-
-    async def _drain(self, *, everything: bool) -> None:
+        """一輪結束：排著的全部審掉，每 batch_size 句問一次模型。"""
         if self._lock is None:
             self._lock = asyncio.Lock()
         async with self._lock:
-            while len(self._queue) >= self.batch_size or (everything and self._queue):
+            while self._queue:
                 size = min(self.batch_size, len(self._queue))
                 batch = [self._queue.popleft() for _ in range(size)]
                 await self._audit(batch)
@@ -474,11 +498,35 @@ def auditor_for(character: Any) -> Optional[TranslationAuditor]:
     return auditor
 
 
+def _done(task: asyncio.Task) -> None:
+    _BACKGROUND.discard(task)
+    if not task.cancelled() and task.exception() is not None:
+        error = task.exception()
+        logger.warning(
+            f"Translation audit task failed ({type(error).__name__}: {error})"
+        )
+
+
 def spawn(coro: Awaitable) -> None:
     """丟到背景跑，不等；留著參照，task 才不會跑到一半被回收。"""
     task = asyncio.ensure_future(coro)
     _BACKGROUND.add(task)
-    task.add_done_callback(_BACKGROUND.discard)
+    task.add_done_callback(_done)
+
+
+def flush_for(character: Any) -> None:
+    """一輪結束：這個角色排著的句子在背景審掉。不等、不丟例外。
+
+    只找已經有的審核器（這一輪有句子排進來才會有）；開關關著什麼都不做。
+    """
+    try:
+        if not getattr(character, "translation_audit", False):
+            return
+        auditor = _AUDITORS.get(str(getattr(character, "conf_uid", "") or ""))
+        if auditor is not None and auditor._queue:
+            spawn(auditor.flush())
+    except Exception as e:
+        logger.warning(f"Translation audit flush skipped ({type(e).__name__}: {e})")
 
 
 async def wait_background() -> None:

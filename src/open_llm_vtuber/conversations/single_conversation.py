@@ -20,6 +20,7 @@ from ..agent.input_types import TextSource
 from ..chat_history_manager import store_message
 from ..character_mood import send_character_mood
 from ..service_context import ServiceContext
+from ..translate import audit as translation_audit
 from ..conversation_quality import normalize_output_language_variant
 from ..proactive_context import (
     breaks_what_the_host_knows,
@@ -259,6 +260,9 @@ async def process_single_conversation(
             )
             # full_response will contain partial response before error
         # --- End processing agent response ---
+
+        # 她講完了（主模型不忙了）：這一輪排著的語音翻譯在背景審。開關關著不做事。
+        translation_audit.flush_for(context.character_config)
 
         # 先存再收尾。full_response 在上面的串流迴圈結束時就已經完整，寫入歷史
         # 不需要等聲音——而 finalize_conversation_turn 會等 TTS 合成收尾、還要等

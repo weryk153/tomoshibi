@@ -8,6 +8,7 @@ import numpy as np
 from .. import asr_repair
 from ..agent.input_types import TextSource
 from ..agent.output_types import AudioOutput, SentenceOutput
+from ..translate import audit as translation_audit
 
 from .conversation_utils import (
     create_batch_input,
@@ -455,4 +456,6 @@ async def process_member_response(
             )
         )
 
+    # 她講完了（主模型不忙了）：這一輪排著的語音翻譯在背景審。開關關著不做事。
+    translation_audit.flush_for(context.character_config)
     return full_response
