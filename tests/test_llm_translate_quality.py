@@ -158,6 +158,21 @@ def test_japanese_without_kana_is_not_mistaken_for_a_failure(monkeypatch):
     assert len(calls) == 1
 
 
+def test_english_terms_carried_over_from_the_source_are_not_a_failure(monkeypatch):
+    calls = []
+
+    def fake_post(url, json, timeout):
+        calls.append(json)
+        return _Response("YouTube配信！")
+
+    monkeypatch.setattr(
+        "src.open_llm_vtuber.translate.llm_translate.httpx.post", fake_post
+    )
+
+    assert _translator("日文").translate("YouTube直播！") == "YouTube配信！"
+    assert len(calls) == 1
+
+
 def test_simplified_chinese_target_is_not_forced_to_traditional(monkeypatch):
     monkeypatch.setattr(
         "src.open_llm_vtuber.translate.llm_translate.httpx.post",

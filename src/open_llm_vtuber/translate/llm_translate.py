@@ -70,12 +70,18 @@ class LLMTranslate(TranslateInterface):
     def _left_japanese_for_english(text: str, res: str) -> bool:
         """譯文該是日文卻沒有半個假名、而且英文字母佔了多數——模型用英文答了。
 
-        全漢字的短句（「了解。」）沒有假名也是日文，所以還要看拉丁字母的比例；
-        只有口頭禪或符號的句子則沒有字母可比。
+        全漢字的短句（「了解。」）沒有假名也是日文，所以還要看拉丁字母的比例。
+        原文裡就有的英文詞（YouTube、AI、OK）照搬過來不算：「YouTube直播！」翻成
+        「YouTube配信！」是對的，不能被當成英文答案而退回原文。
         """
         if re.search(r"[぀-ヿ]", res):
             return False
-        latin = len(re.findall(r"[A-Za-z]", res))
+        carried = {word.lower() for word in re.findall(r"[A-Za-z]+", text)}
+        latin = sum(
+            len(word)
+            for word in re.findall(r"[A-Za-z]+", res)
+            if word.lower() not in carried
+        )
         letters = len(re.findall(r"[^\W\d_]", res))
         return letters > 0 and latin * 2 >= letters
 
