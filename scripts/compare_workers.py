@@ -19,6 +19,10 @@
 每段對話最後在一段新對話裡說一句話，列出她心裡的目標、她自己的事、想法。
 第五頁是回話自檢（reply_check，1.2.0 新增）：只有新欄，舊欄留空（1.1 沒有這個
 工作）；列出每輪找到的問題、引擎收了哪些，與這一輪她收到的上一句提醒。
+第六頁是記憶衝突（memory-conflicts，memory_conflict 工作）：只有新欄；每輪記下的
+使用者記憶、每次觸發的候選、模型的關係判定（含再問一次的回答）、採用與否，與這一輪
+她收到的「問哪個才對」提醒。頁首統計採用的 supersedes／contradicts，逐筆列出給人判
+誤判（supersedes 會讓真事實消失）。
 --pages 只跑指定的頁（例如只看 reply-check 時，舊的那一次與其他工作都不跑）。
 第六、七頁是她的日記（diary）與使用者狀態摘要（user-state），也只有新欄：
 user-state 每 --user-state-every 輪一列（她讀到的使用者原句、情緒序列、模型的回答
@@ -34,8 +38,9 @@ Tomoshibi 一樣當 background 給引擎（回話自檢拿它對照人設）。
 不跑背景。--live 的人設與台詞跟 compare_mood.py 一樣；她的回覆在新的那一次
 現場生成，舊的那一次照念同樣的話。
 
-輸出五頁：<out-prefix>-memory.html、-self-memory.html、-reflection.html、
--emotion.html、-reply-check.html。只讀對話檔，不寫回任何東西。
+輸出：<out-prefix>-memory.html、-self-memory.html、-reflection.html、
+-emotion.html、-reply-check.html、-memory-conflicts.html（--pages 選的那幾頁）。
+只讀對話檔，不寫回任何東西。
 """
 
 import argparse
@@ -51,6 +56,8 @@ from types import MappingProxyType
 from ai_character_engine import CharacterProfile
 from ai_character_engine.cognition import background
 from ai_character_engine.cognition.background import (
+    _CHANGE_QUESTION,
+    MEMORY_CONFLICT_TARGET,
     REPLY_CHECK_KINDS,
     REPLY_FIX_CHARS,
     REPLY_NOTE_TARGET,
@@ -67,7 +74,7 @@ from ai_character_engine.cognition.background import (
     _user_lines,
 )
 from ai_character_engine.companion import CharacterCompanion, CompanionSettings
-from ai_character_engine.companion.companion import REPLY_NOTE_LINE
+from ai_character_engine.companion.companion import CONFLICT_NOTES, REPLY_NOTE_LINE
 from ai_character_engine.context.builder import SELF_MEMORY_LINE, is_turn_context
 from ai_character_engine.llm.local import OpenAICompatibleChatClient
 from ai_character_engine.llm.models import LLMResponse, LLMStreamChunk, Message
@@ -85,6 +92,7 @@ KINDS = {
     "reply-check": BackgroundCognitionKind.REPLY_CHECK,
     "user-state": BackgroundCognitionKind.USER_STATE,
     "diary": BackgroundCognitionKind.DIARY,
+    "memory-conflicts": BackgroundCognitionKind.MEMORY_CONFLICT,
 }
 # 每頁要開的工作（CompanionSettings 的 *_every）。
 SETTING_OF = {
@@ -96,6 +104,8 @@ SETTING_OF = {
 }
 # 只有新欄的頁（1.1 沒有這些工作）。
 NEW_ONLY = ("reply-check", "user-state", "diary")
+# 記憶衝突跟在 memory 後面：要 memory 每輪跑，再開 memory_conflicts。
+CONFLICT_PAGE = "memory-conflicts"
 # 1.1 也有的工作；只要這些頁才需要跑舊的那一次。
 OLD_PAGES = ("memory", "self-memory", "reflection", "emotion")
 TITLES = {
@@ -106,7 +116,12 @@ TITLES = {
     "reply-check": "回話自檢（reply_check）",
     "user-state": "使用者狀態摘要（user_state）",
     "diary": "她的日記（diary）",
+    "memory-conflicts": "記憶衝突（memory_conflict）",
 }
+# 她收到的「問哪個才對」提醒：每種語言框架裡「之前」那段之前的字。
+CONFLICT_NOTE_HEADS = tuple(
+    frame.split("{earlier}")[0] for frame in CONFLICT_NOTES.values()
+)
 # 1.1.1 的提示長度；跟引擎 tests/test_background_cognition.py 的 PROMPTS_OF_1_1 同一組。
 LENGTH_IN_1_1 = {
     BackgroundCognitionKind.MEMORY_EXTRACTION: 906,
@@ -162,6 +177,20 @@ class Replay:
         yield LLMStreamChunk(
             final=True, response=LLMResponse(text=self.line, model="replay")
         )
+
+
+class Asked:
+    """背景模型：照常呼叫，另外記下記憶衝突「再問一次」的問與答。"""
+
+    def __init__(self, client):
+        self.client = client
+        self.again: list[tuple[str, str]] = []
+
+    async def generate(self, messages, *, tools=None):
+        response = await self.client.generate(messages, tools=tools)
+        if messages and messages[0].content == _CHANGE_QUESTION:
+            self.again.append((messages[-1].content, response.text))
+        return response
 
 
 class Live:
@@ -294,7 +323,7 @@ async def converse(
                 seen.append((worker.spec.kind, context, {}, None, worker, reason(exc)))
             raise
 
-    worker = model(args)
+    worker = Asked(model(args))
     clients = {
         "emotion": worker,
         "memory": worker,
@@ -306,6 +335,7 @@ async def converse(
         "summary": worker,
         "user_state": worker,
         "diary": worker,
+        "memory_conflict": worker,
     }
     wanted = set(args.pages)
     every = {
@@ -329,6 +359,9 @@ async def converse(
         # 日記的材料：照 Tomoshibi 的預設開，再加摘要。
         every.update(emotion_every=1, memory_every=2, self_memory_every=2)
         extra.update(mood_every=2, summary_every=args.summary_every)
+    conflicts = CONFLICT_PAGE in wanted and variant == "new"
+    if conflicts:
+        every["memory_every"] = 1
     companion = CharacterCompanion(
         character=CharacterProfile(
             id="workers-compare",
@@ -345,6 +378,7 @@ async def converse(
             call_timeout_seconds=180.0,
             plans_stay_in_conversation=variant == "new",
             language=args.language,
+            memory_conflicts=conflicts,
         ),
     )
     commits = []
@@ -374,6 +408,7 @@ async def converse(
             for number, (user, line) in turns:
                 seen.clear()
                 commits.clear()
+                worker.again.clear()
                 if line is not None:
                     her.line = line
                 asked = len(her.calls)
@@ -387,6 +422,8 @@ async def converse(
                         "readings": list(seen),
                         "commits": list(commits),
                         "told": told(her.calls, asked),
+                        "asked_again": list(worker.again),
+                        "conflict_notes": told(her.calls, asked, CONFLICT_NOTE_HEADS),
                     }
                 )
                 print(f"{variant} {name} turn {number}", file=sys.stderr)
@@ -417,16 +454,20 @@ async def converse(
     return {"rows": rows, "fresh": fresh, "diary": written}
 
 
-def told(calls, asked) -> list[str]:
-    """這一輪她的提示裡「上一句的提醒」：只看這一輪的備註（緊接在使用者這句
-    之前的那則）；之前輪的備註留在對話裡，不算。"""
+def told(calls, asked, heads=(REPLY_NOTE_LINE,)) -> list[str]:
+    """這一輪她的提示裡「上一句的提醒」（或 heads 開頭的其他提醒）：只看這一輪
+    的備註（緊接在使用者這句之前的那則）；之前輪的備註留在對話裡，不算。"""
     if len(calls) <= asked or len(calls[asked]) < 2:
         return []
     note = calls[asked][-2]
     if not is_turn_context(note):
         return []
     return [
-        line for line in note.content.splitlines() if line.startswith(REPLY_NOTE_LINE)
+        line
+        for line in note.content.splitlines()
+        if any(
+            line.removeprefix("For the next reply only: ").startswith(h) for h in heads
+        )
     ]
 
 
@@ -682,6 +723,112 @@ def user_state_items(reading, commits, variant) -> list[str]:
     )
     if status:
         out.append(f"commit：{status}")
+
+
+def conflict_judgements(row):
+    """這一輪每次觸發：(新事實, 候選 [(label, 摘要)], 模型原答, 判定列 [(label, 關係,
+    理由, 處置)], commit 狀態)。"""
+    out = []
+    readings = [
+        r for r in row["readings"] if r[0] is BackgroundCognitionKind.MEMORY_CONFLICT
+    ]
+    for _, context, data, normalized, _, error in readings:
+        payload = context.request.payload
+        new = payload.get("new_memory") or {}
+        candidates = [
+            (f"m{n}", str(item.get("id")), str(item.get("summary") or ""))
+            for n, item in enumerate(payload.get("candidates") or (), 1)
+        ]
+        by_label = {label: (old_id, summary) for label, old_id, summary in candidates}
+        by_label.update(
+            {old_id: (old_id, summary) for _, old_id, summary in candidates}
+        )
+        passed = {item["old_id"] for item in (normalized[0] if normalized else ())}
+        final, status = {}, ""
+        for proposal, outcome in row["commits"]:
+            if proposal.target == MEMORY_CONFLICT_TARGET and proposal.payload.get(
+                "new_id"
+            ) == new.get("id"):
+                status = outcome.status.value
+                for item in (
+                    outcome.metadata.get("applied") or proposal.payload["conflicts"]
+                ):
+                    final[item["old_id"]] = item["relation"]
+        verdicts = []
+        raw_conflicts = data.get("conflicts") if isinstance(data, dict) else None
+        for raw in raw_conflicts if isinstance(raw_conflicts, list) else ():
+            if not isinstance(raw, dict):
+                continue
+            label = str(raw.get("old_id") or "").strip()
+            relation = str(raw.get("relation") or "").strip()
+            known = by_label.get(label)
+            if known is None:
+                verdict = "丟：不是給它看的候選"
+            elif relation.casefold() not in ("supersedes", "contradicts", "refines"):
+                verdict = "丟：關係不在清單"
+            elif known[0] in final and status == "committed":
+                verdict = f"採用：{final[known[0]]}"
+            elif known[0] in final:
+                verdict = f"判定 {final[known[0]]}，commit：{status}"
+            elif known[0] in passed:
+                verdict = "丟：再問一次後不成立（計畫／一天對習慣／可同時為真／答不清）"
+            else:
+                verdict = "丟"
+            verdicts.append(
+                (
+                    label,
+                    known[1] if known else "?",
+                    relation,
+                    str(raw.get("reason") or ""),
+                    verdict,
+                )
+            )
+        out.append(
+            {
+                "new": str(new.get("summary") or ""),
+                "said": str(new.get("said") or ""),
+                "candidates": candidates,
+                "raw": data,
+                "verdicts": verdicts,
+                "status": status,
+                "error": error,
+            }
+        )
+    return out
+
+
+def conflict_items(row) -> list[str]:
+    out = []
+    remembered = [
+        (proposal.payload.get("summary"), outcome)
+        for proposal, outcome in row["commits"]
+        if proposal.target == "memory.append_candidate"
+    ]
+    for summary, outcome in remembered:
+        candidates = len(outcome.metadata.get("conflict_candidates") or ())
+        out.append(
+            f"記下：{summary}（commit：{outcome.status.value}"
+            + (f"，候選 {candidates} 筆" if outcome.committed else "")
+            + "）"
+        )
+    if not remembered:
+        out.append("（這輪沒有記下使用者的事）")
+    for job in conflict_judgements(row):
+        lines = [f"▶ 觸發：「{job['new']}」　使用者原話「{job['said']}」"]
+        lines += [f"　{label}: {summary}" for label, _, summary in job["candidates"]]
+        if job["error"]:
+            lines.append(f"　呼叫失敗：{job['error']}")
+        else:
+            lines.append(f"　模型答：{json.dumps(job['raw'], ensure_ascii=False)}")
+        for label, summary, relation, why, verdict in job["verdicts"]:
+            lines.append(f"　{label}「{summary}」→ {relation}（{why}）　{verdict}")
+        if not job["verdicts"] and not job["error"]:
+            lines.append("　（模型判定無關）")
+        out.append("\n".join(lines))
+    for question, answer in row.get("asked_again") or []:
+        out.append(
+            f"再問一次：{' / '.join(question.splitlines()[1::3])}\n　答：{' '.join(answer.split())}"
+        )
     return out
 
 
@@ -720,8 +867,13 @@ def cell(text) -> str:
 
 
 def column(row, page, variant) -> str:
-    if page in NEW_ONLY and variant == "old":
+    if (page in NEW_ONLY or page == CONFLICT_PAGE) and variant == "old":
         return "（1.1 沒有這個工作）"
+    if page == CONFLICT_PAGE:
+        received = "\n".join(row.get("conflict_notes") or []) or "（無）"
+        return "\n".join(
+            [f"這一輪她收到的確認提醒：{received}", "——", *conflict_items(row)]
+        )
     reading = reading_of(row, KINDS[page])
     if reading is None:
         text = "（這輪沒有跑）"
@@ -895,13 +1047,71 @@ def render(page, sections, args) -> str:
             "給她的提醒）與引擎的處置；「這一輪她收到的提醒」是上一輪的問題被帶進這一輪提示的那幾行。"
             "重播的對話她照念紀錄，提醒不會改變她說的話；現場生成的才看得出她有沒有照做。"
         )
+    if page == CONFLICT_PAGE:
+        note = (
+            "記憶衝突是新工作，舊欄留空。新欄：這輪記下的使用者記憶與候選數；每次觸發列候選"
+            "（m1…）、模型原答、每筆關係的處置（supersedes／contradicts 會再問一次，答案列在"
+            "「再問一次」）；「這一輪她收到的確認提醒」是 contradicts 帶進下一輪的那行。"
+            "頁首是採用的關係，逐筆給人判：supersedes 誤判會讓真事實消失（硬指標 0）。"
+        )
     body = "".join(section(page, *item) for item in sections)
+    if page == CONFLICT_PAGE:
+        body = conflict_summary(sections) + body
     return (
         "<!doctype html><html lang='zh-Hant'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width,initial-scale=1'>"
         f"<title>{cell(TITLES[page])}</title><style>{style}</style></head><body>"
         f"<h1>引擎 1.2.0：{cell(TITLES[page])}　舊與新並排</h1>"
         f"<p>{cell(meta)}</p><p>{cell(note)}</p>{body}</body></html>"
+    )
+
+
+def conflict_summary(sections) -> str:
+    """頁首：每段對話觸發幾次、模型答了什麼、採用了什麼；採用的逐筆列出。"""
+    rows, adopted = [], []
+    for title, _, runs in sections:
+        triggers = answered = 0
+        kinds = {"supersedes": 0, "contradicts": 0, "refines": 0}
+        for row in runs["new"]["rows"]:
+            for job in conflict_judgements(row):
+                triggers += 1
+                answered += len(job["verdicts"])
+                for label, summary, relation, _, verdict in job["verdicts"]:
+                    if verdict.startswith("採用："):
+                        kind = verdict.removeprefix("採用：")
+                        kinds[kind] = kinds.get(kind, 0) + 1
+                        adopted.append(
+                            (
+                                title,
+                                row["number"],
+                                kind,
+                                summary,
+                                job["new"],
+                                job["said"],
+                            )
+                        )
+        rows.append(
+            f"<tr><td>{cell(title)}</td><td>{triggers}</td><td>{answered}</td>"
+            + "".join(
+                f"<td>{kinds[k]}</td>" for k in ("supersedes", "contradicts", "refines")
+            )
+            + "</tr>"
+        )
+    listed = (
+        "".join(
+            f"<tr><td>{cell(title)}</td><td>{number}</td><td>{cell(kind)}</td>"
+            f"<td>{cell(old)}</td><td>{cell(new)}</td><td>{cell(said)}</td><td></td></tr>"
+            for title, number, kind, old, new, said in adopted
+        )
+        or "<tr><td colspan='7'>（沒有採用任何關係）</td></tr>"
+    )
+    return (
+        "<h2>統計</h2><table><thead><tr><th>對話</th><th>觸發</th><th>模型給的關係</th>"
+        "<th>採用 supersedes</th><th>採用 contradicts</th><th>採用 refines</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table>"
+        "<h3>採用的關係（逐筆判：對／誤判）</h3><table><thead><tr><th>對話</th><th>輪</th>"
+        "<th>關係</th><th>舊事實</th><th>新事實</th><th>使用者原話</th><th>人判</th></tr></thead>"
+        f"<tbody>{listed}</tbody></table>"
     )
 
 
