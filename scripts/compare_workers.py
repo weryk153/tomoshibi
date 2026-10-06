@@ -299,6 +299,7 @@ async def converse(
             summary_every=0,
             call_timeout_seconds=180.0,
             plans_stay_in_conversation=variant == "new",
+            language=args.language,
         ),
     )
     commits = []
@@ -674,6 +675,7 @@ def render(page, sections, args) -> str:
     )
     meta = (
         f"模型 {args.model} @ {args.base_url}　goal_every={args.goal_every}"
+        f"　language={args.language or '（空）'}"
         f"　{datetime.now():%Y-%m-%d %H:%M}"
     )
     note = (
@@ -767,6 +769,12 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--out-prefix", default="docs/superpowers/eval/2026-10-06-engine-1.2.0"
+    )
+    parser.add_argument(
+        "--language",
+        default="",
+        help="CompanionSettings.language，跟 Tomoshibi 一樣用角色的回話語言"
+        "（例如 Traditional Chinese (Taiwan)）；預設空",
     )
     parser.add_argument(
         "--pages",
