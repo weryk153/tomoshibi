@@ -265,7 +265,7 @@ function Personas({ confUid, isActive }: PersonasProps): JSX.Element {
           {t('settings.personas.add')}
         </Button>
       </Stack>
-      <Text fontSize="xs" color="whiteAlpha.500">
+      <Text fontSize="xs" color="fg.muted">
         {t('settings.personas.independentNote')}
       </Text>
 
@@ -311,7 +311,7 @@ function Personas({ confUid, isActive }: PersonasProps): JSX.Element {
             >
               <Stack gap={0}>
                 <Text fontWeight="semibold">{persona.name}</Text>
-                <Text fontSize="xs" color="whiteAlpha.500">{persona.id}</Text>
+                <Text fontSize="xs" color="fg.muted">{persona.id}</Text>
                 {activeId === persona.id && (
                   <Text fontSize="xs" color="blue.300">{t('settings.personas.active')}</Text>
                 )}

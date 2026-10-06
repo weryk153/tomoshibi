@@ -14,6 +14,7 @@ import { useConfig } from '@/context/character-config-context';
 import { useWebSocket } from '@/context/websocket-context';
 import { FaTools, FaCheck, FaTimes, FaDownload } from 'react-icons/fa';
 import { useTranslation } from 'react-i18next';
+import { ACCENT2_INK } from '@/theme/tomoshibi';
 
 // 這兩個鍵由 you.tsx（設定 > 一般 > 「你」區塊）寫入，純 localStorage、沒有
 // 後端端點。you.tsx 用的是 useLocalStorage（見 hooks/utils/use-local-storage.ts），
@@ -94,7 +95,7 @@ function ChatHistoryPanel(): JSX.Element {
                 alignItems="center"
                 justifyContent="center"
                 height="100%"
-                color="whiteAlpha.500"
+                color="fg.muted"
                 fontSize="sm"
               >
                 {t('sidebar.noMessages')}
@@ -215,7 +216,7 @@ function ChatHistoryPanel(): JSX.Element {
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
                               const fallbackName = msg.name || confName || 'A';
-                              target.outerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 50%; background-color: var(--chakra-colors-blue-500); color: white; font-size: 14px;">${fallbackName[0].toUpperCase()}</div>`;
+                              target.outerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 50%; background-color: var(--chakra-colors-blue-500); color: ${ACCENT2_INK}; font-size: 14px;">${fallbackName[0].toUpperCase()}</div>`;
                             }}
                           />
                         ) : (
@@ -230,7 +231,7 @@ function ChatHistoryPanel(): JSX.Element {
                           style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
-                            target.outerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 50%; background-color: var(--chakra-colors-blue-500); color: white; font-size: 14px;">${userName[0].toUpperCase()}</div>`;
+                            target.outerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 50%; background-color: var(--chakra-colors-blue-500); color: ${ACCENT2_INK}; font-size: 14px;">${userName[0].toUpperCase()}</div>`;
                           }}
                         />
                       ) : (

@@ -3,6 +3,9 @@ import { useWebSocket } from '@/context/websocket-context';
 
 interface WSStatusInfo {
   color: string
+  // 膠囊上的字色。green 換成主色粉、yellow 本來就亮，白字在上面都不到 3:1，
+  // 改用深色；紅底維持白字。
+  textColor: string
   textKey: string
   isDisconnected: boolean
   handleClick: () => void
@@ -45,6 +48,7 @@ export const useWSStatus = () => {
       case 'OPEN':
         return {
           color: 'green.500',
+          textColor: 'gray.950',
           textKey: 'wsStatus.connected',
           isDisconnected: false,
           handleClick,
@@ -52,6 +56,7 @@ export const useWSStatus = () => {
       case 'CONNECTING':
         return {
           color: 'yellow.500',
+          textColor: 'gray.950',
           textKey: 'wsStatus.connecting',
           isDisconnected: false,
           handleClick,
@@ -59,6 +64,7 @@ export const useWSStatus = () => {
       default:
         return {
           color: 'red.500',
+          textColor: 'white',
           textKey: 'wsStatus.clickToReconnect',
           isDisconnected: true,
           handleClick,

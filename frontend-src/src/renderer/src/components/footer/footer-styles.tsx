@@ -1,34 +1,42 @@
 import { SystemStyleObject } from '@chakra-ui/react';
+import { ACCENT_INK } from '@/theme/tomoshibi';
+
+// 底部列（方向 02「直播間・霓虹」）：一列 64px——角色膠囊、圓形麥克風、單行輸入框，
+// 上面照舊是 28px 的收合把手。顏色全用 token：gray.900＝panel、gray.800＝panel2、
+// green.*＝主色粉、gray.400＝次文字（fg2），見 theme/tomoshibi.ts。
+
+/** 一行的輸入框高度；麥克風、膠囊都對齊這條中線。 */
+const INPUT_HEIGHT = '44px';
+/** 長到三行為止，再多就在框內捲動。15px 字 × 1.45 行高 ≈ 22px 一行。 */
+const INPUT_MAX_HEIGHT = '88px';
+/** 主色 18% 透明：麥克風開著時的外圈光暈。 */
+const ACCENT_GLOW = 'rgba(255, 79, 154, 0.18)';
+const LINE = 'rgba(255, 255, 255, 0.07)';
 
 interface FooterStyles {
   container: (isCollapsed: boolean) => SystemStyleObject
   toggleButton: SystemStyleObject
-  actionButton: SystemStyleObject
-  sendButton: SystemStyleObject
-  input: SystemStyleObject
+  row: SystemStyleObject
+  mic: (micOn: boolean) => SystemStyleObject
+  inputSlot: SystemStyleObject
+  inputBox: SystemStyleObject
+  input: (hasInterrupt: boolean) => SystemStyleObject
+  inlineButtons: SystemStyleObject
+  interruptButton: SystemStyleObject
+  sendButton: (hasText: boolean) => SystemStyleObject
 }
 
-interface AIIndicatorStyles {
-  stateColors: Record<string, string>
-  container: SystemStyleObject
-  text: SystemStyleObject
-}
-
-export const footerStyles: {
-  footer: FooterStyles
-  aiIndicator: AIIndicatorStyles
-} = {
+export const footerStyles: { footer: FooterStyles } = {
   footer: {
     container: (isCollapsed) => ({
-      bg: isCollapsed ? 'transparent' : 'gray.800',
-      borderTopRadius: isCollapsed ? 'none' : 'lg',
+      bg: isCollapsed ? 'transparent' : 'gray.900',
+      borderTop: isCollapsed ? 'none' : `1px solid ${LINE}`,
       transform: isCollapsed ? 'translateY(calc(100% - 28px))' : 'translateY(0)',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       height: '100%',
       position: 'relative',
-      overflow: isCollapsed ? 'visible' : 'hidden',
-      // 28px toggle + 86px controls already fill most of the 128px footer.
-      // Extra bottom padding made the 50px action buttons visibly clip.
+      // 展開時也要 visible：輸入框長到第二、三行是往上長的，會越過把手那一條。
+      overflow: 'visible',
       pb: '0',
     }),
     toggleButton: {
@@ -40,91 +48,120 @@ export const footerStyles: {
       alignItems: 'center',
       justifyContent: 'center',
       cursor: 'pointer',
-      color: 'whiteAlpha.700',
-      _hover: { color: 'white' },
+      color: 'gray.400',
+      _hover: { color: 'gray.50' },
       bg: 'transparent',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     },
-    actionButton: {
-      borderRadius: '12px',
-      width: '50px',
-      height: '50px',
-      minW: '50px',
+    row: {
+      height: '64px',
+      px: '4',
+      gap: '3',
+      display: 'flex',
+      alignItems: 'center',
     },
-    sendButton: {
+    mic: (micOn) => ({
+      width: '40px',
+      height: '40px',
+      minW: '40px',
+      borderRadius: 'full',
+      bg: 'transparent',
+      border: '1.5px solid',
+      borderColor: micOn ? 'green.500' : 'gray.400',
+      color: micOn ? 'green.500' : 'gray.400',
+      boxShadow: micOn ? `0 0 0 4px ${ACCENT_GLOW}` : 'none',
+      transition: 'border-color 0.2s, color 0.2s, box-shadow 0.2s',
+      _hover: {
+        bg: 'gray.800',
+        color: micOn ? 'green.400' : 'gray.50',
+      },
+    }),
+    // 佔住一行的高度；真正的輸入框絕對定位在它底部，多行時往上長。
+    inputSlot: {
+      flex: 1,
+      minW: 0,
+      position: 'relative',
+      height: INPUT_HEIGHT,
+    },
+    inputBox: {
       position: 'absolute',
-      right: '12px',
-      top: '50%',
-      transform: 'translateY(-50%)',
-      width: '44px',
-      height: '44px',
-      minWidth: '44px',
-      borderRadius: '10px',
-      bg: 'green.500',
-      color: 'black',
-      _hover: { bg: 'green.400' },
-      _disabled: {
-        bg: 'whiteAlpha.100',
-        color: 'whiteAlpha.400',
-        cursor: 'not-allowed',
-        opacity: 1,
-      },
+      left: 0,
+      right: 0,
+      bottom: 0,
     },
-    input: {
-      bg: 'gray.700',
-      border: 'none',
-      height: '80px',
-      borderRadius: '12px',
-      fontSize: '18px',
-      pl: '4',
-      pr: '68px',
-      color: 'whiteAlpha.900',
-      _placeholder: {
-        color: 'whiteAlpha.500',
-      },
-      _focus: {
-        border: 'none',
-        bg: 'gray.700',
-      },
+    input: (hasInterrupt) => ({
+      display: 'block',
+      width: '100%',
+      bg: 'gray.800',
+      border: `1px solid ${LINE}`,
+      borderRadius: 'lg',
+      fontSize: '15px',
+      lineHeight: '1.45',
+      color: 'gray.50',
+      pl: '3.5',
+      // 送出鍵 32px＋右邊距；打斷鍵出現時再讓出一顆的位置。
+      pr: hasInterrupt ? '84px' : '48px',
+      py: '10px',
+      minHeight: INPUT_HEIGHT,
+      maxHeight: INPUT_MAX_HEIGHT,
+      overflowY: 'auto',
       resize: 'none',
-      minHeight: '80px',
-      maxHeight: '80px',
-      py: '0',
+      // 內容多高框就多高（Chromium 123+，Electron 31 是 126）；不支援的瀏覽器
+      // 停在一行、超過就捲動，功能不受影響。
+      css: { fieldSizing: 'content' },
+      _placeholder: { color: 'gray.400' },
+      _focus: { outline: 'none' },
+      _focusVisible: {
+        outline: 'none',
+        borderColor: 'green.500',
+        boxShadow: 'none',
+      },
+      _disabled: { opacity: 0.6, cursor: 'not-allowed' },
+    }),
+    inlineButtons: {
+      position: 'absolute',
+      right: '6px',
+      bottom: '6px',
       display: 'flex',
+      gap: '1',
       alignItems: 'center',
-      paddingTop: '28px',
-      lineHeight: '1.4',
     },
-  },
-  aiIndicator: {
-    // 這顆徽章顯示的是會變的狀態（空閒／思考／聆聽／已打斷），顏色卻是固定的
-    // 紫色——一個不帶資訊的飽和色塊，只是在跟旁邊的麥克風、舉手按鈕搶注意力。
-    // 讓顏色跟著狀態走，它才真的在說話；順帶讓「空閒」退成中性灰，畫面靜下來。
-    stateColors: {
-      idle: '#4A5568',
-      loading: '#4A5568',
-      waiting: '#4A5568',
-      'thinking-speaking': '#7C5CFF',
-      listening: '#2F855A',
-      interrupted: '#C05621',
-    } as Record<string, string>,
-    container: {
-      bg: '#7C5CFF',
-      color: 'white',
-      width: '110px',
-      height: '30px',
-      borderRadius: '12px',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      boxShadow: '0 2px 6px rgba(0,0,0,0.1)',
-      overflow: 'hidden',
+    interruptButton: {
+      width: '32px',
+      height: '32px',
+      minW: '32px',
+      borderRadius: 'md',
+      bg: 'transparent',
+      border: '1px solid',
+      borderColor: 'green.500',
+      color: 'green.400',
+      _hover: { bg: 'green.950' },
     },
-    text: {
-      fontSize: '12px',
-      whiteSpace: 'nowrap',
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-    },
+    sendButton: (hasText) => ({
+      width: '32px',
+      height: '32px',
+      minW: '32px',
+      borderRadius: 'md',
+      transition: 'background-color 0.2s, color 0.2s, opacity 0.2s',
+      ...(hasText
+        ? {
+          bg: 'green.500',
+          color: ACCENT_INK,
+          border: '1px solid transparent',
+          _hover: { bg: 'green.400' },
+        }
+        : {
+          bg: 'transparent',
+          color: 'gray.400',
+          border: '1px solid',
+          borderColor: 'gray.600',
+          opacity: 0.7,
+        }),
+      _disabled: {
+        cursor: 'not-allowed',
+        // 沒字時本來就是淡的那一套；Chakra 預設的 disabled 透明度會再疊一層。
+        opacity: hasText ? 0.5 : 0.7,
+      },
+    }),
   },
 };

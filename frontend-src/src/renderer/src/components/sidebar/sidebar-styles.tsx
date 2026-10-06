@@ -1,5 +1,6 @@
 import { css } from '@emotion/react';
 import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/layout';
+import { ACCENT_INK, ACCENT2_INK } from '@/theme/tomoshibi';
 
 const isElectron = window.api !== undefined;
 
@@ -507,11 +508,12 @@ export const chatPanelStyles = css`
     // padding-top: 20px !important;
   }
 
+  /* 她的泡泡：panel2 底。你的泡泡：主色粉底配深色墨水（白字在粉上對比不夠）。 */
   .cs-message__content {
-    background-color: var(--chakra-colors-gray-700) !important;
-    border-radius: var(--chakra-radii-md);
+    background-color: var(--chakra-colors-gray-800) !important;
+    border-radius: var(--chakra-radii-lg);
     padding: 8px !important;
-    color: var(--chakra-colors-white) !important;
+    color: var(--chakra-colors-gray-50) !important;
     font-size: 0.95rem !important;
     line-height: 1.5 !important;
     margin-top: 4px !important;
@@ -522,7 +524,12 @@ export const chatPanelStyles = css`
   }
 
   .cs-message--outgoing .cs-message__content {
-    background-color: var(--chakra-colors-gray-600) !important;
+    background-color: var(--chakra-colors-green-500) !important;
+    color: ${ACCENT_INK} !important;
+  }
+
+  .cs-message--outgoing .cs-message__html-content {
+    color: ${ACCENT_INK} !important;
   }
 
   .cs-chat-container {
@@ -555,7 +562,7 @@ export const chatPanelStyles = css`
 
   .cs-avatar {
     background-color: var(--chakra-colors-blue-500) !important;
-    color: white !important;
+    color: ${ACCENT2_INK} !important;
     width: 28px !important;
     height: 28px !important;
     font-size: 14px !important;
@@ -567,6 +574,7 @@ export const chatPanelStyles = css`
 
   .cs-message--outgoing .cs-avatar {
     background-color: var(--chakra-colors-green-500) !important;
+    color: ${ACCENT_INK} !important;
   }
 
   .cs-message__header {

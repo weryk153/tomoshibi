@@ -375,7 +375,7 @@ function VrmMotionConfig({ modelName, isLoaded }: VrmMotionConfigProps): JSX.Ele
         return (
           <Box key={clip.clip} p={2} borderWidth="1px" borderColor="whiteAlpha.200" borderRadius="md">
             <Text fontSize="sm" fontWeight="semibold">{clip.clip}</Text>
-            <Text fontSize="xs" color="whiteAlpha.500">
+            <Text fontSize="xs" color="fg.muted">
               {t('settings.live2d.vrmClipFileLabel', { file: clip.file })}
             </Text>
 
@@ -389,7 +389,7 @@ function VrmMotionConfig({ modelName, isLoaded }: VrmMotionConfigProps): JSX.Ele
                 {t('settings.live2d.previewButton')}
               </Button>
               {!canPreview && (
-                <Text fontSize="xs" color="whiteAlpha.500">{isLoaded ? t('settings.live2d.previewDisabledReason') : t('settings.live2d.previewNotOnScreen')}</Text>
+                <Text fontSize="xs" color="fg.muted">{isLoaded ? t('settings.live2d.previewDisabledReason') : t('settings.live2d.previewNotOnScreen')}</Text>
               )}
             </HStack>
 
@@ -442,7 +442,7 @@ function VrmMotionConfig({ modelName, isLoaded }: VrmMotionConfigProps): JSX.Ele
                   {t('settings.live2d.expressionResetButton')}
                 </Button>
                 {!canReset && (
-                  <Text fontSize="xs" color="whiteAlpha.500">{isLoaded ? t('settings.live2d.previewDisabledReason') : t('settings.live2d.previewNotOnScreen')}</Text>
+                  <Text fontSize="xs" color="fg.muted">{isLoaded ? t('settings.live2d.previewDisabledReason') : t('settings.live2d.previewNotOnScreen')}</Text>
                 )}
               </HStack>
 
@@ -489,7 +489,7 @@ function VrmMotionConfig({ modelName, isLoaded }: VrmMotionConfigProps): JSX.Ele
                       </Text>
                     )}
                     {extras.length > 0 && (
-                      <Text fontSize="xs" color="whiteAlpha.500">
+                      <Text fontSize="xs" color="fg.muted">
                         {t('settings.live2d.emotionKeywordExtras', { keywords: extras.join('、') })}
                       </Text>
                     )}

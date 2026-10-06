@@ -35,9 +35,10 @@
 @source './**/*.{ts,tsx}';
 
 @theme {
-  /* Chakra v3 的預設灰階就是 Tailwind 的 zinc（gray.800 = #27272a = zinc-800），
-   * blue/yellow/red 也逐一對得上，所以那些直接用 Tailwind 內建色階即可，不用
-   * 在這裡重寫一份。只有 whiteAlpha 是 Chakra 自己的，Tailwind 沒有對應物。
+  /* Chakra v3 的預設灰階就是 Tailwind 的 zinc（gray.800 = zinc-800），
+   * blue/yellow/red 也逐一對得上。Tomoshibi 主題把 gray/green/blue 換掉了，
+   * 所以 zinc/green/blue 在下面重寫成同一組值；yellow/red 沒換，直接用 Tailwind
+   * 內建色階。whiteAlpha 是 Chakra 自己的，Tailwind 沒有對應物。
    *
    * 值是從執行中的 app 讀 --chakra-colors-white-alpha-* 取得的，不是估的——
    * 遷移中的分頁跟還沒遷移的分頁會並排出現在同一個抽屜裡，差一點就會被看見。
@@ -48,6 +49,77 @@
   --color-walpha-400: rgba(255, 255, 255, 0.24);
   --color-walpha-600: rgba(255, 255, 255, 0.48);
   --color-walpha-800: rgba(255, 255, 255, 0.8);
+
+  /* Tomoshibi 主題（方向 02「直播間・霓虹」）。值跟 theme/tomoshibi.ts 一模一樣，
+   * 兩邊要一起改。上面說「Chakra 灰階＝Tailwind zinc」那條對應關係仍然成立——
+   * 只是兩邊同時換成了冷灰：Tailwind 元件裡寫的 zinc-800 依然等於 Chakra 的
+   * gray.800。green→主色粉、blue→副色青，理由見 tomoshibi.ts 檔頭。 */
+  --color-zinc-50: #f2f2f6;
+  --color-zinc-100: #e2e2ea;
+  --color-zinc-200: #c8c8d4;
+  --color-zinc-300: #a9a9b8;
+  --color-zinc-400: #8b8b9c;
+  --color-zinc-500: #6a6a7c;
+  --color-zinc-600: #464658;
+  --color-zinc-700: #242433;
+  --color-zinc-800: #1a1a24;
+  --color-zinc-900: #111118;
+  --color-zinc-950: #0a0a0e;
+
+  --color-green-50: #fff0f6;
+  --color-green-100: #ffd6e8;
+  --color-green-200: #ffb3d4;
+  --color-green-300: #ff8bbd;
+  --color-green-400: #ff6daa;
+  --color-green-500: #ff4f9a;
+  --color-green-600: #e0307d;
+  --color-green-700: #b81f63;
+  --color-green-800: #8a174a;
+  --color-green-900: #5c0f31;
+  --color-green-950: #3a0820;
+
+  --color-blue-50: #e8fdfb;
+  --color-blue-100: #c3f9f4;
+  --color-blue-200: #8ff3ea;
+  --color-blue-300: #5aebdf;
+  --color-blue-400: #3be6d9;
+  --color-blue-500: #27e2d4;
+  --color-blue-600: #1bb8ac;
+  --color-blue-700: #158e85;
+  --color-blue-800: #10665f;
+  --color-blue-900: #0a403c;
+  --color-blue-950: #062826;
+
+  /* 主色／副色上的字（tomoshibi.ts 的 ACCENT_INK／ACCENT2_INK）。 */
+  --color-accent-ink: #1a0611;
+  --color-accent2-ink: #04201d;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+
+  --font-sans: 'Noto Sans TC Variable', 'PingFang TC', 'Hiragino Sans', 'Apple SD Gothic Neo', 'Microsoft JhengHei', 'Yu Gothic', 'Malgun Gothic', 'Noto Sans CJK TC', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Noto Sans TC Variable', 'PingFang TC', 'Hiragino Sans', 'Apple SD Gothic Neo', ui-monospace, monospace;
+  --font-display: 'Space Grotesk', 'Noto Sans TC Variable', 'PingFang TC', 'Hiragino Sans', system-ui, sans-serif;
+}
+
+/* 內文字型跟著介面語言換。Noto Sans TC 的漢字是繁中字形，日文介面拿它排漢字會
+ * 出現「錯字感」（同一個字日中字形不同），韓文它則根本沒有諺文；簡中也一樣有
+ * 字形差。這幾個語言改用系統的 CJK 字型，繁中與英文才用 Noto Sans TC。
+ * html 的 lang 由 i18n.ts 在換語言時設定。
+ *
+ * 改的是 Chakra 的 --chakra-fonts-body：Chakra 在每個元素上設
+ * --global-font-body: var(--chakra-fonts-body)，所以從根節點改它全部跟著變。
+ * 寫在 layer 之外，才蓋得過 Chakra 在 tokens 層裡的定義。 */
+html:lang(ja) {
+  --chakra-fonts-body: 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Noto Sans JP', 'Noto Sans CJK JP', system-ui, sans-serif;
+}
+html:lang(ko) {
+  --chakra-fonts-body: 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans KR', 'Noto Sans CJK KR', system-ui, sans-serif;
+}
+html:lang(zh-CN) {
+  --chakra-fonts-body: 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', 'Noto Sans CJK SC', system-ui, sans-serif;
 }
 
 body,
@@ -66,6 +138,12 @@ html {
  * 寫在 @layer 之外（無 layer）是刻意的：@keyframes 不受串接優先度影響，但放進
  * utilities 層會被 Tailwind 的 tree-shaking 當成沒被用到而移除——class 名稱是
  * 出現在 animate-[…] 的方括號裡，掃描器認不出那是對 keyframes 的引用。 */
+/* 底部列角色膠囊：她在忙（思考／說話／聆聽）時圓點的跳動。 */
+@keyframes tmsbChipBeat {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.6); opacity: 0.55; }
+}
+
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }

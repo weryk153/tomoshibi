@@ -5,7 +5,8 @@ const isElectron = window.api !== undefined;
 // common zoom levels, while the 24px collapsed rail was too small to target.
 export const SIDEBAR_WIDTH = 'clamp(320px, 26vw, 400px)';
 export const SIDEBAR_COLLAPSED_WIDTH = '32px';
-export const FOOTER_HEIGHT = '128px';
+// 28px 收合把手＋64px 一列（角色膠囊／麥克風／單行輸入框）。
+export const FOOTER_HEIGHT = '92px';
 export const FOOTER_COLLAPSED_HEIGHT = '28px';
 
 const getAppHeight = () => {
@@ -23,7 +24,7 @@ export const layoutStyles = {
   appContainer: {
     width: '100vw',
     height: getAppHeight(),
-    bg: 'gray.900',
+    bg: 'gray.950',
     color: 'white',
     overflow: 'hidden',
     position: 'relative',
@@ -35,9 +36,9 @@ export const layoutStyles = {
     position: 'relative' as const,
     width: { base: '100%', md: SIDEBAR_WIDTH },
     height: { base: 'auto', md: '100%' },
-    bg: 'gray.800',
+    bg: 'gray.900',
     borderRight: '1px solid',
-    borderColor: 'whiteAlpha.200',
+    borderColor: 'whiteAlpha.100',
     overflow: 'hidden',
     flexShrink: 0,
     transition: 'all 0.2s',

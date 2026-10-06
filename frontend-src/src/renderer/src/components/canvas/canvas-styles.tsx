@@ -38,23 +38,26 @@ export const canvasStyles = {
   },
   subtitle: {
     container: {
-      backgroundColor: 'rgba(0, 0, 0, 0.7)',
+      // 底色是 bg（#0a0a0e）的 78%，跟整個介面同一個冷黑，不是純黑。
+      backgroundColor: 'rgba(10, 10, 14, 0.78)',
       padding: '15px 30px',
-      borderRadius: '12px',
+      borderRadius: '6px',
       minWidth: '60%',
       maxWidth: '95%',
     },
     text: {
       color: 'white',
+      fontFamily: 'body',
       fontSize: '1.5rem',
       textAlign: 'center',
       lineHeight: '1.4',
       whiteSpace: 'pre-wrap',
     },
-    // 雙語字幕的上行（她唸的原文）：小一號、淡一點，視線先落在下行的字幕。
+    // 雙語字幕的上行（她唸的原文）：等寬小字、淡一點，視線先落在下行的字幕。
     spoken: {
       color: 'whiteAlpha.700',
-      fontSize: '1.15rem',
+      fontFamily: 'mono',
+      fontSize: '12px',
       textAlign: 'center',
       lineHeight: '1.4',
       whiteSpace: 'pre-wrap',

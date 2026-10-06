@@ -458,9 +458,9 @@ function MotionConfig({ modelName, isLoaded }: MotionConfigProps): JSX.Element {
                 <Text fontSize="xs" color="orange.300">{t('settings.live2d.reservedBadge')}</Text>
               )}
             </HStack>
-            <Text fontSize="xs" color="whiteAlpha.500">{motion.file}</Text>
+            <Text fontSize="xs" color="fg.muted">{motion.file}</Text>
             {motion.reserved && (
-              <Text fontSize="xs" color="whiteAlpha.500">{t('settings.live2d.reservedHelp')}</Text>
+              <Text fontSize="xs" color="fg.muted">{t('settings.live2d.reservedHelp')}</Text>
             )}
 
             <HStack mt={1} gap={2}>
@@ -473,7 +473,7 @@ function MotionConfig({ modelName, isLoaded }: MotionConfigProps): JSX.Element {
                 {t('settings.live2d.previewButton')}
               </Button>
               {!canPreview && (
-                <Text fontSize="xs" color="whiteAlpha.500">{isLoaded ? t('settings.live2d.previewDisabledReason') : t('settings.live2d.previewNotOnScreen')}</Text>
+                <Text fontSize="xs" color="fg.muted">{isLoaded ? t('settings.live2d.previewDisabledReason') : t('settings.live2d.previewNotOnScreen')}</Text>
               )}
             </HStack>
 
@@ -530,7 +530,7 @@ function MotionConfig({ modelName, isLoaded }: MotionConfigProps): JSX.Element {
                   {t('settings.live2d.expressionResetButton')}
                 </Button>
                 {!canPreview && (
-                  <Text fontSize="xs" color="whiteAlpha.500">{isLoaded ? t('settings.live2d.previewDisabledReason') : t('settings.live2d.previewNotOnScreen')}</Text>
+                  <Text fontSize="xs" color="fg.muted">{isLoaded ? t('settings.live2d.previewDisabledReason') : t('settings.live2d.previewNotOnScreen')}</Text>
                 )}
               </HStack>
 
@@ -583,7 +583,7 @@ function MotionConfig({ modelName, isLoaded }: MotionConfigProps): JSX.Element {
                       </Text>
                     )}
                     {extras.length > 0 && (
-                      <Text fontSize="xs" color="whiteAlpha.500">
+                      <Text fontSize="xs" color="fg.muted">
                         {t('settings.live2d.emotionKeywordExtras', { keywords: extras.join('、') })}
                       </Text>
                     )}
@@ -612,7 +612,7 @@ function MotionConfig({ modelName, isLoaded }: MotionConfigProps): JSX.Element {
                   </Text>
 
                   {entries.length === 0 && (
-                    <Text fontSize="xs" color="whiteAlpha.500">{t('settings.live2d.tapAreaEmptyEntries')}</Text>
+                    <Text fontSize="xs" color="fg.muted">{t('settings.live2d.tapAreaEmptyEntries')}</Text>
                   )}
 
                   {entries.map((entry, entryIndex) => (

@@ -933,7 +933,7 @@ function Characters(): JSX.Element {
           <Text fontSize="xs" color="whiteAlpha.600">
             {t('settings.characters.voiceHelp')}
           </Text>
-          <Text fontSize="xs" color="whiteAlpha.500">
+          <Text fontSize="xs" color="fg.muted">
             {t('settings.characters.voiceEngineNote')}
           </Text>
           <HStack>
@@ -1379,7 +1379,7 @@ function Characters(): JSX.Element {
               <Text fontSize="xs" color="whiteAlpha.600">
                 {t('settings.characters.voiceHelp')}
               </Text>
-              <Text fontSize="xs" color="whiteAlpha.500">
+              <Text fontSize="xs" color="fg.muted">
                 {t('settings.characters.voiceEngineNote')}
               </Text>
               <HStack>

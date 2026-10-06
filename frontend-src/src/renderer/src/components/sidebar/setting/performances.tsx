@@ -333,7 +333,7 @@ function Performances(): JSX.Element {
                   >
                     <Stack gap="0">
                       <Text fontWeight="semibold">{preset.name}</Text>
-                      <Text fontSize="xs" color="whiteAlpha.500">{preset.id}</Text>
+                      <Text fontSize="xs" color="fg.muted">{preset.id}</Text>
                     </Stack>
                   </Checkbox>
                   <HStack flexWrap="wrap">

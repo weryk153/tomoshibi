@@ -273,7 +273,7 @@ function Memory({ confUid }: { confUid: string }): JSX.Element {
               <Text fontSize="xs" color="whiteAlpha.600">
                 {t('settings.memory.charCountNoCap', { count: contentDraft.length })}
               </Text>
-              <Text fontSize="xs" color="whiteAlpha.500">{t('settings.memory.editHint')}</Text>
+              <Text fontSize="xs" color="fg.muted">{t('settings.memory.editHint')}</Text>
               <SaveStatus state={contentSaver.state} />
             </Stack>
 

@@ -1,4 +1,13 @@
 import { createRoot } from 'react-dom/client';
+// 字型打包進來，不走 Google Fonts：離線也要長得一樣。
+// Space Grotesk／IBM Plex Mono 只拿 latin 子集（角色名、標籤是中日文時會
+// 落到下一個字型）。Noto Sans TC 用可變字型版：一組 woff2 涵蓋所有字重，
+// 比靜態版 400/500/700 三組（各自還附 woff 備援）小五倍左右。
+import '@fontsource/space-grotesk/latin-500.css';
+import '@fontsource/space-grotesk/latin-700.css';
+import '@fontsource/ibm-plex-mono/latin-400.css';
+import '@fontsource/ibm-plex-mono/latin-500.css';
+import '@fontsource-variable/noto-sans-tc/wght.css';
 import './index.css';
 import App from './App';
 import { LAppAdapter } from '../WebSDK/src/lappadapter';

@@ -428,7 +428,7 @@ function ASR({active = true}: ASRProps): JSX.Element {
           </Collapsible.Trigger>
           <Collapsible.Content>
             <Stack gap={2} mt={2}>
-              <Text fontSize="xs" color="whiteAlpha.500">
+              <Text fontSize="xs" color="fg.muted">
                 {t('settings.asr.micAdvancedHint')}
               </Text>
 

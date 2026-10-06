@@ -58,5 +58,9 @@ i18n.on("languageChanged", (lng) => {
   // Update HTML document lang attribute
   document.documentElement.lang = lng;
 });
+// 上面的監聽器掛上時 init 已經同步跑完（資源是內嵌的），第一次的
+// languageChanged 早就發過了——不補這一行，重新整理後 <html lang> 是空的，
+// index.css 依語言換內文字型的 :lang() 規則要等使用者手動換一次語言才生效。
+document.documentElement.lang = i18n.resolvedLanguage || i18n.language || "zh";
 
 export default i18n;

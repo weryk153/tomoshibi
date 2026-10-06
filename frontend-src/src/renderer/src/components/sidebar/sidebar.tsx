@@ -1,5 +1,5 @@
 /* eslint-disable react/require-default-props */
-import { Box, Button, Menu } from '@chakra-ui/react';
+import { Box, Button, Menu, Text } from '@chakra-ui/react';
 import {
   FiSettings, FiClock, FiPlus, FiChevronLeft, FiUsers, FiLayers
 } from 'react-icons/fi';
@@ -13,6 +13,7 @@ import HistoryDrawer from './history-drawer';
 import { useSidebar } from '@/hooks/sidebar/use-sidebar';
 import GroupDrawer from './group-drawer';
 import { ModeType } from '@/context/mode-context';
+import { SIDEBAR_COLLAPSED_WIDTH } from '@/layout';
 
 // Type definitions
 interface SidebarProps {
@@ -169,6 +170,20 @@ const SidebarContent = memo(({
         currentMode={currentMode}
         isElectron={isElectron}
       />
+      {/* 品牌記號，只是裝飾。右邊讓出收合把手那一欄（它疊在整條側欄的最右邊）。 */}
+      <Text
+        aria-hidden="true"
+        ml="auto"
+        mr={SIDEBAR_COLLAPSED_WIDTH}
+        fontFamily="mono"
+        fontSize="11px"
+        fontWeight="500"
+        letterSpacing="0.14em"
+        color="blue.500"
+        userSelect="none"
+      >
+        TMSB
+      </Text>
     </Box>
     <ChatHistoryPanel />
     <BottomTab />

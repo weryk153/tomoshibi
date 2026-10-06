@@ -890,7 +890,8 @@
     "interrupt": "打断她说话",
     "collapseControls": "收起输入控制栏",
     "expandControls": "展开输入控制栏",
-    "streamingPaused": "直播中，私人聊天暂停"
+    "streamingPaused": "直播中，私人聊天暂停",
+    "queuedWhileSpeaking": "她在说话，发送后会接着讲"
   },
   "sidebar": {
     "camera": "摄像头",
@@ -997,5 +998,15 @@
     "stageReplaced": "另一个舞台页已经接手，这页不再播放",
     "privateChatPaused": "直播中，私人聊天先暂停",
     "switchBlocked": "直播中不能换角色，请先停止直播"
+  },
+  "mood": {
+    "neutral": "平静",
+    "happy": "开心",
+    "sad": "难过",
+    "angry": "生气",
+    "surprised": "惊讶",
+    "embarrassed": "害羞",
+    "calm": "放松",
+    "worried": "担心"
   }
 }

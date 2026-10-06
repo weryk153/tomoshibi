@@ -1,6 +1,6 @@
 /* eslint-disable react/require-default-props */
 import {
-  Box, Button, Textarea, IconButton, HStack,
+  Box, Button, Textarea, IconButton,
 } from '@chakra-ui/react';
 import { BsMicFill, BsMicMuteFill } from 'react-icons/bs';
 import { IoHandRightSharp } from 'react-icons/io5';
@@ -9,10 +9,11 @@ import { LuSend } from 'react-icons/lu';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { footerStyles } from './footer-styles';
-import AIStateIndicator from './ai-state-indicator';
+import CharacterChip from './character-chip';
 import { useFooter } from '@/hooks/footer/use-footer';
 import { useAiState, AiStateEnum } from '@/context/ai-state-context';
 import { useStream } from '@/context/stream-context';
+import { useProactiveSpeak } from '@/context/proactive-speak-context';
 
 // Type definitions
 interface FooterProps {
@@ -25,13 +26,9 @@ interface ToggleButtonProps {
   onToggle?: () => void
 }
 
-interface ActionButtonsProps {
+interface MicButtonProps {
   micOn: boolean
   onMicToggle: () => void
-  onInterrupt: () => void
-  // 只有角色正在說話時打斷才有意義。沒有這個旗標的話，那顆黃色按鈕永遠亮著，
-  // 跟麥克風的綠／紅一起在畫面上搶注意力，卻有大半時間根本沒有東西可以打斷。
-  canInterrupt: boolean
 }
 
 interface MessageInputProps {
@@ -41,6 +38,12 @@ interface MessageInputProps {
   onCompositionStart: () => void
   onCompositionEnd: () => void
   onSend: () => void | Promise<void>
+  onInterrupt: () => void
+  // 她正在說話：打斷鍵出現，placeholder 改成「送出後會接著講」。
+  speaking: boolean
+  // 設定 > 代理「舉手按鈕提示她發言」開著時，不在說話也要有那顆鍵可按
+  // （use-footer.ts 的 handleInterrupt 不在說話時走的就是這條）。
+  allowRaiseHand: boolean
   // 直播中私人聊天暫停（後端也會擋）。
   disabled?: boolean
 }
@@ -58,7 +61,6 @@ const ToggleButton = memo(({ isCollapsed, onToggle }: ToggleButtonProps) => {
       aria-label={label}
       aria-expanded={!isCollapsed}
       title={label}
-      color="whiteAlpha.500"
       style={{
         transform: isCollapsed ? 'rotate(180deg)' : 'rotate(0deg)',
       }}
@@ -70,39 +72,25 @@ const ToggleButton = memo(({ isCollapsed, onToggle }: ToggleButtonProps) => {
 
 ToggleButton.displayName = 'ToggleButton';
 
-const ActionButtons = memo(({
-  micOn, onMicToggle, onInterrupt, canInterrupt,
-}: ActionButtonsProps) => {
+// 圓形開關：開＝主色描邊加光暈，關＝灰描邊加靜音圖示。不再是紅／綠方塊——
+// 紅色留給錯誤，靜音不是錯誤。
+const MicButton = memo(({ micOn, onMicToggle }: MicButtonProps) => {
   const { t } = useTranslation();
+  const label = micOn ? t('footer.micOn') : t('footer.micOff');
   return (
-    <HStack gap={2}>
-      <IconButton
-        aria-label={micOn ? t('footer.micOn') : t('footer.micOff')}
-        title={micOn ? t('footer.micOn') : t('footer.micOff')}
-        bg={micOn ? 'green.500' : 'red.500'}
-        {...footerStyles.footer.actionButton}
-        onClick={onMicToggle}
-      >
-        {micOn ? <BsMicFill /> : <BsMicMuteFill />}
-      </IconButton>
-      <IconButton
-        aria-label={t('footer.interrupt')}
-        title={t('footer.interrupt')}
-        // 能打斷的時候才上色。不能打斷時仍然可按（按了是無害的 no-op），
-        // 只是視覺上退到背景，不再假裝自己跟麥克風一樣重要。
-        bg={canInterrupt ? 'yellow.500' : 'whiteAlpha.200'}
-        color={canInterrupt ? 'black' : 'whiteAlpha.700'}
-        transition="background-color 0.2s ease-out, color 0.2s ease-out"
-        {...footerStyles.footer.actionButton}
-        onClick={onInterrupt}
-      >
-        <IoHandRightSharp size="24" />
-      </IconButton>
-    </HStack>
+    <IconButton
+      aria-label={label}
+      title={label}
+      aria-pressed={micOn}
+      {...footerStyles.footer.mic(micOn)}
+      onClick={onMicToggle}
+    >
+      {micOn ? <BsMicFill size="18" /> : <BsMicMuteFill size="18" />}
+    </IconButton>
   );
 });
 
-ActionButtons.displayName = 'ActionButtons';
+MicButton.displayName = 'MicButton';
 
 const MessageInput = memo(({
   value,
@@ -111,39 +99,62 @@ const MessageInput = memo(({
   onCompositionStart,
   onCompositionEnd,
   onSend,
+  onInterrupt,
+  speaking,
+  allowRaiseHand,
   disabled = false,
 }: MessageInputProps) => {
   const { t } = useTranslation();
+  const hasText = value.trim() !== '';
+  // 打斷鍵只在有東西可打斷時出現——原本那顆黃色方塊大半時間沒事可做，
+  // 卻一直在畫面上搶注意力。
+  const showHand = speaking || allowRaiseHand;
+  const handLabel = speaking ? t('footer.interrupt') : t('footer.raiseHand');
 
-  // 這裡原本是 ui/input-group（Chakra）。它支援 start/end 附加元素，但迴紋針
-  // 移除之後就沒有任何附加元素了，剩下的作用只有 flex:1——換成一個 div。
+  let placeholder = t('footer.typeYourMessage');
+  if (disabled) placeholder = t('footer.streamingPaused');
+  else if (speaking) placeholder = t('footer.queuedWhileSpeaking');
+
+  // 這裡本來有一顆迴紋針按鈕，但它沒有 onClick，也沒有任何附加檔案的流程可
+  // 以接——按下去毫無反應。等真的做附加檔案再放回來。
   return (
-    <div className="flex-1">
-      {/* 這裡本來有一顆迴紋針按鈕，但它沒有 onClick，也沒有任何附加檔案的流程可
-          以接——按下去毫無反應。一個看起來能點、點了什麼都不會發生的控制項，
-          比沒有這個控制項更糟：使用者會以為是壞掉了。等真的做附加檔案再放回來。 */}
-      <Box position="relative" width="100%">
+    <Box {...footerStyles.footer.inputSlot}>
+      <Box {...footerStyles.footer.inputBox}>
         <Textarea
+          rows={1}
           value={value}
           onChange={onChange}
           onKeyDown={onKeyDown}
           onCompositionStart={onCompositionStart}
           onCompositionEnd={onCompositionEnd}
           disabled={disabled}
-          placeholder={disabled ? t('footer.streamingPaused') : t('footer.typeYourMessage')}
-          {...footerStyles.footer.input}
+          placeholder={placeholder}
+          aria-label={t('footer.typeYourMessage')}
+          {...footerStyles.footer.input(showHand)}
         />
-        <IconButton
-          aria-label={t('footer.send')}
-          title={t('footer.send')}
-          disabled={disabled || !value.trim()}
-          onClick={onSend}
-          {...footerStyles.footer.sendButton}
-        >
-          <LuSend size="20" aria-hidden="true" />
-        </IconButton>
+        <Box {...footerStyles.footer.inlineButtons}>
+          {showHand && (
+            <IconButton
+              aria-label={handLabel}
+              title={handLabel}
+              onClick={onInterrupt}
+              {...footerStyles.footer.interruptButton}
+            >
+              <IoHandRightSharp size="15" aria-hidden="true" />
+            </IconButton>
+          )}
+          <IconButton
+            aria-label={t('footer.send')}
+            title={t('footer.send')}
+            disabled={disabled || !hasText}
+            onClick={onSend}
+            {...footerStyles.footer.sendButton(hasText)}
+          >
+            <LuSend size="16" aria-hidden="true" />
+          </IconButton>
+        </Box>
       </Box>
-    </div>
+    </Box>
   );
 });
 
@@ -164,35 +175,27 @@ function Footer({ isCollapsed = false, onToggle }: FooterProps): JSX.Element {
   } = useFooter();
   const { aiState } = useAiState();
   const { live } = useStream();
+  const { settings } = useProactiveSpeak();
 
   return (
     <Box {...footerStyles.footer.container(isCollapsed)}>
       <ToggleButton isCollapsed={isCollapsed} onToggle={onToggle} />
 
-      <Box pt="0" px="4">
-        <HStack width="100%" gap={4}>
-          <Box>
-            <Box mb="1.5">
-              <AIStateIndicator />
-            </Box>
-            <ActionButtons
-              micOn={micOn}
-              onMicToggle={handleMicToggle}
-              onInterrupt={handleInterrupt}
-              canInterrupt={aiState === AiStateEnum.THINKING_SPEAKING}
-            />
-          </Box>
-
-          <MessageInput
-            value={inputValue}
-            onChange={handleInputChange}
-            onKeyDown={handleKeyPress}
-            onCompositionStart={handleCompositionStart}
-            onCompositionEnd={handleCompositionEnd}
-            onSend={handleSend}
-            disabled={live}
-          />
-        </HStack>
+      <Box {...footerStyles.footer.row}>
+        <CharacterChip />
+        <MicButton micOn={micOn} onMicToggle={handleMicToggle} />
+        <MessageInput
+          value={inputValue}
+          onChange={handleInputChange}
+          onKeyDown={handleKeyPress}
+          onCompositionStart={handleCompositionStart}
+          onCompositionEnd={handleCompositionEnd}
+          onSend={handleSend}
+          onInterrupt={handleInterrupt}
+          speaking={aiState === AiStateEnum.THINKING_SPEAKING}
+          allowRaiseHand={settings.allowButtonTrigger}
+          disabled={live}
+        />
       </Box>
     </Box>
   );

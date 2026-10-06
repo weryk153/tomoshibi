@@ -19,7 +19,7 @@ const MemoizedStatusContent = memo(StatusContent);
 // Main component
 const WebSocketStatus = memo((): JSX.Element => {
   const {
-    color, textKey, handleClick, isDisconnected, visible,
+    color, textColor, textKey, handleClick, isDisconnected, visible,
   } = useWSStatus();
 
   // 用透明度淡出而不是直接不渲染：狀態一變（例如斷線）要能立刻回來，
@@ -33,6 +33,7 @@ const WebSocketStatus = memo((): JSX.Element => {
       transition="opacity 0.4s ease"
       aria-hidden={!visible}
       backgroundColor={color}
+      color={textColor}
       onClick={handleClick}
       cursor={isDisconnected ? 'pointer' : 'default'}
       _hover={{

@@ -890,7 +890,8 @@
     "interrupt": "話を遮る",
     "collapseControls": "入力コントロールを折りたたむ",
     "expandControls": "入力コントロールを展開する",
-    "streamingPaused": "配信中は個別チャットを一時停止しています"
+    "streamingPaused": "配信中は個別チャットを一時停止しています",
+    "queuedWhileSpeaking": "話している途中です。送信すると続けて返事します"
   },
   "sidebar": {
     "camera": "カメラ",
@@ -997,5 +998,15 @@
     "stageReplaced": "別のステージページに切り替わりました",
     "privateChatPaused": "配信中のため個別チャットは一時停止中です",
     "switchBlocked": "配信中はキャラクターを切り替えられません"
+  },
+  "mood": {
+    "neutral": "ふつう",
+    "happy": "うれしい",
+    "sad": "かなしい",
+    "angry": "怒ってる",
+    "surprised": "びっくり",
+    "embarrassed": "照れてる",
+    "calm": "リラックス",
+    "worried": "心配"
   }
 }

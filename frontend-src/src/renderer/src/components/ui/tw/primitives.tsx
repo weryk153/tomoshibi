@@ -271,7 +271,8 @@ const BUTTON_SIZE = {
 // 不會有任何錯誤，只是顏色安靜地消失。
 const BUTTON_TONE = {
   blue: {
-    solid: 'bg-blue-600 text-white hover:bg-blue-500',
+    // blue 已換成副色青（index.css 的 @theme），白字在青上只有 2:1 上下，改深色墨水。
+    solid: 'bg-blue-500 text-accent2-ink hover:bg-blue-400',
     outline: 'border border-blue-500/60 text-blue-300 hover:bg-blue-500/10',
     ghost: 'text-blue-300 hover:bg-blue-500/10',
   },
@@ -581,13 +582,14 @@ export function Checkbox({
         className={cx(
           'flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors',
           'border-walpha-400 bg-walpha-100',
-          'data-[state=checked]:border-blue-600 data-[state=checked]:bg-blue-600',
+          // 勾勾跟著 currentColor：青底上用深色墨水，白色勾在青上看不清。
+          'data-[state=checked]:border-blue-500 data-[state=checked]:bg-blue-500 text-accent2-ink',
           'focus-visible:ring-2 focus-visible:ring-blue-500/40',
         )}
       >
         <ArkCheckbox.Indicator>
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M5 13l4 4L19 7" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M5 13l4 4L19 7" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" />
           </svg>
         </ArkCheckbox.Indicator>
       </ArkCheckbox.Control>

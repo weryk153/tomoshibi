@@ -1,6 +1,7 @@
 /* eslint-disable no-shadow */
 // import { StrictMode } from 'react';
-import { Box, Flex, ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { Box, Flex, ChakraProvider } from "@chakra-ui/react";
+import { tomoshibiSystem } from "./theme/tomoshibi";
 import { useState, useEffect, useRef } from "react";
 import { installAudioUnlock } from "@/utils/audio-unlock";
 import { resumeSharedAudioContext } from "@/utils/voice-gain";
@@ -188,7 +189,7 @@ function AppContent(): JSX.Element {
 
 function App(): JSX.Element {
   return (
-    <ChakraProvider value={defaultSystem}>
+    <ChakraProvider value={tomoshibiSystem}>
       {/* ModeProvider needs to wrap AppContent to provide mode to getGlobalStyles */}
       <ModeProvider>
         <AppWithGlobalStyles />

@@ -890,7 +890,8 @@
     "interrupt": "말을 끊기",
     "collapseControls": "입력 컨트롤 접기",
     "expandControls": "입력 컨트롤 펼치기",
-    "streamingPaused": "방송 중에는 개인 채팅이 멈춥니다"
+    "streamingPaused": "방송 중에는 개인 채팅이 멈춥니다",
+    "queuedWhileSpeaking": "말하는 중이에요. 보내면 이어서 답해요"
   },
   "sidebar": {
     "camera": "카메라",
@@ -997,5 +998,15 @@
     "stageReplaced": "다른 무대 페이지가 이어받았습니다",
     "privateChatPaused": "방송 중이라 개인 채팅이 일시 중지되었습니다",
     "switchBlocked": "방송 중에는 캐릭터를 바꿀 수 없습니다"
+  },
+  "mood": {
+    "neutral": "평온",
+    "happy": "기쁨",
+    "sad": "슬픔",
+    "angry": "화남",
+    "surprised": "놀람",
+    "embarrassed": "부끄러움",
+    "calm": "편안함",
+    "worried": "걱정"
   }
 }
