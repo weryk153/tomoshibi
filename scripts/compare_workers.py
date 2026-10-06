@@ -723,6 +723,7 @@ def user_state_items(reading, commits, variant) -> list[str]:
     )
     if status:
         out.append(f"commit：{status}")
+    return out
 
 
 def conflict_judgements(row):
