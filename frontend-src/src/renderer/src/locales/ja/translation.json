@@ -852,8 +852,10 @@
       "restartFailed": "バックエンドの再起動に失敗しました（停止している可能性があります）。もう一度試すか、アプリを終了して開き直してください。ログ：{{path}}",
       "retry": "もう一度試す"
     },
+    "conversation": {
+      "display": "字幕と音量"
+    },
     "stage": {
-      "display": "字幕と音量",
       "canvas": "キャンバス操作"
     },
     "models": {
@@ -890,8 +892,7 @@
     "interrupt": "話を遮る",
     "collapseControls": "入力コントロールを折りたたむ",
     "expandControls": "入力コントロールを展開する",
-    "streamingPaused": "配信中は個別チャットを一時停止しています",
-    "queuedWhileSpeaking": "話している途中です。送信すると続けて返事します"
+    "streamingPaused": "配信中は個別チャットを一時停止しています"
   },
   "sidebar": {
     "camera": "カメラ",

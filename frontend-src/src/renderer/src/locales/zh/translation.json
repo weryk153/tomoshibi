@@ -852,8 +852,10 @@
       "restartFailed": "重新啟動後端失敗，後端可能已經停了。可以再試一次，或關掉 App 重開。記錄檔：{{path}}",
       "retry": "再試一次"
     },
+    "conversation": {
+      "display": "字幕與音量"
+    },
     "stage": {
-      "display": "字幕與音量",
       "canvas": "畫布互動"
     },
     "models": {
@@ -890,8 +892,7 @@
     "interrupt": "打斷她說話",
     "collapseControls": "收合輸入控制列",
     "expandControls": "展開輸入控制列",
-    "streamingPaused": "直播中，私人聊天暫停",
-    "queuedWhileSpeaking": "她在說話，送出後會接著講"
+    "streamingPaused": "直播中，私人聊天暫停"
   },
   "sidebar": {
     "camera": "攝像頭",

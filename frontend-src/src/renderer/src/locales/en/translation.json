@@ -852,8 +852,10 @@
       "restartFailed": "Restarting the backend failed and it may have stopped. Try again, or quit and reopen the app. Log: {{path}}",
       "retry": "Try again"
     },
+    "conversation": {
+      "display": "Subtitles & volume"
+    },
     "stage": {
-      "display": "Subtitles & volume",
       "canvas": "Canvas interaction"
     },
     "models": {
@@ -890,8 +892,7 @@
     "interrupt": "Interrupt her",
     "collapseControls": "Collapse input controls",
     "expandControls": "Expand input controls",
-    "streamingPaused": "Live stream in progress — chat paused",
-    "queuedWhileSpeaking": "She's talking — sending will queue it for after"
+    "streamingPaused": "Live stream in progress — chat paused"
   },
   "sidebar": {
     "camera": "Camera",

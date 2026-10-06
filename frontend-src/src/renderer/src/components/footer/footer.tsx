@@ -40,7 +40,8 @@ interface MessageInputProps {
   onCompositionEnd: () => void
   onSend: () => void | Promise<void>
   onInterrupt: () => void
-  // 她正在說話：打斷鍵出現，placeholder 改成「送出後會接著講」。
+  // 她正在說話：打斷鍵出現、輸入框描邊亮起。placeholder 不換——空輸入框裡一句
+  // 「她在說話…」讀起來像系統訊息（使用者反映很怪）；送出後排隊的事由字幕與她接著講來表示。
   speaking: boolean
   // 設定 > 代理「舉手按鈕提示她發言」開著時，不在說話也要有那顆鍵可按
   // （use-footer.ts 的 handleInterrupt 不在說話時走的就是這條）。
@@ -112,9 +113,7 @@ const MessageInput = memo(({
   const showHand = speaking || allowRaiseHand;
   const handLabel = speaking ? t('footer.interrupt') : t('footer.raiseHand');
 
-  let placeholder = t('footer.typeYourMessage');
-  if (disabled) placeholder = t('footer.streamingPaused');
-  else if (speaking) placeholder = t('footer.queuedWhileSpeaking');
+  const placeholder = disabled ? t('footer.streamingPaused') : t('footer.typeYourMessage');
 
   // 這裡本來有一顆迴紋針按鈕，但它沒有 onClick，也沒有任何附加檔案的流程可
   // 以接——按下去毫無反應。等真的做附加檔案再放回來。

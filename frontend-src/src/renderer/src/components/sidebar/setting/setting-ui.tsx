@@ -64,11 +64,12 @@ const RENDERS: Record<SettingsTabId, (a: TabRenderArgs) => JSX.Element> = {
     <Stack gap={6}>
       <SettingSection title={t('settings.tabs.agent')}><Agent /></SettingSection>
       <SettingSection><You active={active} /></SettingSection>
+      {/* 字幕開關與語音音量是「怎麼聽她說話」，跟對話放一起；舞台留給場景、演出、特效。 */}
+      <SettingSection title={t('settings.conversation.display')}><StageDisplay /></SettingSection>
     </Stack>
   ),
   stage: ({ t }) => (
     <Stack gap={6}>
-      <SettingSection title={t('settings.stage.display')}><StageDisplay /></SettingSection>
       <SettingSection><Scenes /></SettingSection>
       <SettingSection><Performances /></SettingSection>
       <SettingSection><StageEffects /></SettingSection>

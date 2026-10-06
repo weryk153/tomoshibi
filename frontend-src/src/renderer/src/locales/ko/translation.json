@@ -852,8 +852,10 @@
       "restartFailed": "백엔드 다시 시작에 실패했습니다(멈췄을 수 있습니다). 다시 시도하거나 앱을 껐다가 다시 여세요. 로그: {{path}}",
       "retry": "다시 시도"
     },
+    "conversation": {
+      "display": "자막과 음량"
+    },
     "stage": {
-      "display": "자막과 음량",
       "canvas": "캔버스 상호작용"
     },
     "models": {
@@ -890,8 +892,7 @@
     "interrupt": "말을 끊기",
     "collapseControls": "입력 컨트롤 접기",
     "expandControls": "입력 컨트롤 펼치기",
-    "streamingPaused": "방송 중에는 개인 채팅이 멈춥니다",
-    "queuedWhileSpeaking": "말하는 중이에요. 보내면 이어서 답해요"
+    "streamingPaused": "방송 중에는 개인 채팅이 멈춥니다"
   },
   "sidebar": {
     "camera": "카메라",
