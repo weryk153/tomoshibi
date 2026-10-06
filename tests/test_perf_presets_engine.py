@@ -64,9 +64,12 @@ def test_a_preset_writes_only_performance_numbers(conf):
         assert leaf(before, key) == leaf(after, key)
 
 
-def test_every_preset_sets_all_seven_numbers():
+def test_every_preset_sets_every_number_and_switch():
     for preset in perf_route.PRESETS.values():
-        assert set(preset) == set(engine_config_route.EVERY_KEYS)
+        assert set(preset) == {
+            *engine_config_route.EVERY_KEYS,
+            *engine_config_route.SWITCH_KEYS,
+        }
 
 
 def test_the_current_preset_is_recognised_and_anything_else_is_custom(conf):
@@ -74,6 +77,15 @@ def test_the_current_preset_is_recognised_and_anything_else_is_custom(conf):
     assert perf_route._current_preset() == "high"
     engine_config_route.write_engine_settings({"goal_every": 7})
     assert perf_route._current_preset() == "custom"
+
+
+def test_turning_memory_conflicts_off_is_not_a_preset(conf):
+    perf_route._apply_preset_bundle(perf_route.PRESETS["standard"])
+    engine_config_route.write_engine_settings({"memory_conflicts": False})
+    assert perf_route._current_preset() == "custom"
+
+    perf_route._apply_preset_bundle(perf_route.PRESETS["standard"])
+    assert engine_config_route.read_engine_settings()["memory_conflicts"] is True
 
 
 def test_keep_alive_is_gone():
@@ -105,3 +117,20 @@ def test_the_light_preset_checks_her_reply_every_second_turn(conf):
 def test_the_other_presets_check_every_reply():
     assert perf_route.PRESETS["standard"]["reply_check_every"] == 1
     assert perf_route.PRESETS["high"]["reply_check_every"] == 1
+
+
+def test_the_light_preset_reads_the_user_less_often_and_writes_no_diary(conf):
+    perf_route._apply_preset_bundle(perf_route.PRESETS["light"])
+
+    settings = engine_config_route.read_engine_settings()
+    assert settings["user_state_every"] == 12
+    assert settings["diary_every_hours"] == 0
+    assert settings["memory_conflicts"] is True
+
+
+def test_the_other_presets_keep_the_engine_defaults_for_user_state_diary_and_conflicts():
+    for name in ("standard", "high"):
+        preset = perf_route.PRESETS[name]
+        assert preset["user_state_every"] == 6
+        assert preset["diary_every_hours"] == 24
+        assert preset["memory_conflicts"] is True

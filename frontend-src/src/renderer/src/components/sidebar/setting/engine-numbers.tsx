@@ -1,5 +1,6 @@
-// 效能頁的「背景工作頻率」：情緒、回話自檢、記憶、她自己的事、她的心情、目標、反思每幾輪跑一次，
-// 以及放在心上的目標／想法數量。從原本的「一般」分頁搬來。停手才存，打到一半
+// 效能頁的「背景工作頻率」：情緒、回話自檢、記憶、她自己的事、她的心情、目標、反思、
+// 使用者近況每幾輪跑一次，日記每幾小時寫一篇，記憶衝突檢查的開關，以及放在心上的
+// 目標／想法數量。從原本的「一般」分頁搬來。停手才存，打到一半
 // 的值不存也不彈回；要重新載入才生效，由抽屜頂端的提示處理。
 import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -11,13 +12,15 @@ import { boundsMessage, parseBoundedNumber, type Bounds } from '@/utils/setting-
 import {
   fetchEngineSettings, saveEngineSettings, type EngineSettings, type EngineEvery,
 } from '@/api/agent-config.ts';
-import { NumberField } from './common';
+import { NumberField, SwitchField } from './common';
 
 const EVERY_BOUNDS: Bounds = { min: 0, max: 99, integer: true };
 const EVERY_KEYS: EngineEvery[] = [
   'emotion_every', 'reply_check_every', 'memory_every', 'self_memory_every', 'mood_every', 'goal_every',
-  'reflection_every',
+  'reflection_every', 'user_state_every',
 ];
+// 每幾小時，不是每幾輪；標籤自己寫明。
+const HOURS_KEYS: EngineEvery[] = ['diary_every_hours'];
 const SHOWN_KEYS: EngineEvery[] = ['goals_shown', 'thoughts_shown'];
 
 function EngineNumbers(): JSX.Element {
@@ -44,6 +47,8 @@ function EngineNumbers(): JSX.Element {
           reflection_every: String(result.data.reflection_every),
           goals_shown: String(result.data.goals_shown),
           thoughts_shown: String(result.data.thoughts_shown),
+          user_state_every: String(result.data.user_state_every),
+          diary_every_hours: String(result.data.diary_every_hours),
         });
       } else {
         setEngineError(result.error);
@@ -92,6 +97,25 @@ function EngineNumbers(): JSX.Element {
     everySaver.change(next);
   };
 
+  // 開關改了就存，跟抽屜裡其他 switch 一樣。
+  const [conflictsError, setConflictsError] = useState<string | null>(null);
+  const changeConflicts = async (checked: boolean): Promise<void> => {
+    const saved = savedEngineRef.current;
+    if (!saved) return;
+    setConflictsError(null);
+    setEngine((current) => (current ? { ...current, memory_conflicts: checked } : current));
+    const result = await saveEngineSettings(baseUrl, { memory_conflicts: checked });
+    if (!result.ok) {
+      setConflictsError(result.error);
+      setEngine((current) => (
+        current ? { ...current, memory_conflicts: saved.memory_conflicts } : current
+      ));
+      return;
+    }
+    savedEngineRef.current = { ...saved, ...result.data };
+    setEngine((current) => (current ? { ...current, ...result.data } : current));
+  };
+
   const field = (key: EngineEvery): JSX.Element => (
     <NumberField
       key={key}
@@ -112,6 +136,16 @@ function EngineNumbers(): JSX.Element {
         <>
           <Text fontSize="xs" color="whiteAlpha.600">{t('settings.general.engineEveryHelp')}</Text>
           {EVERY_KEYS.map(field)}
+          {HOURS_KEYS.map(field)}
+          {engine && (
+            <SwitchField
+              label={t('settings.general.engine_memory_conflicts')}
+              help={t('settings.general.engineMemoryConflictsHelp')}
+              checked={engine.memory_conflicts}
+              onChange={(checked) => { void changeConflicts(checked); }}
+            />
+          )}
+          {conflictsError && <Text fontSize="xs" color="red.300">{conflictsError}</Text>}
           <Text fontSize="xs" color="whiteAlpha.600">{t('settings.general.engineShownHelp')}</Text>
           {SHOWN_KEYS.map(field)}
           <SaveStatus state={everySaver.state} />

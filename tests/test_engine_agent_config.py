@@ -26,6 +26,7 @@ def test_defaults_match_what_was_measured_on_a_local_model():
     assert config.model_dump() == {
         "emotion_every": 1,
         "reply_check_every": 1,
+        "memory_conflicts": True,
         "memory_every": 2,
         "self_memory_every": 2,
         "mood_every": 2,
@@ -37,6 +38,10 @@ def test_defaults_match_what_was_measured_on_a_local_model():
         "goal_max_age_days": 7,
         "goals_shown": 3,
         "thoughts_shown": 2,
+        "user_state_every": 6,
+        "user_state_ttl_hours": 48.0,
+        "diary_every_hours": 24.0,
+        "diary_in_context": True,
         "foreground_patience_seconds": 120.0,
         "max_history_messages": 80,
         "background_base_url": "",

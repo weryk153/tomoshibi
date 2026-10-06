@@ -79,8 +79,6 @@ GPT_SOVITS_LANGS = {"zh", "en", "ja", "ko", "yue", "auto"}
 # 只寫這幾個數字。語音辨識、聲音不歸效能預設管：以前三個預設都寫死 edge-tts，
 # 選一次「高效能」就把訓練好的聲音打回內建語音。標準＝出廠預設
 # （engine_config_route.EVERY_DEFAULTS）。
-# TODO(engine): 輕量預設還要 user_state_every 12、diary_every_hours 0（關），等
-# 引擎 main 有了這兩個再加（見 config_manager/agent.py）。
 PRESETS: dict[str, dict[str, Any]] = {
     # 輕量：弱機 / 共用機。每一項背景工作都是多一次模型呼叫。
     "light": {
@@ -94,6 +92,11 @@ PRESETS: dict[str, dict[str, Any]] = {
         "reflection_every": 12,
         "goals_shown": 2,
         "thoughts_shown": 1,
+        # 使用者近況隔久一點讀；日記不自動寫（一天一次的日記也是一次模型呼叫）。
+        "user_state_every": 12,
+        "diary_every_hours": 0,
+        # 只在剛記下使用者的事、又有同主題舊記憶時多一次呼叫，留著。
+        "memory_conflicts": True,
     },
     "standard": {
         "emotion_every": 1,
@@ -105,6 +108,9 @@ PRESETS: dict[str, dict[str, Any]] = {
         "reflection_every": 6,
         "goals_shown": 3,
         "thoughts_shown": 2,
+        "user_state_every": 6,
+        "diary_every_hours": 24,
+        "memory_conflicts": True,
     },
     # 高效能：強機，或背景工作另外交給一台電腦的模型。
     "high": {
@@ -117,17 +123,22 @@ PRESETS: dict[str, dict[str, Any]] = {
         "reflection_every": 4,
         "goals_shown": 4,
         "thoughts_shown": 3,
+        "user_state_every": 6,
+        "diary_every_hours": 24,
+        "memory_conflicts": True,
     },
 }
 
 
 def _current_preset() -> str:
     """目前的數字正好是哪一個預設；都對不上就是 custom。"""
-    from .engine_config_route import EVERY_KEYS, read_engine_settings
+    from .engine_config_route import EVERY_KEYS, SWITCH_KEYS, read_engine_settings
 
     now = read_engine_settings()
     for name, bundle in PRESETS.items():
-        if all(int(now[key]) == int(bundle[key]) for key in EVERY_KEYS):
+        if all(int(now[key]) == int(bundle[key]) for key in EVERY_KEYS) and all(
+            now[key] is bundle[key] for key in SWITCH_KEYS
+        ):
             return name
     return "custom"
 
@@ -569,9 +580,11 @@ def _apply_preset_bundle(bundle: dict) -> bool:
         lines = f.readlines()
 
     # --- 引擎背景工作的頻率（接 character_engine_agent 時真正影響速度的是這幾個）---
-    from .engine_config_route import EVERY_KEYS, apply_engine_settings
+    from .engine_config_route import EVERY_KEYS, SWITCH_KEYS, apply_engine_settings
 
-    apply_engine_settings(lines, {k: bundle[k] for k in EVERY_KEYS if k in bundle})
+    apply_engine_settings(
+        lines, {k: bundle[k] for k in (*EVERY_KEYS, *SWITCH_KEYS) if k in bundle}
+    )
 
     _write_conf(lines)
     return True

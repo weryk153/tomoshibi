@@ -62,6 +62,7 @@ export type EngineEvery =
   | 'goal_every'
   | 'reflection_every'
   | 'goals_shown' | 'thoughts_shown'
+  | 'user_state_every' | 'diary_every_hours'
 
 export interface EngineSettings {
   available: boolean
@@ -77,13 +78,19 @@ export interface EngineSettings {
   reflection_every: number
   goals_shown: number
   thoughts_shown: number
+  // 使用者最近過得怎樣，每幾輪讀一次（引擎 1.2.0 起）。
+  user_state_every: number
+  // 她的日記：每幾「小時」寫一篇，不是每幾輪；0 是不自動寫（引擎 1.2.0 起）。
+  diary_every_hours: number
+  // 新記下的使用者記憶跟同主題的舊記憶對一遍（引擎 1.2.0 起）。
+  memory_conflicts: boolean
   // 背景工作另外用的端點與模型；空字串就是跟她講話用同一顆。
   background_base_url: string
   background_model: string
 }
 
 export type EngineSettingsChange = Partial<
-  Pick<EngineSettings, EngineEvery | 'background_base_url' | 'background_model'>
+  Pick<EngineSettings, EngineEvery | 'memory_conflicts' | 'background_base_url' | 'background_model'>
 >
 
 interface EngineSaveResponse extends Omit<EngineSettings, 'available' | 'reason'> {

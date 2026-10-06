@@ -93,6 +93,7 @@ character_config:
         emotion_every: 1
         reply_check_every: 1 # 她的回話事後讀一遍（講到提示、重複、語言不對…），有就在下一則提醒她（引擎 1.2.0 起）
         memory_every: 2
+        memory_conflicts: True # 新記下的使用者記憶跟同主題的舊記憶對一遍；矛盾就問使用者一次（引擎 1.2.0 起）
         self_memory_every: 2
         mood_every: 2 # 她自己的心情；空檔時的表情跟著它
         summary_every: 0
@@ -107,6 +108,10 @@ character_config:
         goals_shown: 3 # 她同時放在心上的目標最多幾條（最急的優先）
         thoughts_shown: 2 # 她同時放在心上的想法最多幾條（最新的優先）
         max_history_messages: 80 # 對話最多留幾則給模型
+        user_state_every: 6 # 每幾輪讀一次使用者最近過得怎樣（引擎 1.2.0 起）
+        user_state_ttl_hours: 48 # 讀到後幾小時忘掉；0 為留到下次讀
+        diary_every_hours: 24 # 她的日記：離上一篇過了幾小時就寫一篇；0 為不自動寫（引擎 1.2.0 起）
+        diary_in_context: True # 最近一篇日記的開頭放進她的系統提示
 
       hume_ai_agent:
         api_key: ''

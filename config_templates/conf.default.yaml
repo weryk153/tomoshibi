@@ -112,6 +112,7 @@ character_config:
         emotion_every: 1
         reply_check_every: 1 # read her reply back for slips; a slip is pointed out on her next reply (engine 1.2.0+)
         memory_every: 2
+        memory_conflicts: True # hold a new memory of the user against earlier ones on its topic; ask about what cannot both be true (engine 1.2.0+)
         self_memory_every: 2
         mood_every: 2 # her own mood; her resting face follows it
         summary_every: 0
@@ -126,6 +127,10 @@ character_config:
         goals_shown: 3 # how many goals (the most pressing) she keeps in mind
         thoughts_shown: 2 # how many thoughts (the newest) she keeps in mind
         max_history_messages: 80 # how many messages of the conversation are kept for the model
+        user_state_every: 6 # how the user has been lately, read every N turns (engine 1.2.0+)
+        user_state_ttl_hours: 48 # forgotten this many hours after it was read; 0 keeps it until read again
+        diary_every_hours: 24 # her diary: one entry once this many hours have passed since the last; 0 = no automatic entry (engine 1.2.0+)
+        diary_in_context: True # the start of her last entry goes in her system prompt
 
       letta_agent:
         host: 'localhost' # Host address

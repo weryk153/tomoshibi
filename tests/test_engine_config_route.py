@@ -49,6 +49,9 @@ def test_reading_gives_the_numbers_and_the_engine_is_always_on():
         "reflection_every": 6,
         "goals_shown": 3,
         "thoughts_shown": 2,
+        "user_state_every": 6,
+        "diary_every_hours": 24,
+        "memory_conflicts": True,
         "background_base_url": "",
         "background_model": "",
     }
@@ -92,6 +95,41 @@ def test_the_reply_check_rhythm_is_written_and_read_back(conf_file):
     assert route.read_engine_settings()["reply_check_every"] == 3
 
 
+def test_the_user_state_and_diary_rhythms_are_written_and_read_back(conf_file):
+    """引擎的使用者近況（每幾輪）與日記（每幾小時）：0 都是關掉。"""
+    route.write_engine_settings({"user_state_every": 0, "diary_every_hours": 0})
+
+    text = conf_file.read_text(encoding="utf-8")
+    assert "        user_state_every: 0\n" in text
+    assert "        diary_every_hours: 0\n" in text
+    settings = route.read_engine_settings()
+    assert settings["user_state_every"] == 0
+    assert settings["diary_every_hours"] == 0
+
+    route.write_engine_settings({"user_state_every": 12, "diary_every_hours": 48})
+    settings = route.read_engine_settings()
+    assert settings["user_state_every"] == 12
+    assert settings["diary_every_hours"] == 48
+
+
+def test_memory_conflicts_is_a_switch(conf_file):
+    route.write_engine_settings({"memory_conflicts": False})
+
+    assert "        memory_conflicts: False\n" in conf_file.read_text(encoding="utf-8")
+    assert route.read_engine_settings()["memory_conflicts"] is False
+
+    route.write_engine_settings({"memory_conflicts": True})
+    assert route.read_engine_settings()["memory_conflicts"] is True
+
+
+def test_memory_conflicts_takes_only_a_real_boolean(conf_file):
+    before = conf_file.read_text(encoding="utf-8")
+    route.write_engine_settings({"memory_conflicts": "no"})
+    route.write_engine_settings({"memory_conflicts": 0})
+
+    assert conf_file.read_text(encoding="utf-8") == before
+
+
 def test_a_conf_without_the_engine_block_gets_one(conf_file):
     conf_file.write_text(
         "character_config:\n"
@@ -116,6 +154,9 @@ def test_a_conf_without_the_engine_block_gets_one(conf_file):
         "reflection_every": 6,
         "goals_shown": 3,
         "thoughts_shown": 2,
+        "user_state_every": 6,
+        "diary_every_hours": 24,
+        "memory_conflicts": True,
         "background_base_url": "",
         "background_model": "",
     }
@@ -218,7 +259,7 @@ def test_what_the_settings_page_writes_reaches_the_engine():
         background_model="qwen/qwen3.5-9b",
     ).model_dump()
 
-    for key in (*route.EVERY_KEYS, *route.TEXT_KEYS):
+    for key in (*route.EVERY_KEYS, *route.SWITCH_KEYS, *route.TEXT_KEYS):
         assert key in dumped, key
     assert dumped["self_memory_every"] == 3
     assert dumped["background_model"] == "qwen/qwen3.5-9b"

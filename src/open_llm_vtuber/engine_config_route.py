@@ -33,8 +33,6 @@ from .conf_editor import (
 
 ENGINE_CHOICE = "character_engine_agent"
 # 畫面開得出來的幾個；其餘（timeout、goal_max_age_days…）留在 YAML。
-# TODO(engine): diary_every_hours、user_state_every、user_state_ttl_hours、
-# memory_conflicts 還在引擎分支上（見 config_manager/agent.py）。
 EVERY_KEYS = (
     "emotion_every",
     "reply_check_every",
@@ -45,6 +43,9 @@ EVERY_KEYS = (
     "reflection_every",
     "goals_shown",
     "thoughts_shown",
+    "user_state_every",
+    # 這個是每幾小時，不是每幾輪；0 一樣是關掉。
+    "diary_every_hours",
 )
 EVERY_DEFAULTS = {
     "emotion_every": 1,
@@ -56,8 +57,13 @@ EVERY_DEFAULTS = {
     "reflection_every": 6,
     "goals_shown": 3,
     "thoughts_shown": 2,
+    "user_state_every": 6,
+    "diary_every_hours": 24,
 }
 EVERY_MAX = 99
+# 開關：只收真正的 true／false。
+SWITCH_KEYS = ("memory_conflicts",)
+SWITCH_DEFAULTS = {"memory_conflicts": True}
 # 背景工作（情緒、記憶、目標…）另外用的端點與模型。空字串就是跟她講話用同一顆。
 TEXT_KEYS = ("background_base_url", "background_model")
 TEXT_MAX = 300
@@ -82,6 +88,9 @@ def read_engine_settings() -> dict:
     settings = {"enabled": True}
     for key in EVERY_KEYS:
         settings[key] = _clamp(block.get(key), EVERY_DEFAULTS[key])
+    for key in SWITCH_KEYS:
+        value = block.get(key)
+        settings[key] = value if isinstance(value, bool) else SWITCH_DEFAULTS[key]
     for key in TEXT_KEYS:
         settings[key] = str(block.get(key) or "")
     return settings
@@ -126,6 +135,9 @@ def apply_engine_settings(lines: list[str], changes: dict) -> None:
                 numbers[key] = str(_clamp(int(changes[key]), EVERY_DEFAULTS[key]))
             except (TypeError, ValueError):
                 continue
+    for key in SWITCH_KEYS:
+        if isinstance(changes.get(key), bool):
+            numbers[key] = "True" if changes[key] else "False"
     for key in TEXT_KEYS:
         if key in changes and (value := _clean_text(key, changes[key])) is not None:
             numbers[key] = f"'{value}'"
@@ -193,7 +205,9 @@ def init_engine_config_route() -> APIRouter:
         body, bad = await _parse_body(request)
         if bad:
             return bad
-        changes = {k: body[k] for k in (*EVERY_KEYS, *TEXT_KEYS) if k in body}
+        changes = {
+            k: body[k] for k in (*EVERY_KEYS, *SWITCH_KEYS, *TEXT_KEYS) if k in body
+        }
         try:
             await asyncio.to_thread(write_engine_settings, changes)
             settings = await asyncio.to_thread(read_engine_settings)

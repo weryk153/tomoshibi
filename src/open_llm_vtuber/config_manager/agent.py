@@ -130,10 +130,9 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
     # 下一則提醒她（引擎 1.2.0 起 CompanionSettings.reply_check_every；舊引擎不認得，
     # character_engine/factory.py 不傳）。
     reply_check_every: int = Field(1, alias="reply_check_every", ge=0)
-    # TODO(engine): diary_every_hours、user_state_every、user_state_ttl_hours、
-    # memory_conflicts 還沒進引擎 main（日記與使用者近況在 feat/diary-and-user-state
-    # 分支，memory_conflicts 還沒有）；進了再照 reply_check_every 加在這裡、
-    # engine_config_route 的 EVERY_KEYS 與 perf_route 的預設。
+    # 剛記下的使用者記憶跟同主題的舊記憶對一遍：事情變了（換工作、搬家）就換掉
+    # 舊的，兩個不可能同時成立就都留著、問使用者一次（引擎 1.2.0 起）。
+    memory_conflicts: bool = Field(True, alias="memory_conflicts")
     memory_every: int = Field(2, alias="memory_every", ge=0)
     self_memory_every: int = Field(2, alias="self_memory_every", ge=0)
     # 她自己的心情（引擎 CompanionSettings.mood_every）；空檔的臉跟著它。
@@ -146,6 +145,14 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
     goal_max_age_days: int = Field(7, alias="goal_max_age_days", ge=0)
     goals_shown: int = Field(3, alias="goals_shown", ge=0)
     thoughts_shown: int = Field(2, alias="thoughts_shown", ge=0)
+    # 使用者最近過得怎樣（精神、心情怎麼變、在煩什麼），每幾輪從使用者的話讀
+    # 一次；讀到之後幾小時忘掉（0：留到下次讀）。引擎 1.2.0 起。
+    user_state_every: int = Field(6, alias="user_state_every", ge=0)
+    user_state_ttl_hours: float = Field(48.0, alias="user_state_ttl_hours", ge=0)
+    # 她的日記：離上一篇過了這麼多小時、中間又跟人說過話，就寫一篇（0：不自動
+    # 寫）；最近一篇的開頭放進她的系統提示，除非 diary_in_context 關掉。引擎 1.2.0 起。
+    diary_every_hours: float = Field(24.0, alias="diary_every_hours", ge=0)
+    diary_in_context: bool = Field(True, alias="diary_in_context")
     foreground_patience_seconds: float = Field(
         120.0, alias="foreground_patience_seconds", gt=0
     )
@@ -167,6 +174,26 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
         "reply_check_every": Description(
             en="Read her reply back for slips every N turns; a slip is pointed out on her next reply (0 disables)",
             zh="每幾輪檢查一次她的回話（講到提示、重複、語言不對…），有就在下一則提醒她（0 為停用）",
+        ),
+        "memory_conflicts": Description(
+            en="Hold a new memory of the user against earlier ones on its topic; replace what moved on, ask about what cannot both be true",
+            zh="新記下的使用者記憶跟同主題的舊記憶對一遍：變了就換掉，矛盾就問使用者一次",
+        ),
+        "user_state_every": Description(
+            en="Read how the user has been lately every N turns (0 disables)",
+            zh="每幾輪讀一次使用者最近過得怎樣（0 為停用）",
+        ),
+        "user_state_ttl_hours": Description(
+            en="Forget how the user has been this many hours after it was read (0 keeps it until read again)",
+            zh="使用者近況讀到後幾小時忘掉（0 為留到下次讀）",
+        ),
+        "diary_every_hours": Description(
+            en="She writes a diary entry once this many hours have passed since her last one (0: no automatic entry)",
+            zh="離上一篇日記過了幾小時就寫一篇（0 為不自動寫）",
+        ),
+        "diary_in_context": Description(
+            en="Put the start of her last diary entry in her system prompt",
+            zh="把最近一篇日記的開頭放進她的系統提示",
         ),
         "memory_every": Description(
             en="Extract engine memories every N turns (0 disables)",
