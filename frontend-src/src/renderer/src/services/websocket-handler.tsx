@@ -38,7 +38,9 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
   const { aiState, setAiState, backendSynthComplete, setBackendSynthComplete } = useAiState();
   const { setModelInfo } = useLive2DConfig();
   const { setSubtitleText, clearSpeechSubtitle } = useSubtitle();
-  const { clearResponse, setForceNewMessage, appendHumanMessage, appendOrUpdateToolCallMessage } = useChatHistory();
+  const {
+    clearResponse, setForceNewMessage, appendHumanMessage, replaceLastHumanMessage, appendOrUpdateToolCallMessage,
+  } = useChatHistory();
   const { addAudioTask } = useAudioTask();
   const bgUrlContext = useBgUrl();
   const { confUid, setConfName, setConfUid, setConfigFiles } = useConfig();
@@ -355,6 +357,13 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
           appendHumanMessage(message.text);
         }
         break;
+      case 'user-input-transcription-updated':
+        // 先顯示的是 ASR 原始字；修好後換掉那一則（只在它還是最後一則時）。
+        if (message.text && latestUserTextRef.current) {
+          replaceLastHumanMessage(latestUserTextRef.current, message.text);
+          latestUserTextRef.current = message.text;
+        }
+        break;
       case 'error':
         // 重新載入（或換角色）被拒時，畫面不能一直停在「載入中」。
         setAiState((current: AiState) => (current === 'loading' ? 'idle' : current));
@@ -442,7 +451,7 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
       default:
         console.warn('Unknown message type:', message.type);
     }
-  }, [aiState, addAudioTask, appendHumanMessage, baseUrl, bgUrlContext, setAiState, setConfName, setConfUid, setConfigFiles, setCurrentHistoryUid, setHistoryList, setMessages, setModelInfo, setSubtitleText, clearSpeechSubtitle, startMic, stopMic, setSelfUid, setGroupMembers, setIsOwner, backendSynthComplete, setBackendSynthComplete, clearResponse, handleControlMessage, appendOrUpdateToolCallMessage, interrupt, setBrowserViewData, playEffect, getPool, playTrigger, t, setStreamLive, setStreamComment, setStageReplaced]);
+  }, [aiState, addAudioTask, appendHumanMessage, replaceLastHumanMessage, baseUrl, bgUrlContext, setAiState, setConfName, setConfUid, setConfigFiles, setCurrentHistoryUid, setHistoryList, setMessages, setModelInfo, setSubtitleText, clearSpeechSubtitle, startMic, stopMic, setSelfUid, setGroupMembers, setIsOwner, backendSynthComplete, setBackendSynthComplete, clearResponse, handleControlMessage, appendOrUpdateToolCallMessage, interrupt, setBrowserViewData, playEffect, getPool, playTrigger, t, setStreamLive, setStreamComment, setStageReplaced]);
 
   useEffect(() => {
     wsService.connect(connectUrl);

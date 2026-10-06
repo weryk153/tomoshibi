@@ -4,6 +4,7 @@ import {
 } from 'react';
 import { Message } from '@/services/websocket-service';
 import { HistoryInfo } from './websocket-context';
+import { applyTranscriptUpdate } from '@/utils/transcript-update';
 
 /**
  * Chat history context state interface
@@ -14,6 +15,8 @@ interface ChatHistoryState {
   historyList: HistoryInfo[];
   currentHistoryUid: string | null;
   appendHumanMessage: (content: string) => void;
+  // 語音輪：把畫面上還是原始辨識字（raw）的最後一則使用者訊息換成修好的字
+  replaceLastHumanMessage: (raw: string, fixed: string) => void;
   appendAIMessage: (content: string, name?: string, avatar?: string) => void;
   appendOrUpdateToolCallMessage: (toolMessageData: Partial<Message>) => void; // Accept partial data
   setMessages: (messages: Message[]) => void; // Use the unified Message type
@@ -74,6 +77,10 @@ export function ChatHistoryProvider({ children }: { children: React.ReactNode })
       timestamp: new Date().toISOString(),
     };
     setMessages((prevMessages) => [...prevMessages, newMessage]);
+  }, []);
+
+  const replaceLastHumanMessage = useCallback((raw: string, fixed: string) => {
+    setMessages((prevMessages) => applyTranscriptUpdate(prevMessages, raw, fixed));
   }, []);
 
   /**
@@ -210,6 +217,7 @@ export function ChatHistoryProvider({ children }: { children: React.ReactNode })
       historyList,
       currentHistoryUid,
       appendHumanMessage,
+      replaceLastHumanMessage,
       appendAIMessage,
       appendOrUpdateToolCallMessage, // Add to context value
       setMessages,
@@ -227,6 +235,7 @@ export function ChatHistoryProvider({ children }: { children: React.ReactNode })
       historyList,
       currentHistoryUid,
       appendHumanMessage,
+      replaceLastHumanMessage,
       appendAIMessage,
       appendOrUpdateToolCallMessage, // Add dependency
       updateHistoryList,
