@@ -15,7 +15,8 @@ class ImageSource(Enum):
 class TextSource(Enum):
     """Enum for different text sources"""
 
-    INPUT = "input"  # Main user input/transcription
+    INPUT = "input"  # 使用者打的字
+    VOICE = "voice"  # 語音辨識出來的字（使用者用講的）
     CLIPBOARD = "clipboard"  # Text from clipboard
 
 

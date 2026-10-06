@@ -102,7 +102,7 @@ class LettaAgent(AgentInterface):
 
         # Process text inputs in order
         for text_data in input_data.texts:
-            if text_data.source == TextSource.INPUT:
+            if text_data.source in (TextSource.INPUT, TextSource.VOICE):
                 message_parts.append(text_data.content)
             elif text_data.source == TextSource.CLIPBOARD:
                 message_parts.append(f"[Clipboard content: {text_data.content}]")

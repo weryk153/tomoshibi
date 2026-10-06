@@ -15,6 +15,7 @@ from .conversation_utils import (
 )
 from .types import WebSocketSend
 from .tts_manager import TTSTaskManager
+from ..agent.input_types import TextSource
 from ..chat_history_manager import store_message
 from ..character_mood import send_character_mood
 from ..service_context import ServiceContext
@@ -132,6 +133,9 @@ async def process_single_conversation(
             )
             return ""
 
+        # 音訊進來就是用講的；轉成文字之後就分不出來了，所以在轉之前看。
+        spoken = not isinstance(user_input, str) and not is_proactive
+
         # Process user input
         input_text = await process_user_input(
             user_input, context.asr_engine, websocket_send
@@ -149,6 +153,7 @@ async def process_single_conversation(
             images=images,
             from_name=context.character_config.human_name,
             metadata=agent_metadata,
+            source=TextSource.VOICE if spoken else TextSource.INPUT,
         )
 
         # Store user message (check if we should skip storing to history)

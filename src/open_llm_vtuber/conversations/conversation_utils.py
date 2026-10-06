@@ -164,12 +164,14 @@ def create_batch_input(
     images: Optional[List[Dict[str, Any]]],
     from_name: str,
     metadata: Optional[Dict[str, Any]] = None,
+    source: TextSource = TextSource.INPUT,
 ) -> BatchInput:
-    """Create batch input for agent processing"""
+    """Create batch input for agent processing
+
+    source 是使用者這一句怎麼來的：打字是 INPUT，語音辨識出來的是 VOICE。
+    """
     return BatchInput(
-        texts=[
-            TextData(source=TextSource.INPUT, content=input_text, from_name=from_name)
-        ],
+        texts=[TextData(source=source, content=input_text, from_name=from_name)],
         images=[
             ImageData(
                 source=ImageSource(img["source"]),

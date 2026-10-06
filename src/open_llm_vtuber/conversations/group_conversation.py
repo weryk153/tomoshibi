@@ -5,6 +5,7 @@ from loguru import logger
 from fastapi import WebSocket
 import numpy as np
 
+from ..agent.input_types import TextSource
 from ..agent.output_types import AudioOutput, SentenceOutput
 
 from .conversation_utils import (
@@ -82,6 +83,8 @@ async def process_group_conversation(
         # 主動發言那一輪的「輸入」是提示詞本身，不是使用者講的話——同一個旗標
         # 既決定要不要寫進歷史，也決定要不要當成使用者發言廣播出去。
         skip_history = should_skip_history(metadata)
+        # 音訊進來就是用講的；轉成文字之後就分不出來了，所以在轉之前看。
+        spoken = not isinstance(user_input, str) and not skip_history
 
         input_text = await process_group_input(
             user_input=user_input,
@@ -130,6 +133,7 @@ async def process_group_conversation(
                     images=images,
                     tts_manager=tts_managers[current_member_uid],
                     metadata=current_metadata,
+                    human_source=TextSource.VOICE if spoken else TextSource.INPUT,
                 )
             except Exception as e:
                 logger.error(f"Error in group member turn: {e}")
@@ -244,8 +248,13 @@ async def handle_group_member_turn(
     images: Optional[List[Dict[str, Any]]],
     tts_manager: TTSTaskManager,
     metadata: Optional[Dict[str, Any]] = None,
+    human_source: TextSource = TextSource.INPUT,
 ) -> None:
-    """Handle a single group member's conversation turn"""
+    """Handle a single group member's conversation turn
+
+    human_source 是使用者那一句怎麼來的。成員之間會一直輪下去，只有讀到使用者
+    那一句的那一輪（這個成員第一次接話）才帶著它；之後只剩彼此的回話。
+    """
     # Update current speaker before processing
     state.current_speaker_uid = current_member_uid
 
@@ -254,6 +263,7 @@ async def handle_group_member_turn(
     context = client_contexts[current_member_uid]
     current_ws_send = client_connections[current_member_uid].send_text
 
+    heard_the_human = state.memory_index[current_member_uid] == 0
     new_messages = state.conversation_history[state.memory_index[current_member_uid] :]
     new_context = "\n".join(new_messages) if new_messages else ""
 
@@ -264,6 +274,7 @@ async def handle_group_member_turn(
         # 這一輪屬於這個成員的對話。agent 是所有連線共用的，不講的話它只能猜
         # 是最後一個載入歷史的連線那一段（見 single_conversation 的 agent_metadata）。
         metadata={**(metadata or {}), "history_uid": context.history_uid},
+        source=human_source if heard_the_human else TextSource.INPUT,
     )
 
     logger.info(
