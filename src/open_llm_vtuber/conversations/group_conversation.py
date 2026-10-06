@@ -217,15 +217,25 @@ async def process_group_input(
     使用者講的話。那段文字是給模型看的系統指令，廣播出去會變成其他成員畫面上的
     一則使用者訊息——整段提示詞原文貼在對話裡。發起端本來就被 exclude_uid 排除，
     所以這個 bug 只有從另一台看得到。
+
+    語音輪的轉寫（先原始字、還原有變再送更新）發起端和其他成員一起收；
+    打的字沒有轉寫可送，照樣只廣播一次給其他成員。
     """
+
+    async def announce(message: Dict[str, str]) -> None:
+        await initiator_ws_send(json.dumps(message))
+        if is_user_speech:
+            await broadcast_func(group_members, message, initiator_client_uid)
+
     input_text = await process_user_input(
         user_input,
         initiator_context.asr_engine,
         initiator_ws_send,
         repair=asr_repair.repairer(initiator_context) if is_user_speech else None,
         on_cancelled=on_cancelled,
+        announce=announce,
     )
-    if is_user_speech:
+    if is_user_speech and not isinstance(user_input, np.ndarray):
         await broadcast_transcription(
             broadcast_func, group_members, input_text, initiator_client_uid
         )

@@ -469,7 +469,7 @@ def _process(user_input, repair_fn):
     return text, sent
 
 
-def test_a_spoken_line_is_repaired_before_anyone_sees_it():
+def test_a_spoken_line_shows_raw_first_then_the_repair():
     calls = []
 
     async def fix(text):
@@ -479,7 +479,36 @@ def test_a_spoken_line_is_repaired_before_anyone_sees_it():
     text, sent = _process(AUDIO, fix)
     assert calls == ["空尼七哇"]
     assert text == "こんにちは"
-    assert sent == [{"type": "user-input-transcription", "text": "こんにちは"}]
+    assert sent == [
+        {"type": "user-input-transcription", "text": "空尼七哇"},
+        {"type": "user-input-transcription-updated", "text": "こんにちは"},
+    ]
+
+
+def test_the_raw_line_is_on_screen_before_the_repair_starts():
+    order = []
+
+    async def send(message):
+        order.append(("sent", json.loads(message)["type"]))
+
+    async def fix(text):
+        order.append(("repair", text))
+        return "こんにちは"
+
+    asyncio.run(conversation_utils.process_user_input(AUDIO, _ASR(), send, repair=fix))
+    assert order[:2] == [
+        ("sent", "user-input-transcription"),
+        ("repair", "空尼七哇"),
+    ]
+
+
+def test_an_unchanged_repair_sends_no_update():
+    async def same(text):
+        return text
+
+    text, sent = _process(AUDIO, same)
+    assert text == "空尼七哇"
+    assert sent == [{"type": "user-input-transcription", "text": "空尼七哇"}]
 
 
 def test_a_typed_line_is_never_repaired():
@@ -612,7 +641,6 @@ def test_a_spoken_group_line_is_repaired_once_for_everyone(monkeypatch):
         broadcast.append(args)
 
     monkeypatch.setattr(asr_repair, "repairer", lambda context: fix)
-    monkeypatch.setattr(group_conversation, "broadcast_transcription", record)
     context = _context()
     context.asr_engine = _ASR()
     text = asyncio.run(
@@ -620,13 +648,127 @@ def test_a_spoken_group_line_is_repaired_once_for_everyone(monkeypatch):
             user_input=AUDIO,
             initiator_context=context,
             initiator_ws_send=send,
-            broadcast_func=send,
+            broadcast_func=record,
             group_members=["a", "b"],
             initiator_client_uid="a",
         )
     )
     assert text == "こんにちは"
-    assert broadcast and broadcast[0][2] == "こんにちは"
+    assert broadcast == [
+        (["a", "b"], {"type": "user-input-transcription", "text": "空尼七哇"}, "a"),
+        (
+            ["a", "b"],
+            {"type": "user-input-transcription-updated", "text": "こんにちは"},
+            "a",
+        ),
+    ]
+
+
+def _group_input(monkeypatch, user_input, fix, **kwargs):
+    from src.open_llm_vtuber.conversations import group_conversation
+
+    sent, broadcast = [], []
+
+    async def send(message):
+        sent.append(json.loads(message))
+
+    async def record(*args):
+        broadcast.append(args[1])
+
+    monkeypatch.setattr(asr_repair, "repairer", lambda context: fix)
+    context = _context()
+    context.asr_engine = _ASR()
+    text = asyncio.run(
+        group_conversation.process_group_input(
+            user_input=user_input,
+            initiator_context=context,
+            initiator_ws_send=send,
+            broadcast_func=record,
+            group_members=["a", "b"],
+            initiator_client_uid="a",
+            **kwargs,
+        )
+    )
+    return text, sent, broadcast
+
+
+def test_the_group_initiator_also_sees_raw_then_repair(monkeypatch):
+    async def fix(text):
+        return "こんにちは"
+
+    _text, sent, _broadcast = _group_input(monkeypatch, AUDIO, fix)
+    assert sent == [
+        {"type": "user-input-transcription", "text": "空尼七哇"},
+        {"type": "user-input-transcription-updated", "text": "こんにちは"},
+    ]
+
+
+def test_an_unchanged_group_line_is_broadcast_once(monkeypatch):
+    async def same(text):
+        return text
+
+    _text, sent, broadcast = _group_input(monkeypatch, AUDIO, same)
+    assert broadcast == [{"type": "user-input-transcription", "text": "空尼七哇"}]
+    assert sent == broadcast
+
+
+def test_a_typed_group_line_is_broadcast_once(monkeypatch):
+    async def fix(text):
+        raise AssertionError("typed lines are never repaired")
+
+    text, sent, broadcast = _group_input(monkeypatch, "你好", fix)
+    assert text == "你好"
+    assert sent == []
+    assert broadcast == [{"type": "user-input-transcription", "text": "你好"}]
+
+
+def test_a_proactive_prompt_is_not_broadcast(monkeypatch):
+    text, sent, broadcast = _group_input(
+        monkeypatch, "（系統提示）", None, is_user_speech=False
+    )
+    assert text == "（系統提示）"
+    assert broadcast == []
+
+
+def test_an_interrupted_group_repair_broadcasts_only_the_raw_line(monkeypatch):
+    from src.open_llm_vtuber.conversations import group_conversation
+
+    broadcast, kept = [], []
+
+    async def send(_message):
+        return None
+
+    async def record(*args):
+        broadcast.append(args[1])
+
+    async def slow(text):
+        await asyncio.sleep(10)
+        return "こんにちは"
+
+    monkeypatch.setattr(asr_repair, "repairer", lambda context: slow)
+    context = _context()
+    context.asr_engine = _ASR()
+
+    async def main():
+        task = asyncio.create_task(
+            group_conversation.process_group_input(
+                user_input=AUDIO,
+                initiator_context=context,
+                initiator_ws_send=send,
+                broadcast_func=record,
+                group_members=["a", "b"],
+                initiator_client_uid="a",
+                on_cancelled=kept.append,
+            )
+        )
+        await asyncio.sleep(0.01)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(main())
+    assert broadcast == [{"type": "user-input-transcription", "text": "空尼七哇"}]
+    assert kept == ["空尼七哇"]
 
 
 def test_an_interrupted_single_turn_still_records_what_was_said(monkeypatch):
