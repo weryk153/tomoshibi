@@ -36,6 +36,7 @@ import {
 } from '@/utils/character-page';
 import Personas from './personas';
 import Memory from './memory';
+import TranslationAuditSuggestions from './translation-audit';
 import MotionConfig from './motion-config';
 import VrmMotionConfig from './vrm-motion-config';
 import { CharacterList } from './character-list';
@@ -1518,7 +1519,16 @@ function Characters(): JSX.Element {
             onChange={(checked) => handleToggle('bilingual_subtitle', checked)}
             help={t('settings.characters.bilingualSubtitleHelp')}
           />
+          <SwitchField
+            label={t('settings.characters.translationAudit')}
+            checked={Boolean(record.translation_audit)}
+            onChange={(checked) => handleToggle('translation_audit', checked)}
+            help={t('settings.characters.translationAuditHelp')}
+          />
           <SaveStatus state={toggleSaver.state} />
+          {record.translation_audit && (
+            <TranslationAuditSuggestions filename={record.filename} />
+          )}
         </SettingSection>
 
         <SettingSection title={t('settings.characterPage.memory')}>

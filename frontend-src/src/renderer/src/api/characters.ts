@@ -15,6 +15,8 @@ export interface CharacterRecord {
   actions_enabled?: boolean
   // 雙語字幕：字幕多一行她實際唸的原文。
   bilingual_subtitle?: boolean
+  // 翻譯審核：她每句語音翻譯在背景審一遍，累積成建議（見 api/translation-audit.ts）。
+  translation_audit?: boolean
   slug: string
   is_base: boolean
   conf_name: string | null
@@ -230,6 +232,8 @@ export interface CharacterToggles {
   actions_enabled: boolean
   // 雙語字幕：字幕上面多一行她實際唸的那句（語音翻譯後的原文）。只影響畫面。
   bilingual_subtitle: boolean
+  // 翻譯審核：背景審她的語音翻譯，只累積建議，不改她說的話。
+  translation_audit: boolean
 }
 
 export type CharacterToggleName = keyof CharacterToggles
