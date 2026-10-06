@@ -54,9 +54,13 @@ export const canvasStyles = {
       whiteSpace: 'pre-wrap',
     },
     // 雙語字幕的上行（她唸的原文）：等寬小字、淡一點，視線先落在下行的字幕。
+    // 這一行實務上是日文，而 IBM Plex Mono 沒有 CJK 字形——照 fonts.mono 的
+    // 堆疊會落到 Noto Sans TC，漢字變成繁中字形。所以這裡的備援先接日文字型。
+    // （前端拿不到這句是哪個語言：後端只送 spoken_text，沒送語言，所以沒有
+    // 加 lang="ja"。）
     spoken: {
       color: 'whiteAlpha.700',
-      fontFamily: 'mono',
+      fontFamily: "'IBM Plex Mono', 'Hiragino Sans', 'Yu Gothic', 'Noto Sans JP', 'Noto Sans TC Variable', sans-serif",
       fontSize: '12px',
       textAlign: 'center',
       lineHeight: '1.4',

@@ -17,9 +17,9 @@ interface FooterStyles {
   container: (isCollapsed: boolean) => SystemStyleObject
   toggleButton: SystemStyleObject
   row: SystemStyleObject
+  lineSlot: SystemStyleObject
   mic: (micOn: boolean) => SystemStyleObject
   inputSlot: SystemStyleObject
-  inputBox: SystemStyleObject
   input: (hasInterrupt: boolean) => SystemStyleObject
   inlineButtons: SystemStyleObject
   interruptButton: SystemStyleObject
@@ -33,9 +33,14 @@ export const footerStyles: { footer: FooterStyles } = {
       borderTop: isCollapsed ? 'none' : `1px solid ${LINE}`,
       transform: isCollapsed ? 'translateY(calc(100% - 28px))' : 'translateY(0)',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      height: '100%',
-      position: 'relative',
-      // 展開時也要 visible：輸入框長到第二、三行是往上長的，會越過把手那一條。
+      // 貼著底部、至少佔滿 footer 那一格，內容變高就往上長：輸入框長到第二、
+      // 三行時整塊面板（連同收合把手）一起往上蓋到畫布上，把手永遠在最上面、
+      // 點得到；畫布本身不縮，角色不會跟著打字一抖一抖地重新排版。
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      minHeight: '100%',
       overflow: 'visible',
       pb: '0',
     }),
@@ -53,12 +58,22 @@ export const footerStyles: { footer: FooterStyles } = {
       bg: 'transparent',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
     },
+    // 一行時 10＋44＋10＝64px。多行時這一列跟著輸入框長高，膠囊與麥克風
+    // 貼齊底部那一行（lineSlot 各佔一行高、在裡面置中）。
     row: {
-      height: '64px',
+      minHeight: '64px',
       px: '4',
+      py: '10px',
       gap: '3',
       display: 'flex',
+      alignItems: 'flex-end',
+    },
+    lineSlot: {
+      height: INPUT_HEIGHT,
+      display: 'flex',
       alignItems: 'center',
+      flexShrink: 0,
+      minW: 0,
     },
     mic: (micOn) => ({
       width: '40px',
@@ -76,18 +91,10 @@ export const footerStyles: { footer: FooterStyles } = {
         color: micOn ? 'green.400' : 'gray.50',
       },
     }),
-    // 佔住一行的高度；真正的輸入框絕對定位在它底部，多行時往上長。
     inputSlot: {
       flex: 1,
       minW: 0,
       position: 'relative',
-      height: INPUT_HEIGHT,
-    },
-    inputBox: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
     },
     input: (hasInterrupt) => ({
       display: 'block',

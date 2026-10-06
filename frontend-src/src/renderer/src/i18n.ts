@@ -52,15 +52,20 @@ i18n
     },
   });
 
+// <html lang> 用的語言標籤。介面語系的 "zh" 是繁體中文，但瀏覽器把不帶地區的
+// "zh" 當成簡體：Noto Sans TC 會因此套上簡中的 locl 字形，全形標點（，？）
+// 掉到左下角變成簡中排法。所以寫進 lang 時要明講 zh-Hant。
+const htmlLang = (lng: string): string => (lng === "zh" ? "zh-Hant" : lng);
+
 // Save language change to localStorage
 i18n.on("languageChanged", (lng) => {
   localStorage.setItem("i18nextLng", lng);
   // Update HTML document lang attribute
-  document.documentElement.lang = lng;
+  document.documentElement.lang = htmlLang(lng);
 });
 // 上面的監聽器掛上時 init 已經同步跑完（資源是內嵌的），第一次的
 // languageChanged 早就發過了——不補這一行，重新整理後 <html lang> 是空的，
 // index.css 依語言換內文字型的 :lang() 規則要等使用者手動換一次語言才生效。
-document.documentElement.lang = i18n.resolvedLanguage || i18n.language || "zh";
+document.documentElement.lang = htmlLang(i18n.resolvedLanguage || i18n.language || "zh");
 
 export default i18n;

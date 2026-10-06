@@ -57,7 +57,9 @@ export interface ChipLabel {
 export function chipLabel({ aiState, mood, intensity, t }: ChipLabelInput): ChipLabel {
   // 不是空閒就說她在做什麼——思考／說話、聆聽、載入⋯⋯這時候心情不是重點，
   // 而且這顆膠囊接手了原本狀態徽章的 aria-live，讀螢幕要聽得到狀態。
-  if (aiState !== 'idle') {
+  // waiting 例外、當成空閒：那是「使用者在打字」，use-footer 每按一個鍵就設
+  // 一次、2 秒後回 idle，跟著換字的話打字時膠囊會一直閃（aria-live 也會一直念）。
+  if (aiState !== 'idle' && aiState !== 'waiting') {
     return { text: t(`aiState.${aiState}`), tone: 'busy' };
   }
   // 淡到門檻以下、或引擎之後多了這裡不認得的詞，都當成沒有心情。

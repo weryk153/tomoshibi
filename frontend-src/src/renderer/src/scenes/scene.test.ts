@@ -120,7 +120,7 @@ test("場景資料正規化限制數值並阻擋可執行 URL", () => {
   assert.equal(room.opacity, 1);
   assert.equal(room.transitionMs, 0);
   assert.equal(room.model.cameraFov, 100);
-  assert.equal(room.model.backgroundColor, "#10131a");
+  assert.equal(room.model.backgroundColor, "#0a0a0e");
 });
 
 test("Live2D 場景保留獨立縮放、位置與視差設定", () => {

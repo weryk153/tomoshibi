@@ -54,7 +54,7 @@ test('a mood word the engine invents later falls back to neutral', () => {
 });
 
 test('a non-idle state replaces the mood with the state label', () => {
-  for (const aiState of ['thinking-speaking', 'listening', 'interrupted', 'loading', 'waiting']) {
+  for (const aiState of ['thinking-speaking', 'listening', 'interrupted', 'loading']) {
     assert.deepEqual(
       chipLabel({ aiState, mood: 'happy', intensity: 0.9, t }),
       { text: `aiState.${aiState}`, tone: 'busy' },
@@ -67,4 +67,13 @@ test('back to idle returns to the mood', () => {
   const idle = chipLabel({ aiState: 'idle', mood: 'sad', intensity: 0.5, t });
   assert.equal(busy.tone, 'busy');
   assert.deepEqual(idle, { text: 'mood.sad', tone: 'accent2' });
+});
+
+test('waiting (the user is typing) keeps showing the mood instead of flickering', () => {
+  // use-footer 每按一個鍵就把狀態設成 waiting，2 秒後回 idle；
+  // 膠囊要是跟著換字，打字時會在「心情」和「等待中」之間一直閃。
+  assert.deepEqual(
+    chipLabel({ aiState: 'waiting', mood: 'happy', intensity: 0.8, t }),
+    { text: 'mood.happy', tone: 'accent' },
+  );
 });

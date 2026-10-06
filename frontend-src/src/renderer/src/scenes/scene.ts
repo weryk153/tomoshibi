@@ -79,7 +79,7 @@ const SCENE_DEFAULTS: ScenePreset = {
     directionalIntensity: 2,
     autoRotate: false,
     rotationSpeed: 0.15,
-    backgroundColor: "#10131a",
+    backgroundColor: "#0a0a0e",
   },
 };
 

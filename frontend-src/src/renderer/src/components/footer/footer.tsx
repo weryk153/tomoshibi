@@ -119,40 +119,38 @@ const MessageInput = memo(({
   // 以接——按下去毫無反應。等真的做附加檔案再放回來。
   return (
     <Box {...footerStyles.footer.inputSlot}>
-      <Box {...footerStyles.footer.inputBox}>
-        <Textarea
-          rows={1}
-          value={value}
-          onChange={onChange}
-          onKeyDown={onKeyDown}
-          onCompositionStart={onCompositionStart}
-          onCompositionEnd={onCompositionEnd}
-          disabled={disabled}
-          placeholder={placeholder}
-          aria-label={t('footer.typeYourMessage')}
-          {...footerStyles.footer.input(showHand)}
-        />
-        <Box {...footerStyles.footer.inlineButtons}>
-          {showHand && (
-            <IconButton
-              aria-label={handLabel}
-              title={handLabel}
-              onClick={onInterrupt}
-              {...footerStyles.footer.interruptButton}
-            >
-              <IoHandRightSharp size="15" aria-hidden="true" />
-            </IconButton>
-          )}
+      <Textarea
+        rows={1}
+        value={value}
+        onChange={onChange}
+        onKeyDown={onKeyDown}
+        onCompositionStart={onCompositionStart}
+        onCompositionEnd={onCompositionEnd}
+        disabled={disabled}
+        placeholder={placeholder}
+        aria-label={t('footer.typeYourMessage')}
+        {...footerStyles.footer.input(showHand)}
+      />
+      <Box {...footerStyles.footer.inlineButtons}>
+        {showHand && (
           <IconButton
-            aria-label={t('footer.send')}
-            title={t('footer.send')}
-            disabled={disabled || !hasText}
-            onClick={onSend}
-            {...footerStyles.footer.sendButton(hasText)}
+            aria-label={handLabel}
+            title={handLabel}
+            onClick={onInterrupt}
+            {...footerStyles.footer.interruptButton}
           >
-            <LuSend size="16" aria-hidden="true" />
+            <IoHandRightSharp size="15" aria-hidden="true" />
           </IconButton>
-        </Box>
+        )}
+        <IconButton
+          aria-label={t('footer.send')}
+          title={t('footer.send')}
+          disabled={disabled || !hasText}
+          onClick={onSend}
+          {...footerStyles.footer.sendButton(hasText)}
+        >
+          <LuSend size="16" aria-hidden="true" />
+        </IconButton>
       </Box>
     </Box>
   );
@@ -182,8 +180,12 @@ function Footer({ isCollapsed = false, onToggle }: FooterProps): JSX.Element {
       <ToggleButton isCollapsed={isCollapsed} onToggle={onToggle} />
 
       <Box {...footerStyles.footer.row}>
-        <CharacterChip />
-        <MicButton micOn={micOn} onMicToggle={handleMicToggle} />
+        <Box {...footerStyles.footer.lineSlot}>
+          <CharacterChip />
+        </Box>
+        <Box {...footerStyles.footer.lineSlot}>
+          <MicButton micOn={micOn} onMicToggle={handleMicToggle} />
+        </Box>
         <MessageInput
           value={inputValue}
           onChange={handleInputChange}
