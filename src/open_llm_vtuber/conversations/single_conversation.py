@@ -138,11 +138,25 @@ async def process_single_conversation(
         spoken = not isinstance(user_input, str) and not is_proactive
 
         # Process user input
+        skip_history = metadata and metadata.get("skip_history", False)
+
+        def store_human(text: str) -> None:
+            if context.history_uid and not skip_history:
+                store_message(
+                    conf_uid=context.character_config.conf_uid,
+                    history_uid=context.history_uid,
+                    role="human",
+                    content=text,
+                    name=context.character_config.human_name,
+                )
+
         input_text = await process_user_input(
             user_input,
             context.asr_engine,
             websocket_send,
             repair=asr_repair.repairer(context) if spoken else None,
+            # 還原時被打斷：她沒聽到，但紀錄裡要有使用者講的那句（原文）。
+            on_cancelled=store_human,
         )
 
         # 給 agent 的兩件它自己分不出來的事：這一輪屬於哪段對話（agent 是所有連線
@@ -161,15 +175,7 @@ async def process_single_conversation(
         )
 
         # Store user message (check if we should skip storing to history)
-        skip_history = metadata and metadata.get("skip_history", False)
-        if context.history_uid and not skip_history:
-            store_message(
-                conf_uid=context.character_config.conf_uid,
-                history_uid=context.history_uid,
-                role="human",
-                content=input_text,
-                name=context.character_config.human_name,
-            )
+        store_human(input_text)
 
         if skip_history:
             logger.debug("Skipping storing user input to history (proactive speak)")

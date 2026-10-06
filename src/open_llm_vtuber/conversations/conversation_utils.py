@@ -444,11 +444,15 @@ async def process_user_input(
     websocket_send: WebSocketSend,
     *,
     repair: Optional[Callable[[str], Awaitable[str]]] = None,
+    on_cancelled: Optional[Callable[[str], None]] = None,
 ) -> str:
     """Process user input, converting audio to text if needed
 
     repair 是 ASR 還原（asr_repair.repairer）：只用在語音辨識出來的字，打的字不碰。
     畫面上的轉寫、她讀到的、記下來的都是還原後的字。
+
+    還原要等最多幾秒；這段時間被打斷時，使用者講的那句不能就這樣不見：照樣
+    送出轉寫、交給 on_cancelled 記下原文，再讓取消繼續往上傳。
     """
     if isinstance(user_input, np.ndarray):
         if asr_engine is None:
@@ -470,7 +474,16 @@ async def process_user_input(
         logger.info("Transcribing audio input...")
         input_text = await asr_engine.async_transcribe_np(user_input)
         if repair is not None and input_text:
-            input_text = await repair(input_text)
+            raw_text = input_text
+            try:
+                input_text = await repair(raw_text)
+            except asyncio.CancelledError:
+                await websocket_send(
+                    json.dumps({"type": "user-input-transcription", "text": raw_text})
+                )
+                if on_cancelled is not None:
+                    on_cancelled(raw_text)
+                raise
         await websocket_send(
             json.dumps({"type": "user-input-transcription", "text": input_text})
         )

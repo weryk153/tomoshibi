@@ -20,6 +20,7 @@ from typing import Any, Awaitable, Callable, Iterable, Optional, Sequence
 import httpx
 from loguru import logger
 
+from .character_engine.factory import REASONING_KEYS
 from .chat_history_manager import get_history
 from .conversations.conversation_utils import derive_voice_lang
 from .translate.catchphrases import only_catchphrases
@@ -32,21 +33,18 @@ MIN_CONFIDENCE = 0.7
 MIN_RATIO = 0.5
 MAX_RATIO = 2.0
 MIN_RAW_LENGTH = 2
-# 中文諧音換成假名時，每拿掉一個漢字最多多幾個假名（長音、拗音會多一點）。
+# 中文諧音換成假名時，每拿掉一個漢字最多多幾拍（拗音、促音、長音不算一拍）。
+# 羅馬字換成假名時，兩個字母算一個音節。
 KANA_PER_HAN = 1.5
+LETTERS_PER_SYLLABLE = 2
+# 中文換中文最多換幾個字；每個換掉的字都要同音或近音。
+MAX_CHANGED_HAN = 2
 # 給模型看的上下文：最近幾輪（她一句＋使用者一句算一輪）、每一句最多幾個字。
 # 模型讀提示的速度約每秒三四百 token，而且快取用不上：上下文越長越慢。最後兩句
 # （通常是她要對方念的那句）留長一點，更早的只留結尾。
 ROUNDS = 6
 LINE_CHARS = 80
 OLDER_LINE_CHARS = 30
-# 只帶思考開關（同 character_engine/factory.py 的背景工作），取樣參數不帶。
-_REASONING_KEYS = (
-    "reasoning_effort",
-    "reasoning",
-    "chat_template_kwargs",
-    "enable_thinking",
-)
 _LANG_NAMES = {"ja": "Japanese", "zh": "Chinese", "en": "English", "ko": "Korean"}
 
 SYSTEM_PROMPT = """\
@@ -73,7 +71,16 @@ _HAN = re.compile(r"[一-鿿㐀-䶿]")
 _KANA = re.compile(r"[぀-ゟ゠-ヿ]")
 _KANA_RUN = re.compile(r"[぀-ゟ゠-ヿ]+")
 _DIGITS = re.compile(r"[0-9０-９]+")
-_KANA_OR_LATIN = re.compile(r"[぀-ゟ゠-ヿA-Za-z]")
+_LATIN = re.compile(r"[A-Za-zＡ-Ｚａ-ｚ]")
+# 不算一拍的假名：拗音、促音、小寫母音、長音。
+_NOT_A_MORA = set("ゃゅょっぁぃぅぇぉゎャュョッァィゥェォヮー")
+_INITIALS = (
+    "zh", "ch", "sh", "b", "p", "m", "f", "d", "t", "n", "l",
+    "g", "k", "h", "j", "q", "x", "r", "z", "c", "s", "y", "w",
+)  # fmt: skip
+# 近音：台灣口音常混的聲母、韻母（平翹舌、n/l、前後鼻音），以及 uan/an、uo/o。
+_FUZZY_INITIALS = {"zh": "z", "ch": "c", "sh": "s", "l": "n"}
+_FUZZY_FINALS = {"ang": "an", "eng": "en", "ing": "in", "uan": "an", "uo": "o"}
 
 
 @lru_cache(maxsize=1)
@@ -90,6 +97,31 @@ def _bare(text: str) -> str:
     return _FILLER.sub("", text or "")
 
 
+def _morae(text: str) -> int:
+    return sum(1 for char in _KANA.findall(text) if char not in _NOT_A_MORA)
+
+
+def _fuzzy(syllable: str) -> str:
+    initial = next((i for i in _INITIALS if syllable.startswith(i)), "")
+    final = syllable[len(initial) :]
+    return _FUZZY_INITIALS.get(initial, initial) + _FUZZY_FINALS.get(final, final)
+
+
+@lru_cache(maxsize=4096)
+def _readings(char: str) -> frozenset:
+    """一個字所有的讀音（不帶聲調、近音合併）；不是漢字就是空的。"""
+    from pypinyin import Style, pinyin
+
+    if not _HAN.match(char):
+        return frozenset()
+    readings = pinyin(char, style=Style.NORMAL, heteronym=True, errors="ignore")
+    return frozenset(_fuzzy(r) for r in (readings[0] if readings else []))
+
+
+def _sounds_alike(a: str, b: str) -> bool:
+    return bool(_readings(a) & _readings(b))
+
+
 def accept(
     raw: str,
     fixed: str,
@@ -97,13 +129,15 @@ def accept(
     *,
     catchphrases: Iterable[str] = (),
     earlier: Iterable[str] = (),
+    her_lines: Iterable[str] = (),
     context: Optional[str] = None,
 ) -> bool:
     """模型的還原要不要採用。不過就用原文。
 
-    earlier 是使用者前面講過的話：模型有時把上一句整句抄過來當「還原」。
-    context 是模型看到的對話；給了的話，中文諧音換成的假名要是她剛講過的
-    （沒上下文時模型會把「哈囉」翻成「ハロー」）。
+    earlier 是使用者前面講過的話：模型有時把上一句整句抄過來當「還原」。但她
+    要對方再念一次的時候（her_lines 裡有這句），跟上一句一樣是對的。
+    context 是模型看到的對話；給了的話，中文諧音或羅馬字換成的假名要是她剛講
+    過的（沒上下文時模型會把「哈囉」翻成「ハロー」）。
     """
     raw = (raw or "").strip()
     fixed = (fixed or "").strip()
@@ -119,26 +153,38 @@ def accept(
     # 只差標點、空白：不算還原。
     if bare_raw == bare_fixed:
         return False
-    # 中文換中文：同音字是一個字換一個字，字數變了就是潤飾或改寫。
-    if not _KANA_OR_LATIN.search(raw + fixed) and len(bare_raw) != len(bare_fixed):
-        return False
     # 只換了字形（繁簡、日文新字體）：不是還原，是改了使用者的寫法。
     simplified = _simplified()
     if simplified(bare_raw) == simplified(bare_fixed):
         return False
-    # 中文諧音換成假名：一個字大約一個音節。假名多出一大截就是翻譯，不是還原。
+    # 中文換中文（拉丁字母那部分不算）：同音字是一個字換一個字，字數變了就是
+    # 潤飾或改寫；字數一樣也要每個換掉的字都同音或近音，而且只換幾個字。
+    if not _KANA.search(raw + fixed):
+        core_raw, core_fixed = _bare(_LATIN.sub("", raw)), _bare(_LATIN.sub("", fixed))
+        if len(core_raw) != len(core_fixed):
+            return False
+        changed = [(a, b) for a, b in zip(core_raw, core_fixed) if a != b]
+        if len(changed) > MAX_CHANGED_HAN:
+            return False
+        if not all(_sounds_alike(a, b) for a, b in changed):
+            return False
+    # 中文諧音或羅馬字換成假名：一個字（兩個字母）大約一拍。多出一大截就是
+    # 翻譯，不是還原。
     han_removed = len(_HAN.findall(raw)) - len(_HAN.findall(fixed))
-    kana_added = len(_KANA.findall(fixed)) - len(_KANA.findall(raw))
-    if kana_added > 0 and kana_added > KANA_PER_HAN * max(han_removed, 0):
+    latin_removed = len(_LATIN.findall(raw)) - len(_LATIN.findall(fixed))
+    morae_added = _morae(fixed) - _morae(raw)
+    sounds = max(han_removed, 0) + max(latin_removed, 0) / LETTERS_PER_SYLLABLE
+    if morae_added > 0 and morae_added > KANA_PER_HAN * sounds:
         return False
-    if context is not None and kana_added > 0 and han_removed > 0:
+    if context is not None and morae_added > 0 and sounds > 0:
         new_kana = set(_KANA_RUN.findall(fixed)) - set(_KANA_RUN.findall(raw))
         if any(run not in context for run in new_kana):
             return False
     # 數字照原樣（50音 不是 五十音）。
     if _DIGITS.findall(raw) != _DIGITS.findall(fixed):
         return False
-    if any(_bare(line) == bare_fixed for line in earlier):
+    asked_for = any(bare_fixed in _bare(line) for line in her_lines)
+    if not asked_for and any(_bare(line) == bare_fixed for line in earlier):
         return False
     return True
 
@@ -243,12 +289,14 @@ async def repair(
     fixed, confidence, note = parsed
     fixed = _unquote(fixed, raw)
     earlier = [said for who, said in transcript if user and who == user]
+    her_lines = [said for who, said in transcript if user and who != user]
     taken = accept(
         raw,
         fixed,
         confidence,
         catchphrases=catchphrases,
         earlier=earlier,
+        her_lines=her_lines,
         context="\n".join(said for _, said in transcript),
     )
     logger.info(
@@ -301,11 +349,43 @@ def transcript_from(
         )
         lines.append((str(who), content))
     lines = lines[-2 * ROUNDS :]
+    taught = next(
+        (
+            index
+            for index in range(len(lines) - 1, -1, -1)
+            if lines[index][0] != human_name and _TAUGHT.search(lines[index][1])
+        ),
+        None,
+    )
     for index, (who, content) in enumerate(lines):
+        if index == taught:
+            lines[index] = (who, _around_the_phrase(content))
+            continue
         limit = LINE_CHARS if index >= len(lines) - 2 else OLDER_LINE_CHARS
         if len(content) > limit:
             lines[index] = (who, "…" + content[-limit:])
     return lines
+
+
+# 她要對方念的句子：「引號」裡的字或一段假名。
+_TAUGHT = re.compile(r"「[^」]*」|[぀-ゟ゠-ヿ]{2,}")
+
+
+def _around_the_phrase(content: str) -> str:
+    """她最近那句有要對方念的句子：留住那一段（取最後一個帶假名的，沒有就最後一個引號）。"""
+    if len(content) <= LINE_CHARS:
+        return content
+    matches = list(_TAUGHT.finditer(content))
+    with_kana = [m for m in matches if _KANA.search(m.group())]
+    phrase = (with_kana or matches)[-1]
+    start = max(0, min(phrase.end() + 15 - LINE_CHARS, phrase.start()))
+    end = min(len(content), start + LINE_CHARS)
+    start = max(0, end - LINE_CHARS)
+    return (
+        ("…" if start else "")
+        + content[start:end]
+        + ("…" if end < len(content) else "")
+    )
 
 
 def recent_transcript(context: Any) -> list[tuple[str, str]]:
@@ -348,7 +428,7 @@ def _client(character: Any) -> Optional[ChatClient]:
         request_options={
             "temperature": 0,
             "max_tokens": MAX_TOKENS,
-            **{k: v for k, v in extra_body.items() if k in _REASONING_KEYS},
+            **{k: v for k, v in extra_body.items() if k in REASONING_KEYS},
         },
     )
 

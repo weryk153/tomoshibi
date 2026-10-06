@@ -139,6 +139,64 @@ def test_rejects_a_fix_that_copies_an_earlier_user_line():
     assert accept("太暖的", "太難的", 0.95, earlier=earlier)
 
 
+def test_the_length_ratio_bounds_are_inclusive():
+    assert accept("abcdefgh", "abcd", 0.95)  # 0.5
+    assert not accept("abcdefgh", "abc", 0.95)
+    assert accept("ab", "abcd", 0.95)  # 2.0
+    assert not accept("ab", "abcde", 0.95)
+
+
+def test_a_chinese_fix_must_sound_like_what_it_replaces():
+    # 字數一樣也可能改了意思：換掉的字要同音或近音。
+    assert not accept("我不要吃飯", "我也要吃飯", 0.95)
+    assert not accept("你是 AI 嗎？", "你是 AI 吧？", 0.95)
+    assert not accept("你打疫苗關現也不舒服。", "你打疫苗現在也不舒服。", 0.95)
+    assert accept("太暖的", "太難的", 0.95)  # nuan／nan
+    assert accept("叫我日文", "教我日文", 0.95)  # 同音
+    assert accept("我是說四十", "我是說是時", 0.95)  # 平翹舌不分
+
+
+def test_at_most_two_chinese_characters_change():
+    assert accept("期中考", "其終考", 0.95)
+    assert not accept("期中考", "其終烤", 0.95)
+
+
+def test_latin_letters_do_not_switch_off_the_chinese_rules():
+    assert not accept("用 ASR 說的什麼聽不懂", "用 ASR 說的什麼都聽不懂", 0.95)
+    assert not accept("我不要 coffee", "我也要 coffee", 0.95)
+    assert accept("用 ASR 說太暖了", "用 ASR 說太難了", 0.95)
+
+
+def test_kana_is_counted_in_morae():
+    # 拗音、促音、長音不算一拍：きょう 是兩拍。
+    assert accept("給我寇", "給我コー", 0.95)
+    assert accept("給我寇寇", "給我きょきょ", 0.95)
+    assert not accept("給我寇", "給我コーヒー", 0.95)
+
+
+def test_romaji_can_become_the_kana_she_taught():
+    said = "跟著我念「こんにちは」！"
+    assert accept("konnichiwa", "こんにちは", 0.95, context=said)
+    assert accept("ohayou gozaimasu", "おはようございます", 0.95)
+    assert not accept("thank you", "ありがとう", 0.95, context=said)
+
+
+def test_she_may_ask_for_the_line_the_user_already_said():
+    # 跟讀重來：使用者上一句已經被還原成「こんにちは」，她又要他再念一次。
+    said = "再念一次「こんにちは」！"
+    assert accept(
+        "空尼七哇",
+        "こんにちは",
+        0.95,
+        earlier=["こんにちは"],
+        her_lines=[said],
+        context=said,
+    )
+    assert not accept(
+        "空尼七哇", "こんにちは", 0.95, earlier=["こんにちは"], her_lines=["好"]
+    )
+
+
 # --- repair() --------------------------------------------------------------------
 
 
@@ -177,6 +235,20 @@ def test_repair_will_not_copy_an_earlier_user_line():
     )
     assert result.text == "叫我日文"
     assert not result.changed
+
+
+def test_repair_lets_her_ask_for_a_repeat():
+    transcript = [("User", "こんにちは"), ("Pekora", "再念一次「こんにちは」！")]
+    result = asyncio.run(
+        repair(
+            "空尼七哇",
+            transcript,
+            client=FakeClient(_reply("こんにちは", 0.95)),
+            languages=LANGS,
+            user="User",
+        )
+    )
+    assert result.text == "こんにちは"
 
 
 def test_repair_keeps_the_original_on_low_confidence():
@@ -337,7 +409,7 @@ def test_the_transcript_keeps_only_the_last_six_rounds(monkeypatch):
 
 
 def test_older_lines_are_cut_shorter_than_the_last_two():
-    long = "あ" * 200
+    long = "哈" * 200
     history = [
         {"role": "human", "content": "u0", "name": "me"},
         {"role": "ai", "content": long, "name": "Pekora"},
@@ -345,10 +417,34 @@ def test_older_lines_are_cut_shorter_than_the_last_two():
         {"role": "ai", "content": long + "跟著我念", "name": "Pekora"},
     ]
     lines = asr_repair.transcript_from(history, "me", "Pekora")
-    assert lines[1][1] == "…" + "あ" * asr_repair.OLDER_LINE_CHARS
+    assert lines[1][1] == "…" + "哈" * asr_repair.OLDER_LINE_CHARS
     # 她最後一句的結尾（通常是要對方念的那句）留得比較長。
     assert lines[3][1].endswith("跟著我念")
     assert len(lines[3][1]) == asr_repair.LINE_CHARS + 1
+
+
+def test_the_phrase_she_taught_survives_in_an_older_line():
+    taught = "前" * 100 + "試著跟著我念：「さようなら」，意思是再見！" + "後" * 100
+    history = [
+        {"role": "ai", "content": taught, "name": "Pekora"},
+        {"role": "human", "content": "咋嬌娜娜", "name": "me"},
+        {"role": "ai", "content": "不對喔，" + "再" * 60, "name": "Pekora"},
+        {"role": "human", "content": "什麼", "name": "me"},
+    ]
+    lines = asr_repair.transcript_from(history, "me", "Pekora")
+    assert "「さようなら」" in lines[0][1]
+    assert len(lines[0][1]) <= asr_repair.LINE_CHARS + 2
+    # 沒有要念的句子的舊句子照樣只留結尾。
+    assert len(lines[2][1]) <= asr_repair.LINE_CHARS + 1
+
+
+def test_the_repairer_keeps_the_line_when_the_history_cannot_be_read(monkeypatch):
+    def broken(conf_uid, history_uid):
+        raise OSError("disk")
+
+    monkeypatch.setattr(asr_repair, "get_history", broken)
+    fix = asr_repair.repairer(_context())
+    assert asyncio.run(fix("空尼七哇")) == "空尼七哇"
 
 
 # --- process_user_input -----------------------------------------------------------
@@ -403,6 +499,32 @@ def test_without_a_repairer_the_line_is_untouched():
     text, sent = _process(AUDIO, None)
     assert text == "空尼七哇"
     assert sent == [{"type": "user-input-transcription", "text": "空尼七哇"}]
+
+
+def test_an_interrupt_during_the_repair_keeps_the_line():
+    sent, kept = [], []
+
+    async def send(message):
+        sent.append(json.loads(message))
+
+    async def slow(text):
+        await asyncio.sleep(10)
+        return "こんにちは"
+
+    async def main():
+        task = asyncio.create_task(
+            conversation_utils.process_user_input(
+                AUDIO, _ASR(), send, repair=slow, on_cancelled=kept.append
+            )
+        )
+        await asyncio.sleep(0.01)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+    asyncio.run(main())
+    assert sent == [{"type": "user-input-transcription", "text": "空尼七哇"}]
+    assert kept == ["空尼七哇"]
 
 
 # --- 單人對話 ---------------------------------------------------------------------
@@ -505,3 +627,30 @@ def test_a_spoken_group_line_is_repaired_once_for_everyone(monkeypatch):
     )
     assert text == "こんにちは"
     assert broadcast and broadcast[0][2] == "こんにちは"
+
+
+def test_an_interrupted_single_turn_still_records_what_was_said(monkeypatch):
+    stored = []
+
+    async def interrupted(text):
+        raise asyncio.CancelledError
+
+    async def nothing(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr(asr_repair, "repairer", lambda context: interrupted)
+    monkeypatch.setattr(single_conversation, "send_conversation_start_signals", nothing)
+    monkeypatch.setattr(single_conversation, "cleanup_conversation", lambda *a: None)
+    monkeypatch.setattr(
+        single_conversation, "store_message", lambda **kw: stored.append(kw)
+    )
+    context = _context()
+    context.agent_engine = object()
+    context.asr_engine = _ASR()
+    with pytest.raises(asyncio.CancelledError):
+        asyncio.run(
+            single_conversation.process_single_conversation(
+                context, nothing, "client", AUDIO
+            )
+        )
+    assert [(m["role"], m["content"]) for m in stored] == [("human", "空尼七哇")]

@@ -22,7 +22,7 @@ from ..character_mood import mood_message
 # 背景工作要的是穩定的 JSON，不是有個性的對話。只帶「關掉思考模式」這類欄位：
 # 沒帶的話每個背景工作都會先思考到逾時（舊的記憶整理出過同一件事）；
 # 而對話用的 presence_penalty／repeat_penalty 會懲罰 JSON 裡本來就該重複的鍵名。
-_REASONING_KEYS = (
+REASONING_KEYS = (
     "reasoning_effort",
     "reasoning",
     "chat_template_kwargs",
@@ -129,7 +129,7 @@ def _clients(
     if extra_body:
         talking["extra_body"] = extra_body
     thinking = {"temperature": WORKER_TEMPERATURE, "max_tokens": WORKER_MAX_TOKENS}
-    switches = {k: v for k, v in extra_body.items() if k in _REASONING_KEYS}
+    switches = {k: v for k, v in extra_body.items() if k in REASONING_KEYS}
     if switches:
         thinking["extra_body"] = switches
 

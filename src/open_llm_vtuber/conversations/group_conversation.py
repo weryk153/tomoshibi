@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 import asyncio
 import json
 from loguru import logger
@@ -87,6 +87,17 @@ async def process_group_conversation(
         # 音訊進來就是用講的；轉成文字之後就分不出來了，所以在轉之前看。
         spoken = not isinstance(user_input, str) and not skip_history
 
+        def store_human(text: str) -> None:
+            for member_uid in group_members:
+                member_context = client_contexts[member_uid]
+                store_message(
+                    conf_uid=member_context.character_config.conf_uid,
+                    history_uid=member_context.history_uid,
+                    role="human",
+                    content=text,
+                    name=human_name,
+                )
+
         input_text = await process_group_input(
             user_input=user_input,
             initiator_context=initiator_context,
@@ -95,18 +106,12 @@ async def process_group_conversation(
             group_members=group_members,
             initiator_client_uid=initiator_client_uid,
             is_user_speech=not skip_history,
+            # 還原時被打斷：紀錄裡照樣要有使用者講的那句（原文）。
+            on_cancelled=None if skip_history else store_human,
         )
 
         if not skip_history:
-            for member_uid in group_members:
-                member_context = client_contexts[member_uid]
-                store_message(
-                    conf_uid=member_context.character_config.conf_uid,
-                    history_uid=member_context.history_uid,
-                    role="human",
-                    content=input_text,
-                    name=human_name,
-                )
+            store_human(input_text)
         else:
             logger.debug("Skipping storing proactive speak input to group history")
 
@@ -204,6 +209,7 @@ async def process_group_input(
     group_members: List[str],
     initiator_client_uid: str,
     is_user_speech: bool = True,
+    on_cancelled: Optional[Callable[[str], None]] = None,
 ) -> str:
     """Process and broadcast user input to group.
 
@@ -217,6 +223,7 @@ async def process_group_input(
         initiator_context.asr_engine,
         initiator_ws_send,
         repair=asr_repair.repairer(initiator_context) if is_user_speech else None,
+        on_cancelled=on_cancelled,
     )
     if is_user_speech:
         await broadcast_transcription(

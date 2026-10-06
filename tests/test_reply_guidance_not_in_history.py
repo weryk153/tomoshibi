@@ -11,6 +11,8 @@ from src.open_llm_vtuber.conversations import single_conversation
 
 def test_history_and_the_agent_both_get_the_raw_user_text():
     src = inspect.getsource(single_conversation.process_single_conversation)
+    # 歷史經 store_human 寫入（還原時被打斷也走同一個函式）。
     store_call = src.split("store_message(", 1)[1]
-    assert "content=input_text," in store_call
+    assert "content=text," in store_call
+    assert "store_human(input_text)" in src
     assert "input_text=input_text," in src
