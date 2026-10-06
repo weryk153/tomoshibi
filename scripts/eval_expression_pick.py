@@ -121,7 +121,9 @@ async def run(args) -> list[dict]:
             except Exception as e:  # noqa: BLE001 — 記下來給人看
                 error = f"{type(e).__name__}: {e}"
             seconds = time.monotonic() - started
-            picked = pick_actions(line, expressions, list(motions), raw) if raw else None
+            picked = (
+                pick_actions(line, expressions, list(motions), raw) if raw else None
+            )
             rows.append(
                 {
                     "line": line,
@@ -263,9 +265,7 @@ def render(groups: list[dict], args) -> str:
                     return "<td class='null'>—</td>"
                 return f"<td><span class='chip'>{html.escape(value)}</span></td>"
 
-            intensity = (
-                f"{picked['intensity']:.2f}" if expression and picked else "—"
-            )
+            intensity = f"{picked['intensity']:.2f}" if expression and picked else "—"
             parts.append(
                 f"<tr class='{'late' if row['late'] else ''}'><td class='num'>{i}</td>"
                 f"<td>{html.escape(row['line'])}{note}</td><td class='null'>unknown</td>"
