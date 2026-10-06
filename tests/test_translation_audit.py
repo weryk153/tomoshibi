@@ -255,7 +255,10 @@ def _flagged_reply():
                 {
                     "i": 1,
                     "ok": False,
-                    "issues": [{"kind": "name", "detail": "ぺこら written as ペコラ"}],
+                    "issues": [
+                        {"kind": "name", "detail": "ぺこら written as ペコラ"},
+                        {"kind": "catchphrase", "detail": "peko dropped"},
+                    ],
                     "suggest": {
                         "protected_names": {"ペコラ": "ぺこら"},
                         "catchphrases": {"peko": "ぺこ"},
@@ -549,3 +552,118 @@ def test_process_agent_output_passes_the_characters_auditor(monkeypatch):
             )
         )
         assert seen["translation_auditor"] is expected
+
+
+# ---------------------------------------------------------------- 實測後補的
+
+
+def test_parse_ignores_what_follows_the_json():
+    """9B 模型有時把整段 JSON 重複一次、尾巴多一個反引號。"""
+    one = '{"results": [{"i": 1, "ok": true, "issues": []}]}'
+    (result,) = parse_reply(one + ", " + one[1:] + "`", 1)
+    assert result["ok"] is True
+    (result,) = parse_reply("Here you go:\n" + one, 1)
+    assert result["ok"] is True
+
+
+@pytest.mark.parametrize(
+    "original, translated, target",
+    [
+        ("安安。", "安安。", "ja"),  # 沒翻
+        ("懂了嗎?", "理解了吗？", "ja"),  # 還是中文
+        (
+            "既然你不想學那些讓人頭痛的日語,那我們聊點輕鬆的?",
+            "Since you don't want to learn Japanese, shall we talk?",
+            "ja",
+        ),  # 整句英文
+    ],
+)
+def test_lines_plainly_not_in_the_target_language_are_flagged_without_the_model(
+    original, translated, target
+):
+    (issue,) = audit.plain_issues(original, translated, target)
+    assert issue["kind"] == "wrong_language"
+
+
+@pytest.mark.parametrize(
+    "original, translated, target",
+    [
+        ("沒事吧?", "大丈夫？", "ja"),  # 短的全漢字日文
+        ("知道了。", "了解。", "ja"),
+        (
+            "是想說「kommen」還是「kommenen」?",
+            "「kommen」なのか「kommenen」なのか？",
+            "ja",
+        ),
+        ("Asia/Taipei 00:14", "台北 00:14", "ja"),
+        ("你好", "こんにちは", "ja"),
+        ("こんにちは", "你好", "zh"),
+    ],
+)
+def test_plain_check_leaves_real_translations_alone(original, translated, target):
+    assert audit.plain_issues(original, translated, target) == []
+
+
+def test_plain_issues_are_recorded_even_when_the_model_says_ok(tmp_path):
+    auditor = _auditor(tmp_path, FakeClient(_ok(1)))
+
+    async def run():
+        await auditor.submit("懂了嗎?", "理解了吗？", "ja")
+        await auditor.flush()
+
+    asyncio.run(run())
+    (line,) = _lines(tmp_path)
+    assert [issue["kind"] for issue in line["issues"]] == ["wrong_language"]
+
+
+def test_suggestions_need_an_issue_of_their_kind(tmp_path):
+    """模型說句子沒問題、或只報了別種問題時，順手給的建議不算。"""
+    reply = json.dumps(
+        {
+            "results": [
+                {
+                    "ok": False,
+                    "issues": [{"kind": "name", "detail": "x"}],
+                    "suggest": {
+                        "protected_names": {"ペコラ": "ぺこら"},
+                        "catchphrases": {"哈哈哈": "ハハハ"},
+                    },
+                }
+            ]
+        }
+    )
+    auditor = _auditor(tmp_path, FakeClient(reply))
+
+    async def run():
+        await auditor.submit("哈哈哈佩克拉", "哈哈哈ペコラ", "ja")
+        await auditor.flush()
+
+    asyncio.run(run())
+    (line,) = _lines(tmp_path)
+    assert line["suggest"] == {
+        "protected_names": {"ペコラ": "ぺこら"},
+        "catchphrases": {},
+    }
+
+
+def test_foreign_words_copied_from_the_source_are_not_wrong_language(tmp_path):
+    """她教對方念的外語詞照抄是對的；模型常把它標成 wrong_language。"""
+    flagged = json.dumps(
+        {
+            "results": [
+                {"ok": False, "issues": [{"kind": "wrong_language", "detail": "x"}]},
+                {"ok": False, "issues": [{"kind": "wrong_language", "detail": "x"}]},
+            ]
+        }
+    )
+    auditor = _auditor(tmp_path, FakeClient(flagged))
+
+    async def run():
+        await auditor.submit("哈哈哈,「The」?", "ハハハ、「The」？", "ja")
+        await auditor.submit("你那邊現在是凌晨喔?", "君の那边は夜明け前だ？", "ja")
+        await auditor.flush()
+
+    asyncio.run(run())
+    copied, drifted = _lines(tmp_path)
+    assert copied["issues"] == []
+    assert [issue["kind"] for issue in drifted["issues"]] == ["wrong_language"]

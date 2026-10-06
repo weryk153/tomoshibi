@@ -55,7 +55,7 @@ You review machine translations of a character's spoken lines. She wrote each li
 - name: a name is misspelled, replaced by a sound-alike, or written inconsistently
 - catchphrase: her catchphrase or verbal tic was dropped or translated away
 - meaning: the meaning is changed or inverted
-Natural rewording, a different politeness level, dropped filler words and punctuation are fine. Most translations are fine: then ok is true and issues is empty.
+Fine, not problems: natural rewording, a different politeness level, dropped filler words, punctuation, kanji in Japanese, a common noun translated normally, and words kept as they are in the source (quoted foreign words, names, numbers, typos). Most translations are fine: then ok is true and issues is empty.
 Suggest only fixes for problems you reported:
 - protected_names: {"<wrong spelling, exactly as in the translation>": "<correct spelling>"}
 - catchphrases: {"<catchphrase exactly as in the source>": "<how to write it in the target language>"}
@@ -125,11 +125,19 @@ def _result(raw: Any) -> Optional[dict]:
     }
 
 
+def _first_json(reply: str) -> Any:
+    """回覆裡第一個 JSON 值；後面多出來的不管（9B 模型會把整段重複一次）。"""
+    body = _FENCE.sub("", (reply or "").strip())
+    starts = [i for i in (body.find("{"), body.find("[")) if i >= 0]
+    if not starts:
+        raise ValueError("no JSON")
+    return json.JSONDecoder().raw_decode(body[min(starts) :])[0]
+
+
 def parse_reply(reply: str, count: int) -> Optional[list[Optional[dict]]]:
     """模型的回覆 → 每句一個結果（對不上的那句是 None）；整個讀不懂回 None。"""
-    body = _FENCE.sub("", (reply or "").strip())
     try:
-        data = json.loads(body)
+        data = _first_json(reply)
     except ValueError:
         return None
     if isinstance(data, dict):
@@ -147,20 +155,86 @@ def parse_reply(reply: str, count: int) -> Optional[list[Optional[dict]]]:
     return results
 
 
-def _grounded(suggest: Mapping[str, Mapping[str, str]], item: AuditItem) -> dict:
-    """建議要指得到句子：名字的錯誤寫法在譯句裡，口頭禪在原句裡（不分大小寫）。"""
+def _grounded(
+    suggest: Mapping[str, Mapping[str, str]], item: AuditItem, issues: list[dict]
+) -> dict:
+    """建議要有同類的問題，而且指得到句子：名字的錯誤寫法在譯句裡、口頭禪在
+    原句裡（不分大小寫）。模型說沒問題時順手給的建議，多半是把普通詞當口頭禪。
+    """
+    kinds = {issue["kind"] for issue in issues}
     return {
         "protected_names": {
             wrong: right
             for wrong, right in suggest.get("protected_names", {}).items()
-            if wrong in item.translated
+            if "name" in kinds and wrong in item.translated
         },
         "catchphrases": {
             source: target
             for source, target in suggest.get("catchphrases", {}).items()
-            if source.lower() in item.original.lower()
+            if "catchphrase" in kinds and source.lower() in item.original.lower()
         },
     }
+
+
+_KANA = re.compile(r"[぀-ゟ゠-ヿ]")
+_HAN = re.compile(r"[一-鿿㐀-䶿]")
+_LATIN = re.compile(r"[A-Za-z]")
+_LETTER = re.compile(r"[^\W\d_]")
+# 全漢字的日文短句（大丈夫？、了解。）是對的；長一點還一個假名都沒有、或帶著
+# 中文才有的虛字（吗、呢、這……），才算還是中文。
+MIN_HAN_WITHOUT_KANA = 5
+_CHINESE_ONLY = re.compile(r"[的吗嗎呢們们这這吧啊喔耶麼么沒没]")
+
+
+def _mostly_latin(text: str) -> bool:
+    letters = len(_LETTER.findall(text))
+    return letters > 0 and len(_LATIN.findall(text)) * 2 >= letters
+
+
+def plain_issues(original: str, translated: str, target_lang: str) -> list[dict]:
+    """不用問模型就看得出來的：沒翻、目標日文卻還是中文、整句跑成英文。
+
+    9B 模型自己常漏掉這幾種（實測：還是中文的句子它說沒問題）。
+    """
+    original, translated = (original or "").strip(), (translated or "").strip()
+    if not translated:
+        return []
+    if translated == original and _LETTER.search(original):
+        return [{"kind": "wrong_language", "detail": "not translated"}]
+    if _mostly_latin(translated) and not _mostly_latin(original):
+        return [{"kind": "wrong_language", "detail": "mostly Latin letters"}]
+    if (
+        target_lang == "ja"
+        and not _KANA.search(translated)
+        and (
+            len(_HAN.findall(translated)) >= MIN_HAN_WITHOUT_KANA
+            or (len(_HAN.findall(translated)) >= 2 and _CHINESE_ONLY.search(translated))
+        )
+    ):
+        return [{"kind": "wrong_language", "detail": "no kana: still Chinese"}]
+    return []
+
+
+_LATIN_WORD = re.compile(r"[A-Za-z][A-Za-z'-]*")
+
+
+def _only_copied_foreign_words(original: str, translated: str) -> bool:
+    """譯句是日文（有假名），裡面的拉丁字母詞都是原句照抄的（她要對方念的詞）。"""
+    words = _LATIN_WORD.findall(translated)
+    source = original.lower()
+    return (
+        bool(words)
+        and bool(_KANA.search(translated))
+        and all(word.lower() in source for word in words)
+    )
+
+
+def _merge(plain: list[dict], issues: list[dict], item: AuditItem) -> list[dict]:
+    """模型的 issues 加上看得出來的；照抄原句外語詞的 wrong_language 是誤報。"""
+    if _only_copied_foreign_words(item.original, item.translated):
+        issues = [issue for issue in issues if issue["kind"] != "wrong_language"]
+    kinds = {issue["kind"] for issue in issues}
+    return issues + [issue for issue in plain if issue["kind"] not in kinds]
 
 
 # --------------------------------------------------------------------- 存檔
@@ -322,29 +396,26 @@ class TranslationAuditor:
                 await self._audit(batch)
 
     async def _audit(self, batch: list[AuditItem]) -> None:
+        """問一次模型。模型沒回、回不懂：只記下不用模型也看得出錯的那幾句。"""
+        results: Optional[list[Optional[dict]]] = None
         messages = _messages(batch, self.character, self.names, self.catchphrases)
         try:
             reply = await asyncio.wait_for(self.client.complete(messages), self.timeout)
         except asyncio.TimeoutError:
-            logger.warning(
-                f"Translation audit timed out after {self.timeout}s; "
-                f"dropped {len(batch)} line(s)"
-            )
-            return
+            logger.warning(f"Translation audit timed out after {self.timeout}s")
         except Exception as e:
-            logger.warning(
-                f"Translation audit failed ({type(e).__name__}: {e}); "
-                f"dropped {len(batch)} line(s)"
-            )
-            return
-        results = parse_reply(reply, len(batch))
-        if results is None:
-            logger.warning(f"Translation audit: unreadable reply {reply[:200]!r}")
-            return
+            logger.warning(f"Translation audit failed ({type(e).__name__}: {e})")
+        else:
+            results = parse_reply(reply, len(batch))
+            if results is None:
+                logger.warning(f"Translation audit: unreadable reply {reply[:200]!r}")
         entries = []
-        for item, result in zip(batch, results):
-            if result is None:
+        for index, item in enumerate(batch):
+            result = results[index] if results else None
+            plain = plain_issues(item.original, item.translated, item.target_lang)
+            if result is None and not plain:
                 continue
+            issues = _merge(plain, result["issues"] if result else [], item)
             entries.append(
                 {
                     "time": item.time,
@@ -352,16 +423,21 @@ class TranslationAuditor:
                     "original": item.original,
                     "translated": item.translated,
                     "target_lang": item.target_lang,
-                    "issues": result["issues"],
-                    "suggest": _grounded(result["suggest"], item),
+                    "issues": issues,
+                    "suggest": _grounded(
+                        result["suggest"] if result else {}, item, issues
+                    ),
                 }
             )
-            if result["issues"]:
-                kinds = ",".join(issue["kind"] for issue in result["issues"])
+            if issues:
+                kinds = ",".join(issue["kind"] for issue in issues)
                 logger.info(
                     f"Translation audit [{kinds}]: '{item.original}' -> "
                     f"'{item.translated}'"
                 )
+        skipped = len(batch) - len(entries)
+        if skipped:
+            logger.debug(f"Translation audit: {skipped} line(s) not reviewed")
         try:
             await asyncio.to_thread(self.store.record, entries)
         except Exception as e:
