@@ -1006,7 +1006,20 @@ class ServiceContext:
             rules = f"{rules}\n\n{ACTION_RULES}"
         persona_prompt = f"{rules}\n\n{persona_prompt}"
 
+        # 表情與動作由背景模型逐句挑（expression_pick）時，不教她寫標籤。
+        # 「提示只增不改」顧的是同一模式下的快取；切模式本來就整段重讀。
+        from .expression_pick import uses_background_expressions
+
+        tags_by_background = uses_background_expressions(target_character)
+
         for prompt_name, prompt_file in self.system_config.tool_prompts.items():
+            if tags_by_background and prompt_name in (
+                "live2d_expression_prompt",
+                "live2d_motion_prompt",
+                "vrm_motion_prompt",
+            ):
+                continue
+
             if (
                 prompt_name == "group_conversation_prompt"
                 or prompt_name == "proactive_speak_prompt"

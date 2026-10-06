@@ -309,6 +309,10 @@
       "translationAuditLoadFailed": "翻訳チェックの提案を読み込めませんでした",
       "translationAuditLoading": "翻訳チェックを読み込み中…",
       "actionsEnabled": "動作描写を書いてよい",
+      "expressionSource": "表情とモーション",
+      "expressionSource_tags": "彼女が書くタグ",
+      "expressionSource_background": "バックグラウンドモデルが選ぶ",
+      "expressionSourceHelp": "タグ：セリフに [joy] のようなタグを書きます。バックグラウンドモデル：音声を作っている間に、一文ごとの表情とモーションをバックグラウンドモデル（モデル › バックグラウンド処理とツール）が選び、プロンプトではタグを教えません。バックグラウンドモデルがなければタグのままです。キャラクターを読み込み直すと反映されます。",
       "actionsEnabledHelp": "*目をそらす* のように、星印で囲んだ短い動作を一つ添えられます。字幕に出るだけで読み上げられません。オフのときは動作について一切伝えないので、間と言葉選びだけで表現します。"
     },
     "personas": {

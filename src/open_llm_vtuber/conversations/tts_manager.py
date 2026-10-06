@@ -2,16 +2,20 @@ import asyncio
 import json
 import uuid
 from datetime import datetime
-from typing import List, Optional, Dict, Tuple
+from typing import Awaitable, Callable, List, Optional, Dict, Tuple
 from loguru import logger
 
 from ..agent.output_types import DisplayText, Actions
 from ..avatar_model import AvatarModel
+from ..expression_pick import apply_pick
 from ..tts.tts_interface import TTSInterface
 from ..utils.stream_audio import prepare_audio_payload
 from .laughter import is_laughter_only
 from .text_content import has_speakable_text
 from .types import WebSocketSend
+
+# 背景模型挑這句的表情與動作（expression_pick.ExpressionPicker.ask 綁好這句）。
+Pick = Callable[[], Awaitable[Optional[dict]]]
 
 
 def _is_timeout(error: Optional[BaseException]) -> bool:
@@ -69,6 +73,8 @@ class TTSTaskManager:
         # Caps how many synthesis calls to the (single, local) TTS service are
         # in flight at once. See SYNTHESIS_CONCURRENCY above.
         self._synthesis_semaphore = asyncio.Semaphore(self.SYNTHESIS_CONCURRENCY)
+        # 這則回覆上一句說了什麼；背景模型挑表情時當前文（expression_pick）。
+        self.last_line = ""
 
     async def speak(
         self,
@@ -81,6 +87,7 @@ class TTSTaskManager:
         subtitle_text: Optional[str] = None,
         spoken_text: Optional[str] = None,
         silenced: bool = False,
+        pick: Optional[Pick] = None,
     ) -> None:
         """
         Queue a TTS task while maintaining order of delivery.
@@ -102,6 +109,9 @@ class TTSTaskManager:
                 （conversation_utils）。靜音 payload 的畫面字幕本來不動（「……」
                 「（笑）」沒必要上字幕），這種句子例外：標 show_subtitle 讓前端
                 把字幕換到這句，不然畫面停在上一句。
+            pick: 背景模型挑這句的表情與動作（expression_source: background）。
+                跟合成並行，結果放進 actions；它自己有上限、失敗回 None，不擋聲音。
+                None＝tags 模式，流程與 payload 跟沒有這個功能時一樣。
         """
         # 沒有字母／文字／數字可念（「……」「♪」、表情符號、*動作*）就不送去合成：
         # 引擎對這種輸入多半回錯（GPT-SoVITS 回 400），會被當成失敗重試再跳通知。
@@ -119,8 +129,24 @@ class TTSTaskManager:
                     self._process_payload_queue(websocket_send)
                 )
 
-            await self._send_silent_payload(
-                display_text, actions, current_sequence, subtitle_text, silenced
+            if pick is None:
+                await self._send_silent_payload(
+                    display_text, actions, current_sequence, subtitle_text, silenced
+                )
+                return
+            # 沒聲音的句子（*歪頭*）一樣配表情；等挑選的時候不能擋住下一句。
+            self.task_list.append(
+                asyncio.create_task(
+                    self._send_picked_silent_payload(
+                        pick,
+                        live2d_model,
+                        display_text,
+                        actions,
+                        current_sequence,
+                        subtitle_text,
+                        silenced,
+                    )
+                )
             )
             return
 
@@ -149,6 +175,7 @@ class TTSTaskManager:
                 sequence_number=current_sequence,
                 subtitle_text=subtitle_text,
                 spoken_text=spoken_text,
+                **({"pick": pick} if pick is not None else {}),
             )
         )
         self.task_list.append(task)
@@ -198,6 +225,29 @@ class TTSTaskManager:
             audio_payload["show_subtitle"] = True
         await self._payload_queue.put(([audio_payload], sequence_number))
 
+    async def _send_picked_silent_payload(
+        self,
+        pick: Pick,
+        live2d_model: AvatarModel,
+        display_text: DisplayText,
+        actions: Optional[Actions],
+        sequence_number: int,
+        subtitle_text: Optional[str],
+        silenced: bool,
+    ) -> None:
+        actions = apply_pick(actions, await pick(), live2d_model)
+        await self._send_silent_payload(
+            display_text, actions, sequence_number, subtitle_text, silenced
+        )
+
+    async def _synthesize(
+        self, tts_engine: TTSInterface, tts_text: str, emotion: Optional[str]
+    ) -> Tuple[Optional[str], Optional[Exception]]:
+        async with self._synthesis_semaphore:
+            return await self._synthesize_with_retry(
+                tts_engine, tts_text, emotion=emotion
+            )
+
     async def _process_tts(
         self,
         tts_text: str,
@@ -208,15 +258,23 @@ class TTSTaskManager:
         sequence_number: int,
         subtitle_text: Optional[str] = None,
         spoken_text: Optional[str] = None,
+        pick: Optional[Pick] = None,
     ) -> None:
         """Process TTS generation and queue the result for ordered delivery"""
         audio_file_path = None
         failure_notice: Optional[Dict] = None
         try:
-            async with self._synthesis_semaphore:
-                audio_file_path, error = await self._synthesize_with_retry(
-                    tts_engine, tts_text, emotion=getattr(actions, "emotion", None)
+            emotion = getattr(actions, "emotion", None)
+            if pick is None:
+                audio_file_path, error = await self._synthesize(
+                    tts_engine, tts_text, emotion
                 )
+            else:
+                # 挑表情跟合成同時跑；挑選自己有上限、失敗回 None。
+                (audio_file_path, error), picked = await asyncio.gather(
+                    self._synthesize(tts_engine, tts_text, emotion), pick()
+                )
+                actions = apply_pick(actions, picked, live2d_model)
             if not audio_file_path:
                 logger.error(
                     f"TTS synthesis failed after {self.SYNTHESIS_ATTEMPTS} attempts,"
@@ -352,5 +410,6 @@ class TTSTaskManager:
             self._sender_task.cancel()
         self._sequence_counter = 0
         self._next_sequence_to_send = 0
+        self.last_line = ""
         # Create a new queue to clear any pending items
         self._payload_queue = asyncio.Queue()

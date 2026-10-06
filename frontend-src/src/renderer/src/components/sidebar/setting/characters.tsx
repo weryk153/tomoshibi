@@ -59,6 +59,9 @@ import {
   saveCharacterSettings,
   type CharacterRecord,
   type CharacterToggleName,
+  type CharacterToggles,
+  EXPRESSION_SOURCES,
+  isExpressionSource,
   type CharacterEdits,
   type CharacterCreate,
   type OptionalCharacterFields,
@@ -425,9 +428,9 @@ function Characters(): JSX.Element {
   // 這個角色自己的開關（字幕翻成你看的語言、雙語字幕、可以寫動作描寫、長期記憶）：切了就
   // 存，不跟整份表單一起存。正在用的角色要重新載入才生效，由抽屜頂端的提示處理。
   const toggleSaver = useAutosave(async (change: {
-    filename: string; name: CharacterToggleName; checked: boolean;
+    filename: string; name: CharacterToggleName; value: CharacterToggles[CharacterToggleName];
   }) => {
-    const result = await saveCharacterSettings(baseUrl, change.filename, { [change.name]: change.checked });
+    const result = await saveCharacterSettings(baseUrl, change.filename, { [change.name]: change.value });
     if (!result.ok) return { ok: false, error: result.error } as const;
     setCharacters((list) => (list ?? []).map((c) => (
       c.filename === change.filename ? { ...c, [change.name]: result.data.settings[change.name] } : c
@@ -435,13 +438,23 @@ function Characters(): JSX.Element {
     return { ok: true } as const;
   }, { delayMs: 0 });
 
-  const handleToggle = useCallback((
-    name: CharacterToggleName,
-    checked: boolean,
+  const handleToggle = useCallback(<K extends CharacterToggleName>(
+    name: K,
+    value: CharacterToggles[K],
   ) => {
     if (!selectedRecord) return;
-    toggleSaver.change({ filename: selectedRecord.filename, name, checked });
+    toggleSaver.change({ filename: selectedRecord.filename, name, value });
   }, [selectedRecord, toggleSaver]);
+
+  const expressionSourceCollection = useMemo(
+    () => createListCollection({
+      items: EXPRESSION_SOURCES.map((value): { label: string; value: string } => ({
+        label: t(`settings.characters.expressionSource_${value}`),
+        value,
+      })),
+    }),
+    [t],
+  );
 
   const openEdit = useCallback((record: CharacterRecord) => {
     // 遞增世代號：任何還在飛的頭像上傳（不論屬於哪個表單）從這一刻起都是舊世代，
@@ -1331,6 +1344,15 @@ function Characters(): JSX.Element {
           {/* 動作與表情對應寫在 model_dict.json，是「這個模型」的設定。Live2D 跟
               VRM 的資料形狀不同（(group, index)＋HitArea vs. clip 檔名），所以是
               兩個各自獨立的編輯器。 */}
+          <SelectField
+            label={t('settings.characters.expressionSource')}
+            value={[record.expression_source ?? 'tags']}
+            onChange={(value) => {
+              if (isExpressionSource(value[0])) handleToggle('expression_source', value[0]);
+            }}
+            collection={expressionSourceCollection}
+            help={t('settings.characters.expressionSourceHelp')}
+          />
           <Text fontSize="xs" color="whiteAlpha.600">{t('settings.characterPage.sharedModelNote')}</Text>
           {/* key 用模型名：換了模型（換選角色或改上面的選單）就換一個編輯器，舊的
               卸載時把還沒送的修改存進它自己的模型。不換的話，排隊中的修改會在新模型

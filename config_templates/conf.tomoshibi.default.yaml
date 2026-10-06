@@ -45,6 +45,7 @@ character_config:
   long_term_memory_enabled: True # 長期記憶：引擎記住你說過的事、她自己說過的事。關掉時引擎不抽取、不帶進對話
   bilingual_subtitle: False # 雙語字幕：設 True，字幕顯示兩行，上行是她實際唸的原文（語音翻譯後），下行是原本的字幕。只影響畫面；每個角色可以在角色頁各自開關
   translation_audit: False # 翻譯審核：設 True，她每句語音翻譯事後由引擎的背景模型（background_model）審一遍，累積成建議清單（角色頁「語言」區）。不改當下輸出、不加延遲
+  expression_source: 'tags' # 表情與動作誰決定：'tags' 她在台詞裡帶 [joy] 這類標籤；'background' 由引擎的背景模型（background_model）逐句挑，提示裡不再教標籤。沒設背景模型時照舊用標籤
 
   # ============== 提示词 ==============
 

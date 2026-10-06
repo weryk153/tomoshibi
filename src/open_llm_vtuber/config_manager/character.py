@@ -1,6 +1,6 @@
 # config_manager/character.py
 from pydantic import Field, field_validator
-from typing import Dict, ClassVar
+from typing import Dict, ClassVar, Literal
 from .i18n import I18nMixin, Description
 from .asr import ASRConfig
 from .tts import TTSConfig
@@ -46,6 +46,12 @@ class CharacterConfig(I18nMixin):
     # 翻譯審核：她每句語音翻譯事後由引擎的背景模型審一遍，累積成建議清單
     # （角色頁「語言」區）。不改當下輸出、不加延遲；預設關，關著完全不跑。
     translation_audit: bool = Field(default=False, alias="translation_audit")
+    # 表情與動作誰決定（角色頁「外觀」區）：tags＝她在台詞裡帶 [joy] 這類標籤；
+    # background＝引擎的背景模型逐句挑，系統提示不再教標籤（expression_pick）。
+    # 沒設背景模型時 background 不成立，照舊用標籤。
+    expression_source: Literal["tags", "background"] = Field(
+        default="tags", alias="expression_source"
+    )
     # 這個角色說話用的語言。留空＝沿用 system_config.player_language。
     #
     # 為什麼要在角色層級：player_language 是全域的，設成日文會讓每一個角色都
@@ -93,6 +99,10 @@ class CharacterConfig(I18nMixin):
         "translation_audit": Description(
             en="Review each voice translation in the background and collect suggestions",
             zh="背景審核每句語音翻譯，累積成建議清單",
+        ),
+        "expression_source": Description(
+            en="Who picks her expressions and motions: tags she writes, or the background model",
+            zh="表情與動作由誰決定：她寫的標籤，或背景模型逐句挑",
         ),
         "conf_name": Description(
             en="Name of the character configuration", zh="角色配置名称"

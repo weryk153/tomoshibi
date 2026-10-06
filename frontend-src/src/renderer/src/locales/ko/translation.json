@@ -309,6 +309,10 @@
       "translationAuditLoadFailed": "번역 검토 제안을 불러오지 못했습니다",
       "translationAuditLoading": "번역 검토를 불러오는 중…",
       "actionsEnabled": "동작 묘사 허용",
+      "expressionSource": "표정과 모션",
+      "expressionSource_tags": "그녀가 쓰는 태그",
+      "expressionSource_background": "백그라운드 모델이 고름",
+      "expressionSourceHelp": "태그: 대사에 [joy] 같은 태그를 씁니다. 백그라운드 모델: 음성을 만드는 동안 문장마다 표정과 모션을 백그라운드 모델(모델 › 백그라운드 작업 및 도구)이 고르고, 프롬프트에서 태그를 가르치지 않습니다. 백그라운드 모델이 없으면 태그를 그대로 씁니다. 캐릭터를 다시 불러오면 적용됩니다.",
       "actionsEnabledHelp": "*시선을 돌린다* 처럼 별표로 감싼 짧은 동작을 하나 덧붙일 수 있습니다. 자막에만 나오고 읽지 않습니다. 끄면 동작에 대해 아예 알려 주지 않아, 멈춤과 단어 선택으로만 표현합니다."
     },
     "personas": {

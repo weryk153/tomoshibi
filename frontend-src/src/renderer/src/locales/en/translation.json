@@ -309,6 +309,10 @@
       "translationAuditLoadFailed": "Could not load the translation review",
       "translationAuditLoading": "Loading translation review…",
       "actionsEnabled": "May add an action",
+      "expressionSource": "Expressions and motions",
+      "expressionSource_tags": "Tags she writes",
+      "expressionSource_background": "Picked by the background model",
+      "expressionSourceHelp": "Tags: she writes [joy]-style tags in her lines. Background model: while the voice is made, the background model (Models › Background tasks & tools) picks each sentence's expression and motion, and her prompt no longer teaches tags. Without a background model it stays on tags. Applies after the character reloads.",
       "actionsEnabledHelp": "Lets her add one short action between asterisks, e.g. *looks away*. It shows in the subtitle and is not spoken. Off: actions are never mentioned to her, so she speaks with pauses and word choice only."
     },
     "personas": {

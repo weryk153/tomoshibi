@@ -309,6 +309,10 @@
       "translationAuditLoadFailed": "读取不到翻译审核建议",
       "translationAuditLoading": "正在加载翻译审核…",
       "actionsEnabled": "可以写动作描写",
+      "expressionSource": "表情与动作",
+      "expressionSource_tags": "她写的标签",
+      "expressionSource_background": "背景模型挑",
+      "expressionSourceHelp": "标签：她在台词里带 [joy] 这类标签。背景模型：合成语音的同时，由背景模型（模型 › 后台工作与工具）逐句挑表情与动作，提示里不再教标签。没设背景模型时照旧用标签。重新载入角色后生效。",
       "actionsEnabledHelp": "让她在台词里搭配一句星号包起来的动作，例如「*把视线移开*」，只显示在字幕上、不会念出来。关掉时完全不跟她提动作，感情只用停顿与选词表现。"
     },
     "personas": {

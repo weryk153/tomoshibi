@@ -17,6 +17,8 @@ export interface CharacterRecord {
   bilingual_subtitle?: boolean
   // 翻譯審核：她每句語音翻譯在背景審一遍，累積成建議（見 api/translation-audit.ts）。
   translation_audit?: boolean
+  // 表情與動作誰決定：她寫的標籤（tags）或背景模型逐句挑（background）。
+  expression_source?: ExpressionSource
   slug: string
   is_base: boolean
   conf_name: string | null
@@ -234,6 +236,16 @@ export interface CharacterToggles {
   bilingual_subtitle: boolean
   // 翻譯審核：背景審她的語音翻譯，只累積建議，不改她說的話。
   translation_audit: boolean
+  // 不是開關而是二選一，但跟開關同一個端點、同一種存法。
+  expression_source: ExpressionSource
+}
+
+// 表情與動作誰決定。background 要有背景模型才成立（沒有就照舊用標籤）。
+export const EXPRESSION_SOURCES = ['tags', 'background'] as const
+export type ExpressionSource = typeof EXPRESSION_SOURCES[number]
+
+export function isExpressionSource(value: unknown): value is ExpressionSource {
+  return (EXPRESSION_SOURCES as readonly unknown[]).includes(value)
 }
 
 export type CharacterToggleName = keyof CharacterToggles

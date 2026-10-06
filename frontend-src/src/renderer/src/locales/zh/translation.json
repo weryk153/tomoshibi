@@ -309,6 +309,10 @@
       "translationAuditLoadFailed": "讀不到翻譯審核建議",
       "translationAuditLoading": "正在載入翻譯審核…",
       "actionsEnabled": "可以寫動作描寫",
+      "expressionSource": "表情與動作",
+      "expressionSource_tags": "她寫的標籤",
+      "expressionSource_background": "背景模型挑",
+      "expressionSourceHelp": "標籤：她在台詞裡帶 [joy] 這類標籤。背景模型：合成語音的同時，由背景模型（模型 › 背景工作與工具）逐句挑表情與動作，提示裡不再教標籤。沒設背景模型時照舊用標籤。重新載入角色後生效。",
       "actionsEnabledHelp": "讓她在台詞裡搭配一句星號包起來的動作，例如「*把視線移開*」，只顯示在字幕上、不會唸出來。關掉時完全不跟她提動作，感情只用停頓與選詞表現。"
     },
     "personas": {

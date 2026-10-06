@@ -99,6 +99,7 @@ def test_settings_endpoint_reads_and_writes(tmp_path, monkeypatch):
         "actions_enabled": False,
         "bilingual_subtitle": False,
         "translation_audit": False,
+        "expression_source": "tags",
     }
     saved = http.post(
         "/api/characters/kurisu.yaml/settings", json={"translate_subtitle": True}
