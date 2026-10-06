@@ -31,10 +31,12 @@ TIMEOUT_SECONDS = 2.5
 MAX_TOKENS = 80
 SOURCES = ("tags", "background")
 
+# 一行、不留空白：9B 模型排版過的 JSON 是 30 個 token，一行是 17 個；本機閒著時
+# 一句從 2.2 秒降到 1.8 秒，2.5 秒的上限才放得下。
 SYSTEM_PROMPT = """\
 You direct an animated character's face and body while she speaks. For the line she is saying now, pick the facial expression that fits the feeling of that line, and a gesture only when the line clearly calls for one (a greeting, agreeing, pointing something out); most lines have no gesture. Use the previous line and her current mood only as context: the expression follows the line she is saying now. Pick only from the lists given. intensity is how strongly the expression shows, from 0 (barely) to 1 (fully).
-Reply with JSON only:
-{"expression": "<one of the expressions, or null>", "motion": "<one of the motions, or null>", "intensity": <0 to 1>}"""
+Reply with JSON only, on one line without spaces:
+{"expression":"<one of the expressions, or null>","motion":"<one of the motions, or null>","intensity":<0 to 1>}"""
 
 _THINK = re.compile(r"<think>.*?</think>", re.S)
 _FENCE = re.compile(r"```(?:json)?")
