@@ -26,16 +26,21 @@ from src.open_llm_vtuber.expression_pick import (
 
 try:
     from ai_character_engine.companion import AvatarChoices  # noqa: F401
+
     ENGINE_PICKS = True
 except ImportError:  # 引擎 1.3.0 以前
     ENGINE_PICKS = False
-needs_engine = pytest.mark.skipif(not ENGINE_PICKS, reason="ai-character-engine 1.3.0 or later")
+needs_engine = pytest.mark.skipif(
+    not ENGINE_PICKS, reason="ai-character-engine 1.3.0 or later"
+)
 
 
 class _Actions:
     """引擎的 ReplyActions 的替身：記下問了哪幾句，晚一點或答 None。"""
 
-    def __init__(self, answer=("joy", None, 1.0), *, delay=0.0, mood_face=None, can_pick=True):
+    def __init__(
+        self, answer=("joy", None, 1.0), *, delay=0.0, mood_face=None, can_pick=True
+    ):
         self.answer = answer
         self.delay = delay
         self.mood_face = mood_face
@@ -53,7 +58,9 @@ class _Actions:
         expression, motion, intensity = answer
         if expression and self.first is None:
             self.first = expression
-        return SimpleNamespace(expression=expression, motion=motion, intensity=intensity)
+        return SimpleNamespace(
+            expression=expression, motion=motion, intensity=intensity
+        )
 
     def voice(self):
         return self.first or self.mood_face
@@ -64,8 +71,12 @@ class _Actions:
 
 def test_moods_map_to_the_models_own_expressions_with_fallbacks():
     assert mood_faces(["neutral", "joy", "sadness", "anger"]) == {
-        "happy": "joy", "sad": "sadness", "angry": "anger", "worried": "sadness",
-        "embarrassed": "joy", "calm": "neutral",
+        "happy": "joy",
+        "sad": "sadness",
+        "angry": "anger",
+        "worried": "sadness",
+        "embarrassed": "joy",
+        "calm": "neutral",
     }
     assert mood_faces(["neutral"]) == {"calm": "neutral"}
 
@@ -137,34 +148,65 @@ def test_a_character_without_the_setting_has_no_picker():
 
 
 def test_background_mode_without_a_background_model_stays_on_tags():
-    assert picker_for(_character("background", background=False), _model(), _agent(_Actions())) is None
+    assert (
+        picker_for(
+            _character("background", background=False), _model(), _agent(_Actions())
+        )
+        is None
+    )
 
 
 @needs_engine
 def test_an_agent_that_is_not_the_engine_or_cannot_pick_has_no_picker():
     assert picker_for(_character("background"), _model(), SimpleNamespace()) is None
     assert picker_for(_character("background"), _model(), _agent(None)) is None
-    assert picker_for(_character("background"), _model(), _agent(_Actions(can_pick=False))) is None
+    assert (
+        picker_for(_character("background"), _model(), _agent(_Actions(can_pick=False)))
+        is None
+    )
 
 
 @needs_engine
 def test_background_mode_asks_the_engine_with_the_models_lists():
     asked = []
-    agent = SimpleNamespace(reply_actions=lambda choices: asked.append(choices) or _Actions())
+    agent = SimpleNamespace(
+        reply_actions=lambda choices: asked.append(choices) or _Actions()
+    )
     picker = picker_for(_character("background"), _model(), agent)
     assert isinstance(picker, EnginePicker)
     assert asked[0].expressions == ("neutral", "joy", "sadness")
 
 
+@needs_engine
 def test_uses_background_expressions_follows_the_same_rule():
     assert expression_pick.uses_background_expressions(_character("background"))
     assert not expression_pick.uses_background_expressions(_character("tags"))
-    assert not expression_pick.uses_background_expressions(_character("background", background=False))
+    assert not expression_pick.uses_background_expressions(
+        _character("background", background=False)
+    )
+
+
+def test_an_engine_too_old_to_pick_keeps_the_tags(monkeypatch):
+    """引擎 1.2.0 沒有 reply_actions：提示照舊教標籤，不然一個表情都沒有。"""
+    import sys
+
+    monkeypatch.setitem(sys.modules, "ai_character_engine.companion", None)
+    assert not expression_pick.uses_background_expressions(_character("background"))
+
+
+def test_an_agent_other_than_the_engine_keeps_the_tags():
+    character = _character("background")
+    character.agent_config.conversation_agent_choice = "letta_agent"
+    assert not expression_pick.uses_background_expressions(character)
 
 
 def test_the_engines_pick_comes_back_as_tomoshibi_reads_it():
     picker = EnginePicker(_Actions(("sadness", "nod", 0.4)))
-    assert asyncio.run(picker.ask("今天好累。")) == {"expression": "sadness", "motion": "nod", "intensity": 0.4}
+    assert asyncio.run(picker.ask("今天好累。")) == {
+        "expression": "sadness",
+        "motion": "nod",
+        "intensity": 0.4,
+    }
     assert picker.voice_emotion() == "sadness"
     assert asyncio.run(EnginePicker(_Actions(None)).ask("…")) is None
 
@@ -287,13 +329,18 @@ def test_each_line_gets_its_pick_in_its_own_payload(monkeypatch):
 
     actions = _Actions(by_line)
     messages = _run(
-        monkeypatch, [("你來啦！", "你來啦！"), ("今天好累。", "今天好累。")], _picker(actions)
+        monkeypatch,
+        [("你來啦！", "你來啦！"), ("今天好累。", "今天好累。")],
+        _picker(actions),
     )
 
     assert [m["actions"]["expressions"] for m in messages] == [[3], [1]]
     assert messages[0]["actions"]["motions"] == [{"group": "", "index": 1}]
     assert "motions" not in messages[1]["actions"]
-    assert [m["audio"] for m in messages] == ["AUDIO:你來啦！.wav", "AUDIO:今天好累。.wav"]
+    assert [m["audio"] for m in messages] == [
+        "AUDIO:你來啦！.wav",
+        "AUDIO:今天好累。.wav",
+    ]
     assert actions.lines == ["你來啦！", "今天好累。"]
 
 
@@ -306,7 +353,12 @@ def test_no_pick_leaves_the_voice_playing(monkeypatch):
 def test_the_pick_runs_while_the_voice_is_made(monkeypatch):
     """合成 0.3 秒、挑選 0.3 秒：並行的話一句大約 0.3 秒，不是 0.6。"""
     started = time.monotonic()
-    _run(monkeypatch, [("你來啦！", "你來啦！")], _picker(_Actions(delay=0.3)), engine=_Engine(delay=0.3))
+    _run(
+        monkeypatch,
+        [("你來啦！", "你來啦！")],
+        _picker(_Actions(delay=0.3)),
+        engine=_Engine(delay=0.3),
+    )
     assert time.monotonic() - started < 0.55
 
 
@@ -334,6 +386,7 @@ def test_tags_mode_sends_what_it_always_sent(monkeypatch):
 
 
 # ---------------------------------------------------------------- 不擋聲音、語氣
+
 
 class _Voiced(TTSInterface):
     """記下每句拿到的語氣（emotion_refs 用的那個關鍵字）。"""
@@ -372,7 +425,10 @@ def test_a_slow_pick_holds_the_voice_only_a_moment(monkeypatch):
     """合成好了、挑選還沒好：最多再等 GRACE_SECONDS，聲音就先走。"""
     started = time.monotonic()
     (message,) = _run(
-        monkeypatch, [("你來啦！", "你來啦！")], _picker(_Actions(delay=3.0)), engine=_Engine(delay=0.1)
+        monkeypatch,
+        [("你來啦！", "你來啦！")],
+        _picker(_Actions(delay=3.0)),
+        engine=_Engine(delay=0.1),
     )
     assert time.monotonic() - started < 0.1 + expression_pick.GRACE_SECONDS + 0.3
     assert message["audio"] == "AUDIO:你來啦！.wav"
@@ -388,13 +444,20 @@ def test_a_silent_line_waits_only_a_moment_for_its_pick(monkeypatch):
 
 def test_the_voice_takes_her_mood_before_anything_is_picked(monkeypatch):
     engine = _Voiced()
-    _run(monkeypatch, [("今天好累。", "今天好累。")], _picker(_Actions(delay=3.0, mood_face="sadness")), engine=engine)
+    _run(
+        monkeypatch,
+        [("今天好累。", "今天好累。")],
+        _picker(_Actions(delay=3.0, mood_face="sadness")),
+        engine=engine,
+    )
     assert engine.emotions == ["sadness"]
 
 
 def test_the_first_pick_sets_the_voice_for_the_rest_of_the_reply(monkeypatch):
     """跟標籤一樣：這則回覆第一個挑到的表情，就是後面幾句的語氣。"""
-    monkeypatch.setattr(tts_manager_module, "prepare_audio_payload", _fake_prepare_audio_payload)
+    monkeypatch.setattr(
+        tts_manager_module, "prepare_audio_payload", _fake_prepare_audio_payload
+    )
     engine = _Voiced(delay=0.2)
     picker = _picker(_Actions(delay=0.05, mood_face="sadness"))
 
@@ -402,8 +465,11 @@ def test_the_first_pick_sets_the_voice_for_the_rest_of_the_reply(monkeypatch):
         manager = TTSTaskManager()
         await handle_sentence_output(
             _Paced([("你來啦！", "你來啦！"), ("好開心！", "好開心！")], gap=0.3),
-            live2d_model=_model(), tts_engine=engine, websocket_send=_Send(),
-            tts_manager=manager, expression_picker=picker,
+            live2d_model=_model(),
+            tts_engine=engine,
+            websocket_send=_Send(),
+            tts_manager=manager,
+            expression_picker=picker,
         )
         await asyncio.gather(*manager.task_list)
         await manager._payload_queue.join()

@@ -82,8 +82,18 @@ def avatar_choices(live2d_model: Any) -> Optional[Any]:
 
 
 def uses_background_expressions(character: Any) -> bool:
-    """這個角色的表情真的由背景模型挑：選了 background，而且有背景模型。"""
+    """這個角色的表情真的由背景模型挑：選了 background、對話交給引擎、引擎挑得了
+    （1.3.0 起），而且有背景模型。"""
     if getattr(character, "expression_source", "tags") != "background":
+        return False
+    agent = getattr(
+        getattr(character, "agent_config", None), "conversation_agent_choice", None
+    )
+    if (agent or "character_engine_agent") != "character_engine_agent":
+        return False
+    try:
+        from ai_character_engine.companion import AvatarChoices  # noqa: F401
+    except ImportError:
         return False
     return background_client(character, max_tokens=80, timeout_seconds=6.5) is not None
 
