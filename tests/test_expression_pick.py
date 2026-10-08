@@ -476,3 +476,131 @@ def test_the_first_pick_sets_the_voice_for_the_rest_of_the_reply(monkeypatch):
 
     asyncio.run(go())
     assert engine.emotions == ["sadness", "joy"]
+
+
+# ---------------------------------------------------------------- 講這句時挑下一句
+
+
+class _Overlap(_Actions):
+    """記下同一時間有幾句在挑。"""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.now = 0
+        self.most = 0
+
+    async def pick(self, line):
+        self.now += 1
+        self.most = max(self.most, self.now)
+        try:
+            return await super().pick(line)
+        finally:
+            self.now -= 1
+
+
+def _lasting(seconds_by_text):
+    """假的 payload，帶著念完要多久（volumes × slice_length）。"""
+
+    def prepare(audio_path, **kwargs):
+        payload = _fake_prepare_audio_payload(audio_path, **kwargs)
+        text = kwargs["display_text"].text
+        seconds = seconds_by_text.get(text, 0.0)
+        payload["slice_length"] = 50
+        payload["volumes"] = [0.5] * int(seconds * 20)
+        return payload
+
+    return prepare
+
+
+def _run_lasting(monkeypatch, lines, picker, seconds_by_text):
+    monkeypatch.setattr(
+        tts_manager_module, "prepare_audio_payload", _lasting(seconds_by_text)
+    )
+
+    async def go():
+        manager = TTSTaskManager()
+        send = _Send()
+        started = time.monotonic()
+        await handle_sentence_output(
+            _Sentences(lines),
+            live2d_model=_model(),
+            tts_engine=_Engine(delay=0.05),
+            websocket_send=send,
+            tts_manager=manager,
+            expression_picker=picker,
+        )
+        await asyncio.gather(*manager.task_list)
+        await manager._payload_queue.join()
+        return send.messages, time.monotonic() - started
+
+    return asyncio.run(go())
+
+
+def test_lines_are_picked_one_after_another_and_none_is_dropped(monkeypatch):
+    actions = _Overlap(delay=0.1)
+    lines = [
+        ("你來啦！", "你來啦！"),
+        ("今天好累。", "今天好累。"),
+        ("要喝茶嗎？", "要喝茶嗎？"),
+    ]
+    messages, _ = _run_lasting(
+        monkeypatch, lines, _picker(actions), {"你來啦！": 1.0, "今天好累。": 1.0}
+    )
+    assert actions.most == 1
+    assert actions.lines == ["你來啦！", "今天好累。", "要喝茶嗎？"]
+    assert all(m["actions"]["expressions"] == [3] for m in messages)
+
+
+def test_a_later_line_is_picked_while_the_line_before_plays(monkeypatch):
+    """第一句念 1.5 秒：第二句的挑選有 1 秒可用，不是只有合成後的 0.3 秒。"""
+    messages, took = _run_lasting(
+        monkeypatch,
+        [("你來啦！", "你來啦！"), ("今天好累。", "今天好累。")],
+        _picker(_Actions(delay=0.6)),
+        {"你來啦！": 1.5},
+    )
+    assert "expressions" not in (messages[0]["actions"] or {})  # 第一句照舊只等一下
+    assert messages[1]["actions"]["expressions"] == [3]
+    assert took < 1.5
+
+
+def test_a_pick_given_up_on_does_not_hold_up_the_next_line(monkeypatch):
+    actions = _Actions(lambda line: ("joy", None, 1.0))
+    slow = {"你來啦！": 3.0}
+
+    async def pick(line):
+        actions.lines.append(line)
+        await asyncio.sleep(slow.get(line, 0.1))
+        return SimpleNamespace(expression="joy", motion=None, intensity=1.0)
+
+    actions.pick = pick
+    messages, took = _run_lasting(
+        monkeypatch,
+        [("你來啦！", "你來啦！"), ("今天好累。", "今天好累。")],
+        _picker(actions),
+        {"你來啦！": 1.0},
+    )
+    assert "expressions" not in (messages[0]["actions"] or {})
+    assert messages[1]["actions"]["expressions"] == [3]
+    assert took < 1.5
+
+
+def test_waiting_for_the_lines_before_does_not_spin(monkeypatch):
+    """前面的句子還沒送出時，這句是睡著等，不是一直空轉。"""
+    import src.open_llm_vtuber.conversations.tts_manager as module
+
+    rounds = []
+    real_wait = module.asyncio.wait
+
+    async def counting_wait(*args, **kwargs):
+        rounds.append(1)
+        return await real_wait(*args, **kwargs)
+
+    monkeypatch.setattr(module.asyncio, "wait", counting_wait)
+    _run_lasting(
+        monkeypatch,
+        [("你來啦！", "你來啦！"), ("今天好累。", "今天好累。")],
+        _picker(_Actions(delay=0.4)),
+        {"你來啦！": 1.0},
+    )
+    assert len(rounds) < 20

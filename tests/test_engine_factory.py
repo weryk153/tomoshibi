@@ -213,6 +213,22 @@ def test_her_faces_are_picked_with_a_short_answer_at_temperature_0():
         assert agent._companion()._actions_llm is picking
 
 
+def test_on_lm_studio_her_picks_line_up_with_its_prompt_cache():
+    """LM Studio 的提示快取 256 token 一格：挑表情的固定部分補到剛好跨過一格。"""
+    agent = AgentFactory.create_agent(**factory_arguments())
+    settings = agent._companion().settings
+    if hasattr(settings, "actions_cache_block"):
+        assert settings.actions_cache_block == 256
+
+
+def test_other_servers_leave_the_picks_as_they_are():
+    arguments = factory_arguments()
+    arguments["agent_settings"]["conversation"]["llm_provider"] = "ollama_llm"
+    arguments["llm_configs"] = {"ollama_llm": arguments["llm_configs"]["lmstudio_llm"]}
+    settings = AgentFactory.create_agent(**arguments)._companion().settings
+    assert getattr(settings, "actions_cache_block", 0) == 0
+
+
 def test_half_a_background_endpoint_is_not_used():
     """只填了網址或只填了模型：用講話那一顆，不要拿半套設定去連。"""
     arguments = factory_arguments()

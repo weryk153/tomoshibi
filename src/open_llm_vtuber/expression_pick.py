@@ -8,8 +8,10 @@
 都在引擎；這裡只管 Tomoshibi 這一側：從 Live2D／VRM 模型做出清單與「心情→表情」
 對照，把挑到的放進這句的 actions（apply_pick），以及聲音等多久（GRACE_SECONDS）。
 
-聲音不等它：合成好了挑選還沒好，最多再等 GRACE_SECONDS（沒聲音的句子
-SILENT_GRACE_SECONDS），再沒好這句就不帶表情。她自己還是寫了標籤的話以標籤為準。
+聲音不等它：一句一句照順序挑（講這句時挑下一句）。合成好了挑選還沒好，至少再等
+GRACE_SECONDS（沒聲音的句子 SILENT_GRACE_SECONDS）；前面的句子還在念的話，可以
+等到前面念完前 LEAD_SECONDS。再沒好這句就不帶表情，挑選取消、換下一句。她自己
+還是寫了標籤的話以標籤為準。
 
 語氣（GPT-SoVITS 的 emotion_refs）：引擎的 voice()——這則回覆第一個挑到的表情，還
 沒有就用她的心情經 mood_faces 對到的表情。
@@ -21,12 +23,15 @@ SILENT_GRACE_SECONDS），再沒好這句就不帶表情。她自己還是寫了
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any, Mapping, Optional
 
 from .background_llm import background_client
 
 SOURCES = ("tags", "background")
-GRACE_SECONDS = 0.3  # 合成好了，挑選最多再等這麼久
+GRACE_SECONDS = 0.3  # 合成好了，挑選至少再等這麼久
+# 前面的句子還在念時，這句的挑選可以等到前面快念完（提早這麼久送出）
+LEAD_SECONDS = 0.5
 SILENT_GRACE_SECONDS = 1.0  # 沒聲音的句子（*歪頭*）沒有合成時間可以並行，多等一點
 
 # 引擎的心情詞 → 這個模型的表情（emotionMap 的鍵）；跟前端空檔的臉同一份
@@ -103,10 +108,14 @@ class EnginePicker:
 
     def __init__(self, actions: Any) -> None:
         self._actions = actions
+        # 一句挑完才挑下一句，照順序排隊（引擎遇到正在挑會直接回 None）；
+        # 不等了的那句由 tts_manager 取消，排隊中的就不會再問。
+        self._turn = asyncio.Lock()
 
     async def ask(self, line: str) -> Optional[dict]:
         """這句挑到的 {"expression", "motion", "intensity"}；挑不到是 None。"""
-        picked = await self._actions.pick(line)
+        async with self._turn:
+            picked = await self._actions.pick(line)
         if picked is None:
             return None
         return {

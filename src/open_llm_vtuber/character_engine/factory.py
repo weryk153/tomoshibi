@@ -186,6 +186,19 @@ def _clients(
     )
 
 
+# LM Studio 的提示快取以 256 token 為一格；挑表情的固定部分補到跨過一格，換句子
+# 只要重讀那一句（worker 上每句約 3 秒→1.4 秒）。別的伺服器規則不同，不補。
+LMSTUDIO_CACHE_BLOCK = 256
+
+
+def _cache_block(provider: str) -> dict:
+    return (
+        {"actions_cache_block": LMSTUDIO_CACHE_BLOCK}
+        if provider == "lmstudio_llm"
+        else {}
+    )
+
+
 def storage_dir(conf_uid: str) -> Path:
     """chat_history/<conf_uid>/engine。
 
@@ -407,7 +420,9 @@ def build_companion(
             **{
                 "max_history_messages": HISTORY_MESSAGES,
                 "language": language,
-                **_known_settings(CompanionSettings, settings),
+                **_known_settings(
+                    CompanionSettings, {**_cache_block(provider), **settings}
+                ),
             }
         ),
         context_builder=ContextBuilder(budget=budget),
