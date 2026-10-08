@@ -100,6 +100,7 @@ def test_settings_endpoint_reads_and_writes(tmp_path, monkeypatch):
         "bilingual_subtitle": False,
         "translation_audit": False,
         "expression_source": "tags",
+        "proactive_when_unanswered": "keep_talking",
     }
     saved = http.post(
         "/api/characters/kurisu.yaml/settings", json={"translate_subtitle": True}
@@ -178,3 +179,15 @@ def test_the_action_switch_is_a_character_setting(tmp_path, monkeypatch):
     ).json()
     assert saved["settings"]["actions_enabled"] is True
     assert character_settings.effective("kurisu.yaml")["actions_enabled"] is True
+
+
+def test_what_she_does_when_nobody_answers_is_a_character_setting(
+    tmp_path, monkeypatch
+):
+    http = client(tmp_path, monkeypatch)
+    url = "/api/characters/kurisu.yaml/settings"
+    saved = http.post(url, json={"proactive_when_unanswered": "wait"}).json()
+    assert saved["settings"]["proactive_when_unanswered"] == "wait"
+    assert (
+        http.post(url, json={"proactive_when_unanswered": "sleep"}).status_code == 400
+    )

@@ -52,6 +52,12 @@ class CharacterConfig(I18nMixin):
     expression_source: Literal["tags", "background"] = Field(
         default="tags", alias="expression_source"
     )
+    # 主動開口之後你沒回話時（角色頁）：keep_talking＝照間隔繼續開口、順著自己的話
+    # 聊下去；wait＝一次比一次等得久，連續 3 次沒回就停，等你開口（proactive_context）。
+    # 兩種她都知道最後那段是自己講的，不會把自己的提議當成你問的來回答。
+    proactive_when_unanswered: Literal["keep_talking", "wait"] = Field(
+        default="keep_talking", alias="proactive_when_unanswered"
+    )
     # 這個角色說話用的語言。留空＝沿用 system_config.player_language。
     #
     # 為什麼要在角色層級：player_language 是全域的，設成日文會讓每一個角色都
@@ -103,6 +109,10 @@ class CharacterConfig(I18nMixin):
         "expression_source": Description(
             en="Who picks her expressions and motions: tags she writes, or the background model",
             zh="表情與動作由誰決定：她寫的標籤，或背景模型逐句挑",
+        ),
+        "proactive_when_unanswered": Description(
+            en="When she spoke up and you did not answer: keep talking, or wait for you",
+            zh="她主動開口後你沒回話時：自己聊下去，或等你",
         ),
         "conf_name": Description(
             en="Name of the character configuration", zh="角色配置名称"

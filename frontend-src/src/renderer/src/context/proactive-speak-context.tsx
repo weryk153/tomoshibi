@@ -60,10 +60,14 @@ export function ProactiveSpeakProvider({ children }: { children: ReactNode }) {
 
     idleStartTimeRef.current = Date.now();
     const idleSeconds = Math.max(30, Number(settings.idleSecondsToSpeak) || 30);
-    idleTimerRef.current = setTimeout(() => {
+    const tick = () => {
       const actualIdleTime = (Date.now() - idleStartTimeRef.current!) / 1000;
       sendTriggerSignal(actualIdleTime);
-    }, idleSeconds * 1000);
+      // 後端可能這次不開口（角色設成「等你」時，沒人回就跳過幾次觸發）：她真的開口
+      // 會換狀態、清掉這個計時器；沒開口就照樣再等一輪，不然計時器就此停住。
+      idleTimerRef.current = setTimeout(tick, idleSeconds * 1000);
+    };
+    idleTimerRef.current = setTimeout(tick, idleSeconds * 1000);
   }, [settings.allowProactiveSpeak, settings.idleSecondsToSpeak, sendTriggerSignal, clearIdleTimer, live]);
 
   useEffect(() => {

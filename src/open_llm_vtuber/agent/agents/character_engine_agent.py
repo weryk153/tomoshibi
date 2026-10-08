@@ -85,22 +85,36 @@ def _one_line(text: str) -> str:
 # 對方問「可以聊什麼」，回「既然你問我可以聊什麼……」。
 MATERIAL_HEADING = "你自己想聊的話可以參考這些（對方沒有問，不是對方問的）："
 
-# 她主動開口後對方一直沒回，下一次主動開口時加在指示後面：不然她把自己上一句的
-# 提議當成對方的問題來回答（自問自答），或說「你終於肯說話了」。
+# 她主動開口後對方一直沒回，下一次主動開口時加在指示後面：對方不講話時她照自己
+# 的個性自己聊下去（不是每個角色都是 VTuber，不寫直播）。沒這句的話，她會把自己
+# 上一句的提議當成對方問的來回答（自問自答），或一直問「你怎麼不說話」。
 UNANSWERED_NOTE = (
-    "你上一句是自己主動開口說的，講完到現在對方都沒回（你已經主動開口 {n} 次了）。"
-    "對話最後那段是你自己講的，不是對方問的：不要把它當成對方的問題來回答，也不要講得"
-    "好像他剛剛開口了。接著你自己的話往下說，或叫他一聲。"
+    "你上一句是自己主動開口說的，對方到現在都沒出聲（你已經自己講了 {n} 次）。"
+    "對方可能在聽，只是沒說話。對話最後那段是你自己講的，不是對方問的：不要把它當成"
+    "對方的問題來回答，不要講得好像他剛開口了，也不要一直問他在不在、怎麼不說話。"
+    "照你自己的個性，順著剛才的話自然地往下講：補一個新的細節、你的想法或一件相關的事。"
 )
 
 
-def _with_unanswered(instruction: str, companion, conversation) -> str:
+# 角色設成「等你」（proactive_when_unanswered: wait）時用這句：她不自顧自地聊下去，
+# 只簡短接一句或叫一聲，等對方回。
+WAITING_NOTE = (
+    "你上一句是自己主動開口說的，對方到現在都沒回（你已經自己講了 {n} 次）。"
+    "對話最後那段是你自己講的，不是對方問的：不要把它當成對方的問題來回答，也不要講得"
+    "好像他剛開口了。簡短地接一句或叫他一聲就好，不要自己長篇大論地聊下去。"
+)
+
+
+def _with_unanswered(
+    instruction: str, companion, conversation, mode: str = "keep_talking"
+) -> str:
     """主機的主動開口指示；她上一句還沒人回時補一句（引擎太舊不知道時照舊）。"""
     count = getattr(companion, "unanswered_remarks", None)
     unanswered = count(conversation) if callable(count) else 0
     if not instruction or not unanswered:
         return instruction
-    return f"{instruction}\n\n{UNANSWERED_NOTE.format(n=unanswered)}"
+    note = WAITING_NOTE if mode == "wait" else UNANSWERED_NOTE
+    return f"{instruction}\n\n{note.format(n=unanswered)}"
 
 
 class CharacterEngineAgent(AgentInterface):
@@ -198,6 +212,11 @@ class CharacterEngineAgent(AgentInterface):
 
     # --- 她記得對方什麼 -------------------------------------------------------
     # 記憶頁讀寫的是這一份。
+
+    def unanswered_remarks(self, history_uid: Optional[str] = None) -> int:
+        """她在這段對話裡主動開口、對方還沒回的次數（引擎太舊時是 0）。"""
+        count = getattr(self._companion(), "unanswered_remarks", None)
+        return count(history_uid or self._conversation) if callable(count) else 0
 
     def conversation_memory(self, history_uid: str) -> str:
         return "\n".join(self._companion().memories(history_uid))
@@ -450,6 +469,7 @@ class CharacterEngineAgent(AgentInterface):
                         str(metadata.get("proactive_instruction") or ""),
                         companion,
                         conversation,
+                        str(metadata.get("proactive_when_unanswered") or ""),
                     )
                     or None,
                 )

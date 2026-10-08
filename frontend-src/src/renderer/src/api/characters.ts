@@ -19,6 +19,8 @@ export interface CharacterRecord {
   translation_audit?: boolean
   // 表情與動作誰決定：她寫的標籤（tags）或背景模型逐句挑（background）。
   expression_source?: ExpressionSource
+  // 她主動開口後你沒回話時：自己聊下去，或等你。
+  proactive_when_unanswered?: WhenUnanswered
   slug: string
   is_base: boolean
   conf_name: string | null
@@ -238,6 +240,16 @@ export interface CharacterToggles {
   translation_audit: boolean
   // 不是開關而是二選一，但跟開關同一個端點、同一種存法。
   expression_source: ExpressionSource
+  proactive_when_unanswered: WhenUnanswered
+}
+
+// 她主動開口後你沒回話時：keep_talking＝照間隔繼續、順著自己的話聊；wait＝一次比
+// 一次等得久，連續 3 次沒回就停（後端 proactive_context.wait_allows_speaking）。
+export const WHEN_UNANSWERED = ['keep_talking', 'wait'] as const
+export type WhenUnanswered = typeof WHEN_UNANSWERED[number]
+
+export function isWhenUnanswered(value: unknown): value is WhenUnanswered {
+  return typeof value === 'string' && (WHEN_UNANSWERED as readonly string[]).includes(value)
 }
 
 // 表情與動作誰決定。background 要有背景模型才成立（沒有就照舊用標籤）。

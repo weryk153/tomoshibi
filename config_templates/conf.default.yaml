@@ -43,6 +43,7 @@ character_config:
   bilingual_subtitle: False # True shows two subtitle lines: what she actually speaks (after voice translation) above the usual subtitle. Display only; history and memory keep the reply text
   translation_audit: False # True reviews each voice translation afterwards with the engine's background_model and collects suggestions (character page, Language). Never changes what she says; adds no delay
   expression_source: 'tags' # 'tags': she writes [joy]-style tags in her reply; 'background': the engine's background_model picks each sentence's expression and motion (no tag instructions in her prompt). Without a background_model it stays 'tags'
+  proactive_when_unanswered: 'keep_talking' # after she spoke up and you did not answer: 'keep_talking' keeps speaking up at the idle interval and carries on from her own words; 'wait' waits twice as long each time and stops after 3 unanswered remarks until you speak
 
   # Protected proper nouns: official spelling -> misspellings to fold back into it.
   # Empty (the default) means no name is protected.

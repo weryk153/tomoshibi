@@ -30,6 +30,7 @@ OWNED: dict[str, tuple[str, ...]] = {
     "bilingual_subtitle": ("bilingual_subtitle",),
     "translation_audit": ("translation_audit",),
     "expression_source": ("expression_source",),
+    "proactive_when_unanswered": ("proactive_when_unanswered",),
 }
 TOGGLES = (
     "translate_subtitle",
@@ -45,10 +46,12 @@ DEFAULTS: dict[str, Any] = {
     "long_term_memory_enabled": True,
     "actions_enabled": False,
     "expression_source": "tags",
+    "proactive_when_unanswered": "keep_talking",
 }
 # 角色頁設定端點收的選項（值只能是其中之一）；開關（TOGGLES）是 true／false。
 CHOICES: dict[str, tuple[str, ...]] = {
     "expression_source": ("tags", "background"),
+    "proactive_when_unanswered": ("keep_talking", "wait"),
 }
 SETTINGS = (*TOGGLES, *CHOICES)
 

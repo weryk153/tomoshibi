@@ -1130,8 +1130,8 @@ def test_the_agent_does_not_lean_on_the_engines_private_helpers():
     reason="ai-character-engine with unanswered_remarks",
 )
 def test_speaking_up_again_unanswered_she_is_told_in_chinese(tmp_path):
-    """她主動開口後沒人回，下次再主動開口時要知道「最後那段是自己講的」——不然會把
-    自己的提議當成對方問的來回答（自問自答）。"""
+    """她主動開口後沒人回，下次再主動開口時要知道「最後那段是自己講的」，照自己的
+    個性聊下去——不然會把自己的提議當成對方問的來回答（自問自答）。"""
 
     async def scenario():
         llm = EngineLLM("要不我們聊電玩？")
@@ -1153,6 +1153,35 @@ def test_speaking_up_again_unanswered_she_is_told_in_chinese(tmp_path):
         return before, "\n".join(llm.sent())
 
     before, after = asyncio.run(scenario())
-    assert "對方都沒回" not in before
-    assert "對方都沒回" in after and "1 次" in after
+    assert (
+        "不是對方問的" not in before.split("參考這些")[0] and "自己講了" not in before
+    )
+    assert "自己講了 1 次" in after and "照你自己的個性" in after
     assert "可以聊的素材" not in after and "不是對方問的" in after
+
+
+@pytest.mark.skipif(
+    not hasattr(CharacterCompanion, "unanswered_remarks"),
+    reason="ai-character-engine with unanswered_remarks",
+)
+def test_a_character_that_waits_says_only_a_short_word_when_unanswered(tmp_path):
+    async def scenario():
+        llm = EngineLLM("要不我們聊電玩？")
+        current = agent(companion(tmp_path, llm))
+        await say(current, "你好", history_uid="h1")
+        turn = dict(
+            proactive_speak=True,
+            skip_memory=True,
+            history_uid="h1",
+            proactive_instruction="自然地開口。",
+            proactive_when_unanswered="wait",
+        )
+        await say(current, "（主動開口）", **turn)
+        await current.remember_remark("h1", "要不我們聊電玩？")
+        llm.reply = "你還在嗎？"
+        await say(current, "（主動開口）", **turn)
+        return "\n".join(llm.sent()), current.unanswered_remarks("h1")
+
+    sent, unanswered = asyncio.run(scenario())
+    assert "不是對方問的" in sent and "簡短" in sent and "照你自己的個性" not in sent
+    assert unanswered == 1

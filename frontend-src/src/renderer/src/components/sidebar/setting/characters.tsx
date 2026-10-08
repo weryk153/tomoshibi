@@ -62,6 +62,8 @@ import {
   type CharacterToggles,
   EXPRESSION_SOURCES,
   isExpressionSource,
+  isWhenUnanswered,
+  WHEN_UNANSWERED,
   type CharacterEdits,
   type CharacterCreate,
   type OptionalCharacterFields,
@@ -445,6 +447,16 @@ function Characters(): JSX.Element {
     if (!selectedRecord) return;
     toggleSaver.change({ filename: selectedRecord.filename, name, value });
   }, [selectedRecord, toggleSaver]);
+
+  const whenUnansweredCollection = useMemo(
+    () => createListCollection({
+      items: WHEN_UNANSWERED.map((value): { label: string; value: string } => ({
+        label: t(`settings.characters.whenUnanswered_${value}`),
+        value,
+      })),
+    }),
+    [t],
+  );
 
   const expressionSourceCollection = useMemo(
     () => createListCollection({
@@ -1264,6 +1276,16 @@ function Characters(): JSX.Element {
             checked={Boolean(record.actions_enabled)}
             onChange={(checked) => handleToggle('actions_enabled', checked)}
             help={t('settings.characters.actionsEnabledHelp')}
+          />
+
+          <SelectField
+            label={t('settings.characters.whenUnanswered')}
+            value={[record.proactive_when_unanswered ?? 'keep_talking']}
+            onChange={(value) => {
+              if (isWhenUnanswered(value[0])) handleToggle('proactive_when_unanswered', value[0]);
+            }}
+            collection={whenUnansweredCollection}
+            help={t('settings.characters.whenUnansweredHelp')}
           />
 
           <InputField

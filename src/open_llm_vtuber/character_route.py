@@ -340,6 +340,12 @@ def _read_character_fields(path: str, *, is_base: bool) -> Optional[dict]:
             in character_settings.CHOICES["expression_source"]
             else "tags"
         ),
+        "proactive_when_unanswered": (
+            cc.get("proactive_when_unanswered")
+            if cc.get("proactive_when_unanswered")
+            in character_settings.CHOICES["proactive_when_unanswered"]
+            else "keep_talking"
+        ),
     }
 
 
@@ -1023,8 +1029,9 @@ def init_character_route() -> APIRouter:
         ):
             return _bad_request(
                 "Only translate_subtitle, long_term_memory_enabled, actions_enabled,"
-                " bilingual_subtitle and translation_audit, as true/false, and"
-                " expression_source as 'tags' or 'background'."
+                " bilingual_subtitle and translation_audit, as true/false,"
+                " expression_source as 'tags' or 'background', and"
+                " proactive_when_unanswered as 'keep_talking' or 'wait'."
             )
         try:
             await asyncio.to_thread(character_settings.write, filename, body)
