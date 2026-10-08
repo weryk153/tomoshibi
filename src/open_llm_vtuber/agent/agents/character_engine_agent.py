@@ -42,6 +42,8 @@ from ...stage_director import strip_stage_performance_tag
 from ..input_types import BatchInput, TextSource
 from ..output_types import SentenceOutput
 from ..transformers import (
+    ActionDropper,
+    drop_actions,
     tidy_marks,
     actions_extractor,
     display_processor,
@@ -81,6 +83,42 @@ def _one_line(text: str) -> str:
     return " ".join(text.split())
 
 
+# 主動開口時給她的素材。舊的標題「可以聊的素材：」接在她自己的提議後面，她會當成
+# 對方問「可以聊什麼」，回「既然你問我可以聊什麼……」。
+MATERIAL_HEADING = "你自己想聊的話可以參考這些（對方沒有問，不是對方問的）："
+
+# 她主動開口後對方一直沒回，下一次主動開口時加在指示後面：對方不講話時她照自己
+# 的個性自己聊下去（不是每個角色都是 VTuber，不寫直播）。沒這句的話，她會把自己
+# 上一句的提議當成對方問的來回答（自問自答），或一直問「你怎麼不說話」。
+UNANSWERED_NOTE = (
+    "你上一句是自己主動開口說的，對方到現在都沒出聲（你已經自己講了 {n} 次）。"
+    "對方可能在聽，只是沒說話。對話最後那段是你自己講的，不是對方問的：不要把它當成"
+    "對方的問題來回答，不要講得好像他剛開口了，也不要一直問他在不在、怎麼不說話。"
+    "照你自己的個性，順著剛才的話自然地往下講：補一個新的細節、你的想法或一件相關的事。"
+)
+
+
+# 角色設成「等你」（proactive_when_unanswered: wait）時用這句：她不自顧自地聊下去，
+# 只簡短接一句或叫一聲，等對方回。
+WAITING_NOTE = (
+    "你上一句是自己主動開口說的，對方到現在都沒回（你已經自己講了 {n} 次）。"
+    "對話最後那段是你自己講的，不是對方問的：不要把它當成對方的問題來回答，也不要講得"
+    "好像他剛開口了。簡短地接一句或叫他一聲就好，不要自己長篇大論地聊下去。"
+)
+
+
+def _with_unanswered(
+    instruction: str, companion, conversation, mode: str = "keep_talking"
+) -> str:
+    """主機的主動開口指示；她上一句還沒人回時補一句（引擎太舊不知道時照舊）。"""
+    count = getattr(companion, "unanswered_remarks", None)
+    unanswered = count(conversation) if callable(count) else 0
+    if not instruction or not unanswered:
+        return instruction
+    note = WAITING_NOTE if mode == "wait" else UNANSWERED_NOTE
+    return f"{instruction}\n\n{note.format(n=unanswered)}"
+
+
 class CharacterEngineAgent(AgentInterface):
     # 她說出口的話由引擎把關（不重複、不講客服腔、不留只剩標點的碎片、主動開口
     # 不只是應一聲）。主機自己那一層過濾對這個 agent 跳過，不然兩邊各擋一次。
@@ -99,6 +137,8 @@ class CharacterEngineAgent(AgentInterface):
         tool_manager=None,
         tool_executor=None,
         player_language: str = "",
+        # 角色頁「可以寫動作描寫」：關著時她寫的 *動作* 不顯示、不記。
+        actions_enabled: bool = True,
         conf_uid: str = "",
         character_name: str = "",
         now: Callable[[], datetime] = datetime.now,
@@ -136,6 +176,7 @@ class CharacterEngineAgent(AgentInterface):
         self._told: set = set()
         self._group_note = ""
         self.set_system(system)
+        self._actions_enabled = actions_enabled
 
         @tts_filter(tts_preprocessor_config)
         @display_processor()
@@ -146,7 +187,13 @@ class CharacterEngineAgent(AgentInterface):
             valid_tags=["think"],
         )
         async def pipeline(input_data: BatchInput):
+            # 動作描寫關著：提示不教，但她照前面的對話還是寫了的話，在斷句之前拿掉。
+            dropper = None if self._actions_enabled else ActionDropper()
             async for output in self._reply(input_data):
+                if dropper is not None and isinstance(output, str):
+                    output = dropper.feed(output)
+                    if not output:
+                        continue
                 yield output
 
         self._pipeline = pipeline
@@ -176,6 +223,11 @@ class CharacterEngineAgent(AgentInterface):
 
     # --- 她記得對方什麼 -------------------------------------------------------
     # 記憶頁讀寫的是這一份。
+
+    def unanswered_remarks(self, history_uid: Optional[str] = None) -> int:
+        """她在這段對話裡主動開口、對方還沒回的次數（引擎太舊時是 0）。"""
+        count = getattr(self._companion(), "unanswered_remarks", None)
+        return count(history_uid or self._conversation) if callable(count) else 0
 
     def conversation_memory(self, history_uid: str) -> str:
         return "\n".join(self._companion().memories(history_uid))
@@ -253,6 +305,13 @@ class CharacterEngineAgent(AgentInterface):
             return None
         return mood_message(companion.snapshot())
 
+    def reply_actions(self, choices: Any) -> Any:
+        """這則回覆的表情與動作挑選器（引擎的 ReplyActions，1.3.0 起）；引擎那一側
+        還沒好、或引擎太舊是 None。"""
+        companion = self._companion()
+        make = getattr(companion, "reply_actions", None)
+        return make(choices) if callable(make) else None
+
     def listen_to_mood(self, listener: Callable[[dict], None]) -> Callable[[], None]:
         """背景結果改了她的心情時呼叫 listener(訊息)。記在角色上：引擎那一側
         換了一個也照樣收得到。回傳停止聽的函式。"""
@@ -300,10 +359,12 @@ class CharacterEngineAgent(AgentInterface):
     def _remembered(self, reply: str) -> str:
         """她記得自己說了什麼：表情與動作
         標籤留著（她得讀到自己會做表情），演出標籤拿掉，字形跟畫面一致。"""
-        return normalize_output_language_variant(
+        said = normalize_output_language_variant(
             deduplicate_response_text(strip_stage_performance_tag(tidy_marks(reply))),
             self._player_language,
         )
+        # 動作描寫關著：對話裡不留她寫的動作，不然她照著寫、越寫越多。
+        return said if self._actions_enabled else drop_actions(said)
 
     async def close(self) -> None:
         """一個連線結束時由 ServiceContext.close() 呼叫。
@@ -404,7 +465,7 @@ class CharacterEngineAgent(AgentInterface):
                     # 留在對話裡，素材只屬於這一句。
                     notes=[
                         *(
-                            ["可以聊的素材：\n" + "\n\n".join(material)]
+                            [MATERIAL_HEADING + "\n" + "\n\n".join(material)]
                             if material
                             else []
                         ),
@@ -417,7 +478,12 @@ class CharacterEngineAgent(AgentInterface):
                     # 上一次主動開口已經問過問題：這次的問句由引擎拿掉，不只是叮嚀。
                     statement_only=bool(metadata.get("proactive_forbid_question")),
                     # 主機自己的規矩（中文，實測出來的）；沒有就用引擎的。
-                    instruction=str(metadata.get("proactive_instruction") or "")
+                    instruction=_with_unanswered(
+                        str(metadata.get("proactive_instruction") or ""),
+                        companion,
+                        conversation,
+                        str(metadata.get("proactive_when_unanswered") or ""),
+                    )
                     or None,
                 )
             else:

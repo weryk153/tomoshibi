@@ -285,7 +285,11 @@
       "use": "전환",
       "refAudioPath": "참조 음성",
       "refAudioPathPlaceholder": "/경로/voice.wav",
-      "refAudioPathHelp": "GPT-SoVITS 전용입니다. 이 음성 자체가 목소리입니다——파일을 바꾸면 목소리의 주인이 바뀌고, 학습은 필요 없습니다. 고르면 아래 받아쓰기도 자동으로 채워집니다. 「기본 캐릭터와 같게」를 고르면 기본 캐릭터의 지금 참조 음성을 그녀의 설정으로 저장합니다. 새 목소리를 추가하려면 .wav를 같은 폴더에 두세요. 같은 이름의 .txt를 함께 두면 받아쓰기도 자동으로 채워집니다.",
+      "refAudioPathHelp": "GPT-SoVITS에만 적용됩니다. 이 음성 파일이 곧 목소리입니다 — 파일을 바꾸면 목소리가 바뀌고 학습은 필요 없습니다. 고르면 아래 받아쓰기도 채워집니다. \"기본 캐릭터와 같게\"는 기본 캐릭터의 현재 참조 음성을 그녀의 것으로 저장합니다. 새 목소리를 추가하려면 \"업로드\"를 눌러 mp3나 wav를 고르세요. 3~10초가 가장 좋고, 길면 문장 사이 쉼에서 자동으로 자르며 받아쓰기도 자동으로 만듭니다. 여기에는 그녀 자신의 목소리와 공용 목소리만 나옵니다.",
+      "refAudioUpload": "mp3/wav 업로드",
+      "refAudioUploadFailed": "업로드 실패",
+      "refAudioUploaded": "{{label}} 추가됨 ({{seconds}}초)",
+      "refAudioNoTranscript": "받아쓰기를 자동으로 만들지 못했습니다. 음성에서 말하는 내용을 아래에 적어 주세요.",
       "promptText": "참조 음성 대본",
       "promptTextPlaceholder": "음성에서 말한 내용 그대로",
       "promptTextHelp": "참조 음성이 실제로 말하는 내용을 한 글자도 빠짐없이 적어요. GPT-SoVITS가 이걸로 음색을 맞추기 때문에 대본이 틀리면 복제된 목소리가 흔들려요.",
@@ -309,6 +313,14 @@
       "translationAuditLoadFailed": "번역 검토 제안을 불러오지 못했습니다",
       "translationAuditLoading": "번역 검토를 불러오는 중…",
       "actionsEnabled": "동작 묘사 허용",
+      "whenUnanswered": "답하지 않을 때",
+      "whenUnanswered_keep_talking": "계속 이야기하기",
+      "whenUnanswered_wait": "기다리기",
+      "whenUnansweredHelp": "자발적 발화에만 적용됩니다. 그녀가 말을 걸었는데 답하지 않으면: 계속 이야기하기＝간격대로 계속 말을 걸며 자기 이야기를 이어 갑니다. 기다리기＝매번 두 배씩 더 기다리고, 3번 연속 답이 없으면 당신이 말할 때까지 말을 걸지 않습니다. 어느 쪽이든 마지막 말이 자기 말이라는 것을 알기 때문에 당신의 질문으로 착각해 답하지 않습니다. 방송에는 영향이 없습니다.",
+      "expressionSource": "표정과 모션",
+      "expressionSource_tags": "그녀가 쓰는 태그",
+      "expressionSource_background": "백그라운드 모델이 고름",
+      "expressionSourceHelp": "태그: 대사에 [joy] 같은 태그를 씁니다. 백그라운드 모델: 음성을 만드는 동안 문장마다 표정과 모션을 백그라운드 모델(모델 › 백그라운드 작업 및 도구)이 고르고, 프롬프트에서 태그를 가르치지 않습니다. 백그라운드 모델이 없으면 태그를 그대로 씁니다. 캐릭터를 다시 불러오면 적용됩니다.",
       "actionsEnabledHelp": "*시선을 돌린다* 처럼 별표로 감싼 짧은 동작을 하나 덧붙일 수 있습니다. 자막에만 나오고 읽지 않습니다. 끄면 동작에 대해 아예 알려 주지 않아, 멈춤과 단어 선택으로만 표현합니다."
     },
     "personas": {
@@ -878,6 +890,7 @@
       "extras": "백그라운드 작업 및 도구"
     },
     "characterPage": {
+      "motionEditorToggle": "모션과 표정 키워드",
       "basic": "기본",
       "personas": "페르소나 버전",
       "personasNote": "페르소나는 공용이며 캐릭터마다 하나를 고릅니다. 사용 중이 아닌 캐릭터는 전환할 때 적용됩니다.",
@@ -892,6 +905,8 @@
     }
   },
   "footer": {
+    "queuedNote": "대기 중: 말이 끝나면 보냅니다",
+    "cancelQueued": "이 메시지 취소",
     "typeYourMessage": "메시지를 입력하세요...",
     "send": "전송",
     "attachImage": "이미지 첨부",

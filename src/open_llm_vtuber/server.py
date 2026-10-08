@@ -18,6 +18,7 @@ from starlette.staticfiles import StaticFiles as StarletteStaticFiles
 from .routes import init_client_ws_route, init_webtool_routes, init_proxy_route
 from .llm_config_route import init_llm_config_route
 from .character_route import init_character_route
+from .reference_voices import init_reference_voice_route
 from .live2d_config_route import init_live2d_config_route
 from .persona_route import init_persona_route
 from .translator_route import init_translator_route
@@ -141,6 +142,12 @@ class WebSocketServer:
         # 存取控制統一在 api_guard，各 route 不各自實作。
         self.app.include_router(init_llm_config_route())  # 首次設定精靈
         self.app.include_router(init_character_route())  # 角色管理
+        # 參考音上傳：逐字稿用這個連線的語音辨識（沒有就留空讓使用者填）。
+        self.app.include_router(
+            init_reference_voice_route(
+                lambda: getattr(self.default_context_cache, "asr_engine", None)
+            )
+        )
         self.app.include_router(init_persona_route())  # 人設預設
         self.app.include_router(init_translator_route())  # 翻譯
         self.app.include_router(init_player_route())  # 玩家層級設定

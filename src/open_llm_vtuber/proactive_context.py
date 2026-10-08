@@ -237,3 +237,29 @@ def clear_proactive_context(conf_uid: str, client_uid: str) -> None:
     """Clear one session (primarily for lifecycle cleanup and tests)."""
     key = _session_key(conf_uid, client_uid)
     _recent_by_session.pop(key, None)
+
+
+# 「你沒回話時：等你」（character_config.proactive_when_unanswered: wait）。前端照設定的
+# 秒數一直送觸發，這裡決定這一次開不開口：她沒人回的話一次比一次等得久（沒回 n 次
+# 就跳過 2^n - 1 次觸發，也就是等 2^n 倍），連續 WAIT_GIVE_UP 次沒回就不再開口，
+# 等對方說話（引擎的 unanswered_remarks 歸零）再從頭算。
+WAIT_GIVE_UP = 3
+_skipped: OrderedDict[tuple[str, str], int] = OrderedDict()
+
+
+def wait_allows_speaking(key: tuple[str, str], unanswered: int) -> bool:
+    """這次觸發她開不開口（等你模式）。``unanswered`` 是她上次之後沒人回的次數。"""
+    if unanswered <= 0:
+        _skipped.pop(key, None)
+        return True
+    if unanswered >= WAIT_GIVE_UP:
+        return False
+    skipped = _skipped.get(key, 0)
+    if skipped < 2**unanswered - 1:
+        _skipped[key] = skipped + 1
+        _skipped.move_to_end(key)
+        while len(_skipped) > MAX_PROACTIVE_CONTEXTS:
+            _skipped.popitem(last=False)
+        return False
+    _skipped.pop(key, None)
+    return True

@@ -16,6 +16,8 @@ export const useFooter = () => {
     handleCompositionEnd,
     handleSend,
     flushPending,
+    queued,
+    removeQueued,
   } = useTextInput();
 
   const { interrupt } = useInterrupt();
@@ -69,5 +71,7 @@ export const useFooter = () => {
     handleInterrupt,
     handleMicToggle,
     micOn,
+    queued,
+    removeQueued,
   };
 };

@@ -19,6 +19,7 @@ from ..news_topics import proactive_instruction, proactive_material
 from ..topics_route import current_proactive_prompt
 from ..proactive_context import (
     proactive_context_uid,
+    wait_allows_speaking,
     should_force_statement,
 )
 
@@ -70,10 +71,27 @@ def proactive_turn_metadata(
         # 引擎決定講什麼，主機只給素材（話題、新聞）與規矩。
         "proactive_material": material,
         "proactive_instruction": instruction,
+        # 她上一句沒人回時怎麼接（角色設定）：自己聊下去，或簡短一句等對方。
+        "proactive_when_unanswered": getattr(
+            context.character_config, "proactive_when_unanswered", "keep_talking"
+        ),
         # 她開口之後，拿來找出她提到了哪則新聞（news_topics.note_mentioned）。
         "proactive_source": source,
         "proactive_context_uid": proactive_uid,
     }
+
+
+def _speaks_up_now(context: ServiceContext, client_uid: str) -> bool:
+    """這次觸發她開不開口。角色設成「等你」（proactive_when_unanswered: wait）時，
+    沒人回就一次比一次等得久、連續幾次就停（proactive_context.wait_allows_speaking）；
+    「自己聊下去」每次都開口。"""
+    character = context.character_config
+    if getattr(character, "proactive_when_unanswered", "keep_talking") != "wait":
+        return True
+    count = getattr(context.agent_engine, "unanswered_remarks", None)
+    unanswered = count(context.history_uid) if callable(count) else 0
+    key = (str(character.conf_uid or ""), str(client_uid or ""))
+    return wait_allows_speaking(key, unanswered)
 
 
 async def handle_conversation_trigger(
@@ -94,6 +112,8 @@ async def handle_conversation_trigger(
     images_for_generation = data.get("images")
 
     if msg_type == "ai-speak-signal":
+        if not _speaks_up_now(context, client_uid):
+            return
         raw_images = data.get("images")
         image_sources = [
             image.get("source") for image in raw_images or [] if isinstance(image, dict)

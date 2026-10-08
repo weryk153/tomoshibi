@@ -441,6 +441,7 @@ async def process_member_response(
                     tts_manager=tts_manager,
                     translate_engine=context.translate_engine,
                     subtitle_translate_engine=context.subtitle_translate_engine,
+                    agent=context.agent_engine,
                 )
                 full_response += response_part  # Accumulate text response
             else:

@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import re
 from typing import Awaitable, Callable, Optional, Union, Any, List, Dict
 import numpy as np
@@ -13,6 +14,7 @@ from ..agent.output_types import SentenceOutput, AudioOutput
 from ..agent.input_types import BatchInput, TextData, ImageData, TextSource, ImageSource
 from ..asr.asr_interface import ASRInterface
 from ..avatar_model import AvatarModel
+from ..expression_pick import picker_for as expression_picker_for
 from ..translate.audit import auditor_for as translation_auditor
 from ..translate.catchphrases import only_catchphrases, replace_catchphrases
 from ..translate.translate_interface import UnspeakableTranslation
@@ -197,8 +199,12 @@ async def process_agent_output(
     translate_engine: Optional[Any] = None,
     subtitle_translate_engine: Optional[Any] = None,
     subtitle_collector: Optional[List[str]] = None,
+    agent: Optional[Any] = None,
 ) -> str:
-    """把回覆補上角色資訊，必要時翻譯，然後送出去。"""
+    """把回覆補上角色資訊，必要時翻譯，然後送出去。
+
+    agent 是說這句話的 agent：表情交給背景模型挑時（expression_pick）讀她的心情。
+    """
     # 對話框上顯示的名字。絕不能是空的——前端拿到空值會退回寫死的「AI」，
     # 使用者會看到自己的角色突然叫做 AI。
     output.display_text.name = (
@@ -219,6 +225,12 @@ async def process_agent_output(
     except Exception as e:
         logger.warning(f"Translation audit unavailable ({type(e).__name__}: {e})")
         auditor = None
+    # 表情與動作由背景模型挑（角色頁「外觀」區）：tags 模式或沒有背景模型就是 None。
+    try:
+        picker = expression_picker_for(character_config, live2d_model, agent)
+    except Exception as e:
+        logger.warning(f"Expression picker unavailable ({type(e).__name__}: {e})")
+        picker = None
 
     full_response = ""
     try:
@@ -236,6 +248,7 @@ async def process_agent_output(
                 catchphrases=catchphrases,
                 bilingual_subtitle=bilingual_subtitle,
                 translation_auditor=auditor,
+                expression_picker=picker,
             )
         elif isinstance(output, AudioOutput):
             full_response = await handle_audio_output(output, websocket_send)
@@ -265,8 +278,12 @@ async def handle_sentence_output(
     catchphrases: Optional[Dict[str, str]] = None,
     bilingual_subtitle: bool = False,
     translation_auditor: Optional[Any] = None,
+    expression_picker: Optional[Any] = None,
 ) -> str:
     """處理一句輸出：需要時翻譯，然後交給語音合成。
+
+    ``expression_picker``（expression_pick.EnginePicker）有給時，每一句交給
+    tts_manager，跟合成並行請引擎挑表情與動作；沒給時 speak 的參數跟以前一樣。
 
     ``bilingual_subtitle`` 開著時，畫面字幕多一行她實際唸的那句（見
     conversations/bilingual.py）；關著時送出去的 payload 跟以前一樣。
@@ -411,6 +428,14 @@ async def handle_sentence_output(
             speak_kwargs["spoken_text"] = spoken_text
         if silenced:
             speak_kwargs["silenced"] = True
+        if expression_picker is not None:
+            # 沒有標籤可以定語氣：用這則回覆挑到過的表情，還沒有就用她的心情。
+            if actions is not None and not getattr(actions, "emotion", None):
+                actions.emotion = expression_picker.voice_emotion()
+            # 前一句由引擎的挑選器自己記（ReplyActions）。
+            speak_kwargs["pick"] = functools.partial(
+                expression_picker.ask, display_text.text
+            )
 
         await tts_manager.speak(
             tts_text=tts_text,

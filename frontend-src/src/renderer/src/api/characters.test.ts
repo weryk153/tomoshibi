@@ -2,7 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   buildCharacterUpdate, validateAvatarFile, AVATAR_MAX_CLIENT_BYTES,
-  characterSettingsPath,
+  characterSettingsPath, EXPRESSION_SOURCES, isExpressionSource,
   type CharacterRecord,
 } from './characters.ts'
 
@@ -151,4 +151,12 @@ test('character settings go to that character\'s own settings path', () => {
   assert.equal(characterSettingsPath('kurisu.yaml'), '/api/characters/kurisu.yaml/settings')
   assert.equal(characterSettingsPath('conf.yaml'), '/api/characters/conf.yaml/settings')
   assert.equal(characterSettingsPath('a b.yaml'), '/api/characters/a%20b.yaml/settings')
+})
+
+test('expression source accepts only the two choices the backend takes', () => {
+  assert.deepEqual([...EXPRESSION_SOURCES], ['tags', 'background'])
+  assert.equal(isExpressionSource('background'), true)
+  assert.equal(isExpressionSource('tags'), true)
+  assert.equal(isExpressionSource('vibes'), false)
+  assert.equal(isExpressionSource(undefined), false)
 })

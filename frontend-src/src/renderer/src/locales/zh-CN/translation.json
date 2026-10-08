@@ -285,7 +285,11 @@
       "use": "切换",
       "refAudioPath": "参考音频",
       "refAudioPathPlaceholder": "/路径/到/声音.wav",
-      "refAudioPathHelp": "只对 GPT-SoVITS 有效。这段音频就是声线本身——换文件就换人的嗓子，不需要训练。选了会一并把下面的逐字稿填好。选「跟底稿角色一样」会把底稿角色现在的参考音存成她自己的。要加新声线，把 .wav 放到同一个文件夹就会出现在这里；再放一个同名 .txt，逐字稿也会自动带入。",
+      "refAudioPathHelp": "只对 GPT-SoVITS 有效。这段音档就是声线本身——换档案就换人的嗓子，不需要训练。选了会一并把下面的逐字稿填好。选「跟底稿角色一样」会把底稿角色现在的参考音存成她自己的。要加新声线，按「上传」选 mp3 或 wav：3 到 10 秒最好，太长会在句子的停顿处自动切，逐字稿也会自动产生。这里只列她自己的声音和共用的。",
+      "refAudioUpload": "上传 mp3／wav",
+      "refAudioUploadFailed": "上传失败",
+      "refAudioUploaded": "已加入 {{label}}（{{seconds}} 秒）",
+      "refAudioNoTranscript": "没有自动产生逐字稿，请在下面填上音档里说的话。",
       "promptText": "参考音频逐字稿",
       "promptTextPlaceholder": "音频里一字不差说了什么",
       "promptTextHelp": "参考音频实际说出来的内容，要一字不差。GPT-SoVITS 拿它来对齐音色，逐字稿给错克隆出来的声音就会歪。",
@@ -309,6 +313,14 @@
       "translationAuditLoadFailed": "读取不到翻译审核建议",
       "translationAuditLoading": "正在加载翻译审核…",
       "actionsEnabled": "可以写动作描写",
+      "whenUnanswered": "你没回话时",
+      "whenUnanswered_keep_talking": "自己聊下去",
+      "whenUnanswered_wait": "等你",
+      "whenUnansweredHelp": "只对「主动说话」有效。她主动开口后你没回：自己聊下去＝照间隔继续开口，顺着自己刚才的话往下讲；等你＝一次比一次等得久，连续 3 次没回就不再开口，等你说话再重新算。两种她都知道最后那段是自己讲的，不会当成你问的。直播不受影响。",
+      "expressionSource": "表情与动作",
+      "expressionSource_tags": "她写的标签",
+      "expressionSource_background": "背景模型挑",
+      "expressionSourceHelp": "标签：她在台词里带 [joy] 这类标签。背景模型：合成语音的同时，由背景模型（模型 › 后台工作与工具）逐句挑表情与动作，提示里不再教标签。没设背景模型时照旧用标签。重新载入角色后生效。",
       "actionsEnabledHelp": "让她在台词里搭配一句星号包起来的动作，例如「*把视线移开*」，只显示在字幕上、不会念出来。关掉时完全不跟她提动作，感情只用停顿与选词表现。"
     },
     "personas": {
@@ -878,6 +890,7 @@
       "extras": "后台工作与工具"
     },
     "characterPage": {
+      "motionEditorToggle": "动作与表情的关键字",
       "basic": "基本",
       "personas": "人设版本",
       "personasNote": "人设是共用的；每个角色各自选一个。不是正在用的角色，选了会在切换到她时生效。",
@@ -892,6 +905,8 @@
     }
   },
   "footer": {
+    "queuedNote": "排队中：等她讲完就送出",
+    "cancelQueued": "取消这则",
     "typeYourMessage": "输入您的消息……",
     "send": "发送",
     "attachImage": "附加图片",

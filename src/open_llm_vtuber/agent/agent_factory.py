@@ -98,6 +98,7 @@ class AgentFactory:
                 tool_manager=kwargs.get("tool_manager"),
                 tool_executor=kwargs.get("tool_executor"),
                 player_language=player_language,
+                actions_enabled=bool(kwargs.get("actions_enabled", True)),
             )
 
         if conversation_agent_choice == "hume_ai_agent":

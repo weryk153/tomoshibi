@@ -334,6 +334,18 @@ def _read_character_fields(path: str, *, is_base: bool) -> Optional[dict]:
         "actions_enabled": bool(cc.get("actions_enabled", False)),
         "bilingual_subtitle": bool(cc.get("bilingual_subtitle", False)),
         "translation_audit": bool(cc.get("translation_audit", False)),
+        "expression_source": (
+            cc.get("expression_source")
+            if cc.get("expression_source")
+            in character_settings.CHOICES["expression_source"]
+            else "tags"
+        ),
+        "proactive_when_unanswered": (
+            cc.get("proactive_when_unanswered")
+            if cc.get("proactive_when_unanswered")
+            in character_settings.CHOICES["proactive_when_unanswered"]
+            else "keep_talking"
+        ),
     }
 
 
@@ -988,7 +1000,10 @@ def init_character_route() -> APIRouter:
             )
         values = await asyncio.to_thread(character_settings.effective, filename)
         return JSONResponse(
-            {"ok": True, "settings": {k: values[k] for k in character_settings.TOGGLES}}
+            {
+                "ok": True,
+                "settings": {k: values[k] for k in character_settings.SETTINGS},
+            }
         )
 
     @router.post("/api/characters/{filename}/settings")
@@ -1005,11 +1020,18 @@ def init_character_route() -> APIRouter:
             return _bad_request("Invalid JSON body.")
         if not isinstance(body, dict) or not body:
             return _bad_request("Send at least one setting.")
-        unknown = set(body) - set(character_settings.TOGGLES)
-        if unknown or not all(isinstance(v, bool) for v in body.values()):
+        unknown = set(body) - set(character_settings.SETTINGS)
+        if unknown or not all(
+            value in character_settings.CHOICES[key]
+            if key in character_settings.CHOICES
+            else isinstance(value, bool)
+            for key, value in body.items()
+        ):
             return _bad_request(
                 "Only translate_subtitle, long_term_memory_enabled, actions_enabled,"
-                " bilingual_subtitle and translation_audit, as true/false."
+                " bilingual_subtitle and translation_audit, as true/false,"
+                " expression_source as 'tags' or 'background', and"
+                " proactive_when_unanswered as 'keep_talking' or 'wait'."
             )
         try:
             await asyncio.to_thread(character_settings.write, filename, body)
@@ -1026,7 +1048,7 @@ def init_character_route() -> APIRouter:
         return JSONResponse(
             {
                 "ok": True,
-                "settings": {k: values[k] for k in character_settings.TOGGLES},
+                "settings": {k: values[k] for k in character_settings.SETTINGS},
                 # 正在用的角色要重新載入設定才生效；子專案 3 的提示列會用到。
                 "reload_required": True,
             }

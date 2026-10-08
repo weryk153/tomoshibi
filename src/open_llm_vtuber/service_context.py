@@ -706,6 +706,9 @@ class ServiceContext:
                 # character_engine_agent 的狀態存在 chat_history/<conf_uid>/engine/。
                 conf_uid=target_character.conf_uid,
                 character_name=target_character.character_name,
+                actions_enabled=bool(
+                    getattr(target_character, "actions_enabled", False)
+                ),
                 # 記憶頁的開關：關掉時引擎也不再抽記憶、不再把記憶帶進對話。
                 long_term_memory_enabled=target_character.long_term_memory_enabled,
                 # 她的人設原文（逐字包在 system_prompt 裡）；給引擎的
@@ -1006,7 +1009,20 @@ class ServiceContext:
             rules = f"{rules}\n\n{ACTION_RULES}"
         persona_prompt = f"{rules}\n\n{persona_prompt}"
 
+        # 表情與動作由背景模型逐句挑（expression_pick）時，不教她寫標籤。
+        # 「提示只增不改」顧的是同一模式下的快取；切模式本來就整段重讀。
+        from .expression_pick import uses_background_expressions
+
+        tags_by_background = uses_background_expressions(target_character)
+
         for prompt_name, prompt_file in self.system_config.tool_prompts.items():
+            if tags_by_background and prompt_name in (
+                "live2d_expression_prompt",
+                "live2d_motion_prompt",
+                "vrm_motion_prompt",
+            ):
+                continue
+
             if (
                 prompt_name == "group_conversation_prompt"
                 or prompt_name == "proactive_speak_prompt"

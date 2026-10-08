@@ -11,6 +11,7 @@ import {
   EMPTY_PENDING_INPUT,
   PendingInputState,
   enqueuePendingInput,
+  removePendingInput,
   hasPendingInput,
   joinPendingInput,
   clearPendingInput,
@@ -35,6 +36,12 @@ export function useTextInput() {
   // ever read inside callbacks/effects, and putting it in state would cause
   // an extra render per queued message for no one to see.
   const pendingRef = useRef<PendingInputState>(EMPTY_PENDING_INPUT);
+  // 畫面上「排隊中」那一區要看的；跟 pendingRef 一起改（setPending）。
+  const [queued, setQueued] = useState<readonly string[]>([]);
+  const setPending = useCallback((next: PendingInputState) => {
+    pendingRef.current = next;
+    setQueued(next.queue);
+  }, []);
   const prevAiStateRef = useRef(aiState);
   const prevConfUidRef = useRef(confUid);
 
@@ -64,12 +71,19 @@ export function useTextInput() {
   // why that's not inferred from the aiState transition alone).
   const flushPendingInput = useCallback(() => {
     if (!hasPendingInput(pendingRef.current)) return;
+    const waiting = pendingRef.current.queue;
     const text = joinPendingInput(pendingRef.current);
-    pendingRef.current = clearPendingInput();
+    setPending(clearPendingInput());
+    // 真的送出這一刻才進對話（排隊時只在輸入框上方的「排隊中」）。
+    waiting.forEach((line) => appendHumanMessage(line));
     sendTextInput(text).catch((error) => {
       console.warn('Failed to send queued text-input:', error);
     });
-  }, [sendTextInput]);
+  }, [sendTextInput, setPending, appendHumanMessage]);
+
+  const removeQueued = useCallback((index: number) => {
+    setPending(removePendingInput(pendingRef.current, index));
+  }, [setPending]);
 
   // A character switch starts a new history for a different character —
   // text queued while talking to whoever she was before must not be
@@ -87,8 +101,8 @@ export function useTextInput() {
       'Character switched while a message was queued — dropping it instead of sending it to the new character:',
       joinPendingInput(pendingRef.current),
     );
-    pendingRef.current = clearPendingInput();
-  }, [confUid]);
+    setPending(clearPendingInput());
+  }, [confUid, setPending]);
 
   // Flush the queue once she genuinely settles back to idle (normal
   // conversation-chain-end, or config-switched/config-reloaded afterwards —
@@ -118,9 +132,6 @@ export function useTextInput() {
     const text = inputText.trim();
     if (!text || !wsContext) return;
 
-    // Shown immediately either way — queueing only delays the backend turn,
-    // not her seeing it echoed in the transcript.
-    appendHumanMessage(text);
     setInputText('');
     if (autoStopMic) stopMic();
 
@@ -128,8 +139,9 @@ export function useTextInput() {
     if (decision === 'queue') {
       // Do NOT interrupt her. Hold the message; it's sent (joined with
       // anything else queued meanwhile) once she's done, or sooner if the
-      // user explicitly hits interrupt.
-      pendingRef.current = enqueuePendingInput(pendingRef.current, text);
+      // user explicitly hits interrupt. 排隊時不進對話，只顯示在「排隊中」；
+      // 真的送出時（flushPendingInput）才進。
+      setPending(enqueuePendingInput(pendingRef.current, text));
       return;
     }
     if (decision === 'interrupt-then-send') {
@@ -144,7 +156,9 @@ export function useTextInput() {
     // queue had a chance to flush) must go out ahead of this one, not
     // after — chat history already shows it in that order.
     const outgoing = mergeQueuedWithImmediate(pendingRef.current, text);
-    pendingRef.current = clearPendingInput();
+    pendingRef.current.queue.forEach((line) => appendHumanMessage(line));
+    appendHumanMessage(text);
+    setPending(clearPendingInput());
     await sendTextInput(outgoing);
   };
 
@@ -168,5 +182,7 @@ export function useTextInput() {
     handleCompositionStart,
     handleCompositionEnd,
     flushPending: flushPendingInput,
+    queued,
+    removeQueued,
   };
 }

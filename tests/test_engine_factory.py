@@ -5,6 +5,7 @@ agent 卻是每次儲存設定就重建一個。
 """
 
 import asyncio
+import inspect
 
 import pytest
 
@@ -16,6 +17,7 @@ from tests.engine_factory_arguments import factory_arguments  # noqa: E402
 
 pytest.importorskip("ai_character_engine")
 
+from ai_character_engine.companion import CharacterCompanion  # noqa: E402
 from ai_character_engine.llm.models import LLMResponse, LLMStreamChunk  # noqa: E402
 
 from src.open_llm_vtuber.character_engine import factory  # noqa: E402
@@ -157,7 +159,7 @@ def test_she_talks_with_the_hosts_settings_and_thinks_with_plain_ones():
     """背景工作要的是穩定的 JSON：溫度壓低，只留「關掉思考模式」這類欄位——
     presence_penalty 會懲罰 JSON 裡本來就該重複的鍵名。"""
     AgentFactory.create_agent(**factory_arguments())
-    talking, thinking = Offline.built
+    talking, thinking, _picking = Offline.built
 
     assert talking.request_options == {
         "temperature": 0.7,
@@ -179,7 +181,7 @@ def test_her_background_work_can_run_on_another_model():
     }
 
     agent = AgentFactory.create_agent(**arguments)
-    talking, thinking = Offline.built
+    talking, thinking, _picking = Offline.built
 
     assert talking.options["model"] == "stub"
     assert talking.options["base_url"] != "http://127.0.0.1:1235/v1"
@@ -187,6 +189,44 @@ def test_her_background_work_can_run_on_another_model():
     assert thinking.options["model"] == "qwen/qwen3.5-9b"
     assert thinking.request_options["temperature"] == pytest.approx(0.1)
     assert agent._companion().settings.goal_every == 9
+
+
+def test_her_faces_are_picked_with_a_short_answer_at_temperature_0():
+    """每句的表情與動作（reply_actions）只要一行 JSON：溫度 0、最多 80 token，
+    跟背景工作同一個端點；評測頁（scripts/eval_expression_pick.py）也是這組設定。"""
+    arguments = factory_arguments()
+    arguments["agent_settings"]["character_engine_agent"] = {
+        "background_base_url": "http://127.0.0.1:1235/v1",
+        "background_model": "qwen/qwen3.5-9b",
+    }
+    agent = AgentFactory.create_agent(**arguments)
+    _talking, thinking, picking = Offline.built
+
+    assert picking.request_options == {
+        "temperature": 0,
+        "max_tokens": 80,
+        "extra_body": {"reasoning_effort": "none"},
+    }
+    assert picking.options["base_url"] == thinking.options["base_url"]
+    assert picking.options["model"] == "qwen/qwen3.5-9b"
+    if "actions_llm" in inspect.signature(CharacterCompanion).parameters:
+        assert agent._companion()._actions_llm is picking
+
+
+def test_on_lm_studio_her_picks_line_up_with_its_prompt_cache():
+    """LM Studio 的提示快取 256 token 一格：挑表情的固定部分補到剛好跨過一格。"""
+    agent = AgentFactory.create_agent(**factory_arguments())
+    settings = agent._companion().settings
+    if hasattr(settings, "actions_cache_block"):
+        assert settings.actions_cache_block == 256
+
+
+def test_other_servers_leave_the_picks_as_they_are():
+    arguments = factory_arguments()
+    arguments["agent_settings"]["conversation"]["llm_provider"] = "ollama_llm"
+    arguments["llm_configs"] = {"ollama_llm": arguments["llm_configs"]["lmstudio_llm"]}
+    settings = AgentFactory.create_agent(**arguments)._companion().settings
+    assert getattr(settings, "actions_cache_block", 0) == 0
 
 
 def test_half_a_background_endpoint_is_not_used():
@@ -198,7 +238,7 @@ def test_half_a_background_endpoint_is_not_used():
     }
 
     AgentFactory.create_agent(**arguments)
-    talking, thinking = Offline.built
+    talking, thinking, _picking = Offline.built
 
     assert thinking.options["base_url"] == talking.options["base_url"]
     assert thinking.options["model"] == talking.options["model"]

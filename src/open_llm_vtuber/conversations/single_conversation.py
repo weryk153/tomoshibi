@@ -84,6 +84,7 @@ async def _speak(
         translate_engine=context.translate_engine,
         subtitle_translate_engine=context.subtitle_translate_engine,
         subtitle_collector=subtitle_response_parts,
+        agent=context.agent_engine,
     )
     return str(response_part) if response_part is not None else ""
 

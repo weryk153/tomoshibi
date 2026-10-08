@@ -285,7 +285,11 @@
       "use": "Use",
       "refAudioPath": "Reference audio",
       "refAudioPathPlaceholder": "/path/to/voice.wav",
-      "refAudioPathHelp": "GPT-SoVITS only. This clip *is* the voice — swapping the file swaps who she sounds like, no training needed. Picking one also fills in its transcript below. \"Same as the base character\" copies the base character's current reference audio into hers. Drop new .wav files next to the others to see them here; add a matching .txt to have the transcript filled in for you.",
+      "refAudioPathHelp": "GPT-SoVITS only. This clip *is* the voice — swapping the file swaps who she sounds like, no training needed. Picking one also fills in its transcript below. \"Same as the base character\" copies the base character's current reference audio into hers. To add a voice, press Upload and pick an mp3 or wav: 3 to 10 seconds is best; a longer one is cut at a pause between sentences, and its transcript is made for you. Only her own voices and shared ones are listed here.",
+      "refAudioUpload": "Upload mp3/wav",
+      "refAudioUploadFailed": "Upload failed",
+      "refAudioUploaded": "Added {{label}} ({{seconds}} s)",
+      "refAudioNoTranscript": "No transcript was made; type below what is said in the clip.",
       "promptText": "Reference transcript",
       "promptTextPlaceholder": "Exactly what is said in the clip",
       "promptTextHelp": "What the reference audio actually says, word for word. GPT-SoVITS aligns the timbre against it — a wrong transcript makes the cloned voice drift.",
@@ -309,6 +313,14 @@
       "translationAuditLoadFailed": "Could not load the translation review",
       "translationAuditLoading": "Loading translation review…",
       "actionsEnabled": "May add an action",
+      "whenUnanswered": "When you don't answer",
+      "whenUnanswered_keep_talking": "Keep talking",
+      "whenUnanswered_wait": "Wait for you",
+      "whenUnansweredHelp": "Only for proactive speech. After she speaks up and you don't answer: Keep talking = she keeps speaking up at the interval and carries on from her own words; Wait for you = she waits twice as long each time and stops after 3 unanswered remarks until you speak. Either way she knows her last remark was her own, not your question. Streaming is not affected.",
+      "expressionSource": "Expressions and motions",
+      "expressionSource_tags": "Tags she writes",
+      "expressionSource_background": "Picked by the background model",
+      "expressionSourceHelp": "Tags: she writes [joy]-style tags in her lines. Background model: while the voice is made, the background model (Models › Background tasks & tools) picks each sentence's expression and motion, and her prompt no longer teaches tags. Without a background model it stays on tags. Applies after the character reloads.",
       "actionsEnabledHelp": "Lets her add one short action between asterisks, e.g. *looks away*. It shows in the subtitle and is not spoken. Off: actions are never mentioned to her, so she speaks with pauses and word choice only."
     },
     "personas": {
@@ -878,6 +890,7 @@
       "extras": "Background tasks & tools"
     },
     "characterPage": {
+      "motionEditorToggle": "Motion and expression keywords",
       "basic": "Basics",
       "personas": "Persona versions",
       "personasNote": "Personas are shared; each character picks one. For a character not in use, the choice takes effect when you switch to her.",
@@ -892,6 +905,8 @@
     }
   },
   "footer": {
+    "queuedNote": "Queued: sent when she finishes speaking",
+    "cancelQueued": "Cancel this one",
     "typeYourMessage": "Type your message...",
     "send": "Send",
     "attachImage": "Attach image",

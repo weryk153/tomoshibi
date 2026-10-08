@@ -6,6 +6,7 @@
 """
 
 import asyncio
+from types import SimpleNamespace
 import json
 
 import pytest
@@ -984,7 +985,10 @@ def test_she_speaks_up_through_the_engine_with_the_hosts_material(tmp_path):
     everything = "\n".join(message.content for message in prompt)
     assert "主機的一大段主動開口指示" not in everything
     assert "請你自然地開口" in prompt[-1].content
-    assert "For the next reply only: 可以聊的素材：\n- 天文" in everything
+    assert (
+        "For the next reply only: 你自己想聊的話可以參考這些（對方沒有問，不是對方問的）：\n- 天文"
+        in everything
+    )
     later = "\n".join(message.content for message in afterwards)
     assert "請你自然地開口" not in later
     assert "- 天文" not in later
@@ -1010,6 +1014,23 @@ def test_her_mood_is_read_from_the_engine(tmp_path):
 
 def test_no_mood_while_the_engine_side_is_being_replaced():
     assert agent(lambda: None).mood_message() is None
+
+
+# --- 每句的表情與動作 ---------------------------------------------------------------
+
+
+def test_the_picks_of_a_reply_come_from_the_engine():
+    asked = []
+    engine_side = SimpleNamespace(
+        reply=None, reply_actions=lambda choices: asked.append(choices) or "picker"
+    )
+    assert agent(engine_side).reply_actions("choices") == "picker"
+    assert asked == ["choices"]
+
+
+def test_no_picks_while_the_engine_side_is_replaced_or_too_old():
+    assert agent(lambda: None).reply_actions("choices") is None
+    assert agent(SimpleNamespace(reply=None)).reply_actions("choices") is None
 
 
 def test_an_agent_that_does_not_know_its_character_has_nothing_to_follow(
@@ -1102,3 +1123,91 @@ def test_the_agent_does_not_lean_on_the_engines_private_helpers():
     source = inspect.getsource(agent_module)
     assert "ai_character_engine.context.builder" not in source
     assert agent_module._one_line(" a\n\n b\tc ") == "a b c"
+
+
+@pytest.mark.skipif(
+    not hasattr(CharacterCompanion, "unanswered_remarks"),
+    reason="ai-character-engine with unanswered_remarks",
+)
+def test_speaking_up_again_unanswered_she_is_told_in_chinese(tmp_path):
+    """她主動開口後沒人回，下次再主動開口時要知道「最後那段是自己講的」，照自己的
+    個性聊下去——不然會把自己的提議當成對方問的來回答（自問自答）。"""
+
+    async def scenario():
+        llm = EngineLLM("要不我們聊電玩？")
+        current = agent(companion(tmp_path, llm))
+        await say(current, "你好", history_uid="h1")
+        first = dict(
+            proactive_speak=True,
+            skip_memory=True,
+            history_uid="h1",
+            proactive_instruction="自然地開口。",
+            proactive_material=["- 電玩"],
+        )
+        llm.reply = "要不我們聊電玩？"
+        await say(current, "（主動開口）", **first)
+        before = "\n".join(llm.sent())
+        await current.remember_remark("h1", "要不我們聊電玩？")
+        llm.reply = "我最近在玩新遊戲。"
+        await say(current, "（主動開口）", **first)
+        return before, "\n".join(llm.sent())
+
+    before, after = asyncio.run(scenario())
+    assert (
+        "不是對方問的" not in before.split("參考這些")[0] and "自己講了" not in before
+    )
+    assert "自己講了 1 次" in after and "照你自己的個性" in after
+    assert "可以聊的素材" not in after and "不是對方問的" in after
+
+
+@pytest.mark.skipif(
+    not hasattr(CharacterCompanion, "unanswered_remarks"),
+    reason="ai-character-engine with unanswered_remarks",
+)
+def test_a_character_that_waits_says_only_a_short_word_when_unanswered(tmp_path):
+    async def scenario():
+        llm = EngineLLM("要不我們聊電玩？")
+        current = agent(companion(tmp_path, llm))
+        await say(current, "你好", history_uid="h1")
+        turn = dict(
+            proactive_speak=True,
+            skip_memory=True,
+            history_uid="h1",
+            proactive_instruction="自然地開口。",
+            proactive_when_unanswered="wait",
+        )
+        await say(current, "（主動開口）", **turn)
+        await current.remember_remark("h1", "要不我們聊電玩？")
+        llm.reply = "你還在嗎？"
+        await say(current, "（主動開口）", **turn)
+        return "\n".join(llm.sent()), current.unanswered_remarks("h1")
+
+    sent, unanswered = asyncio.run(scenario())
+    assert "不是對方問的" in sent and "簡短" in sent and "照你自己的個性" not in sent
+    assert unanswered == 1
+
+
+def test_with_actions_off_what_she_still_writes_between_stars_is_dropped(tmp_path):
+    """動作描寫關著（actions_enabled: false）：提示不教，她照前面的對話還是寫了
+    `*動作*` 的話，字幕、語音都不出現，也不記進對話——不然越寫越多。"""
+
+    async def scenario():
+        llm = EngineLLM("*把相機收起來* 那最後一集呢？*眨眼*")
+        current = agent(companion(tmp_path, llm), actions_enabled=False)
+        outputs = await say(current, "你好")
+        llm.reply = "嗯。"
+        await say(current, "然後呢")
+        return spoken(outputs), llm.said_by_both()
+
+    shown, history = asyncio.run(scenario())
+    assert "*" not in shown and "相機" not in shown and "那最後一集呢" in shown
+    assert all("*" not in line and "相機" not in line for line in history)
+
+
+def test_with_actions_on_they_stay(tmp_path):
+    async def scenario():
+        llm = EngineLLM("*把相機收起來* 那最後一集呢？")
+        current = agent(companion(tmp_path, llm), actions_enabled=True)
+        return spoken(await say(current, "你好"))
+
+    assert "相機" in asyncio.run(scenario())

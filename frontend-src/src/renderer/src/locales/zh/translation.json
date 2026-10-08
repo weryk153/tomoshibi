@@ -285,7 +285,11 @@
       "use": "切換",
       "refAudioPath": "參考音檔",
       "refAudioPathPlaceholder": "/路徑/到/聲音.wav",
-      "refAudioPathHelp": "只對 GPT-SoVITS 有效。這段音檔就是聲線本身——換檔案就換人的嗓子，不需要訓練。選了會一併把下面的逐字稿填好。選「跟底稿角色一樣」會把底稿角色現在的參考音存成她自己的。要加新聲線，把 .wav 放到同一個資料夾就會出現在這裡；再放一個同名 .txt，逐字稿也會自動帶入。",
+      "refAudioPathHelp": "只對 GPT-SoVITS 有效。這段音檔就是聲線本身——換檔案就換人的嗓子，不需要訓練。選了會一併把下面的逐字稿填好。選「跟底稿角色一樣」會把底稿角色現在的參考音存成她自己的。要加新聲線，按「上傳」選 mp3 或 wav：3 到 10 秒最好，太長會在句子的停頓處自動切，逐字稿也會自動產生。這裡只列她自己的聲音和共用的。",
+      "refAudioUpload": "上傳 mp3／wav",
+      "refAudioUploadFailed": "上傳失敗",
+      "refAudioUploaded": "已加入 {{label}}（{{seconds}} 秒）",
+      "refAudioNoTranscript": "沒有自動產生逐字稿，請在下面填上音檔裡說的話。",
       "promptText": "參考音逐字稿",
       "promptTextPlaceholder": "音檔裡一字不差說了什麼",
       "promptTextHelp": "參考音檔實際說出來的內容，要一字不差。GPT-SoVITS 拿它來對齊音色，逐字稿給錯克隆出來的聲音就會歪。",
@@ -309,6 +313,14 @@
       "translationAuditLoadFailed": "讀不到翻譯審核建議",
       "translationAuditLoading": "正在載入翻譯審核…",
       "actionsEnabled": "可以寫動作描寫",
+      "whenUnanswered": "你沒回話時",
+      "whenUnanswered_keep_talking": "自己聊下去",
+      "whenUnanswered_wait": "等你",
+      "whenUnansweredHelp": "只對「主動說話」有效。她主動開口後你沒回：自己聊下去＝照間隔繼續開口，順著自己剛才的話往下講；等你＝一次比一次等得久，連續 3 次沒回就不再開口，等你說話再重新算。兩種她都知道最後那段是自己講的，不會當成你問的。直播不受影響。",
+      "expressionSource": "表情與動作",
+      "expressionSource_tags": "她寫的標籤",
+      "expressionSource_background": "背景模型挑",
+      "expressionSourceHelp": "標籤：她在台詞裡帶 [joy] 這類標籤。背景模型：合成語音的同時，由背景模型（模型 › 背景工作與工具）逐句挑表情與動作，提示裡不再教標籤。沒設背景模型時照舊用標籤。重新載入角色後生效。",
       "actionsEnabledHelp": "讓她在台詞裡搭配一句星號包起來的動作，例如「*把視線移開*」，只顯示在字幕上、不會唸出來。關掉時完全不跟她提動作，感情只用停頓與選詞表現。"
     },
     "personas": {
@@ -878,6 +890,7 @@
       "extras": "背景工作與工具"
     },
     "characterPage": {
+      "motionEditorToggle": "動作與表情的關鍵字",
       "basic": "基本",
       "personas": "人設版本",
       "personasNote": "人設是共用的；每個角色各自選一個。不是正在用的角色，選了會在切換到她時生效。",
@@ -892,6 +905,8 @@
     }
   },
   "footer": {
+    "queuedNote": "排隊中：等她講完就送出",
+    "cancelQueued": "取消這則",
     "typeYourMessage": "輸入您的訊息……",
     "send": "送出",
     "attachImage": "附加圖片",

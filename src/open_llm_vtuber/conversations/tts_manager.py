@@ -2,16 +2,33 @@ import asyncio
 import json
 import uuid
 from datetime import datetime
-from typing import List, Optional, Dict, Tuple
+from typing import Awaitable, Callable, List, Optional, Dict, Tuple
 from loguru import logger
 
 from ..agent.output_types import DisplayText, Actions
 from ..avatar_model import AvatarModel
+from ..expression_pick import (
+    GRACE_SECONDS,
+    LEAD_SECONDS,
+    SILENT_GRACE_SECONDS,
+    apply_pick,
+)
 from ..tts.tts_interface import TTSInterface
 from ..utils.stream_audio import prepare_audio_payload
 from .laughter import is_laughter_only
 from .text_content import has_speakable_text
 from .types import WebSocketSend
+
+# 引擎挑這句的表情與動作（expression_pick.EnginePicker.ask 綁好這句）。
+Pick = Callable[[], Awaitable[Optional[dict]]]
+
+
+def _seconds_of(message: Dict) -> float:
+    """這個 payload 念完要多久（volumes × slice_length）；不是聲音的是 0。"""
+    volumes = message.get("volumes") if isinstance(message, dict) else None
+    if not volumes:
+        return 0.0
+    return len(volumes) * float(message.get("slice_length") or 0) / 1000
 
 
 def _is_timeout(error: Optional[BaseException]) -> bool:
@@ -69,6 +86,9 @@ class TTSTaskManager:
         # Caps how many synthesis calls to the (single, local) TTS service are
         # in flight at once. See SYNTHESIS_CONCURRENCY above.
         self._synthesis_semaphore = asyncio.Semaphore(self.SYNTHESIS_CONCURRENCY)
+        # 已送出的聲音大約何時念完（loop.time()）；每送出一句就通知等著的挑選。
+        self._play_until = 0.0
+        self._sent = asyncio.Condition()
 
     async def speak(
         self,
@@ -81,6 +101,7 @@ class TTSTaskManager:
         subtitle_text: Optional[str] = None,
         spoken_text: Optional[str] = None,
         silenced: bool = False,
+        pick: Optional[Pick] = None,
     ) -> None:
         """
         Queue a TTS task while maintaining order of delivery.
@@ -102,6 +123,9 @@ class TTSTaskManager:
                 （conversation_utils）。靜音 payload 的畫面字幕本來不動（「……」
                 「（笑）」沒必要上字幕），這種句子例外：標 show_subtitle 讓前端
                 把字幕換到這句，不然畫面停在上一句。
+            pick: 背景模型挑這句的表情與動作（expression_source: background）。
+                跟合成並行，結果放進 actions；它自己有上限、失敗回 None，不擋聲音。
+                None＝tags 模式，流程與 payload 跟沒有這個功能時一樣。
         """
         # 沒有字母／文字／數字可念（「……」「♪」、表情符號、*動作*）就不送去合成：
         # 引擎對這種輸入多半回錯（GPT-SoVITS 回 400），會被當成失敗重試再跳通知。
@@ -119,8 +143,24 @@ class TTSTaskManager:
                     self._process_payload_queue(websocket_send)
                 )
 
-            await self._send_silent_payload(
-                display_text, actions, current_sequence, subtitle_text, silenced
+            if pick is None:
+                await self._send_silent_payload(
+                    display_text, actions, current_sequence, subtitle_text, silenced
+                )
+                return
+            # 沒聲音的句子（*歪頭*）一樣配表情；等挑選的時候不能擋住下一句。
+            self.task_list.append(
+                asyncio.create_task(
+                    self._send_picked_silent_payload(
+                        pick,
+                        live2d_model,
+                        display_text,
+                        actions,
+                        current_sequence,
+                        subtitle_text,
+                        silenced,
+                    )
+                )
             )
             return
 
@@ -149,6 +189,7 @@ class TTSTaskManager:
                 sequence_number=current_sequence,
                 subtitle_text=subtitle_text,
                 spoken_text=spoken_text,
+                **({"pick": pick} if pick is not None else {}),
             )
         )
         self.task_list.append(task)
@@ -170,7 +211,13 @@ class TTSTaskManager:
                 while self._next_sequence_to_send in buffered_payloads:
                     for message in buffered_payloads.pop(self._next_sequence_to_send):
                         await websocket_send(json.dumps(message))
+                        seconds = _seconds_of(message)
+                        if seconds:
+                            now = asyncio.get_running_loop().time()
+                            self._play_until = max(now, self._play_until) + seconds
                     self._next_sequence_to_send += 1
+                    async with self._sent:
+                        self._sent.notify_all()
 
                 self._payload_queue.task_done()
 
@@ -198,6 +245,83 @@ class TTSTaskManager:
             audio_payload["show_subtitle"] = True
         await self._payload_queue.put(([audio_payload], sequence_number))
 
+    async def _send_picked_silent_payload(
+        self,
+        pick: Pick,
+        live2d_model: AvatarModel,
+        display_text: DisplayText,
+        actions: Optional[Actions],
+        sequence_number: int,
+        subtitle_text: Optional[str],
+        silenced: bool,
+    ) -> None:
+        picking = asyncio.create_task(pick())
+        actions = apply_pick(
+            actions,
+            await self._wait_for_pick(picking, sequence_number, SILENT_GRACE_SECONDS),
+            live2d_model,
+        )
+        await self._send_silent_payload(
+            display_text, actions, sequence_number, subtitle_text, silenced
+        )
+
+    async def _wait_for_pick(
+        self, picking: asyncio.Task, sequence_number: int, grace: float
+    ) -> Optional[dict]:
+        """這句的挑選結果；等不到就取消（排在後面的句子才挑得到）、回 None。
+
+        至少等 ``grace`` 秒（從合成好算；輪到這句時也至少再給 grace 秒，但不超過
+        前面念完）。前面的句子都送出了、還在念的話，等到它們念完前 LEAD_SECONDS：這句反正要等前面念完才輪到。前面還沒送出時，這句也送不
+        出去，就一直等到輪到它（前面的句子各自有期限，不會卡住）。
+        """
+        loop = asyncio.get_running_loop()
+        ready = loop.time()
+        try:
+            while not picking.done():
+                if self._next_sequence_to_send >= sequence_number:
+                    now = loop.time()
+                    # 輪到這句時至少再給 grace 秒（不超過前面念完），前一句
+                    # 很晚才送出時，這句的挑選才不會一輪到就被取消。
+                    deadline = max(
+                        ready + grace,
+                        self._play_until - LEAD_SECONDS,
+                        min(now + grace, self._play_until),
+                    )
+                    remaining = deadline - loop.time()
+                    if remaining > 0:
+                        await asyncio.wait({picking}, timeout=remaining)
+                    break
+                turn = asyncio.ensure_future(
+                    self._until_sent_past(self._next_sequence_to_send)
+                )
+                try:
+                    await asyncio.wait(
+                        {picking, turn}, return_when=asyncio.FIRST_COMPLETED
+                    )
+                finally:
+                    turn.cancel()
+        except BaseException:
+            picking.cancel()
+            raise
+        if not picking.done():
+            picking.cancel()
+            return None
+        if picking.cancelled() or picking.exception() is not None:
+            return None
+        return picking.result()
+
+    async def _until_sent_past(self, seen: int) -> None:
+        async with self._sent:
+            await self._sent.wait_for(lambda: self._next_sequence_to_send != seen)
+
+    async def _synthesize(
+        self, tts_engine: TTSInterface, tts_text: str, emotion: Optional[str]
+    ) -> Tuple[Optional[str], Optional[Exception]]:
+        async with self._synthesis_semaphore:
+            return await self._synthesize_with_retry(
+                tts_engine, tts_text, emotion=emotion
+            )
+
     async def _process_tts(
         self,
         tts_text: str,
@@ -208,14 +332,31 @@ class TTSTaskManager:
         sequence_number: int,
         subtitle_text: Optional[str] = None,
         spoken_text: Optional[str] = None,
+        pick: Optional[Pick] = None,
     ) -> None:
         """Process TTS generation and queue the result for ordered delivery"""
         audio_file_path = None
         failure_notice: Optional[Dict] = None
         try:
-            async with self._synthesis_semaphore:
-                audio_file_path, error = await self._synthesize_with_retry(
-                    tts_engine, tts_text, emotion=getattr(actions, "emotion", None)
+            emotion = getattr(actions, "emotion", None)
+            if pick is None:
+                audio_file_path, error = await self._synthesize(
+                    tts_engine, tts_text, emotion
+                )
+            else:
+                # 挑表情跟合成同時跑；合成好了，挑選再等一下（見 _wait_for_pick）。
+                picking = asyncio.create_task(pick())
+                try:
+                    audio_file_path, error = await self._synthesize(
+                        tts_engine, tts_text, emotion
+                    )
+                except BaseException:
+                    picking.cancel()
+                    raise
+                actions = apply_pick(
+                    actions,
+                    await self._wait_for_pick(picking, sequence_number, GRACE_SECONDS),
+                    live2d_model,
                 )
             if not audio_file_path:
                 logger.error(
@@ -352,5 +493,6 @@ class TTSTaskManager:
             self._sender_task.cancel()
         self._sequence_counter = 0
         self._next_sequence_to_send = 0
+        self._play_until = 0.0
         # Create a new queue to clear any pending items
         self._payload_queue = asyncio.Queue()

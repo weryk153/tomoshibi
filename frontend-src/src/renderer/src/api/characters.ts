@@ -17,6 +17,10 @@ export interface CharacterRecord {
   bilingual_subtitle?: boolean
   // 翻譯審核：她每句語音翻譯在背景審一遍，累積成建議（見 api/translation-audit.ts）。
   translation_audit?: boolean
+  // 表情與動作誰決定：她寫的標籤（tags）或背景模型逐句挑（background）。
+  expression_source?: ExpressionSource
+  // 她主動開口後你沒回話時：自己聊下去，或等你。
+  proactive_when_unanswered?: WhenUnanswered
   slug: string
   is_base: boolean
   conf_name: string | null
@@ -223,6 +227,40 @@ export async function uploadAvatar(
   }
 }
 
+// 上傳一段參考音（mp3／wav…）到這個角色的資料夾（references/<conf_uid>/）。後端
+// 轉成 wav、太長就在停頓處切到 10 秒內，逐字稿用語音辨識產生（見 reference_voices.py）。
+export interface UploadedVoice {
+  path: string
+  label: string
+  prompt_text: string
+  owner: string
+  seconds: number
+}
+
+export async function uploadReferenceVoice(
+  baseUrl: string,
+  file: File,
+  owner: string,
+): Promise<ApiResult<{ voice: UploadedVoice }>> {
+  const query = `owner=${encodeURIComponent(owner)}&name=${encodeURIComponent(file.name)}`
+  try {
+    const res = await fetch(buildUrl(baseUrl, `/api/reference-voices?${query}`), {
+      method: 'POST',
+      body: file,
+    })
+    let parsed: unknown = null
+    try {
+      parsed = await res.json()
+    } catch {
+      if (!res.ok) return { ok: false, error: `請求失敗（HTTP ${res.status}）` }
+    }
+    if (!res.ok) return { ok: false, error: normalizeError(parsed, res.status) }
+    return { ok: true, data: parsed as { voice: UploadedVoice } }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '網路錯誤' }
+  }
+}
+
 // 角色自己的開關：字幕翻成你看的語言、長期記憶。後端見 character_route.py 的
 // GET/POST /api/characters/{filename}/settings；底稿角色的 filename 是 conf.yaml。
 export interface CharacterToggles {
@@ -234,6 +272,26 @@ export interface CharacterToggles {
   bilingual_subtitle: boolean
   // 翻譯審核：背景審她的語音翻譯，只累積建議，不改她說的話。
   translation_audit: boolean
+  // 不是開關而是二選一，但跟開關同一個端點、同一種存法。
+  expression_source: ExpressionSource
+  proactive_when_unanswered: WhenUnanswered
+}
+
+// 她主動開口後你沒回話時：keep_talking＝照間隔繼續、順著自己的話聊；wait＝一次比
+// 一次等得久，連續 3 次沒回就停（後端 proactive_context.wait_allows_speaking）。
+export const WHEN_UNANSWERED = ['keep_talking', 'wait'] as const
+export type WhenUnanswered = typeof WHEN_UNANSWERED[number]
+
+export function isWhenUnanswered(value: unknown): value is WhenUnanswered {
+  return typeof value === 'string' && (WHEN_UNANSWERED as readonly string[]).includes(value)
+}
+
+// 表情與動作誰決定。background 要有背景模型才成立（沒有就照舊用標籤）。
+export const EXPRESSION_SOURCES = ['tags', 'background'] as const
+export type ExpressionSource = typeof EXPRESSION_SOURCES[number]
+
+export function isExpressionSource(value: unknown): value is ExpressionSource {
+  return (EXPRESSION_SOURCES as readonly unknown[]).includes(value)
 }
 
 export type CharacterToggleName = keyof CharacterToggles
