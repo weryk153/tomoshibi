@@ -611,9 +611,11 @@
       "vadTuningHint": "「聞き取れませんでした」が頻繁に出る場合は、音声認識しきい値と負の音声しきい値を下げるか、検証フレーム数を減らしてください。逆に環境音で誤検出する場合は上げてください。",
       "micModePush": "マイクを押して話す",
       "extraMissing_faster_whisper": "この端末には faster-whisper がまだ入っていません（別途インストール、NVIDIA GPU があると速い）。今は sherpa-onnx で認識しています。インストールすると再読み込みして faster-whisper に切り替わります。",
-      "extraInstall": "{{name}} をインストール（約 {{mb}}MB）",
-      "extraInstalled_faster_whisper": "インストールして再読み込みしました。最初の認識では音声モデル（約 1.6GB）をダウンロードするので時間がかかります。",
-      "extraFailed": "インストールに失敗しました：{{error}}"
+      "extraInstall": "{{name}} をインストール（約 {{mb}}MB、ほかに音声モデル 既定で約 1.6GB）",
+      "extraInstalled_faster_whisper": "インストールしました。faster-whisper に切り替えました。",
+      "extraFailed": "インストールに失敗しました：{{error}}",
+      "extraModelProgress": "音声モデルをダウンロード中 {{percent}}%（{{done}}／{{total}} MB）",
+      "extraModelDownloaded": "音声モデルをダウンロード中：{{done}} MB"
     },
     "agent": {
       "allowProactiveSpeak": "AIが自分から話すのを許可する",

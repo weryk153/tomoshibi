@@ -7,7 +7,9 @@ import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/tw/primitives';
 import { useWebSocket } from '@/context/websocket-context';
 import { useSwitchCharacter } from '@/hooks/utils/use-switch-character';
-import { fetchExtraStatus, installExtra, lastLine, type ExtraStatus } from '@/api/extras';
+import {
+  fetchExtraStatus, installExtra, lastLine, modelProgress, type ExtraStatus,
+} from '@/api/extras';
 
 type Phase = 'idle' | 'installing' | 'done' | 'error';
 
@@ -19,6 +21,7 @@ export function ExtraInstall({ name }: { name: string }): JSX.Element | null {
   const [phase, setPhase] = useState<Phase>('idle');
   const [line, setLine] = useState('');
   const [error, setError] = useState('');
+  const [model, setModel] = useState<ReturnType<typeof modelProgress>>(null);
 
   useEffect(() => {
     let alive = true;
@@ -34,9 +37,12 @@ export function ExtraInstall({ name }: { name: string }): JSX.Element | null {
     setPhase('installing');
     setError('');
     setLine('');
+    setModel(null);
     let failed = '';
     const result = await installExtra(baseUrl, name, (event) => {
       setLine((previous) => lastLine(event, previous));
+      const progress = modelProgress(event);
+      if (progress) setModel(progress);
       if (event.status === 'error') failed = event.error || '';
     });
     if (!result.ok || failed) {
@@ -55,7 +61,8 @@ export function ExtraInstall({ name }: { name: string }): JSX.Element | null {
   return (
     <Stack gap={2}>
       {phase === 'done' ? (
-        <Text fontSize="xs" color="green.300">{t(`settings.asr.extraInstalled_${name}`)}</Text>
+        // 跟「已儲存」同一個顏色（Chakra 的 green.300 在這個主題是粉紅，像錯誤）。
+        <span role="status" className="text-xs text-emerald-400">{t(`settings.asr.extraInstalled_${name}`)}</span>
       ) : (
         <>
           <Text fontSize="xs" color="orange.300">{t(`settings.asr.extraMissing_${name}`)}</Text>
@@ -64,8 +71,23 @@ export function ExtraInstall({ name }: { name: string }): JSX.Element | null {
               {t('settings.asr.extraInstall', { name: 'faster-whisper', mb: status.download_mb })}
             </Button>
           </div>
-          {phase === 'installing' && line && (
+          {/* 先裝套件（顯示安裝工具最新的一行），再下載語音模型（顯示進度）。 */}
+          {phase === 'installing' && !model && line && (
             <Text fontSize="xs" color="whiteAlpha.600" lineClamp={1}>{line}</Text>
+          )}
+          {phase === 'installing' && model && (
+            <Stack gap={1}>
+              <Text fontSize="xs" color="whiteAlpha.700">
+                {model.percent === null
+                  ? t('settings.asr.extraModelDownloaded', { done: model.doneMb })
+                  : t('settings.asr.extraModelProgress', { percent: model.percent, done: model.doneMb, total: model.totalMb })}
+              </Text>
+              {model.percent !== null && (
+                <div className="h-1 w-full overflow-hidden rounded bg-white/10">
+                  <div className="h-full bg-emerald-400 transition-[width]" style={{ width: `${model.percent}%` }} />
+                </div>
+              )}
+            </Stack>
           )}
           {phase === 'error' && (
             <Text fontSize="xs" color="red.300" whiteSpace="pre-wrap">{t('settings.asr.extraFailed', { error })}</Text>

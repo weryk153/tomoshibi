@@ -21,7 +21,7 @@ import importlib.util
 import json
 import os
 import shutil
-from typing import Any, AsyncIterator, Optional
+from typing import Any, AsyncIterator, Callable, Optional
 
 from fastapi import APIRouter, Request
 from loguru import logger
@@ -118,7 +118,111 @@ async def install(extra: str) -> AsyncIterator[dict[str, Any]]:
         return
     remember(extra)
     logger.info(f"[extras] installed {extra}")
+    # 套件要的其他東西（faster-whisper 的語音模型）也在這裡下載、回報進度。以前是
+    # 重新載入時後端默默下載 1.6GB，畫面一直「載入中」，看起來像卡住。
+    prepare = PREPARE.get(extra)
+    if prepare is not None:
+        try:
+            async for event in prepare():
+                yield event
+        except Exception as e:  # noqa: BLE001 — 套件已經裝好了，再按一次只補模型
+            logger.warning(
+                f"[extras] preparing {extra} failed: {type(e).__name__}: {e}"
+            )
+            yield {
+                "status": "error",
+                "error": f"Downloading the speech model failed: {e}",
+            }
+            return
     yield {"status": "success"}
+
+
+def folder_size(path: str) -> int:
+    """資料夾裡實際的檔案大小（不算連結；下載中的 .incomplete 也算）。"""
+    total = 0
+    for folder, _, files in os.walk(path):
+        for name in files:
+            file = os.path.join(folder, name)
+            if not os.path.islink(file):
+                try:
+                    total += os.path.getsize(file)
+                except OSError:
+                    pass
+    return total
+
+
+def whisper_model_settings() -> tuple[str, str]:
+    """設定裡的 faster-whisper 模型與下載資料夾（conf.yaml）。"""
+    from .config_manager.utils import read_yaml
+
+    try:
+        block = read_yaml("conf.yaml")["character_config"]["asr_config"][
+            "faster_whisper"
+        ]
+    except Exception:  # noqa: BLE001 — 讀不到就用預設
+        block = {}
+    return (
+        str(block.get("model_path") or "large-v3-turbo"),
+        str(block.get("download_root") or "models/whisper"),
+    )
+
+
+# faster_whisper.utils.download_model 下載的檔案（跟它的 allow_patterns 一致）。
+_WHISPER_FILES = (
+    "config.json",
+    "preprocessor_config.json",
+    "model.bin",
+    "tokenizer.json",
+    "vocabulary.*",
+)
+
+
+def _repo_size(repo: str) -> int:
+    import fnmatch
+
+    from huggingface_hub import HfApi
+
+    try:
+        info = HfApi().model_info(repo, files_metadata=True)
+    except Exception:  # noqa: BLE001 — 問不到總大小就只顯示已下載多少
+        return 0
+    return sum(
+        sibling.size or 0
+        for sibling in info.siblings or ()
+        if any(
+            fnmatch.fnmatch(sibling.rfilename, pattern) for pattern in _WHISPER_FILES
+        )
+    )
+
+
+async def _download_whisper_model() -> AsyncIterator[dict[str, Any]]:
+    """下載設定裡的 faster-whisper 模型，每半秒回報一次已下載多少。"""
+    model, root = whisper_model_settings()
+    if os.path.exists(model):  # 本機路徑：不用下載
+        return
+    import huggingface_hub.constants as hub
+    from faster_whisper.utils import _MODELS, download_model
+
+    repo = _MODELS.get(model, model)
+    total = await asyncio.to_thread(_repo_size, repo)
+    folder = os.path.join(root, "models--" + repo.replace("/", "--"))
+    # hf-xet 下載完才一次寫進資料夾，算不出進度；改走一般 HTTP，邊下邊寫。
+    hub.HF_HUB_DISABLE_XET = True
+    task = asyncio.ensure_future(
+        asyncio.to_thread(download_model, model, cache_dir=root)
+    )
+    while not task.done():
+        yield {"status": "model", "completed": folder_size(folder), "total": total}
+        await asyncio.wait({task}, timeout=0.5)
+    task.result()
+    done = folder_size(folder)
+    yield {"status": "model", "completed": max(done, total), "total": max(done, total)}
+
+
+# 裝好套件之後還要準備的東西（名字 → 回報進度的 async generator）。
+PREPARE: dict[str, Callable[[], AsyncIterator[dict[str, Any]]]] = {
+    "faster_whisper": _download_whisper_model,
+}
 
 
 def init_extras_route() -> APIRouter:

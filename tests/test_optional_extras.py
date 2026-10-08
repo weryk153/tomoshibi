@@ -16,10 +16,17 @@ from fastapi.testclient import TestClient
 from src.open_llm_vtuber import optional_extras
 
 
+async def _nothing_to_prepare():
+    return
+    yield
+
+
 @pytest.fixture
 def workspace(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("TOMOSHIBI_UV", "/bundled/uv")
+    # 測試不真的去下載 1.6GB 的語音模型。
+    monkeypatch.setitem(optional_extras.PREPARE, "faster_whisper", _nothing_to_prepare)
     return tmp_path
 
 
@@ -114,3 +121,64 @@ def test_the_status_and_install_endpoints(workspace, monkeypatch):
         for line in http.post("/api/extras/faster_whisper/install").text.splitlines()
     ]
     assert lines[-1]["status"] == "success"
+
+
+def test_installing_also_downloads_what_the_package_needs_with_progress(
+    workspace, monkeypatch
+):
+    """faster-whisper 的語音模型（約 1.6GB）也在安裝這一步下載，畫面看得到進度；
+    以前是重新載入時在後端默默下載，畫面一直「載入中」。"""
+    monkeypatch.setattr(
+        optional_extras,
+        "sync_command",
+        lambda extras: [sys.executable, "-c", "print('ok')"],
+    )
+    monkeypatch.setattr(optional_extras, "available", lambda extra: True)
+
+    async def prepare():
+        for done in (0, 800, 1600):
+            yield {"status": "model", "completed": done, "total": 1600}
+
+    monkeypatch.setitem(optional_extras.PREPARE, "faster_whisper", prepare)
+    events = run_install("faster_whisper")
+    progress = [e["completed"] for e in events if e["status"] == "model"]
+    assert progress == [0, 800, 1600] and events[-1]["status"] == "success"
+
+
+def test_a_model_download_that_fails_is_an_error_but_the_package_stays(
+    workspace, monkeypatch
+):
+    monkeypatch.setattr(
+        optional_extras,
+        "sync_command",
+        lambda extras: [sys.executable, "-c", "print('ok')"],
+    )
+    monkeypatch.setattr(optional_extras, "available", lambda extra: True)
+
+    async def prepare():
+        yield {"status": "model", "completed": 0, "total": 1600}
+        raise OSError("connection reset")
+
+    monkeypatch.setitem(optional_extras.PREPARE, "faster_whisper", prepare)
+    events = run_install("faster_whisper")
+    assert events[-1]["status"] == "error" and "connection reset" in events[-1]["error"]
+    assert optional_extras.remembered() == ["faster_whisper"]  # 再按一次只要補下載模型
+
+
+def test_the_whisper_model_comes_from_the_settings(workspace):
+    (workspace / "conf.yaml").write_text(
+        "character_config:\n  asr_config:\n    faster_whisper:\n"
+        "      model_path: 'small'\n      download_root: 'models/whisper'\n",
+        encoding="utf-8",
+    )
+    assert optional_extras.whisper_model_settings() == ("small", "models/whisper")
+
+
+def test_folder_size_counts_what_is_on_disk(tmp_path):
+    tmp_path = tmp_path / "repo"
+    tmp_path.mkdir()
+    (tmp_path / "a").mkdir()
+    (tmp_path / "a" / "blob").write_bytes(b"x" * 300)
+    (tmp_path / "b.incomplete").write_bytes(b"x" * 200)
+    assert optional_extras.folder_size(str(tmp_path)) == 500
+    assert optional_extras.folder_size(str(tmp_path / "missing")) == 0

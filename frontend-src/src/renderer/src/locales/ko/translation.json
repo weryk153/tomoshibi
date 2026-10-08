@@ -611,9 +611,11 @@
       "vadTuningHint": "\"잘 못 들었어요\"가 자주 뜬다면 음성 인식 임계값과 부정 음성 임계값을 낮추거나 검증 프레임 수를 줄이세요. 반대로 주변 소음으로 오작동하면 높이세요.",
       "micModePush": "마이크를 눌러 말하기",
       "extraMissing_faster_whisper": "이 기기에는 아직 faster-whisper가 없습니다(별도 설치, NVIDIA GPU가 있으면 더 빠름). 지금은 sherpa-onnx로 인식합니다. 설치하면 다시 불러와 faster-whisper로 바뀝니다.",
-      "extraInstall": "{{name}} 설치(약 {{mb}}MB)",
-      "extraInstalled_faster_whisper": "설치하고 다시 불러왔습니다. 첫 인식 때 음성 모델(약 1.6GB)을 먼저 내려받아 시간이 걸립니다.",
-      "extraFailed": "설치 실패: {{error}}"
+      "extraInstall": "{{name}} 설치(약 {{mb}}MB, 음성 모델은 따로 기본 약 1.6GB)",
+      "extraInstalled_faster_whisper": "설치했습니다. faster-whisper로 바꿨습니다.",
+      "extraFailed": "설치 실패: {{error}}",
+      "extraModelProgress": "음성 모델 내려받는 중 {{percent}}%({{done}} / {{total}} MB)",
+      "extraModelDownloaded": "음성 모델 내려받는 중: {{done}} MB"
     },
     "agent": {
       "allowProactiveSpeak": "AI가 먼저 말하도록 허용",

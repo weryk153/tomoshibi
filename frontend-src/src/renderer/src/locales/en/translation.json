@@ -611,9 +611,11 @@
       "vadTuningHint": "Seeing \"Didn't catch that\" a lot? Lower the speech threshold, lower the negative speech threshold, or reduce the redemption frames. If background noise keeps triggering it instead, raise them.",
       "micModePush": "Press the mic to talk",
       "extraMissing_faster_whisper": "faster-whisper isn't installed here yet (it's installed separately and runs faster with an NVIDIA GPU), so sherpa-onnx is used for now. After installing, the app reloads and switches to faster-whisper.",
-      "extraInstall": "Install {{name}} (about {{mb}} MB)",
-      "extraInstalled_faster_whisper": "Installed and reloaded. The first recognition downloads the speech model (about 1.6 GB) first, so it takes a while.",
-      "extraFailed": "Install failed: {{error}}"
+      "extraInstall": "Install {{name}} (about {{mb}} MB, plus the speech model, about 1.6 GB by default)",
+      "extraInstalled_faster_whisper": "Installed — now using faster-whisper.",
+      "extraFailed": "Install failed: {{error}}",
+      "extraModelProgress": "Downloading the speech model {{percent}}% ({{done}} / {{total}} MB)",
+      "extraModelDownloaded": "Downloading the speech model: {{done}} MB so far"
     },
     "agent": {
       "allowProactiveSpeak": "Allow AI to Speak Proactively",
