@@ -890,6 +890,7 @@
       "extras": "Background tasks & tools"
     },
     "characterPage": {
+      "motionEditorToggle": "Motion and expression keywords",
       "basic": "Basics",
       "personas": "Persona versions",
       "personasNote": "Personas are shared; each character picks one. For a character not in use, the choice takes effect when you switch to her.",

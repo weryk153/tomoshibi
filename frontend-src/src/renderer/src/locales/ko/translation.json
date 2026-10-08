@@ -890,6 +890,7 @@
       "extras": "백그라운드 작업 및 도구"
     },
     "characterPage": {
+      "motionEditorToggle": "모션과 표정 키워드",
       "basic": "기본",
       "personas": "페르소나 버전",
       "personasNote": "페르소나는 공용이며 캐릭터마다 하나를 고릅니다. 사용 중이 아닌 캐릭터는 전환할 때 적용됩니다.",

@@ -1185,3 +1185,29 @@ def test_a_character_that_waits_says_only_a_short_word_when_unanswered(tmp_path)
     sent, unanswered = asyncio.run(scenario())
     assert "不是對方問的" in sent and "簡短" in sent and "照你自己的個性" not in sent
     assert unanswered == 1
+
+
+def test_with_actions_off_what_she_still_writes_between_stars_is_dropped(tmp_path):
+    """動作描寫關著（actions_enabled: false）：提示不教，她照前面的對話還是寫了
+    `*動作*` 的話，字幕、語音都不出現，也不記進對話——不然越寫越多。"""
+
+    async def scenario():
+        llm = EngineLLM("*把相機收起來* 那最後一集呢？*眨眼*")
+        current = agent(companion(tmp_path, llm), actions_enabled=False)
+        outputs = await say(current, "你好")
+        llm.reply = "嗯。"
+        await say(current, "然後呢")
+        return spoken(outputs), llm.said_by_both()
+
+    shown, history = asyncio.run(scenario())
+    assert "*" not in shown and "相機" not in shown and "那最後一集呢" in shown
+    assert all("*" not in line and "相機" not in line for line in history)
+
+
+def test_with_actions_on_they_stay(tmp_path):
+    async def scenario():
+        llm = EngineLLM("*把相機收起來* 那最後一集呢？")
+        current = agent(companion(tmp_path, llm), actions_enabled=True)
+        return spoken(await say(current, "你好"))
+
+    assert "相機" in asyncio.run(scenario())

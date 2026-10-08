@@ -42,6 +42,8 @@ from ...stage_director import strip_stage_performance_tag
 from ..input_types import BatchInput, TextSource
 from ..output_types import SentenceOutput
 from ..transformers import (
+    ActionDropper,
+    drop_actions,
     tidy_marks,
     actions_extractor,
     display_processor,
@@ -135,6 +137,8 @@ class CharacterEngineAgent(AgentInterface):
         tool_manager=None,
         tool_executor=None,
         player_language: str = "",
+        # 角色頁「可以寫動作描寫」：關著時她寫的 *動作* 不顯示、不記。
+        actions_enabled: bool = True,
         conf_uid: str = "",
         character_name: str = "",
         now: Callable[[], datetime] = datetime.now,
@@ -172,6 +176,7 @@ class CharacterEngineAgent(AgentInterface):
         self._told: set = set()
         self._group_note = ""
         self.set_system(system)
+        self._actions_enabled = actions_enabled
 
         @tts_filter(tts_preprocessor_config)
         @display_processor()
@@ -182,7 +187,13 @@ class CharacterEngineAgent(AgentInterface):
             valid_tags=["think"],
         )
         async def pipeline(input_data: BatchInput):
+            # 動作描寫關著：提示不教，但她照前面的對話還是寫了的話，在斷句之前拿掉。
+            dropper = None if self._actions_enabled else ActionDropper()
             async for output in self._reply(input_data):
+                if dropper is not None and isinstance(output, str):
+                    output = dropper.feed(output)
+                    if not output:
+                        continue
                 yield output
 
         self._pipeline = pipeline
@@ -348,10 +359,12 @@ class CharacterEngineAgent(AgentInterface):
     def _remembered(self, reply: str) -> str:
         """她記得自己說了什麼：表情與動作
         標籤留著（她得讀到自己會做表情），演出標籤拿掉，字形跟畫面一致。"""
-        return normalize_output_language_variant(
+        said = normalize_output_language_variant(
             deduplicate_response_text(strip_stage_performance_tag(tidy_marks(reply))),
             self._player_language,
         )
+        # 動作描寫關著：對話裡不留她寫的動作，不然她照著寫、越寫越多。
+        return said if self._actions_enabled else drop_actions(said)
 
     async def close(self) -> None:
         """一個連線結束時由 ServiceContext.close() 呼叫。

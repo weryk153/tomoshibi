@@ -890,6 +890,7 @@
       "extras": "后台工作与工具"
     },
     "characterPage": {
+      "motionEditorToggle": "动作与表情的关键字",
       "basic": "基本",
       "personas": "人设版本",
       "personasNote": "人设是共用的；每个角色各自选一个。不是正在用的角色，选了会在切换到她时生效。",

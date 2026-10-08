@@ -73,6 +73,40 @@ def tidy_marks(text: str) -> str:
     return tidier.feed(text) + tidier.finish()
 
 
+class ActionDropper:
+    """動作描寫關著的角色（actions_enabled: false）：她照前面的對話還是寫了 `*動作*`
+    的話整段拿掉，串流切在星號中間也一樣。沒收尾的星號，後面的字都當動作丟掉。"""
+
+    def __init__(self) -> None:
+        self._inside = False
+        self._after = False  # 剛拿掉一段動作：後面緊接的空白一併拿掉
+
+    def feed(self, text: str) -> str:
+        out = []
+        for char in text:
+            if char == "*":
+                self._inside = not self._inside
+                self._after = not self._inside
+                continue
+            if self._inside:
+                continue
+            if self._after and char in " \u3000":
+                continue
+            self._after = False
+            out.append(char)
+        return "".join(out)
+
+    def finish(self) -> str:
+        self._inside = self._after = False
+        return ""
+
+
+def drop_actions(text: str) -> str:
+    """整段文字版的 ActionDropper。"""
+    dropper = ActionDropper()
+    return (dropper.feed(text) + dropper.finish()).strip()
+
+
 async def _tidied(stream):
     """斷句之前先收符號：斷句器會在逗號切開，`*A，` 與 `**B*` 就分到兩句了。"""
     tidier = MarkTidier()

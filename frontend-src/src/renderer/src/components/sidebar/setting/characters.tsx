@@ -21,8 +21,9 @@ import {
 // HStack／Text／Heading）仍是 Chakra。createListCollection 從 Ark 直接拿，理由
 // 同 asr.tsx——Chakra 現在只是把 Ark 的原樣 re-export，那是巧合不是契約。
 import {
-  Stack, Box, Text, Heading, HStack,
+  Stack, Box, Text, Heading, HStack, Collapsible,
 } from '@chakra-ui/react';
+import { HiChevronDown, HiChevronRight } from 'react-icons/hi';
 import { createListCollection } from '@ark-ui/react/collection';
 import { useTranslation } from 'react-i18next';
 import { settingStyles } from './setting-styles';
@@ -151,7 +152,7 @@ function Characters(): JSX.Element {
   const { baseUrl } = useWebSocket();
   const { confUid } = useConfig();
   const live2DConfig = useLive2DConfig();
-  const { switchCharacter } = useSwitchCharacter();
+  const { switchCharacter, reloadCharacter } = useSwitchCharacter();
 
   const [characters, setCharacters] = useState<CharacterRecord[] | null>(null);
   const [listError, setListError] = useState<string | null>(null);
@@ -391,6 +392,7 @@ function Characters(): JSX.Element {
   // 上傳參考音：放進這個角色的資料夾，選上它、逐字稿一起填好。
   const voiceFileRef = useRef<HTMLInputElement | null>(null);
   const [voiceUploading, setVoiceUploading] = useState(false);
+  const [motionEditorOpen, setMotionEditorOpen] = useState(false);
   const handleVoiceFile = useCallback(async (file: File) => {
     if (!voiceOwner) return;
     setVoiceUploading(true);
@@ -467,12 +469,16 @@ function Characters(): JSX.Element {
   // 存，不跟整份表單一起存。正在用的角色要重新載入才生效，由抽屜頂端的提示處理。
   const toggleSaver = useAutosave(async (change: {
     filename: string; name: CharacterToggleName; value: CharacterToggles[CharacterToggleName];
+    active: boolean;
   }) => {
     const result = await saveCharacterSettings(baseUrl, change.filename, { [change.name]: change.value });
     if (!result.ok) return { ok: false, error: result.error } as const;
     setCharacters((list) => (list ?? []).map((c) => (
       c.filename === change.filename ? { ...c, [change.name]: result.data.settings[change.name] } : c
     )));
+    // 正在用的角色：馬上重新載入，開關立刻生效（不然要記得按提示列上的「重新載入」，
+    // 關掉動作描寫之後她還照舊寫了好幾句）。
+    if (change.active && result.data.reload_required) reloadCharacter();
     return { ok: true } as const;
   }, { delayMs: 0 });
 
@@ -481,8 +487,10 @@ function Characters(): JSX.Element {
     value: CharacterToggles[K],
   ) => {
     if (!selectedRecord) return;
-    toggleSaver.change({ filename: selectedRecord.filename, name, value });
-  }, [selectedRecord, toggleSaver]);
+    toggleSaver.change({
+      filename: selectedRecord.filename, name, value, active: isActiveCharacter(selectedRecord, confUid),
+    });
+  }, [selectedRecord, toggleSaver, confUid]);
 
   const whenUnansweredCollection = useMemo(
     () => createListCollection({
@@ -1415,19 +1423,36 @@ function Characters(): JSX.Element {
           {/* key 用模型名：換了模型（換選角色或改上面的選單）就換一個編輯器，舊的
               卸載時把還沒送的修改存進它自己的模型。不換的話，排隊中的修改會在新模型
               還沒載入時被當成「沒東西要存」丟掉。 */}
-          {skinTypeOf(skins, edit.live2d_model_name) === 'vrm' ? (
-            <VrmMotionConfig
-              key={edit.live2d_model_name}
-              modelName={edit.live2d_model_name || undefined}
-              isLoaded={modelLoaded}
-            />
-          ) : (
-            <MotionConfig
-              key={edit.live2d_model_name}
-              modelName={edit.live2d_model_name || undefined}
-              isLoaded={modelLoaded}
-            />
-          )}
+          {/* 動作清單與關鍵字很長，平常用不到：預設收起來。 */}
+          <Collapsible.Root
+            open={motionEditorOpen}
+            onOpenChange={(details) => setMotionEditorOpen(details.open)}
+            lazyMount
+          >
+            <Collapsible.Trigger asChild>
+              <Button size="xs" variant="ghost">
+                {motionEditorOpen ? <HiChevronDown /> : <HiChevronRight />}
+                {t('settings.characterPage.motionEditorToggle')}
+              </Button>
+            </Collapsible.Trigger>
+            <Collapsible.Content>
+              <Stack gap={3} mt={2}>
+                {skinTypeOf(skins, edit.live2d_model_name) === 'vrm' ? (
+                  <VrmMotionConfig
+                    key={edit.live2d_model_name}
+                    modelName={edit.live2d_model_name || undefined}
+                    isLoaded={modelLoaded}
+                  />
+                ) : (
+                  <MotionConfig
+                    key={edit.live2d_model_name}
+                    modelName={edit.live2d_model_name || undefined}
+                    isLoaded={modelLoaded}
+                  />
+                )}
+              </Stack>
+            </Collapsible.Content>
+          </Collapsible.Root>
         </SettingSection>
 
         <SettingSection title={t('settings.characterPage.voice')}>

@@ -706,6 +706,9 @@ class ServiceContext:
                 # character_engine_agent 的狀態存在 chat_history/<conf_uid>/engine/。
                 conf_uid=target_character.conf_uid,
                 character_name=target_character.character_name,
+                actions_enabled=bool(
+                    getattr(target_character, "actions_enabled", False)
+                ),
                 # 記憶頁的開關：關掉時引擎也不再抽記憶、不再把記憶帶進對話。
                 long_term_memory_enabled=target_character.long_term_memory_enabled,
                 # 她的人設原文（逐字包在 system_prompt 裡）；給引擎的

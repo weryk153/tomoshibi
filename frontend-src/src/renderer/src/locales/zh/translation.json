@@ -890,6 +890,7 @@
       "extras": "背景工作與工具"
     },
     "characterPage": {
+      "motionEditorToggle": "動作與表情的關鍵字",
       "basic": "基本",
       "personas": "人設版本",
       "personasNote": "人設是共用的；每個角色各自選一個。不是正在用的角色，選了會在切換到她時生效。",

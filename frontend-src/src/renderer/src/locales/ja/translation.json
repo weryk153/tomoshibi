@@ -890,6 +890,7 @@
       "extras": "バックグラウンド処理とツール"
     },
     "characterPage": {
+      "motionEditorToggle": "モーションと表情のキーワード",
       "basic": "基本",
       "personas": "ペルソナ",
       "personasNote": "ペルソナは共通で、キャラクターごとに一つ選びます。使用中でないキャラクターは、切り替えたときに反映されます。",
