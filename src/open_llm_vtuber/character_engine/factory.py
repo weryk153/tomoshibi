@@ -8,6 +8,7 @@ character_engine_agent 的人不該因為沒裝它而受任何影響，所以匯
 import asyncio
 import dataclasses
 import functools
+import inspect
 import json
 import sys
 from dataclasses import dataclass
@@ -32,6 +33,9 @@ REASONING_KEYS = (
 )
 WORKER_TEMPERATURE = 0.1
 WORKER_MAX_TOKENS = 600
+# 每句的表情與動作（reply_actions）只要一行 JSON；scripts/eval_expression_pick.py 同一組。
+PICK_TEMPERATURE = 0
+PICK_MAX_TOKENS = 80
 # 看圖是回覆之前多出來的一次模型呼叫，越短越好。
 EYES_MAX_TOKENS = 160
 EYES_PROMPT = "用兩三句話說出畫面裡有什麼。只講看得到的，不要猜測，不要用條列或標記。"
@@ -130,7 +134,7 @@ def _clients(
     llm_config: Mapping[str, Any],
     background: Optional[Mapping[str, Any]] = None,
 ) -> tuple:
-    """(她講話用的, 背景認知用的, 看圖用的)。預設同一個端點、同一顆模型，設定不同。
+    """(她講話用的, 背景認知用的, 看圖用的, 挑表情用的)。預設同一個端點、同一顆模型，設定不同。
 
     background 有網址也有模型時，背景認知改用那一個（例如另一台電腦上的模型）：
     她講話時就不用跟背景工作搶同一顆。只填一半就不用，免得拿半套設定去連。
@@ -147,9 +151,11 @@ def _clients(
     if extra_body:
         talking["extra_body"] = extra_body
     thinking = {"temperature": WORKER_TEMPERATURE, "max_tokens": WORKER_MAX_TOKENS}
+    picking = {"temperature": PICK_TEMPERATURE, "max_tokens": PICK_MAX_TOKENS}
     switches = {k: v for k, v in extra_body.items() if k in REASONING_KEYS}
     if switches:
         thinking["extra_body"] = switches
+        picking["extra_body"] = dict(switches)
 
     shared = {
         "model": model,
@@ -175,6 +181,8 @@ def _clients(
         # 逾時由引擎的背景排程自己管。
         _engine_client(**elsewhere, timeout_seconds=None, request_options=thinking),
         _vision(provider, llm_config, thinking),
+        # 跟背景工作同一個端點；逾時由引擎的 actions_timeout_seconds 管。
+        _engine_client(**elsewhere, timeout_seconds=None, request_options=picking),
     )
 
 
@@ -376,7 +384,13 @@ def build_companion(
         _fit_the_window(live)
         return key
 
-    talking, thinking, eyes = _clients(provider, llm_config, background)
+    talking, thinking, eyes, picking = _clients(provider, llm_config, background)
+    # 引擎 1.3.0 起挑表情可以有自己的 client；更舊的沒有這個參數。
+    extra = (
+        {"actions_llm": picking}
+        if "actions_llm" in inspect.signature(CharacterCompanion).parameters
+        else {}
+    )
     if live:
         _let_go(live.companion)
     companion = CharacterCompanion(
@@ -399,6 +413,7 @@ def build_companion(
         context_builder=ContextBuilder(budget=budget),
         vision=eyes,
         bridge_config=HostBridgeConfig(turn_timeout_seconds=TURN_TIMEOUT_SECONDS),
+        **extra,
     )
     # 背景結果改了她的心情：告訴正在看這個角色的每個頁面。
     companion.on_mood_change = functools.partial(_tell_mood, key)
