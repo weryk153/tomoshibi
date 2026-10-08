@@ -9,6 +9,7 @@ import {
   mergeQueuedWithImmediate,
   decideSend,
   shouldFlushOnStateChange,
+  removePendingInput,
 } from './pending-input.ts';
 
 test('empty queue has nothing pending', () => {
@@ -109,4 +110,12 @@ test('merging an immediate send does not mutate the queued state', () => {
   const state = enqueuePendingInput(EMPTY_PENDING_INPUT, 'queued');
   mergeQueuedWithImmediate(state, 'new');
   assert.equal(joinPendingInput(state), 'queued');
+});
+
+test('排隊中的訊息可以單獨取消，其他照原順序留著', () => {
+  let state = enqueuePendingInput(EMPTY_PENDING_INPUT, '第一句');
+  state = enqueuePendingInput(state, '第二句');
+  state = enqueuePendingInput(state, '第三句');
+  assert.deepEqual(removePendingInput(state, 1).queue, ['第一句', '第三句']);
+  assert.deepEqual(removePendingInput(state, 9).queue, ['第一句', '第二句', '第三句']);
 });

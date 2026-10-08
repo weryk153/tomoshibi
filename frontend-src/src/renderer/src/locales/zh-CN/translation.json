@@ -905,6 +905,8 @@
     }
   },
   "footer": {
+    "queuedNote": "排队中：等她讲完就送出",
+    "cancelQueued": "取消这则",
     "typeYourMessage": "输入您的消息……",
     "send": "发送",
     "attachImage": "附加图片",

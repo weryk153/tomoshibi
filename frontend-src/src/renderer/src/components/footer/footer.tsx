@@ -3,7 +3,7 @@ import {
   Box, Button, Textarea, IconButton,
 } from '@chakra-ui/react';
 import { BsMicFill, BsMicMuteFill } from 'react-icons/bs';
-import { IoHandRightSharp } from 'react-icons/io5';
+import { IoClose, IoHandRightSharp } from 'react-icons/io5';
 import { FiChevronDown } from 'react-icons/fi';
 import { LuSend } from 'react-icons/lu';
 import { memo, useEffect, useRef } from 'react';
@@ -158,6 +158,45 @@ const MessageInput = memo(({
 
 MessageInput.displayName = 'MessageInput';
 
+function QueuedMessages({ items, onRemove }: {
+  items: readonly string[]
+  onRemove: (index: number) => void
+}): JSX.Element {
+  const { t } = useTranslation();
+  return (
+    <Box display="flex" flexDirection="column" gap="4px" px="12px" pt="6px">
+      <Box fontSize="xs" color="whiteAlpha.600">{t('footer.queuedNote')}</Box>
+      {items.map((text, index) => (
+        <Box
+          // 同一句可能排兩次，索引才分得開
+          // eslint-disable-next-line react/no-array-index-key
+          key={`${index}:${text}`}
+          display="flex"
+          alignItems="center"
+          gap="6px"
+          fontSize="sm"
+          color="whiteAlpha.700"
+          bg="whiteAlpha.100"
+          borderRadius="md"
+          px="8px"
+          py="4px"
+        >
+          <Box flex="1" whiteSpace="pre-wrap" wordBreak="break-word">{text}</Box>
+          <IconButton
+            aria-label={t('footer.cancelQueued')}
+            title={t('footer.cancelQueued')}
+            size="2xs"
+            variant="ghost"
+            onClick={() => onRemove(index)}
+          >
+            <IoClose aria-hidden="true" />
+          </IconButton>
+        </Box>
+      ))}
+    </Box>
+  );
+}
+
 /**
  * 把面板往上長出來的高度寫進根節點的 --footer-extra，讓字幕（App.tsx）跟著
  * 往上讓開。寫在根節點而不是共同祖先：只有一個 footer，跟 App.tsx 的 --vh 同一種做法。
@@ -201,6 +240,8 @@ function Footer({ isCollapsed = false, onToggle }: FooterProps): JSX.Element {
     handleInterrupt,
     handleMicToggle,
     micOn,
+    queued,
+    removeQueued,
   } = useFooter();
   const { aiState } = useAiState();
   const { live } = useStream();
@@ -210,6 +251,9 @@ function Footer({ isCollapsed = false, onToggle }: FooterProps): JSX.Element {
   return (
     <Box ref={panelRef} {...footerStyles.footer.container(isCollapsed)}>
       <ToggleButton isCollapsed={isCollapsed} onToggle={onToggle} />
+
+      {/* 她講話時送出的訊息：排隊中，等她講完才真的送出、才進對話。 */}
+      {queued.length > 0 && <QueuedMessages items={queued} onRemove={removeQueued} />}
 
       <Box {...footerStyles.footer.row}>
         <Box {...footerStyles.footer.lineSlot}>

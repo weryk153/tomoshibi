@@ -905,6 +905,8 @@
     }
   },
   "footer": {
+    "queuedNote": "대기 중: 말이 끝나면 보냅니다",
+    "cancelQueued": "이 메시지 취소",
     "typeYourMessage": "메시지를 입력하세요...",
     "send": "전송",
     "attachImage": "이미지 첨부",

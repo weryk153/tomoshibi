@@ -37,6 +37,12 @@ export function joinPendingInput(state: PendingInputState): string {
   return state.queue.join('\n');
 }
 
+/** 取消排隊中的第 index 則；索引不在範圍內就原樣不動。 */
+export function removePendingInput(state: PendingInputState, index: number): PendingInputState {
+  if (index < 0 || index >= state.queue.length) return state;
+  return { queue: state.queue.filter((_, i) => i !== index) };
+}
+
 export function clearPendingInput(): PendingInputState {
   return EMPTY_PENDING_INPUT;
 }

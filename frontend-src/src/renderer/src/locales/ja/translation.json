@@ -905,6 +905,8 @@
     }
   },
   "footer": {
+    "queuedNote": "送信待ち：話し終わったら送ります",
+    "cancelQueued": "これを取り消す",
     "typeYourMessage": "メッセージを入力...",
     "send": "送信",
     "attachImage": "画像を添付",

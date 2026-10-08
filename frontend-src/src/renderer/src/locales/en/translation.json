@@ -905,6 +905,8 @@
     }
   },
   "footer": {
+    "queuedNote": "Queued: sent when she finishes speaking",
+    "cancelQueued": "Cancel this one",
     "typeYourMessage": "Type your message...",
     "send": "Send",
     "attachImage": "Attach image",
