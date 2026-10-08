@@ -1040,5 +1040,11 @@
     "embarrassed": "Flustered",
     "calm": "Relaxed",
     "worried": "Worried"
+  },
+  "errors": {
+    "llmUnreachable": "Can't reach the language model ({{provider}}, {{url}}). Make sure it is running, or pick another one in Settings › Models.",
+    "llmModelMissing": "{{provider}} doesn't have the model “{{model}}”. Pick a downloaded model in Settings › Models.",
+    "llmAuth": "{{provider}} refused the connection: the API key is wrong or missing. Check it in Settings › Models.",
+    "llmTimeout": "{{provider}} took too long to answer; it may still be loading the model. Try again in a moment."
   }
 }

@@ -1040,5 +1040,11 @@
     "embarrassed": "害羞",
     "calm": "放鬆",
     "worried": "擔心"
+  },
+  "errors": {
+    "llmUnreachable": "連不到語言模型（{{provider}}，{{url}}）。請確認它有開著，或到「設定 › 模型」換一個。",
+    "llmModelMissing": "語言模型 {{provider}} 找不到模型「{{model}}」。請到「設定 › 模型」選一個已經下載的模型。",
+    "llmAuth": "語言模型 {{provider}} 拒絕連線：API 金鑰不對或沒填。請到「設定 › 模型」檢查。",
+    "llmTimeout": "語言模型 {{provider}} 太久沒回應，可能還在載入模型。稍等一下再試。"
   }
 }

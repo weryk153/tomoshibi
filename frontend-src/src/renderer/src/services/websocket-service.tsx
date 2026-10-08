@@ -79,6 +79,10 @@ export interface MessageEvent {
   // full-text 的可翻譯代號。後端只會送英文字面值到 text，前端拿 text_key
   // 去翻；沒有這個欄位（舊後端）就用 text。
   text_key?: string;
+  // error：翻譯裡的變數（例如連不到的模型名稱與網址）。
+  params?: Record<string, string>;
+  // error：要使用者去改設定的錯誤，提示停久一點。
+  sticky?: boolean;
   // 直播：stream-comment 的觀眾名字；stream-state 的直播中與否。
   author?: string;
   live?: boolean;

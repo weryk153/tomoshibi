@@ -369,11 +369,13 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
         setAiState((current: AiState) => (current === 'loading' ? 'idle' : current));
         toaster.create({
           // text_key 是完整的翻譯鍵（例如 stream.privateChatPaused）；沒有翻譯就顯示原文。
+          // params 是翻譯裡的變數（例如連不到的模型名稱與網址）。
           title: message.text_key
-            ? t(message.text_key, { defaultValue: message.message || '' })
+            ? t(message.text_key, { defaultValue: message.message || '', ...(message.params || {}) })
             : message.message,
           type: 'error',
-          duration: 2000,
+          // 要使用者去改設定的錯誤（sticky）停久一點，看得完。
+          duration: message.sticky ? 10000 : 2000,
         });
         break;
       case 'group-update':

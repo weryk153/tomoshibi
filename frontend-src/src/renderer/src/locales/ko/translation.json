@@ -1040,5 +1040,11 @@
     "embarrassed": "부끄러움",
     "calm": "편안함",
     "worried": "걱정"
+  },
+  "errors": {
+    "llmUnreachable": "언어 모델({{provider}}, {{url}})에 연결할 수 없습니다. 실행 중인지 확인하거나 「설정 › 모델」에서 다른 것을 고르세요.",
+    "llmModelMissing": "{{provider}}에 모델 「{{model}}」이 없습니다. 「설정 › 모델」에서 다운로드한 모델을 고르세요.",
+    "llmAuth": "{{provider}}가 연결을 거부했습니다. API 키가 틀렸거나 비어 있습니다. 「설정 › 모델」에서 확인하세요.",
+    "llmTimeout": "{{provider}}의 응답이 너무 늦습니다. 모델을 불러오는 중일 수 있습니다. 잠시 후 다시 시도하세요."
   }
 }
