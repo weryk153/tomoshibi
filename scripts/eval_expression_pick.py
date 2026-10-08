@@ -1,12 +1,14 @@
-"""背景模型挑表情的人讀對照：三段真的對話裡她的句子，逐句跑 ExpressionPicker。
+"""背景模型挑表情的人讀對照：三段真的對話裡她的句子，逐句跑引擎的 ReplyActions。
 
 對話從 chat_history/<conf_uid>/<history_uid>.json 讀她（role=ai）的回覆，照標點切
 成句子（每段取前 LIMIT 句）；表情與動作清單是那個角色當時的模型（model_dict.json
 的 emotionMap／motionMap，含 label）。前一句是同一段對話裡她的上一句。對話紀錄
-沒記心情，心情一律給 unknown（正式流程讀引擎當下的心情）。
+沒記心情，心情一律給 unknown（正式流程讀引擎當下的心情）。走的是引擎正式的那一條
+（ai_character_engine.companion.ReplyActions，需要引擎 1.3.0 起）：提示、讀答案都
+跟她說話時一樣，模型的原始回答另外記下來給人看。
 
-正式流程 2.5 秒沒答就當沒挑到；這裡等到 15 秒，記下真的延遲，超過 2.5 秒的那句
-當成 null 計（頁面上標「逾時」）。
+正式流程 TIMEOUT_SECONDS（引擎的 actions_timeout_seconds）沒答就當沒挑到；這裡等到
+15 秒，記下真的延遲，超過的那句當成 null 計（頁面上標「逾時」）。
 
 輸出 docs/superpowers/eval/2026-10-06-expression-pick.html（gitignored）：
 句子｜心情｜挑到的表情／動作｜延遲；最上面是 null 比例、延遲中位數、逾時句數。
@@ -32,12 +34,16 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
-from src.open_llm_vtuber.background_llm import ChatClient  # noqa: E402
-from src.open_llm_vtuber.expression_pick import (  # noqa: E402
-    TIMEOUT_SECONDS,
-    ExpressionPicker,
-    pick_actions,
+from ai_character_engine.companion import (  # noqa: E402
+    AvatarChoices,
+    CompanionSettings,
+    ReplyActions,
 )
+from ai_character_engine.llm.models import LLMResponse  # noqa: E402
+
+from src.open_llm_vtuber.background_llm import ChatClient  # noqa: E402
+
+TIMEOUT_SECONDS = CompanionSettings().actions_timeout_seconds
 
 OUT = ROOT / "docs/superpowers/eval/2026-10-06-expression-pick.html"
 # (標題, conf_uid, 對話檔, 模型名)
@@ -92,6 +98,25 @@ def load_model(root: Path, model: str) -> tuple[list[str], dict[str, str]]:
     return expressions, motions
 
 
+class Recording:
+    """ChatClient 當引擎的模型用；記下每次的原始回答與錯誤給人看。"""
+
+    def __init__(self, chat: ChatClient) -> None:
+        self.chat = chat
+        self.raw = ""
+        self.error = ""
+
+    async def generate(self, messages, *, tools=None):
+        try:
+            self.raw = await self.chat.complete(
+                [{"role": m.role, "content": m.content} for m in messages]
+            )
+        except Exception as e:  # noqa: BLE001 — 記下來給人看；引擎當成沒挑到
+            self.error = f"{type(e).__name__}: {e}"
+            raise
+        return LLMResponse(text=self.raw)
+
+
 async def run(args) -> list[dict]:
     client = ChatClient(
         base_url=args.base_url,
@@ -103,26 +128,32 @@ async def run(args) -> list[dict]:
         },
         timeout_seconds=WAIT_SECONDS,
     )
+    recording = Recording(client)
     groups = []
     for title, conf_uid, name, model in CONVERSATIONS:
         expressions, motions = load_model(args.root, model)
-        picker = ExpressionPicker(
-            client=client, expressions=expressions, motions=motions
+        picker = ReplyActions(
+            client=recording,
+            choices=AvatarChoices(expressions=expressions, motions=motions),
+            mood=lambda: ("unknown", 0.0),
+            timeout_seconds=WAIT_SECONDS,
         )
         rows = []
         previous = ""
         for line in load_lines(args.root, conf_uid, name):
+            recording.raw, recording.error = "", ""
             started = time.monotonic()
-            raw, error = "", ""
-            try:
-                raw = await asyncio.wait_for(
-                    client.complete(picker.messages(line, previous)), WAIT_SECONDS
-                )
-            except Exception as e:  # noqa: BLE001 — 記下來給人看
-                error = f"{type(e).__name__}: {e}"
+            found = await picker.pick(line)
             seconds = time.monotonic() - started
+            raw, error = recording.raw, recording.error
             picked = (
-                pick_actions(line, expressions, list(motions), raw) if raw else None
+                None
+                if found is None
+                else {
+                    "expression": found.expression,
+                    "motion": found.motion,
+                    "intensity": found.intensity,
+                }
             )
             rows.append(
                 {

@@ -6,6 +6,7 @@
 """
 
 import asyncio
+from types import SimpleNamespace
 import json
 
 import pytest
@@ -1010,6 +1011,21 @@ def test_her_mood_is_read_from_the_engine(tmp_path):
 
 def test_no_mood_while_the_engine_side_is_being_replaced():
     assert agent(lambda: None).mood_message() is None
+
+
+# --- 每句的表情與動作 ---------------------------------------------------------------
+
+
+def test_the_picks_of_a_reply_come_from_the_engine():
+    asked = []
+    engine_side = SimpleNamespace(reply=None, reply_actions=lambda choices: asked.append(choices) or "picker")
+    assert agent(engine_side).reply_actions("choices") == "picker"
+    assert asked == ["choices"]
+
+
+def test_no_picks_while_the_engine_side_is_replaced_or_too_old():
+    assert agent(lambda: None).reply_actions("choices") is None
+    assert agent(SimpleNamespace(reply=None)).reply_actions("choices") is None
 
 
 def test_an_agent_that_does_not_know_its_character_has_nothing_to_follow(

@@ -282,8 +282,8 @@ async def handle_sentence_output(
 ) -> str:
     """處理一句輸出：需要時翻譯，然後交給語音合成。
 
-    ``expression_picker``（expression_pick.ExpressionPicker）有給時，每一句連同
-    前一句交給 tts_manager，跟合成並行挑表情與動作；沒給時 speak 的參數跟以前一樣。
+    ``expression_picker``（expression_pick.EnginePicker）有給時，每一句交給
+    tts_manager，跟合成並行請引擎挑表情與動作；沒給時 speak 的參數跟以前一樣。
 
     ``bilingual_subtitle`` 開著時，畫面字幕多一行她實際唸的那句（見
     conversations/bilingual.py）；關著時送出去的 payload 跟以前一樣。
@@ -432,12 +432,10 @@ async def handle_sentence_output(
             # 沒有標籤可以定語氣：用這則回覆挑到過的表情，還沒有就用她的心情。
             if actions is not None and not getattr(actions, "emotion", None):
                 actions.emotion = expression_picker.voice_emotion()
+            # 前一句由引擎的挑選器自己記（ReplyActions）。
             speak_kwargs["pick"] = functools.partial(
-                expression_picker.ask,
-                display_text.text,
-                previous=getattr(tts_manager, "last_line", ""),
+                expression_picker.ask, display_text.text
             )
-            tts_manager.last_line = display_text.text
 
         await tts_manager.speak(
             tts_text=tts_text,

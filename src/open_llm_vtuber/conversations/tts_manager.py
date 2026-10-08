@@ -14,7 +14,7 @@ from .laughter import is_laughter_only
 from .text_content import has_speakable_text
 from .types import WebSocketSend
 
-# 背景模型挑這句的表情與動作（expression_pick.ExpressionPicker.ask 綁好這句）。
+# 引擎挑這句的表情與動作（expression_pick.EnginePicker.ask 綁好這句）。
 Pick = Callable[[], Awaitable[Optional[dict]]]
 
 
@@ -87,8 +87,6 @@ class TTSTaskManager:
         # Caps how many synthesis calls to the (single, local) TTS service are
         # in flight at once. See SYNTHESIS_CONCURRENCY above.
         self._synthesis_semaphore = asyncio.Semaphore(self.SYNTHESIS_CONCURRENCY)
-        # 這則回覆上一句說了什麼；背景模型挑表情時當前文（expression_pick）。
-        self.last_line = ""
 
     async def speak(
         self,
@@ -429,6 +427,5 @@ class TTSTaskManager:
             self._sender_task.cancel()
         self._sequence_counter = 0
         self._next_sequence_to_send = 0
-        self.last_line = ""
         # Create a new queue to clear any pending items
         self._payload_queue = asyncio.Queue()

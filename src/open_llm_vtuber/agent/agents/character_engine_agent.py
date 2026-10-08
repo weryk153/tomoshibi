@@ -253,6 +253,13 @@ class CharacterEngineAgent(AgentInterface):
             return None
         return mood_message(companion.snapshot())
 
+    def reply_actions(self, choices: Any) -> Any:
+        """這則回覆的表情與動作挑選器（引擎的 ReplyActions，1.3.0 起）；引擎那一側
+        還沒好、或引擎太舊是 None。"""
+        companion = self._companion()
+        make = getattr(companion, "reply_actions", None)
+        return make(choices) if callable(make) else None
+
     def listen_to_mood(self, listener: Callable[[dict], None]) -> Callable[[], None]:
         """背景結果改了她的心情時呼叫 listener(訊息)。記在角色上：引擎那一側
         換了一個也照樣收得到。回傳停止聽的函式。"""
