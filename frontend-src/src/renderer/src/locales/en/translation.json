@@ -609,7 +609,11 @@
       "micVadSectionTitle": "Microphone & voice detection (this browser only)",
       "micVadSectionDesc": "These settings live in this browser's local storage and only control your mic and voice-activity detection. They never reach the backend — the actual recognition engine that turns speech into text is configured below.",
       "vadTuningHint": "Seeing \"Didn't catch that\" a lot? Lower the speech threshold, lower the negative speech threshold, or reduce the redemption frames. If background noise keeps triggering it instead, raise them.",
-      "micModePush": "Press the mic to talk"
+      "micModePush": "Press the mic to talk",
+      "extraMissing_faster_whisper": "faster-whisper isn't installed here yet, so sherpa-onnx is used for now. After installing, the app reloads and switches to faster-whisper.",
+      "extraInstall": "Install {{name}} (about {{mb}} MB)",
+      "extraInstalled_faster_whisper": "Installed and reloaded. The first recognition downloads the speech model (about 1.6 GB) first, so it takes a while.",
+      "extraFailed": "Install failed: {{error}}"
     },
     "agent": {
       "allowProactiveSpeak": "Allow AI to Speak Proactively",
@@ -706,7 +710,7 @@
       "asrEngineSectionNote": "The recognition engine and its key switch only when you press Save below; after that, reload from the notice at the top of settings.",
       "asrEnginePendingNotice": "Not saved yet — still using {{current}}. Enter credentials below and press Save to switch.",
       "asrSherpa": "sherpa-onnx (local · CPU · light, default)",
-      "asrFasterWhisper": "faster-whisper (local · more accurate · needs GPU · dependency not installed here, silently falls back to sherpa-onnx)",
+      "asrFasterWhisper": "faster-whisper (local · more accurate · installed separately, faster with an NVIDIA GPU)",
       "asrGroq": "Groq Whisper (cloud · fast · needs API key)",
       "asrAzure": "Azure (cloud · needs key + region)",
       "groqApiKeyLabel": "Groq API key",

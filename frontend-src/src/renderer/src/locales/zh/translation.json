@@ -609,7 +609,11 @@
       "micVadSectionTitle": "麥克風與語音偵測（僅本機瀏覽器）",
       "micVadSectionDesc": "這些設定存在這個瀏覽器的本機儲存，只控制你的麥克風與語音活動偵測，不會送到後端。實際把語音轉成文字的辨識引擎設定在下面。",
       "vadTuningHint": "常常出現「沒聽清楚，再說一次？」的話：把語音識別閾值調低、負面語音閾值調低，或減少驗證幀數。反過來，如果環境噪音常常誤觸發，就把它們調高。",
-      "micModePush": "主動按麥克風講話"
+      "micModePush": "主動按麥克風講話",
+      "extraMissing_faster_whisper": "這台還沒裝 faster-whisper，現在先用 sherpa-onnx 辨識。裝好會自動重新載入，換成 faster-whisper。",
+      "extraInstall": "安裝 {{name}}（約 {{mb}}MB）",
+      "extraInstalled_faster_whisper": "裝好了，已重新載入。第一次辨識會先下載語音模型（約 1.6GB），會等比較久。",
+      "extraFailed": "安裝失敗：{{error}}"
     },
     "agent": {
       "allowProactiveSpeak": "允許AI主動發言",
@@ -706,7 +710,7 @@
       "asrEngineSectionNote": "辨識引擎與金鑰按下面的「儲存」才會切換；存好之後由設定頂端的提示重新載入。",
       "asrEnginePendingNotice": "尚未儲存——目前仍在用 {{current}}。請在下面輸入憑證並按儲存才會切換。",
       "asrSherpa": "sherpa-onnx（本地 · CPU · 輕量，預設）",
-      "asrFasterWhisper": "faster-whisper（本地 · 較準 · 需要 GPU · 這裡沒裝相依套件，選了會靜默退回 sherpa-onnx）",
+      "asrFasterWhisper": "faster-whisper（本地 · 較準 · 要另外安裝，有 NVIDIA 顯卡更快）",
       "asrGroq": "Groq Whisper（雲端 · 快 · 需 API key）",
       "asrAzure": "Azure（雲端 · 需 key + region）",
       "groqApiKeyLabel": "Groq API 金鑰",

@@ -19,6 +19,7 @@ import {
 } from 'node:fs';
 import { cp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
+import { readExtras, syncArgs } from './backend-extras';
 
 // 與 renderer 的 services/backend-url.ts 的 FALLBACK_HOST 一致。使用者若在 conf.yaml
 // 改了 port，自己架的後端照樣能連（renderer 有自己的連線設定），只是這裡偵測不到。
@@ -158,7 +159,9 @@ export class BackendManager {
 
       // 每次啟動都跑：環境已經對的話一秒內結束，壞掉或裝到一半被中斷的話會補齊。
       onProgress({ stage: 'installing' });
-      await this.runToEnd(this.uvPath(), ['sync', '--frozen', '--no-dev', '--no-progress'], (line) => {
+      // 設定頁裝過的選裝套件（extras.json）一起帶上，不然每次啟動都被清掉。
+      const extras = readExtras(() => readFileSync(join(this.workspace, 'extras.json'), 'utf-8'));
+      await this.runToEnd(this.uvPath(), syncArgs(extras), (line) => {
         onProgress({ stage: 'installing', line });
       });
 
