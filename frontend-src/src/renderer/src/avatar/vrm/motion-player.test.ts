@@ -116,7 +116,9 @@ function withClips(...clips: [string, number][]) {
     .register.bind(player);
   for (const [name, seconds] of clips) register(name, clip(name, seconds));
   const action = (name: string) =>
-    (player as unknown as { actions: Map<string, THREE.AnimationAction> }).actions.get(name)!;
+    (player as unknown as { actions: Map<string, { parts: Map<string, THREE.AnimationAction> }> }).actions
+      .get(name)!
+      .parts.get("core")!;
   const run = (seconds: number) => {
     for (let t = 0; t < seconds - 1e-9; t += 1 / 60) player.update(1 / 60);
   };
@@ -242,4 +244,74 @@ test("一連串動作（同的、不同的、強弱不一）過程中，姿勢�
     biggest = Math.max(biggest, steps(player, idle, frames));
   }
   assert.ok(biggest < MAX_STEP, `idle weight jumped ${biggest} in one frame`);
+});
+
+// 有 humanoid 的 VRM：clip 依骨頭拆成軀幹、手臂、頭三份。
+function withBody(...clips: [string, number][]) {
+  const scene = new THREE.Object3D();
+  const bones = ["hips", "spine", "leftUpperArm", "rightUpperArm", "neck", "head"];
+  for (const bone of bones) {
+    const node = new THREE.Object3D();
+    node.name = `N_${bone}`;
+    scene.add(node);
+  }
+  const vrm = {
+    scene,
+    humanoid: {
+      humanBones: Object.fromEntries(bones.map((bone) => [bone, {}])),
+      getNormalizedBoneNode: (bone: string) => scene.getObjectByName(`N_${bone}`),
+    },
+  } as unknown as VRM;
+  const player = new MotionPlayer(vrm, "https://example.test/motions");
+  const register = (player as unknown as { register(name: string, clip: THREE.AnimationClip): void })
+    .register.bind(player);
+  for (const [name, seconds] of clips) {
+    register(
+      name,
+      new THREE.AnimationClip(
+        name,
+        seconds,
+        bones.map((bone) => new THREE.QuaternionKeyframeTrack(`N_${bone}.quaternion`, [0, seconds], [0, 0, 0, 1, 0, 0, 0, 1])),
+      ),
+    );
+  }
+  const part = (name: string, which: string) =>
+    (player as unknown as { actions: Map<string, { parts: Map<string, THREE.AnimationAction> }> }).actions
+      .get(name)!
+      .parts.get(which)!;
+  const run = (seconds: number) => {
+    for (let t = 0; t < seconds - 1e-9; t += 1 / 60) player.update(1 / 60);
+  };
+  return { player, part, run };
+}
+
+test("像真人：軀幹先動、手臂跟上、頭最後；回 idle 時軀幹先回、頭最後回", () => {
+  const { player, part, run } = withBody(["idle", 6], ["angry", 4]);
+  player.playIdle();
+  player.playOnce("angry", 1);
+  run(0.3);
+  const enter = ["core", "arms", "head"].map((p) => part("angry", p).getEffectiveWeight());
+  assert.ok(enter[0] > enter[1] && enter[1] > enter[2], `entering ${enter}`);
+  run(3.0); // 結束前 0.7 秒左右，正在回
+  const back = ["core", "arms", "head"].map((p) => part("angry", p).getEffectiveWeight());
+  assert.ok(back[0] < back[1] && back[1] < back[2], `returning ${back}`);
+  run(1.0);
+  for (const p of ["core", "arms", "head"]) {
+    assert.equal(part("angry", p).getEffectiveWeight(), 0);
+    assert.equal(part("idle", p).getEffectiveWeight(), 1);
+  }
+});
+
+test("像真人：進出是先慢後快再慢，不是等速", () => {
+  const { player, part } = withBody(["idle", 6], ["angry", 4]);
+  player.playIdle();
+  player.playOnce("angry", 1);
+  const weights: number[] = [];
+  for (let i = 0; i < 40; i++) {
+    player.update(1 / 60);
+    weights.push(part("angry", "core").getEffectiveWeight());
+  }
+  const steps = weights.slice(1).map((w, i) => w - weights[i]);
+  const early = steps[2], middle = steps[17];
+  assert.ok(middle > early * 2, `early step ${early}, middle step ${middle}`);
 });

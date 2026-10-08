@@ -2,9 +2,13 @@
 // .vrma 動畫：idle 迴圈 + LLM 觸發的 one-shot。
 //
 // idle 一直在播、從不重來；動作疊在上面，每幀的權重由這裡算（不用 three.js
-// 的 fadeIn/fadeOut）：動作淡入 FADE_IN 秒，結束前 RETURN_FADE 秒開始淡回，播
-// 完時剛好回到 idle。idle 的權重永遠是 1 減掉動作的，所以強度 0.5 的揮手是
+// 的 fadeIn/fadeOut）。idle 的權重永遠是 1 減掉動作的，所以強度 0.5 的揮手是
 // 「一半揮手、一半 idle」，不會混進 T-pose；回覆講完也不打斷還在做的動作。
+//
+// 像真人：每個 clip 依身體拆成軀幹、手臂、頭頸三份，各自一個 action。進出都用
+// 先慢、中快、後慢的曲線（ENTER／RETURN 秒），軀幹先動、手臂晚一點、頭最後
+// （DELAY）；結束前就開始淡回，播完時剛好回到 idle。TK256 這類動作是「擺一個
+// 情緒姿勢並維持」，頭尾離 idle 都有 15–35 度，等速、全身同時的內插看起來像機器。
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { VRM } from "@pixiv/three-vrm";
@@ -15,29 +19,64 @@ import {
 } from "@pixiv/three-vrm-animation";
 
 export const IDLE_CLIP = "idle";
-// 動作淡入的時間；換下一個動作時，舊的也用這麼久淡出。
-const FADE_IN = 0.3;
-// 動作結束前多久開始淡回 idle。太短看起來像彈回去。
-const RETURN_FADE = 0.7;
+type Part = "core" | "arms" | "head";
+const PARTS: Part[] = ["core", "arms", "head"];
+// 進入動作、回到 idle 各花多久（短的 clip 按比例縮短）。
+const ENTER = 0.6;
+const RETURN = 1.2;
+// 各部位比軀幹晚多久開始（3 秒以上的 clip；短的按比例縮短）。
+const DELAY: Record<Part, number> = { core: 0, arms: 0.12, head: 0.25 };
+const ARM_BONES = ["Shoulder", "UpperArm", "LowerArm", "Hand", "Thumb", "Index", "Middle", "Ring", "Little"];
+const HEAD_BONES = ["neck", "head", "leftEye", "rightEye", "jaw"];
 
+function boneOf(name: string): Part {
+  if (HEAD_BONES.includes(name)) return "head";
+  if (/^(left|right)/.test(name) && ARM_BONES.some((part) => name.includes(part))) return "arms";
+  return "core";
+}
+
+// 先慢、中快、後慢。
+function ease(x: number): number {
+  const t = Math.max(0, Math.min(1, x));
+  return t * t * (3 - 2 * t);
+}
+
+// 一個 clip 的一份（本尊或複本）：同一個 clip 的各部位一起播、時間一致。
+type Instance = { name: string; parts: Map<Part, THREE.AnimationAction>; duration: number };
 // peak 是要的強度，level 是這一幀的強度（往 peak 慢慢靠，強度改了也不會跳）。
-type Gesture = {
-  name: string;
-  action: THREE.AnimationAction;
-  peak: number;
-  level: number;
-  weight: number;
+type Gesture = { instance: Instance; peak: number; level: number; weights: Map<Part, number> };
+// 被下一個動作換掉的：跟新動作的淡入互補著淡出，加起來不超過 1。
+type Leaving = {
+  instance: Instance;
+  from: Map<Part, number>;
+  weights: Map<Part, number>;
+  elapsed: number;
+  timing: Timing;
 };
-type Leaving = { action: THREE.AnimationAction; weight: number; rate: number };
+type Timing = { enter: number; ret: number; delays: Map<Part, number>; last: number };
+
+function timingOf(instance: Instance): Timing {
+  const duration = instance.duration;
+  const scale = Math.min(1, duration / 3);
+  const delays = new Map<Part, number>();
+  const several = instance.parts.size > 1;
+  for (const part of instance.parts.keys()) delays.set(part, several ? DELAY[part] * scale : 0);
+  return {
+    enter: Math.min(ENTER, duration * 0.25),
+    ret: Math.min(RETURN, duration * 0.35),
+    delays,
+    last: Math.max(0, ...delays.values()),
+  };
+}
 
 export class MotionPlayer {
   private mixer: THREE.AnimationMixer;
-  private actions = new Map<string, THREE.AnimationAction>();
+  private actions = new Map<string, Instance>();
   private gesture: Gesture | null = null;
   private leaving: Leaving[] = [];
   // 同一個動作還在淡出時又要做一次，就用它的複本淡入：同一個 action 不能
   // 同時淡出又從頭開始（reset 會讓它一幀之內跳回第一格、權重歸零）。
-  private copies = new Map<string, THREE.AnimationAction[]>();
+  private copies = new Map<string, Instance[]>();
   private loader = new GLTFLoader();
   private readonly vrm: VRM;
   // review a0c0ce7 fix 2：VRMAvatar 只在角色載入時預先讀 motionMap 裡當下有的
@@ -89,14 +128,40 @@ export class MotionPlayer {
   }
 
   private register(name: string, clip: THREE.AnimationClip): void {
-    const action = this.mixer.clipAction(clip);
-    if (name === IDLE_CLIP) {
-      action.setLoop(THREE.LoopRepeat, Number.POSITIVE_INFINITY);
-    } else {
-      action.setLoop(THREE.LoopOnce, 1);
-      action.clampWhenFinished = true;
+    this.actions.set(name, this.instanceOf(name, clip));
+  }
+
+  /** 這個 clip 拆成各部位的 action（沒有 humanoid 的話整份算軀幹）。 */
+  private instanceOf(name: string, clip: THREE.AnimationClip): Instance {
+    const partOfNode = new Map<string, Part>();
+    const humanoid = (this.vrm as Partial<VRM>).humanoid;
+    if (humanoid) {
+      for (const bone of Object.keys(humanoid.humanBones ?? {})) {
+        const node = humanoid.getNormalizedBoneNode(bone as never);
+        if (node?.name) partOfNode.set(node.name, boneOf(bone));
+      }
     }
-    this.actions.set(name, action);
+    const tracks = new Map<Part, THREE.KeyframeTrack[]>();
+    for (const track of clip.tracks) {
+      const node = THREE.PropertyBinding.parseTrackName(track.name).nodeName;
+      // 視線、表情的 track 跟著頭；認不出的跟著軀幹。
+      const part = partOfNode.get(node) ?? (/lookat|expression/i.test(node) ? "head" : "core");
+      tracks.set(part, [...(tracks.get(part) ?? []), track]);
+    }
+    const parts = new Map<Part, THREE.AnimationAction>();
+    for (const part of PARTS) {
+      const own = tracks.get(part);
+      if (!own) continue;
+      const action = this.mixer.clipAction(new THREE.AnimationClip(`${name}:${part}`, clip.duration, own));
+      if (name === IDLE_CLIP) {
+        action.setLoop(THREE.LoopRepeat, Number.POSITIVE_INFINITY);
+      } else {
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = true;
+      }
+      parts.set(part, action);
+    }
+    return { name, parts, duration: clip.duration };
   }
 
   hasClip(name: string): boolean {
@@ -125,9 +190,11 @@ export class MotionPlayer {
   /** 讓 idle 開始播（已經在播就不動，不會從頭來）。 */
   playIdle(): void {
     const idle = this.actions.get(IDLE_CLIP);
-    if (idle && !idle.isRunning()) {
-      idle.setEffectiveWeight(1 - this.gestureWeight());
-      idle.play();
+    if (!idle) return;
+    for (const [part, action] of idle.parts) {
+      if (action.isRunning()) continue;
+      action.setEffectiveWeight(Math.max(0, 1 - this.otherWeight(part)));
+      action.play();
     }
   }
 
@@ -136,8 +203,8 @@ export class MotionPlayer {
    * 上，所以 0.4 的揮手就是小幅度的揮手，而不是另外準備一個小幅度的片段。
    */
   playOnce(name: string, intensity = 1): boolean {
-    const action = this.actions.get(name);
-    if (!action) {
+    const base = this.actions.get(name);
+    if (!base) {
       console.warn(`[VRM] motion clip "${name}" not loaded; staying idle`);
       return false;
     }
@@ -146,46 +213,29 @@ export class MotionPlayer {
     if (intensity < 0.05) return false;
     const peak = Math.max(0, Math.min(1, intensity));
     const previous = this.gesture;
-    if (previous && previous.name === name && !this.returning(previous)) {
+    if (previous && previous.instance.name === name && !this.returning(previous)) {
       // 還在做同一個動作：接著做，只換強度（慢慢換）。
       previous.peak = peak;
       return true;
     }
-    if (previous) this.letGo(previous.action, previous.weight);
-    const next = this.freeAction(name, action);
-    next.reset();
-    next.setEffectiveWeight(0);
-    next.play();
-    this.gesture = { name, action: next, peak, level: peak, weight: 0 };
-    return true;
-  }
-
-  private returning(gesture: Gesture): boolean {
-    const duration = gesture.action.getClip().duration;
-    return duration - gesture.action.time <= Math.min(RETURN_FADE, duration / 2);
-  }
-
-  private letGo(action: THREE.AnimationAction, weight: number): void {
-    if (weight > 0) {
-      this.leaving.push({ action, weight, rate: weight / FADE_IN });
-    } else {
-      action.setEffectiveWeight(0);
-      action.stop();
+    const next = this.freeInstance(name, base);
+    const timing = timingOf(next);
+    if (previous) {
+      this.leaving.push({
+        instance: previous.instance,
+        from: new Map(previous.weights),
+        weights: new Map(previous.weights),
+        elapsed: 0,
+        timing,
+      });
     }
-  }
-
-  /** 這個動作沒在用的一份（本尊或複本）；都在用就多複製一份。 */
-  private freeAction(name: string, base: THREE.AnimationAction): THREE.AnimationAction {
-    const busy = new Set<THREE.AnimationAction>(this.leaving.map((item) => item.action));
-    if (this.gesture) busy.add(this.gesture.action);
-    const copies = this.copies.get(name) ?? [];
-    const free = [base, ...copies].find((candidate) => !busy.has(candidate));
-    if (free) return free;
-    const copy = this.mixer.clipAction(base.getClip().clone());
-    copy.setLoop(THREE.LoopOnce, 1);
-    copy.clampWhenFinished = true;
-    this.copies.set(name, [...copies, copy]);
-    return copy;
+    for (const action of next.parts.values()) {
+      action.reset();
+      action.setEffectiveWeight(0);
+      action.play();
+    }
+    this.gesture = { instance: next, peak, level: peak, weights: new Map() };
+    return true;
   }
 
   /** 回覆講完：還在做的動作讓它做完，自己淡回 idle。 */
@@ -194,39 +244,101 @@ export class MotionPlayer {
   update(dt: number): void {
     const gesture = this.gesture;
     if (gesture) {
-      const duration = gesture.action.getClip().duration;
-      const fadeIn = Math.min(FADE_IN, duration / 2);
-      const fadeOut = Math.min(RETURN_FADE, duration / 2);
-      const elapsed = gesture.action.time;
-      const remaining = duration - elapsed;
-      const step = dt / FADE_IN;
+      const timing = timingOf(gesture.instance);
+      const elapsed = this.timeOf(gesture.instance);
+      const remaining = gesture.instance.duration - elapsed;
+      const step = dt / timing.enter;
       gesture.level += Math.max(-step, Math.min(step, gesture.peak - gesture.level));
-      gesture.weight =
-        gesture.level *
-        Math.min(1, fadeIn > 0 ? elapsed / fadeIn : 1) *
-        Math.max(0, Math.min(1, fadeOut > 0 ? remaining / fadeOut : 0));
-      gesture.action.setEffectiveWeight(gesture.weight);
+      for (const [part, action] of gesture.instance.parts) {
+        const delay = timing.delays.get(part) ?? 0;
+        // 軀幹先回、頭最後回：越晚開始的部位越晚回到 idle。
+        const weight =
+          gesture.level *
+          ease((elapsed - delay) / timing.enter) *
+          ease((remaining - (timing.last - delay)) / timing.ret);
+        gesture.weights.set(part, weight);
+        action.setEffectiveWeight(weight);
+      }
       if (remaining <= 1e-6 && elapsed > 0) {
-        gesture.action.setEffectiveWeight(0);
-        gesture.action.stop();
+        this.release(gesture.instance);
         this.gesture = null;
       }
     }
     for (const item of this.leaving) {
-      item.weight = Math.max(0, item.weight - item.rate * dt);
-      item.action.setEffectiveWeight(item.weight);
-      if (item.weight === 0) item.action.stop();
+      item.elapsed += dt;
+      for (const [part, action] of item.instance.parts) {
+        const delay = item.timing.delays.get(part) ?? 0;
+        // 跟新動作同一條曲線、反過來：新的升多少，舊的就降多少。
+        const weight = (item.from.get(part) ?? 0) * (1 - ease((item.elapsed - delay) / item.timing.enter));
+        item.weights.set(part, weight);
+        action.setEffectiveWeight(weight);
+      }
     }
-    this.leaving = this.leaving.filter((item) => item.weight > 0);
+    this.leaving = this.leaving.filter((item) => {
+      const done = item.elapsed >= item.timing.last + item.timing.enter;
+      if (done) this.release(item.instance);
+      return !done;
+    });
+    // 加起來超過 1 的部位（連換好幾個動作時）按比例壓回來。
+    for (const part of PARTS) {
+      const total = this.otherWeight(part);
+      if (total > 1) {
+        for (const [action, weight] of this.weightsOf(part)) action.setEffectiveWeight(weight / total);
+      }
+    }
     const idle = this.actions.get(IDLE_CLIP);
-    if (idle && idle.isRunning()) idle.setEffectiveWeight(1 - this.gestureWeight());
+    if (idle) {
+      for (const [part, action] of idle.parts) {
+        if (action.isRunning()) action.setEffectiveWeight(Math.max(0, 1 - this.otherWeight(part)));
+      }
+    }
     this.mixer.update(dt);
   }
 
-  private gestureWeight(): number {
-    let total = this.gesture?.weight ?? 0;
-    for (const item of this.leaving) total += item.weight;
-    return Math.min(1, total);
+  private timeOf(instance: Instance): number {
+    return instance.parts.values().next().value?.time ?? 0;
+  }
+
+  private returning(gesture: Gesture): boolean {
+    const timing = timingOf(gesture.instance);
+    const remaining = gesture.instance.duration - this.timeOf(gesture.instance);
+    return remaining <= timing.ret + timing.last;
+  }
+
+  private release(instance: Instance): void {
+    for (const action of instance.parts.values()) {
+      action.setEffectiveWeight(0);
+      action.stop();
+    }
+  }
+
+  private weightsOf(part: Part): [THREE.AnimationAction, number][] {
+    const out: [THREE.AnimationAction, number][] = [];
+    const add = (instance: Instance, weights: Map<Part, number>) => {
+      const action = instance.parts.get(part);
+      if (action) out.push([action, weights.get(part) ?? 0]);
+    };
+    if (this.gesture) add(this.gesture.instance, this.gesture.weights);
+    for (const item of this.leaving) add(item.instance, item.weights);
+    return out;
+  }
+
+  /** 這個部位上，動作（正在做的＋淡出中的）的權重加總。 */
+  private otherWeight(part: Part): number {
+    return this.weightsOf(part).reduce((sum, [, weight]) => sum + weight, 0);
+  }
+
+  /** 這個動作沒在用的一份（本尊或複本）；都在用就多複製一份。 */
+  private freeInstance(name: string, base: Instance): Instance {
+    const busy = new Set<Instance>(this.leaving.map((item) => item.instance));
+    if (this.gesture) busy.add(this.gesture.instance);
+    const copies = this.copies.get(name) ?? [];
+    const free = [base, ...copies].find((candidate) => !busy.has(candidate));
+    if (free) return free;
+    const tracks = [...base.parts.values()].flatMap((action) => action.getClip().tracks);
+    const copy = this.instanceOf(name, new THREE.AnimationClip(name, base.duration, tracks).clone());
+    this.copies.set(name, [...copies, copy]);
+    return copy;
   }
 
   dispose(): void {
