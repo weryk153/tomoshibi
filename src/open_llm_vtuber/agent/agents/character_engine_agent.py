@@ -81,6 +81,28 @@ def _one_line(text: str) -> str:
     return " ".join(text.split())
 
 
+# 主動開口時給她的素材。舊的標題「可以聊的素材：」接在她自己的提議後面，她會當成
+# 對方問「可以聊什麼」，回「既然你問我可以聊什麼……」。
+MATERIAL_HEADING = "你自己想聊的話可以參考這些（對方沒有問，不是對方問的）："
+
+# 她主動開口後對方一直沒回，下一次主動開口時加在指示後面：不然她把自己上一句的
+# 提議當成對方的問題來回答（自問自答），或說「你終於肯說話了」。
+UNANSWERED_NOTE = (
+    "你上一句是自己主動開口說的，講完到現在對方都沒回（你已經主動開口 {n} 次了）。"
+    "對話最後那段是你自己講的，不是對方問的：不要把它當成對方的問題來回答，也不要講得"
+    "好像他剛剛開口了。接著你自己的話往下說，或叫他一聲。"
+)
+
+
+def _with_unanswered(instruction: str, companion, conversation) -> str:
+    """主機的主動開口指示；她上一句還沒人回時補一句（引擎太舊不知道時照舊）。"""
+    count = getattr(companion, "unanswered_remarks", None)
+    unanswered = count(conversation) if callable(count) else 0
+    if not instruction or not unanswered:
+        return instruction
+    return f"{instruction}\n\n{UNANSWERED_NOTE.format(n=unanswered)}"
+
+
 class CharacterEngineAgent(AgentInterface):
     # 她說出口的話由引擎把關（不重複、不講客服腔、不留只剩標點的碎片、主動開口
     # 不只是應一聲）。主機自己那一層過濾對這個 agent 跳過，不然兩邊各擋一次。
@@ -411,7 +433,7 @@ class CharacterEngineAgent(AgentInterface):
                     # 留在對話裡，素材只屬於這一句。
                     notes=[
                         *(
-                            ["可以聊的素材：\n" + "\n\n".join(material)]
+                            [MATERIAL_HEADING + "\n" + "\n\n".join(material)]
                             if material
                             else []
                         ),
@@ -424,7 +446,11 @@ class CharacterEngineAgent(AgentInterface):
                     # 上一次主動開口已經問過問題：這次的問句由引擎拿掉，不只是叮嚀。
                     statement_only=bool(metadata.get("proactive_forbid_question")),
                     # 主機自己的規矩（中文，實測出來的）；沒有就用引擎的。
-                    instruction=str(metadata.get("proactive_instruction") or "")
+                    instruction=_with_unanswered(
+                        str(metadata.get("proactive_instruction") or ""),
+                        companion,
+                        conversation,
+                    )
                     or None,
                 )
             else:
