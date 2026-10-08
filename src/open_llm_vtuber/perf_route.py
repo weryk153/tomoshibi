@@ -397,15 +397,23 @@ def _reference_voices() -> list:
     if installed not in folders:
         folders.append(installed)
 
+    # 參考音的根目錄先：每個角色的資料夾、shared/ 都在這裡（reference_voices）。
+    # owner 是它所在的角色資料夾；前端只列這個角色的、shared 的和舊放法的。
+    from .reference_voices import references_root, voices_in_root
+
     voices: list = []
     seen: set = set()
+    root = references_root()
+    if os.path.isdir(root):
+        voices.extend(voices_in_root(root))
+        seen.update(v["path"] for v in voices)
     for folder in folders:
         if os.path.isdir(folder):
             voices.extend(_voices_in(folder, seen))
     return voices
 
 
-def _voices_in(folder: str, seen: set) -> list:
+def _voices_in(folder: str, seen: set, owner: str = "") -> list:
     voices = []
     for name in sorted(os.listdir(folder)):
         if not name.lower().endswith((".wav", ".mp3", ".flac", ".m4a", ".ogg")):
@@ -427,6 +435,7 @@ def _voices_in(folder: str, seen: set) -> list:
                 "path": path,
                 "label": os.path.splitext(name)[0],
                 "prompt_text": transcript,
+                "owner": owner,
             }
         )
     return voices
