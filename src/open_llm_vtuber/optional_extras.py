@@ -204,6 +204,8 @@ async def _download_whisper_model() -> AsyncIterator[dict[str, Any]]:
     from faster_whisper.utils import _MODELS, download_model
 
     repo = _MODELS.get(model, model)
+    # 問總大小要好幾秒：先讓畫面換成「準備下載語音模型」，不要停在上一行安裝訊息。
+    yield {"status": "model", "completed": 0, "total": 0}
     total = await asyncio.to_thread(_repo_size, repo)
     folder = os.path.join(root, "models--" + repo.replace("/", "--"))
     # hf-xet 下載完才一次寫進資料夾，算不出進度；改走一般 HTTP，邊下邊寫。

@@ -610,12 +610,13 @@
       "micVadSectionDesc": "이 설정은 이 브라우저의 로컬 저장소에 저장되며 마이크와 음성 활동 감지만 제어해요. 백엔드로는 전송되지 않아요. 음성을 실제로 텍스트로 바꾸는 인식 엔진은 아래에서 설정해요.",
       "vadTuningHint": "\"잘 못 들었어요\"가 자주 뜬다면 음성 인식 임계값과 부정 음성 임계값을 낮추거나 검증 프레임 수를 줄이세요. 반대로 주변 소음으로 오작동하면 높이세요.",
       "micModePush": "마이크를 눌러 말하기",
-      "extraMissing_faster_whisper": "이 기기에는 아직 faster-whisper가 없습니다(별도 설치, NVIDIA GPU가 있으면 더 빠름). 지금은 sherpa-onnx로 인식합니다. 설치하면 다시 불러와 faster-whisper로 바뀝니다.",
-      "extraInstall": "{{name}} 설치(약 {{mb}}MB, 음성 모델은 따로 기본 약 1.6GB)",
+      "extraMissing_faster_whisper": "이 기기에는 아직 faster-whisper가 없습니다(프로그램 약 150MB, 음성 모델은 따로 기본 약 1.6GB, NVIDIA GPU가 있으면 더 빠름). 지금은 sherpa-onnx로 인식합니다. 설치하면 다시 불러와 faster-whisper로 바뀝니다.",
+      "extraInstall": "{{name}} 설치",
       "extraInstalled_faster_whisper": "설치했습니다. faster-whisper로 바꿨습니다.",
       "extraFailed": "설치 실패: {{error}}",
       "extraModelProgress": "음성 모델 내려받는 중 {{percent}}%({{done}} / {{total}} MB)",
-      "extraModelDownloaded": "음성 모델 내려받는 중: {{done}} MB"
+      "extraModelDownloaded": "음성 모델 내려받는 중: {{done}} MB",
+      "extraModelPreparing": "음성 모델 내려받기 준비 중…"
     },
     "agent": {
       "allowProactiveSpeak": "AI가 먼저 말하도록 허용",
@@ -709,7 +710,7 @@
       "asrEngineLabel": "인식 엔진",
       "asrEnginePlaceholder": "인식 엔진 선택",
       "asrEngineHelp": "당신의 말을 텍스트로 바꾸는 엔진이에요. sherpa = 순수 CPU로 어떤 기기에서도 실행; faster-whisper = 모델을 내려받으며 CPU에서는 느리고 NVIDIA GPU에서만 빠름(Mac MPS는 미지원); groq/azure = 클라우드로 네트워크와 키가 필요하고 로컬 연산은 없음.",
-      "asrEngineSectionNote": "인식 엔진과 키는 아래의 \"저장\"을 눌러야 바뀝니다. 그다음 설정 위쪽의 알림에서 다시 불러오세요.",
+      "asrEngineSectionNote": "로컬 엔진(sherpa-onnx, faster-whisper)은 고르면 바로 바뀌고, 클라우드 엔진(Groq, Azure)은 키를 넣고 아래 \"저장\"을 눌러야 바뀝니다. 그다음 설정 위쪽의 알림에서 다시 불러오세요.",
       "asrEnginePendingNotice": "아직 저장되지 않았어요 — 현재는 여전히 {{current}}을(를) 사용 중이에요. 아래에서 자격 증명을 입력하고 저장을 눌러야 전환돼요.",
       "asrSherpa": "sherpa-onnx(로컬 · CPU · 경량, 기본값)",
       "asrFasterWhisper": "faster-whisper(로컬 · 더 정확)",

@@ -610,12 +610,13 @@
       "micVadSectionDesc": "这些设置存在这个浏览器的本机存储，只控制你的麦克风与语音活动检测，不会发送到后端。实际把语音转成文字的识别引擎设置在下面。",
       "vadTuningHint": "常常出现「没听清楚，再说一次？」的话：把语音识别阈值调低、负面语音阈值调低，或减少验证帧数。反过来，如果环境噪音常常误触发，就把它们调高。",
       "micModePush": "主动按麦克风讲话",
-      "extraMissing_faster_whisper": "这台还没装 faster-whisper（要另外安装，有 NVIDIA 显卡会更快），现在先用 sherpa-onnx 识别。装好会自动重新加载，换成 faster-whisper。",
-      "extraInstall": "安装 {{name}}（约 {{mb}}MB，另外会下载语音模型，默认约 1.6GB）",
+      "extraMissing_faster_whisper": "这台还没装 faster-whisper（程序约 150MB，另外下载语音模型，默认约 1.6GB；有 NVIDIA 显卡会更快），现在先用 sherpa-onnx 识别。装好会自动重新加载，换成 faster-whisper。",
+      "extraInstall": "安装 {{name}}",
       "extraInstalled_faster_whisper": "装好了，已改用 faster-whisper。",
       "extraFailed": "安装失败：{{error}}",
       "extraModelProgress": "下载语音模型 {{percent}}%（{{done}}／{{total}} MB）",
-      "extraModelDownloaded": "下载语音模型：已下载 {{done}} MB"
+      "extraModelDownloaded": "下载语音模型：已下载 {{done}} MB",
+      "extraModelPreparing": "准备下载语音模型…"
     },
     "agent": {
       "allowProactiveSpeak": "允许AI主动发言",
@@ -709,7 +710,7 @@
       "asrEngineLabel": "识别引擎",
       "asrEnginePlaceholder": "选一个识别引擎",
       "asrEngineHelp": "把你说的话转成文字的引擎。sherpa=纯 CPU、任何机器可跑；faster-whisper=要先下载模型、CPU 慢、有 NVIDIA GPU 才快（Mac 的 MPS 不支持）；groq/azure=云端，要网络与密钥、零本地算力。",
-      "asrEngineSectionNote": "识别引擎与密钥按下面的「保存」才会切换；保存之后由设置顶部的提示重新加载。",
+      "asrEngineSectionNote": "本地引擎（sherpa-onnx、faster-whisper）选了就切换；云端引擎（Groq、Azure）要填好密钥、按下面的「保存」才切换。保存之后由设置顶部的提示重新加载。",
       "asrEnginePendingNotice": "尚未保存——目前仍在用 {{current}}。请在下面输入凭证并按保存才会切换。",
       "asrSherpa": "sherpa-onnx（本地 · CPU · 轻量，默认）",
       "asrFasterWhisper": "faster-whisper（本地 · 较准）",

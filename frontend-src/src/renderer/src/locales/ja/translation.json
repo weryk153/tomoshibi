@@ -610,12 +610,13 @@
       "micVadSectionDesc": "これらの設定はこのブラウザのローカルストレージに保存され、マイクと音声アクティビティ検出のみを制御します。バックエンドには送られません。実際に音声をテキストに変換する認識エンジンは下で設定します。",
       "vadTuningHint": "「聞き取れませんでした」が頻繁に出る場合は、音声認識しきい値と負の音声しきい値を下げるか、検証フレーム数を減らしてください。逆に環境音で誤検出する場合は上げてください。",
       "micModePush": "マイクを押して話す",
-      "extraMissing_faster_whisper": "この端末には faster-whisper がまだ入っていません（別途インストール、NVIDIA GPU があると速い）。今は sherpa-onnx で認識しています。インストールすると再読み込みして faster-whisper に切り替わります。",
-      "extraInstall": "{{name}} をインストール（約 {{mb}}MB、ほかに音声モデル 既定で約 1.6GB）",
+      "extraMissing_faster_whisper": "この端末には faster-whisper がまだ入っていません（本体 約 150MB、ほかに音声モデル 既定で約 1.6GB。NVIDIA GPU があると速い）。今は sherpa-onnx で認識しています。インストールすると再読み込みして faster-whisper に切り替わります。",
+      "extraInstall": "{{name}} をインストール",
       "extraInstalled_faster_whisper": "インストールしました。faster-whisper に切り替えました。",
       "extraFailed": "インストールに失敗しました：{{error}}",
       "extraModelProgress": "音声モデルをダウンロード中 {{percent}}%（{{done}}／{{total}} MB）",
-      "extraModelDownloaded": "音声モデルをダウンロード中：{{done}} MB"
+      "extraModelDownloaded": "音声モデルをダウンロード中：{{done}} MB",
+      "extraModelPreparing": "音声モデルのダウンロードを準備中…"
     },
     "agent": {
       "allowProactiveSpeak": "AIが自分から話すのを許可する",
@@ -709,7 +710,7 @@
       "asrEngineLabel": "認識エンジン",
       "asrEnginePlaceholder": "認識エンジンを選択",
       "asrEngineHelp": "あなたの発話をテキストに変換するエンジンです。sherpa＝純CPUで、どのマシンでも動きます。faster-whisper＝モデルをダウンロードし、CPUでは遅く、NVIDIA GPUがあるときだけ高速です（MacのMPSは非対応）。groq/azure＝クラウドで、ネットワークとキーが必要ですが、ローカルの計算は不要です。",
-      "asrEngineSectionNote": "認識エンジンとキーは下の「保存」を押したときに切り替わります。その後、設定上部の通知から再読み込みしてください。",
+      "asrEngineSectionNote": "ローカルのエンジン（sherpa-onnx、faster-whisper）は選ぶとすぐ切り替わります。クラウドのエンジン（Groq、Azure）はキーを入力して下の「保存」を押すと切り替わります。その後、設定上部の通知から再読み込みしてください。",
       "asrEnginePendingNotice": "まだ保存されていません——現在も {{current}} を使用中です。下で認証情報を入力し、保存を押すと切り替わります。",
       "asrSherpa": "sherpa-onnx（ローカル・CPU・軽量、デフォルト）",
       "asrFasterWhisper": "faster-whisper（ローカル・より正確）",

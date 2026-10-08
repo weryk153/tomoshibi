@@ -182,3 +182,36 @@ def test_folder_size_counts_what_is_on_disk(tmp_path):
     (tmp_path / "b.incomplete").write_bytes(b"x" * 200)
     assert optional_extras.folder_size(str(tmp_path)) == 500
     assert optional_extras.folder_size(str(tmp_path / "missing")) == 0
+
+
+def test_the_model_step_shows_up_before_its_size_is_known(workspace, monkeypatch):
+    """問總大小要好幾秒：在那之前就先回報「開始準備下載模型」，畫面不會停在上一行
+    安裝訊息上。"""
+    import faster_whisper.utils as whisper_utils
+
+    order = []
+    monkeypatch.setattr(
+        optional_extras,
+        "whisper_model_settings",
+        lambda: ("tiny", str(workspace / "models")),
+    )
+    monkeypatch.setattr(
+        optional_extras, "_repo_size", lambda repo: order.append("size") or 1000
+    )
+    monkeypatch.setattr(
+        whisper_utils, "download_model", lambda *a, **k: order.append("download")
+    )
+
+    async def collect():
+        events = []
+        async for event in optional_extras._download_whisper_model():
+            events.append(event)
+            order.append("event")
+        return events
+
+    events = asyncio.run(collect())
+    assert order[0] == "event" and events[0] == {
+        "status": "model",
+        "completed": 0,
+        "total": 0,
+    }

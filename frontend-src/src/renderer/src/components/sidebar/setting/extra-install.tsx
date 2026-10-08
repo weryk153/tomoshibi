@@ -68,7 +68,7 @@ export function ExtraInstall({ name }: { name: string }): JSX.Element | null {
           <Text fontSize="xs" color="orange.300">{t(`settings.asr.extraMissing_${name}`)}</Text>
           <div>
             <Button size="xs" variant="outline" loading={phase === 'installing'} onClick={() => { void install(); }}>
-              {t('settings.asr.extraInstall', { name: 'faster-whisper', mb: status.download_mb })}
+              {t('settings.asr.extraInstall', { name: 'faster-whisper' })}
             </Button>
           </div>
           {/* 先裝套件（顯示安裝工具最新的一行），再下載語音模型（顯示進度）。 */}
@@ -78,7 +78,9 @@ export function ExtraInstall({ name }: { name: string }): JSX.Element | null {
           {phase === 'installing' && model && (
             <Stack gap={1}>
               <Text fontSize="xs" color="whiteAlpha.700">
-                {model.percent === null
+                {model.percent === null && model.doneMb === 0
+                  ? t('settings.asr.extraModelPreparing')
+                  : model.percent === null
                   ? t('settings.asr.extraModelDownloaded', { done: model.doneMb })
                   : t('settings.asr.extraModelProgress', { percent: model.percent, done: model.doneMb, total: model.totalMb })}
               </Text>

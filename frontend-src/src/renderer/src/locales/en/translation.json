@@ -610,12 +610,13 @@
       "micVadSectionDesc": "These settings live in this browser's local storage and only control your mic and voice-activity detection. They never reach the backend — the actual recognition engine that turns speech into text is configured below.",
       "vadTuningHint": "Seeing \"Didn't catch that\" a lot? Lower the speech threshold, lower the negative speech threshold, or reduce the redemption frames. If background noise keeps triggering it instead, raise them.",
       "micModePush": "Press the mic to talk",
-      "extraMissing_faster_whisper": "faster-whisper isn't installed here yet (it's installed separately and runs faster with an NVIDIA GPU), so sherpa-onnx is used for now. After installing, the app reloads and switches to faster-whisper.",
-      "extraInstall": "Install {{name}} (about {{mb}} MB, plus the speech model, about 1.6 GB by default)",
+      "extraMissing_faster_whisper": "faster-whisper isn't installed here yet (about 150 MB, plus the speech model, about 1.6 GB by default; faster with an NVIDIA GPU), so sherpa-onnx is used for now. After installing, the app reloads and switches to faster-whisper.",
+      "extraInstall": "Install {{name}}",
       "extraInstalled_faster_whisper": "Installed — now using faster-whisper.",
       "extraFailed": "Install failed: {{error}}",
       "extraModelProgress": "Downloading the speech model {{percent}}% ({{done}} / {{total}} MB)",
-      "extraModelDownloaded": "Downloading the speech model: {{done}} MB so far"
+      "extraModelDownloaded": "Downloading the speech model: {{done}} MB so far",
+      "extraModelPreparing": "Getting ready to download the speech model…"
     },
     "agent": {
       "allowProactiveSpeak": "Allow AI to Speak Proactively",
@@ -709,7 +710,7 @@
       "asrEngineLabel": "Recognition engine",
       "asrEnginePlaceholder": "Pick a recognition engine",
       "asrEngineHelp": "The engine that turns your speech into text. sherpa = pure CPU, runs on any machine; faster-whisper = downloads a model, slow on CPU, fast only with an NVIDIA GPU (Mac MPS unsupported); groq/azure = cloud, need network + a key, zero local compute.",
-      "asrEngineSectionNote": "The recognition engine and its key switch only when you press Save below; after that, reload from the notice at the top of settings.",
+      "asrEngineSectionNote": "Local engines (sherpa-onnx, faster-whisper) switch as soon as you pick them; cloud engines (Groq, Azure) switch once you enter the key and press Save below. Then reload from the notice at the top of settings.",
       "asrEnginePendingNotice": "Not saved yet — still using {{current}}. Enter credentials below and press Save to switch.",
       "asrSherpa": "sherpa-onnx (local · CPU · light, default)",
       "asrFasterWhisper": "faster-whisper (local · more accurate)",
