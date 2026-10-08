@@ -7,7 +7,7 @@ requires-python = ">=3.11,<3.13"
 dependencies = [
     # 對話由 AI Character Engine 驅動（character_engine_agent）。從 PyPI 裝、釘死版本：
     # 引擎發新版時 Tomoshibi 不會跟著被改掉行為，要升級就改這裡。
-    "ai-character-engine==1.2.0",
+    "ai-character-engine==1.3.0",
     "anthropic>=0.40.0",
     "azure-cognitiveservices-speech>=1.41.1",
     "chardet>=5.2.0",
