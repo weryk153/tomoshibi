@@ -121,7 +121,18 @@
     "notConfiguredYet": "言語モデルがまだ設定されていません",
     "whereLmStudio": "ローカルの LM Studio",
     "whereOllama": "ローカルの Ollama",
-    "whereNamed": "{{name}}"
+    "whereNamed": "{{name}}",
+    "errors": {
+      "auth": "APIキーが拒否されました。キーを確認してください。",
+      "modelMissing": "このアドレスにそのモデルがありません。モデル名を確認してください。",
+      "unreachable": "このアドレスにつながりません。URLと、サーバーが起動しているかを確認してください。",
+      "rateLimited": "プロバイダーにリクエストを制限されています。少し待ってから試してください。",
+      "missingUrl": "URLを入力してください。",
+      "missingModel": "モデル名を入力してください。",
+      "missingKey": "APIキーを入力してください。",
+      "writeFailed": "設定ファイルに書き込めませんでした。もう一度試してください。",
+      "testCallFailed": "テスト呼び出しに失敗しました（{{type}}）。URL・モデル・キーを確認してください。"
+    }
   },
   "effects": {
     "characterEntrance": {
@@ -298,7 +309,7 @@
       "promptLangInherit": "ベースキャラクターと同じ",
       "refAudioInherit": "ベースキャラクターと同じ",
       "translateSubtitle": "字幕をあなたの読む言語に翻訳",
-      "translateSubtitleHelp": "彼女のセリフを、あなたの読む言語（「あなた」で設定）に翻訳して表示します。話す内容と記憶は彼女の言語のままです。",
+      "translateSubtitleHelp": "彼女のセリフを、あなたの読む言語（「会話 › 読む言語／プレイヤー言語」で設定）に翻訳して表示します。話す内容と記憶は彼女の言語のままです。",
       "bilingualSubtitle": "二か国語字幕",
       "bilingualSubtitleHelp": "彼女が実際に話す原文と翻訳を2行で表示します。上が話している言葉、下が字幕です。同じ内容なら1行だけ表示します。",
       "translationAudit": "翻訳チェック",
@@ -320,7 +331,7 @@
       "expressionSource": "表情とモーション",
       "expressionSource_tags": "彼女が書くタグ",
       "expressionSource_background": "バックグラウンドモデルが選ぶ",
-      "expressionSourceHelp": "タグ：セリフに [joy] のようなタグを書きます。バックグラウンドモデル：音声を作っている間に、一文ごとの表情とモーションをバックグラウンドモデル（モデル › バックグラウンド処理とツール）が選び、プロンプトではタグを教えません。バックグラウンドモデルがなければタグのままです。キャラクターを読み込み直すと反映されます。",
+      "expressionSourceHelp": "タグ：セリフに [joy] のようなタグを書きます。バックグラウンドモデル：音声を作っている間に、一文ごとの表情とモーションをバックグラウンドモデル（モデル › バックグラウンド処理とツール）が選び、プロンプトではタグを教えません。バックグラウンドモデルがなければタグのままです。",
       "actionsEnabledHelp": "*目をそらす* のように、星印で囲んだ短い動作を一つ添えられます。字幕に出るだけで読み上げられません。オフのときは動作について一切伝えないので、間と言葉選びだけで表現します。"
     },
     "personas": {
@@ -513,6 +524,20 @@
         "day": "昼",
         "evening": "夕方",
         "night": "夜"
+      },
+      "builtin": {
+        "subtle-accent": {
+          "name": "さりげない演出",
+          "description": "普段の反応に添える、短く控えめな演出。"
+        },
+        "character-entrance": {
+          "name": "キャラクター登場",
+          "description": "汎用のIDカード・スキャン・カメラの登場演出。"
+        },
+        "cinematic-burst": {
+          "name": "シネマティックバースト",
+          "description": "合うキャラクター向けの、全画面の大きなインパクト演出。"
+        }
       }
     },
     "scenes": {
@@ -669,7 +694,7 @@
     "memory": {
       "description": "あなたが話したことも、彼女が自分について話したことも、AI Character Engine が覚えています。記憶もこのスイッチもキャラクターごとに分かれ、ここには使用中のキャラクターのものが表示されます。",
       "toggle": "長期メモリーを有効にする",
-      "toggleHelp": "オフにすると、エンジンは新しい会話を覚えず、記憶も会話に持ち込みません（バックエンドの再起動後に反映）。保存済みの記憶は、下でクリアしない限り残ります。",
+      "toggleHelp": "オフにすると、エンジンは新しい会話を覚えず、記憶も会話に持ち込みません。保存済みの記憶は、下でクリアしない限り残ります。",
       "selfLabel": "彼女自身のこと",
       "selfHelp": "すべての会話で共有され、配信中も持ち歩きます。好み・考え・来歴・彼女自身の予定はここに。あなたとの間の出来事は入りません。視聴者に変なことを教えられたら、ここで直接消してください。",
       "selfClear": "彼女自身の記憶を消去",
@@ -709,7 +734,7 @@
       "asrSectionTitle": "音声認識エンジン（ASR）",
       "asrEngineLabel": "認識エンジン",
       "asrEnginePlaceholder": "認識エンジンを選択",
-      "asrEngineHelp": "あなたの発話をテキストに変換するエンジンです。sherpa＝純CPUで、どのマシンでも動きます。faster-whisper＝モデルをダウンロードし、CPUでは遅く、NVIDIA GPUがあるときだけ高速です（MacのMPSは非対応）。groq/azure＝クラウドで、ネットワークとキーが必要ですが、ローカルの計算は不要です。",
+      "asrEngineHelp": "あなたの発話をテキストに変換するエンジンです。sherpa＝純CPUで、どのマシンでも動きます。faster-whisper＝より正確。初回はパッケージのインストールと約1.6GBのモデルのダウンロードが必要です（選ぶとインストールボタンが出ます）。CPUでは遅く、NVIDIA GPUがあるときだけ高速です（MacのMPSは非対応）。groq/azure＝クラウドで、ネットワークとキーが必要ですが、ローカルの計算は不要です。",
       "asrEngineSectionNote": "ローカルのエンジン（sherpa-onnx、faster-whisper）は選ぶとすぐ切り替わります。クラウドのエンジン（Groq、Azure）はキーを入力して下の「保存」を押すと切り替わります。その後、設定上部の通知から再読み込みしてください。",
       "asrEnginePendingNotice": "まだ保存されていません——現在も {{current}} を使用中です。下で認証情報を入力し、保存を押すと切り替わります。",
       "asrSherpa": "sherpa-onnx（ローカル・CPU・軽量、デフォルト）",
@@ -724,8 +749,8 @@
       "azureRegionHelp": "あなたのAzure Speechサービスのリージョンです。例：eastus、japaneast。",
       "azureRegionRequired": "Azure はキーだけでなく region も必要です——入力するまで保存は押せません。",
       "ttsSectionTitle": "音声合成エンジン（TTS）",
-      "ttsEdge": "Edge TTS（クラウド・軽量・無料、デフォルト）",
-      "ttsGptSovits": "GPT-SoVITS（ローカル・高負荷・声の複製）",
+      "ttsEdge": "Edge TTS（クラウド・無料）",
+      "ttsGptSovits": "GPT-SoVITS（ローカル・声の複製）",
       "gptSovitsApiUrlLabel": "GPT-SoVITSサービスのURL",
       "gptSovitsApiUrlHelp": "あなたが動かしているGPT-SoVITSサービスのURLです。例：http://localhost:9880/tts。",
       "gptSovitsLangZh": "中国語",

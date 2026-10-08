@@ -10,7 +10,7 @@
 // 那次事故的放大機制（見 build-defines.ts）。掛載過就留著（沒有
 // unmountOnExit），切回去時狀態還在。
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tabs as ArkTabs } from '@ark-ui/react';
 import { Stack } from '@chakra-ui/react';
@@ -104,6 +104,8 @@ function SettingUI({ open, onClose }: SettingUIProps): JSX.Element {
   const { t } = useTranslation();
   const [cancelHandlers, setCancelHandlers] = useState<(() => void)[]>([]);
   const [activeTab, setActiveTab] = useState<SettingsTabId>(DEFAULT_SETTINGS_TAB);
+  // 所有分頁共用同一個捲動區：換分頁要回到頂端，不然會停在上一頁捲到的位置。
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   const handleCancelCallback = useCallback((handler: () => void) => {
     setCancelHandlers((prev) => [...prev, handler]);
@@ -150,7 +152,10 @@ function SettingUI({ open, onClose }: SettingUIProps): JSX.Element {
       <PendingBanner active={open} />
       <ArkTabs.Root
         value={activeTab}
-        onValueChange={(details) => setActiveTab(details.value as SettingsTabId)}
+        onValueChange={(details) => {
+          setActiveTab(details.value as SettingsTabId);
+          scrollRef.current?.scrollTo({ top: 0 });
+        }}
         lazyMount
         className="flex min-h-0 flex-1 flex-col sm:flex-row"
       >
@@ -178,7 +183,7 @@ function SettingUI({ open, onClose }: SettingUIProps): JSX.Element {
           ))}
         </ArkTabs.List>
         {/* 捲動發生在這一層，不是整個抽屜——分頁列要固定在上方。 */}
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">{contents}</div>
+        <div ref={scrollRef} className="min-h-0 min-w-0 flex-1 overflow-y-auto">{contents}</div>
       </ArkTabs.Root>
     </Drawer>
   );

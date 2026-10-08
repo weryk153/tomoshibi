@@ -121,7 +121,18 @@
     "notConfiguredYet": "No language model set up yet",
     "whereLmStudio": "local LM Studio",
     "whereOllama": "local Ollama",
-    "whereNamed": "{{name}}"
+    "whereNamed": "{{name}}",
+    "errors": {
+      "auth": "The API key was rejected. Check the key.",
+      "modelMissing": "This endpoint does not have that model. Check the model name.",
+      "unreachable": "Could not reach this address. Check the URL, and that the server is running.",
+      "rateLimited": "The provider is rate limiting requests. Try again in a moment.",
+      "missingUrl": "Enter the URL.",
+      "missingModel": "Enter the model name.",
+      "missingKey": "Enter the API key.",
+      "writeFailed": "Could not write the config file. Try again.",
+      "testCallFailed": "The test call failed ({{type}}). Check the URL, model and key."
+    }
   },
   "effects": {
     "characterEntrance": {
@@ -298,7 +309,7 @@
       "promptLangInherit": "Same as the base character",
       "refAudioInherit": "Same as the base character",
       "translateSubtitle": "Translate subtitles into the language you read",
-      "translateSubtitleHelp": "Shows her lines translated into the language you read (set under You). What she says and remembers stays in her own language.",
+      "translateSubtitleHelp": "Shows her lines translated into the language you read (set under Conversation › Reading / Player language). What she says and remembers stays in her own language.",
       "bilingualSubtitle": "Bilingual subtitle",
       "bilingualSubtitleHelp": "Shows two lines: the line she actually speaks on top, the subtitle below. When both read the same, only one line is shown.",
       "translationAudit": "Translation review",
@@ -320,7 +331,7 @@
       "expressionSource": "Expressions and motions",
       "expressionSource_tags": "Tags she writes",
       "expressionSource_background": "Picked by the background model",
-      "expressionSourceHelp": "Tags: she writes [joy]-style tags in her lines. Background model: while the voice is made, the background model (Models › Background tasks & tools) picks each sentence's expression and motion, and her prompt no longer teaches tags. Without a background model it stays on tags. Applies after the character reloads.",
+      "expressionSourceHelp": "Tags: she writes [joy]-style tags in her lines. Background model: while the voice is made, the background model (Models › Background tasks & tools) picks each sentence's expression and motion, and her prompt no longer teaches tags. Without a background model it stays on tags.",
       "actionsEnabledHelp": "Lets her add one short action between asterisks, e.g. *looks away*. It shows in the subtitle and is not spoken. Off: actions are never mentioned to her, so she speaks with pauses and word choice only."
     },
     "personas": {
@@ -513,6 +524,20 @@
         "day": "Day",
         "evening": "Evening",
         "night": "Night"
+      },
+      "builtin": {
+        "subtle-accent": {
+          "name": "Subtle Accent",
+          "description": "A short, quiet visual accent for ordinary reactions."
+        },
+        "character-entrance": {
+          "name": "Character Entrance",
+          "description": "A general identity card, scan and camera entrance."
+        },
+        "cinematic-burst": {
+          "name": "Cinematic Burst",
+          "description": "A large full-screen impact performance for suitable characters."
+        }
       }
     },
     "scenes": {
@@ -669,7 +694,7 @@
     "memory": {
       "description": "She remembers what you've told her and what she has said about herself; AI Character Engine keeps both. Each character's memory and this switch are her own; this shows the active character's.",
       "toggle": "Enable long-term memory",
-      "toggleHelp": "When off, the engine stops remembering new conversation and stops bringing memories into the conversation (after the backend restarts). Stored memories are kept unless you clear them below.",
+      "toggleHelp": "When off, the engine stops remembering new conversation and stops bringing memories into the conversation. Stored memories are kept unless you clear them below.",
       "selfLabel": "About herself",
       "selfHelp": "Shared across every conversation, including live streams. Her tastes, opinions, background and her own plans live here; things between the two of you never do. If viewers teach her something odd, delete it right here.",
       "selfClear": "Clear her self-memory",
@@ -709,7 +734,7 @@
       "asrSectionTitle": "Speech recognition engine (ASR)",
       "asrEngineLabel": "Recognition engine",
       "asrEnginePlaceholder": "Pick a recognition engine",
-      "asrEngineHelp": "The engine that turns your speech into text. sherpa = pure CPU, runs on any machine; faster-whisper = downloads a model, slow on CPU, fast only with an NVIDIA GPU (Mac MPS unsupported); groq/azure = cloud, need network + a key, zero local compute.",
+      "asrEngineHelp": "The engine that turns your speech into text. sherpa = pure CPU, runs on any machine; faster-whisper = more accurate; the first time it installs a package and downloads a ~1.6GB model (an Install button appears when you pick it), slow on CPU, fast only with an NVIDIA GPU (Mac MPS unsupported); groq/azure = cloud, need network + a key, zero local compute.",
       "asrEngineSectionNote": "Local engines (sherpa-onnx, faster-whisper) switch as soon as you pick them; cloud engines (Groq, Azure) switch once you enter the key and press Save below. Then reload from the notice at the top of settings.",
       "asrEnginePendingNotice": "Not saved yet — still using {{current}}. Enter credentials below and press Save to switch.",
       "asrSherpa": "sherpa-onnx (local · CPU · light, default)",
@@ -724,8 +749,8 @@
       "azureRegionHelp": "Your Azure Speech service region, e.g. eastus, japaneast.",
       "azureRegionRequired": "Azure needs a region as well as a key — Save stays disabled until this is filled in.",
       "ttsSectionTitle": "Text-to-speech engine (TTS)",
-      "ttsEdge": "Edge TTS (cloud · light · free, default)",
-      "ttsGptSovits": "GPT-SoVITS (local · heavy · voice cloning)",
+      "ttsEdge": "Edge TTS (cloud · free)",
+      "ttsGptSovits": "GPT-SoVITS (local · cloning)",
       "gptSovitsApiUrlLabel": "GPT-SoVITS service URL",
       "gptSovitsApiUrlHelp": "URL of the GPT-SoVITS service you run, e.g. http://localhost:9880/tts.",
       "gptSovitsLangZh": "Chinese",

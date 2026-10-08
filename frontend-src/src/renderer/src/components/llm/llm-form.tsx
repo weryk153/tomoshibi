@@ -37,6 +37,7 @@ import {
   type DetectedModel,
   type OllamaPullEvent,
   needsKeyAgain,
+  setupErrorKey,
 } from '@/api/llm-config.ts';
 
 const OLLAMA_DOWNLOAD_URL = 'https://ollama.com/download';
@@ -103,6 +104,11 @@ function NoticeBox({ text, tone = 'yellow' }: { text: string; tone?: 'yellow' | 
 
 function LlmForm({ onSaved, onApplied }: LlmFormProps): JSX.Element {
   const { t } = useTranslation();
+  // 後端的固定英文錯誤換成目前介面語言；認不出來的照原文。
+  const describeError = useCallback((error: string): string => {
+    const known = setupErrorKey(error);
+    return known ? t(known.key, { type: known.type }) : error;
+  }, [t]);
   const { baseUrl: backendBaseUrl } = useWebSocket();
 
   // 四選一的來源，打開時停在正在用的那個（載入現值之後才知道）。
@@ -279,12 +285,12 @@ function LlmForm({ onSaved, onApplied }: LlmFormProps): JSX.Element {
 
     if (!result.ok) {
       setApplyPhase('error');
-      setApplyError(result.error);
+      setApplyError(describeError(result.error));
       return;
     }
     if (!result.data.ok || !result.data.applied) {
       setApplyPhase('error');
-      setApplyError(result.data.error || t('setup.testFailed'));
+      setApplyError(result.data.error ? describeError(result.data.error) : t('setup.testFailed'));
       return;
     }
 
@@ -295,7 +301,7 @@ function LlmForm({ onSaved, onApplied }: LlmFormProps): JSX.Element {
       noTools: await warnsNoTools(result.data.applied.tools),
     });
     setApplyPhase('applied');
-  }, [detectResult, selectedKey, backendBaseUrl, t, warnsNoTools]);
+  }, [detectResult, selectedKey, backendBaseUrl, t, warnsNoTools, describeError]);
 
   // 套用成功後不直接呼叫 onSaved：在首次精靈裡，onSaved 一叫外層就把整個
   // LlmForm 換成「已完成」畫面，note（例如「已為你關閉思考模式」）會連顯示
@@ -467,8 +473,8 @@ function LlmForm({ onSaved, onApplied }: LlmFormProps): JSX.Element {
       setSaveError(t('setup.keyRequiredAgain'));
       return;
     }
-    setSaveError(result.error || t('setup.testFailed'));
-  }, [mode, provider, apiKey, model, customUrl, hasExistingKey, backendBaseUrl, onSaved, t, refreshActive]);
+    setSaveError(result.error ? describeError(result.error) : t('setup.testFailed'));
+  }, [mode, provider, apiKey, model, customUrl, hasExistingKey, backendBaseUrl, onSaved, t, refreshActive, describeError]);
 
   const existingKeyPlaceholder = hasExistingKey ? t('setup.keyAlreadySetPlaceholder') : undefined;
 

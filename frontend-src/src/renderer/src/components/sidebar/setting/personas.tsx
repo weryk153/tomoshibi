@@ -261,7 +261,7 @@ function Personas({ confUid, isActive }: PersonasProps): JSX.Element {
         <Text fontSize="sm" color="whiteAlpha.700">
           {t('settings.personas.description')}
         </Text>
-        <Button size="xs" tone="blue" variant="outline" onClick={openCreate}>
+        <Button size="xs" tone="blue" variant="outline" className="shrink-0 whitespace-nowrap" onClick={openCreate}>
           {t('settings.personas.add')}
         </Button>
       </Stack>

@@ -229,3 +229,26 @@ export function activeWhere(active: ActiveLlm): { key: string; name?: string } {
   }
   return { key: 'setup.whereNamed', name: active.provider }
 }
+
+// 測試或儲存失敗時，後端回的是固定幾句英文（llm_config_route.py 的
+// _sanitize_error 與缺欄位檢查）。換成翻譯鍵，介面是中文時才不會冒出英文；
+// 認不出來的（例如 http.ts 自己的逾時訊息）回 null，照原文顯示。
+const SETUP_ERRORS: Record<string, string> = {
+  'Authentication failed — the API key was rejected. Check the key.': 'auth',
+  'The model was not found at this endpoint. Check the model name.': 'modelMissing',
+  'Could not reach the endpoint. Check the URL (and that the server is running).': 'unreachable',
+  'Rate limited by the provider. Try again in a moment.': 'rateLimited',
+  'Missing base_url.': 'missingUrl',
+  'Missing model name.': 'missingModel',
+  'Missing API key.': 'missingKey',
+  'Could not write config file.': 'writeFailed',
+  'Could not write conf.yaml.': 'writeFailed',
+}
+
+export function setupErrorKey(error: string): { key: string, type?: string } | null {
+  const known = SETUP_ERRORS[error]
+  if (known) return { key: `setup.errors.${known}` }
+  const failed = /^Test call failed \((\w+)\)/.exec(error)
+  if (failed) return { key: 'setup.errors.testCallFailed', type: failed[1] }
+  return null
+}

@@ -121,7 +121,18 @@
     "notConfiguredYet": "아직 언어 모델을 설정하지 않았습니다",
     "whereLmStudio": "로컬 LM Studio",
     "whereOllama": "로컬 Ollama",
-    "whereNamed": "{{name}}"
+    "whereNamed": "{{name}}",
+    "errors": {
+      "auth": "API 키가 거부됐어요. 키를 확인하세요.",
+      "modelMissing": "이 주소에 그 모델이 없어요. 모델 이름을 확인하세요.",
+      "unreachable": "이 주소에 연결할 수 없어요. URL과 서버가 켜져 있는지 확인하세요.",
+      "rateLimited": "제공자가 요청을 제한하고 있어요. 잠시 후 다시 시도하세요.",
+      "missingUrl": "URL을 입력하세요.",
+      "missingModel": "모델 이름을 입력하세요.",
+      "missingKey": "API 키를 입력하세요.",
+      "writeFailed": "설정 파일에 쓰지 못했어요. 다시 시도하세요.",
+      "testCallFailed": "테스트 호출에 실패했어요({{type}}). URL, 모델, 키를 확인하세요."
+    }
   },
   "effects": {
     "characterEntrance": {
@@ -298,7 +309,7 @@
       "promptLangInherit": "기본 캐릭터와 같게",
       "refAudioInherit": "기본 캐릭터와 같게",
       "translateSubtitle": "자막을 당신이 읽는 언어로 번역",
-      "translateSubtitleHelp": "그녀의 대사를 당신이 읽는 언어(「당신」에서 설정)로 번역해 보여 줍니다. 말하는 내용과 기억은 그녀의 언어 그대로입니다.",
+      "translateSubtitleHelp": "그녀의 대사를 당신이 읽는 언어(「대화 › 읽기 / 플레이어 언어」에서 설정)로 번역해 보여 줍니다. 말하는 내용과 기억은 그녀의 언어 그대로입니다.",
       "bilingualSubtitle": "이중 언어 자막",
       "bilingualSubtitleHelp": "그녀가 실제로 말하는 원문과 번역을 두 줄로 보여 줍니다. 위가 실제로 말하는 문장, 아래가 자막입니다. 두 줄이 같으면 한 줄만 보여 줍니다.",
       "translationAudit": "번역 검토",
@@ -320,7 +331,7 @@
       "expressionSource": "표정과 모션",
       "expressionSource_tags": "그녀가 쓰는 태그",
       "expressionSource_background": "백그라운드 모델이 고름",
-      "expressionSourceHelp": "태그: 대사에 [joy] 같은 태그를 씁니다. 백그라운드 모델: 음성을 만드는 동안 문장마다 표정과 모션을 백그라운드 모델(모델 › 백그라운드 작업 및 도구)이 고르고, 프롬프트에서 태그를 가르치지 않습니다. 백그라운드 모델이 없으면 태그를 그대로 씁니다. 캐릭터를 다시 불러오면 적용됩니다.",
+      "expressionSourceHelp": "태그: 대사에 [joy] 같은 태그를 씁니다. 백그라운드 모델: 음성을 만드는 동안 문장마다 표정과 모션을 백그라운드 모델(모델 › 백그라운드 작업 및 도구)이 고르고, 프롬프트에서 태그를 가르치지 않습니다. 백그라운드 모델이 없으면 태그를 그대로 씁니다.",
       "actionsEnabledHelp": "*시선을 돌린다* 처럼 별표로 감싼 짧은 동작을 하나 덧붙일 수 있습니다. 자막에만 나오고 읽지 않습니다. 끄면 동작에 대해 아예 알려 주지 않아, 멈춤과 단어 선택으로만 표현합니다."
     },
     "personas": {
@@ -513,6 +524,20 @@
         "day": "낮",
         "evening": "저녁",
         "night": "밤"
+      },
+      "builtin": {
+        "subtle-accent": {
+          "name": "은은한 강조",
+          "description": "평범한 반응에 곁들이는 짧고 조용한 연출."
+        },
+        "character-entrance": {
+          "name": "캐릭터 등장",
+          "description": "범용 신분 카드, 스캔, 카메라 등장 연출."
+        },
+        "cinematic-burst": {
+          "name": "시네마틱 버스트",
+          "description": "어울리는 캐릭터를 위한 전체 화면의 큰 임팩트 연출."
+        }
       }
     },
     "scenes": {
@@ -669,7 +694,7 @@
     "memory": {
       "description": "당신이 한 말도, 그녀가 자신에 대해 한 말도 AI Character Engine이 기억해요. 기억과 이 스위치는 캐릭터마다 따로이며, 여기에는 현재 캐릭터의 것이 표시돼요.",
       "toggle": "장기 기억 사용",
-      "toggleHelp": "끄면 엔진이 새 대화를 기억하지 않고, 기억도 대화에 가져오지 않습니다 (백엔드를 다시 시작한 뒤 적용). 저장된 기억은 아래에서 지우지 않는 한 유지됩니다.",
+      "toggleHelp": "끄면 엔진이 새 대화를 기억하지 않고, 기억도 대화에 가져오지 않습니다. 저장된 기억은 아래에서 지우지 않는 한 유지됩니다.",
       "selfLabel": "그녀 자신에 대해",
       "selfHelp": "모든 대화에서 공유되며 방송 중에도 함께합니다. 취향, 생각, 내력, 그녀 자신의 계획이 여기에 들어갑니다. 당신과의 일은 들어오지 않습니다. 시청자가 이상한 걸 가르쳤다면 여기서 바로 지우세요.",
       "selfClear": "그녀 자신의 기억 지우기",
@@ -709,7 +734,7 @@
       "asrSectionTitle": "음성 인식 엔진(ASR)",
       "asrEngineLabel": "인식 엔진",
       "asrEnginePlaceholder": "인식 엔진 선택",
-      "asrEngineHelp": "당신의 말을 텍스트로 바꾸는 엔진이에요. sherpa = 순수 CPU로 어떤 기기에서도 실행; faster-whisper = 모델을 내려받으며 CPU에서는 느리고 NVIDIA GPU에서만 빠름(Mac MPS는 미지원); groq/azure = 클라우드로 네트워크와 키가 필요하고 로컬 연산은 없음.",
+      "asrEngineHelp": "당신의 말을 텍스트로 바꾸는 엔진이에요. sherpa = 순수 CPU로 어떤 기기에서도 실행; faster-whisper = 더 정확하며 처음에 패키지를 설치하고 약 1.6GB 모델을 내려받음(고르면 설치 버튼이 나옴), CPU에서는 느리고 NVIDIA GPU에서만 빠름(Mac MPS는 미지원); groq/azure = 클라우드로 네트워크와 키가 필요하고 로컬 연산은 없음.",
       "asrEngineSectionNote": "로컬 엔진(sherpa-onnx, faster-whisper)은 고르면 바로 바뀌고, 클라우드 엔진(Groq, Azure)은 키를 넣고 아래 \"저장\"을 눌러야 바뀝니다. 그다음 설정 위쪽의 알림에서 다시 불러오세요.",
       "asrEnginePendingNotice": "아직 저장되지 않았어요 — 현재는 여전히 {{current}}을(를) 사용 중이에요. 아래에서 자격 증명을 입력하고 저장을 눌러야 전환돼요.",
       "asrSherpa": "sherpa-onnx(로컬 · CPU · 경량, 기본값)",
@@ -724,8 +749,8 @@
       "azureRegionHelp": "당신의 Azure Speech 서비스 지역이에요. 예: eastus, japaneast.",
       "azureRegionRequired": "Azure는 키뿐 아니라 region도 필요해요 — 입력할 때까지 저장을 누를 수 없어요.",
       "ttsSectionTitle": "텍스트 음성 변환 엔진(TTS)",
-      "ttsEdge": "Edge TTS(클라우드 · 경량 · 무료, 기본값)",
-      "ttsGptSovits": "GPT-SoVITS(로컬 · 무거움 · 음성 복제)",
+      "ttsEdge": "Edge TTS(클라우드 · 무료)",
+      "ttsGptSovits": "GPT-SoVITS(로컬 · 음성 복제)",
       "gptSovitsApiUrlLabel": "GPT-SoVITS 서비스 URL",
       "gptSovitsApiUrlHelp": "당신이 실행하는 GPT-SoVITS 서비스의 URL이에요. 예: http://localhost:9880/tts.",
       "gptSovitsLangZh": "중국어",

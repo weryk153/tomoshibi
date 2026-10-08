@@ -39,6 +39,17 @@ import {
 
 function Performances(): JSX.Element {
   const { t } = useTranslation();
+  // 內建方案的名稱與說明在程式裡是英文（也是給 AI 導演看的）；畫面上照介面語言顯示。
+  const presetName = (preset: StagePerformancePreset): string => (
+    preset.builtin
+      ? t(`settings.performances.builtin.${preset.id}.name`, { defaultValue: preset.name })
+      : preset.name
+  );
+  const presetDescription = (preset: StagePerformancePreset): string => (
+    preset.builtin
+      ? t(`settings.performances.builtin.${preset.id}.description`, { defaultValue: preset.description })
+      : preset.description
+  );
   const {
     characterId,
     presets,
@@ -332,7 +343,7 @@ function Performances(): JSX.Element {
                     )}
                   >
                     <Stack gap="0">
-                      <Text fontWeight="semibold">{preset.name}</Text>
+                      <Text fontWeight="semibold">{presetName(preset)}</Text>
                       <Text fontSize="xs" color="fg.muted">{preset.id}</Text>
                     </Stack>
                   </Checkbox>
@@ -352,7 +363,7 @@ function Performances(): JSX.Element {
                   </HStack>
                 </Stack>
                 <Text fontSize="xs" color="whiteAlpha.600">
-                  {preset.description}
+                  {presetDescription(preset)}
                 </Text>
               </Stack>
             </Box>
@@ -364,7 +375,7 @@ function Performances(): JSX.Element {
         <Box p="4" borderWidth="1px" borderColor="whiteAlpha.200" borderRadius="lg">
           <Stack gap="3">
             <HStack justify="space-between">
-              <Heading size="xs">{selectedPreset.name}</Heading>
+              <Heading size="xs">{presetName(selectedPreset)}</Heading>
               <Button size="xs" variant="outline" onClick={() => createCopy(selectedPreset.id)}>
                 {t('settings.performances.duplicateToEdit')}
               </Button>

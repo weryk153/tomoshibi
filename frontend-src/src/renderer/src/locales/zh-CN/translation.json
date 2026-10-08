@@ -121,7 +121,18 @@
     "notConfiguredYet": "还没设置语言模型",
     "whereLmStudio": "本机 LM Studio",
     "whereOllama": "本机 Ollama",
-    "whereNamed": "{{name}}"
+    "whereNamed": "{{name}}",
+    "errors": {
+      "auth": "密钥被拒绝了，请确认密钥。",
+      "modelMissing": "这个地址找不到这个模型，请确认模型名称。",
+      "unreachable": "连不到这个地址。请确认网址，以及服务有开着。",
+      "rateLimited": "供应商限制了请求次数，稍等一下再试。",
+      "missingUrl": "请填网址。",
+      "missingModel": "请填模型名称。",
+      "missingKey": "请填 API 密钥。",
+      "writeFailed": "配置文件写不进去，请再试一次。",
+      "testCallFailed": "测试调用失败（{{type}}）。请确认网址、模型与密钥。"
+    }
   },
   "effects": {
     "characterEntrance": {
@@ -298,7 +309,7 @@
       "promptLangInherit": "跟底稿角色一样",
       "refAudioInherit": "跟底稿角色一样",
       "translateSubtitle": "字幕翻译成你看的语言",
-      "translateSubtitleHelp": "把她说的话翻译成你看的语言（在「你」设置）显示在字幕上。她说的、记得的仍然是她自己的语言。",
+      "translateSubtitleHelp": "把她说的话翻译成你看的语言（在「对话 › 阅读／玩家语言」设置）显示在字幕上。她说的、记得的仍然是她自己的语言。",
       "bilingualSubtitle": "双语字幕",
       "bilingualSubtitleHelp": "显示她念的原文和翻译两行：上行是她实际念出来的那句，下行是字幕。两行一样时只显示一行。",
       "translationAudit": "翻译审核",
@@ -320,7 +331,7 @@
       "expressionSource": "表情与动作",
       "expressionSource_tags": "她写的标签",
       "expressionSource_background": "背景模型挑",
-      "expressionSourceHelp": "标签：她在台词里带 [joy] 这类标签。背景模型：合成语音的同时，由背景模型（模型 › 后台工作与工具）逐句挑表情与动作，提示里不再教标签。没设背景模型时照旧用标签。重新载入角色后生效。",
+      "expressionSourceHelp": "标签：她在台词里带 [joy] 这类标签。背景模型：合成语音的同时，由背景模型（模型 › 后台工作与工具）逐句挑表情与动作，提示里不再教标签。没设背景模型时照旧用标签。",
       "actionsEnabledHelp": "让她在台词里搭配一句星号包起来的动作，例如「*把视线移开*」，只显示在字幕上、不会念出来。关掉时完全不跟她提动作，感情只用停顿与选词表现。"
     },
     "personas": {
@@ -513,6 +524,20 @@
         "day": "白天",
         "evening": "傍晚",
         "night": "夜晚"
+      },
+      "builtin": {
+        "subtle-accent": {
+          "name": "小点缀",
+          "description": "短暂、安静的画面点缀，用在一般的反应。"
+        },
+        "character-entrance": {
+          "name": "角色登场",
+          "description": "通用的身份卡、扫描与镜头登场。"
+        },
+        "cinematic-burst": {
+          "name": "电影感爆发",
+          "description": "全屏的大型冲击演出，给适合的角色用。"
+        }
       }
     },
     "scenes": {
@@ -669,7 +694,7 @@
     "memory": {
       "description": "你说过的事、她自己说过的事，都由 AI Character Engine 记住。记忆和这个开关都是每个角色各自的，这里显示当前角色的。",
       "toggle": "开启长期记忆",
-      "toggleHelp": "关闭后引擎不再记住新的对话、也不会把记忆带进对话（重新启动后端后生效）。已存的记忆内容会保留（除非你按下面的清除）。",
+      "toggleHelp": "关闭后引擎不再记住新的对话、也不会把记忆带进对话。已存的记忆内容会保留（除非你按下面的清除）。",
       "selfLabel": "她自己",
       "selfHelp": "所有对话共用，直播时也会带着。她的喜好、看法、来历、自己的计划放这里；跟你之间的事不会进来。观众教了她什么奇怪的东西，直接在这里删掉。",
       "selfClear": "清除她自己的记忆",
@@ -709,7 +734,7 @@
       "asrSectionTitle": "语音识别引擎（ASR）",
       "asrEngineLabel": "识别引擎",
       "asrEnginePlaceholder": "选一个识别引擎",
-      "asrEngineHelp": "把你说的话转成文字的引擎。sherpa=纯 CPU、任何机器可跑；faster-whisper=要先下载模型、CPU 慢、有 NVIDIA GPU 才快（Mac 的 MPS 不支持）；groq/azure=云端，要网络与密钥、零本地算力。",
+      "asrEngineHelp": "把你说的话转成文字的引擎。sherpa=纯 CPU、任何机器可跑；faster-whisper=较准，第一次要安装套件并下载约 1.6GB 模型（选了它会出现安装按钮）；CPU 上较慢，有 NVIDIA GPU 才快（Mac 的 MPS 不支持）；groq/azure=云端，要网络与密钥、零本地算力。",
       "asrEngineSectionNote": "本地引擎（sherpa-onnx、faster-whisper）选了就切换；云端引擎（Groq、Azure）要填好密钥、按下面的「保存」才切换。保存之后由设置顶部的提示重新加载。",
       "asrEnginePendingNotice": "尚未保存——目前仍在用 {{current}}。请在下面输入凭证并按保存才会切换。",
       "asrSherpa": "sherpa-onnx（本地 · CPU · 轻量，默认）",
@@ -724,8 +749,8 @@
       "azureRegionHelp": "你的 Azure 语音服务区域，例如 eastus、japaneast。",
       "azureRegionRequired": "Azure 除了密钥还需要 region——没填就不能按保存。",
       "ttsSectionTitle": "语音合成引擎（TTS）",
-      "ttsEdge": "Edge TTS（云端 · 轻量 · 免费，默认）",
-      "ttsGptSovits": "GPT-SoVITS（本地 · 重 · 可克隆音色）",
+      "ttsEdge": "Edge TTS（云端 · 免费）",
+      "ttsGptSovits": "GPT-SoVITS（本地 · 克隆音色）",
       "gptSovitsApiUrlLabel": "GPT-SoVITS 服务地址",
       "gptSovitsApiUrlHelp": "你自建的 GPT-SoVITS 服务网址，例如 http://localhost:9880/tts。",
       "gptSovitsLangZh": "中文",

@@ -1,7 +1,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
-  activeWhere, buildSavePayload, initialSource, needsKeyAgain, type ActiveLlm, type LlmFormState,
+  activeWhere, buildSavePayload, initialSource, needsKeyAgain, setupErrorKey, type ActiveLlm, type LlmFormState,
 } from './llm-config.ts'
 
 const base: LlmFormState = {
@@ -84,4 +84,21 @@ test('「目前使用」寫得出它在哪裡', () => {
   )
   assert.deepEqual(activeWhere(active('custom', { base_url: 'not a url' })), { key: 'setup.whereNamed', name: 'not a url' })
   assert.deepEqual(activeWhere(active('other', { provider: 'claude_llm' })), { key: 'setup.whereNamed', name: 'claude_llm' })
+})
+
+test('後端的英文錯誤換成翻譯鍵；認不出來的照原文', () => {
+  assert.deepEqual(
+    setupErrorKey('Could not reach the endpoint. Check the URL (and that the server is running).'),
+    { key: 'setup.errors.unreachable' },
+  )
+  assert.deepEqual(
+    setupErrorKey('Authentication failed — the API key was rejected. Check the key.'),
+    { key: 'setup.errors.auth' },
+  )
+  assert.deepEqual(setupErrorKey('Missing model name.'), { key: 'setup.errors.missingModel' })
+  assert.deepEqual(
+    setupErrorKey('Test call failed (APIError). Check the URL, model, and key.'),
+    { key: 'setup.errors.testCallFailed', type: 'APIError' },
+  )
+  assert.equal(setupErrorKey('請求逾時（6000 毫秒）'), null)
 })
