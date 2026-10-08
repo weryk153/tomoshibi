@@ -227,6 +227,40 @@ export async function uploadAvatar(
   }
 }
 
+// 上傳一段參考音（mp3／wav…）到這個角色的資料夾（references/<conf_uid>/）。後端
+// 轉成 wav、太長就在停頓處切到 10 秒內，逐字稿用語音辨識產生（見 reference_voices.py）。
+export interface UploadedVoice {
+  path: string
+  label: string
+  prompt_text: string
+  owner: string
+  seconds: number
+}
+
+export async function uploadReferenceVoice(
+  baseUrl: string,
+  file: File,
+  owner: string,
+): Promise<ApiResult<{ voice: UploadedVoice }>> {
+  const query = `owner=${encodeURIComponent(owner)}&name=${encodeURIComponent(file.name)}`
+  try {
+    const res = await fetch(buildUrl(baseUrl, `/api/reference-voices?${query}`), {
+      method: 'POST',
+      body: file,
+    })
+    let parsed: unknown = null
+    try {
+      parsed = await res.json()
+    } catch {
+      if (!res.ok) return { ok: false, error: `請求失敗（HTTP ${res.status}）` }
+    }
+    if (!res.ok) return { ok: false, error: normalizeError(parsed, res.status) }
+    return { ok: true, data: parsed as { voice: UploadedVoice } }
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : '網路錯誤' }
+  }
+}
+
 // 角色自己的開關：字幕翻成你看的語言、長期記憶。後端見 character_route.py 的
 // GET/POST /api/characters/{filename}/settings；底稿角色的 filename 是 conf.yaml。
 export interface CharacterToggles {

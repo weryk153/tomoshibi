@@ -55,6 +55,7 @@ import {
   createCharacter,
   buildCharacterUpdate,
   uploadAvatar,
+  uploadReferenceVoice,
   validateAvatarFile,
   saveCharacterSettings,
   type CharacterRecord,
@@ -80,10 +81,12 @@ interface VoiceOption {
 
 // GPT-SoVITS 的參考音。path 是絕對路徑（後端要的），label 是檔名（給人看的），
 // prompt_text 來自同名的 .txt sidecar——選了就一起填，兩者是一組的。
+// owner 是它所在的角色資料夾（conf_uid）；shared 或空字串是每個角色都看得到的。
 interface ReferenceVoice {
   path: string
   label: string
   prompt_text: string
+  owner?: string
 }
 
 // 建立表單的草稿。跟 CharacterEdits 的四個必填欄位相同，另外多一個 slug——
@@ -365,10 +368,17 @@ function Characters(): JSX.Element {
   // 參考音下拉。第一項是「沿用全域設定」（＝清掉，用 conf.yaml 那份），後面是
   // 掃到的檔案。手寫在 YAML 裡、不在資料夾內的路徑要有保底項，否則觸發器只顯示
   // placeholder，看起來像沒設定，一存檔就真的被清掉。
+  // 只列這個角色自己的（排前面）、shared 的和舊放法的；別的角色的聲音不混進來。
+  // 建立表單還沒有 conf_uid，只列共用的。
+  const voiceOwner = draft
+    ? ((characters ?? []).find((c) => c.filename === selectedFilename)?.conf_uid ?? '')
+    : '';
   const refAudioCollection = useMemo(() => {
+    const own = referenceVoices.filter((v) => voiceOwner && v.owner === voiceOwner);
+    const shared = referenceVoices.filter((v) => !v.owner || v.owner === 'shared');
     const items = [
       { label: t('settings.characters.refAudioInherit'), value: INHERIT_VOICE },
-      ...referenceVoices.map((v) => ({ label: v.label, value: v.path })),
+      ...[...own, ...shared].map((v) => ({ label: v.label, value: v.path })),
     ];
     const current = draft?.ref_audio_path ?? createDraft?.ref_audio_path;
     if (current && !items.some((i) => i.value === current)) {
@@ -376,7 +386,33 @@ function Characters(): JSX.Element {
       items.push({ label: current.split('/').pop() || current, value: current });
     }
     return createListCollection({ items });
-  }, [referenceVoices, t, draft?.ref_audio_path, createDraft?.ref_audio_path]);
+  }, [referenceVoices, voiceOwner, t, draft?.ref_audio_path, createDraft?.ref_audio_path]);
+
+  // 上傳參考音：放進這個角色的資料夾，選上它、逐字稿一起填好。
+  const voiceFileRef = useRef<HTMLInputElement | null>(null);
+  const [voiceUploading, setVoiceUploading] = useState(false);
+  const handleVoiceFile = useCallback(async (file: File) => {
+    if (!voiceOwner) return;
+    setVoiceUploading(true);
+    const result = await uploadReferenceVoice(baseUrl, file, voiceOwner);
+    setVoiceUploading(false);
+    if (!result.ok) {
+      toaster.create({ title: t('settings.characters.refAudioUploadFailed'), description: result.error, type: 'error' });
+      return;
+    }
+    const { voice } = result.data;
+    setReferenceVoices((voices) => [...voices.filter((v) => v.path !== voice.path), voice]);
+    setDraft((d) => (d ? {
+      ...d,
+      ref_audio_path: voice.path,
+      prompt_text: voice.prompt_text || d.prompt_text,
+    } : d));
+    toaster.create({
+      title: t('settings.characters.refAudioUploaded', { label: voice.label, seconds: voice.seconds }),
+      description: voice.prompt_text ? undefined : t('settings.characters.refAudioNoTranscript'),
+      type: 'success',
+    });
+  }, [baseUrl, t, voiceOwner]);
 
   // 選了參考音就順手把逐字稿填上。參考音跟逐字稿是一組的，分開填等於留一個
   // 「對不起來就靜默壞掉」的機會給使用者。
@@ -1486,6 +1522,29 @@ function Characters(): JSX.Element {
                   collection={refAudioCollection}
                   placeholder={t('settings.characters.refAudioPath')}
                 />
+                {voiceOwner && (
+                  <HStack>
+                    <input
+                      ref={voiceFileRef}
+                      type="file"
+                      accept="audio/*,.mp3,.wav,.m4a,.flac,.ogg"
+                      style={{ display: 'none' }}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        e.target.value = '';
+                        if (file) void handleVoiceFile(file);
+                      }}
+                    />
+                    <Button
+                      size="xs"
+                      variant="outline"
+                      loading={voiceUploading}
+                      onClick={() => voiceFileRef.current?.click()}
+                    >
+                      {t('settings.characters.refAudioUpload')}
+                    </Button>
+                  </HStack>
+                )}
                 <Text fontSize="xs" color="whiteAlpha.600">
                   {t('settings.characters.refAudioPathHelp')}
                 </Text>
