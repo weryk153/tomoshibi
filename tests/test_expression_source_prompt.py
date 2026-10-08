@@ -1,7 +1,7 @@
 """expression_source: background 時系統提示不教標籤；tags（預設）一字不差。
 
 表情與動作改由背景模型逐句挑（expression_pick），主模型不必再學 [joy] 這套。
-沒設背景模型時 background 不成立，提示照舊教標籤——不然她一個表情都沒有。
+沒設背景模型、或引擎太舊（1.3.0 以前）時 background 不成立，提示照舊教標籤——不然她一個表情都沒有。
 """
 
 import asyncio
@@ -10,6 +10,13 @@ from types import SimpleNamespace
 import pytest
 
 from src.open_llm_vtuber.service_context import ServiceContext
+
+try:
+    from ai_character_engine.companion import AvatarChoices  # noqa: F401
+
+    ENGINE_PICKS = True
+except ImportError:  # 引擎 1.3.0 以前挑不了，background 照舊教標籤
+    ENGINE_PICKS = False
 
 TAG_PROMPTS = ("live2d_expression_prompt", "live2d_motion_prompt", "vrm_motion_prompt")
 
@@ -81,6 +88,7 @@ def _prompt(character):
     return asyncio.run(_context(character).construct_system_prompt("你是詠梨。"))
 
 
+@pytest.mark.skipif(not ENGINE_PICKS, reason="ai-character-engine 1.3.0 or later")
 def test_background_mode_teaches_no_tags(recorder):
     prompt = _prompt(_character("background"))
 
