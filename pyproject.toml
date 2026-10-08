@@ -56,6 +56,15 @@ torch = [
     "torch>=2.6.0; sys_platform == 'darwin' and platform_machine == 'arm64'",
     "torch>=2.6.0; sys_platform != 'darwin'",
 ]
+# faster-whisper 語音辨識：預設不裝（程式約 150MB，模型第一次用時另外下載），在設定頁
+# 「語音辨識」一鍵裝（optional_extras.py）；桌面版記在 extras.json，之後啟動一起同步。
+#     uv sync --extra faster_whisper
+faster_whisper = [
+    "faster-whisper>=1.1.0",
+    # 不指定的話，解析器挑最新的 huggingface-hub（2.x），新的 tokenizers 不接受它，
+    # 就退回 0.13.3——那版沒有 Python 3.12 的 wheel，要從原始碼編 Rust，裝不起來。
+    "tokenizers>=0.21",
+]
 bilibili = [
     "aiohttp>=3.10.0",
     "Brotli~=1.1.0",

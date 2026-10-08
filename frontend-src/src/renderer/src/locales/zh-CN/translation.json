@@ -609,7 +609,11 @@
       "micVadSectionTitle": "麦克风与语音检测（仅本机浏览器）",
       "micVadSectionDesc": "这些设置存在这个浏览器的本机存储，只控制你的麦克风与语音活动检测，不会发送到后端。实际把语音转成文字的识别引擎设置在下面。",
       "vadTuningHint": "常常出现「没听清楚，再说一次？」的话：把语音识别阈值调低、负面语音阈值调低，或减少验证帧数。反过来，如果环境噪音常常误触发，就把它们调高。",
-      "micModePush": "主动按麦克风讲话"
+      "micModePush": "主动按麦克风讲话",
+      "extraMissing_faster_whisper": "这台还没装 faster-whisper，现在先用 sherpa-onnx 识别。装好会自动重新加载，换成 faster-whisper。",
+      "extraInstall": "安装 {{name}}（约 {{mb}}MB）",
+      "extraInstalled_faster_whisper": "装好了，已重新加载。第一次识别会先下载语音模型（约 1.6GB），会等比较久。",
+      "extraFailed": "安装失败：{{error}}"
     },
     "agent": {
       "allowProactiveSpeak": "允许AI主动发言",
@@ -706,7 +710,7 @@
       "asrEngineSectionNote": "识别引擎与密钥按下面的「保存」才会切换；保存之后由设置顶部的提示重新加载。",
       "asrEnginePendingNotice": "尚未保存——目前仍在用 {{current}}。请在下面输入凭证并按保存才会切换。",
       "asrSherpa": "sherpa-onnx（本地 · CPU · 轻量，默认）",
-      "asrFasterWhisper": "faster-whisper（本地 · 较准 · 需要 GPU · 这里没装依赖，选了会静默退回 sherpa-onnx）",
+      "asrFasterWhisper": "faster-whisper（本地 · 较准 · 要另外安装，有 NVIDIA 显卡更快）",
       "asrGroq": "Groq Whisper（云端 · 快 · 需 API key）",
       "asrAzure": "Azure（云端 · 需 key + region）",
       "groqApiKeyLabel": "Groq API 密钥",
@@ -1040,5 +1044,11 @@
     "embarrassed": "害羞",
     "calm": "放松",
     "worried": "担心"
+  },
+  "errors": {
+    "llmUnreachable": "连不到语言模型（{{provider}}，{{url}}）。请确认它有开着，或到「设置 › 模型」换一个。",
+    "llmModelMissing": "语言模型 {{provider}} 找不到模型「{{model}}」。请到「设置 › 模型」选一个已经下载的模型。",
+    "llmAuth": "语言模型 {{provider}} 拒绝连接：API 密钥不对或没填。请到「设置 › 模型」检查。",
+    "llmTimeout": "语言模型 {{provider}} 太久没回应，可能还在加载模型。稍等一下再试。"
   }
 }

@@ -541,10 +541,18 @@ class ServiceContext:
 
                 if derived != getattr(sherpa_block, "language", "auto"):
                     sherpa_block.language = derived
-        if not self.asr_engine or (self.character_config.asr_config != asr_config):
+        # 選的引擎上次載入失敗、退回了 sherpa-onnx（_asr_fallback）：設定沒變也要再試，
+        # 不然在設定頁裝好 faster-whisper、重新載入之後還是一直用 sherpa-onnx。
+        retry_fallback = getattr(self, "_asr_fallback", False)
+        if (
+            not self.asr_engine
+            or retry_fallback
+            or (self.character_config.asr_config != asr_config)
+        ):
             requested = asr_config.asr_model
             logger.info(f"Initializing ASR: {requested}")
             engine = None
+            fell_back = False
             try:
                 engine = ASRFactory.get_asr_system(
                     requested,
@@ -567,6 +575,7 @@ class ServiceContext:
                         engine = ASRFactory.get_asr_system(
                             "sherpa_onnx_asr", **fallback_block.model_dump()
                         )
+                        fell_back = True
                         logger.warning(
                             "Fell back to the bundled 'sherpa_onnx_asr' for voice input."
                         )
@@ -580,6 +589,7 @@ class ServiceContext:
                         "Voice input disabled; text chat and voice output still work."
                     )
             self.asr_engine = engine
+            self._asr_fallback = fell_back
             # saving config should be done after the initialization attempt
             self.character_config.asr_config = asr_config
         else:

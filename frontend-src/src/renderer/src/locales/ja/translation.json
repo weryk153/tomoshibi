@@ -609,7 +609,11 @@
       "micVadSectionTitle": "マイクと音声検出（このブラウザのみ）",
       "micVadSectionDesc": "これらの設定はこのブラウザのローカルストレージに保存され、マイクと音声アクティビティ検出のみを制御します。バックエンドには送られません。実際に音声をテキストに変換する認識エンジンは下で設定します。",
       "vadTuningHint": "「聞き取れませんでした」が頻繁に出る場合は、音声認識しきい値と負の音声しきい値を下げるか、検証フレーム数を減らしてください。逆に環境音で誤検出する場合は上げてください。",
-      "micModePush": "マイクを押して話す"
+      "micModePush": "マイクを押して話す",
+      "extraMissing_faster_whisper": "この端末には faster-whisper がまだ入っていないため、今は sherpa-onnx で認識しています。インストールすると再読み込みして faster-whisper に切り替わります。",
+      "extraInstall": "{{name}} をインストール（約 {{mb}}MB）",
+      "extraInstalled_faster_whisper": "インストールして再読み込みしました。最初の認識では音声モデル（約 1.6GB）をダウンロードするので時間がかかります。",
+      "extraFailed": "インストールに失敗しました：{{error}}"
     },
     "agent": {
       "allowProactiveSpeak": "AIが自分から話すのを許可する",
@@ -706,7 +710,7 @@
       "asrEngineSectionNote": "認識エンジンとキーは下の「保存」を押したときに切り替わります。その後、設定上部の通知から再読み込みしてください。",
       "asrEnginePendingNotice": "まだ保存されていません——現在も {{current}} を使用中です。下で認証情報を入力し、保存を押すと切り替わります。",
       "asrSherpa": "sherpa-onnx（ローカル・CPU・軽量、デフォルト）",
-      "asrFasterWhisper": "faster-whisper（ローカル・高精度・GPU必須・依存関係が未導入のため、選択すると sherpa-onnx に静かにフォールバック）",
+      "asrFasterWhisper": "faster-whisper（ローカル・より正確・別途インストール、NVIDIA GPU があると速い）",
       "asrGroq": "Groq Whisper（クラウド・高速・APIキーが必要）",
       "asrAzure": "Azure（クラウド・キーとリージョンが必要）",
       "groqApiKeyLabel": "Groq APIキー",
@@ -1040,5 +1044,11 @@
     "embarrassed": "照れてる",
     "calm": "リラックス",
     "worried": "心配"
+  },
+  "errors": {
+    "llmUnreachable": "言語モデル（{{provider}}、{{url}}）に接続できません。起動しているか確認するか、「設定 › モデル」で別のものを選んでください。",
+    "llmModelMissing": "{{provider}} にモデル「{{model}}」がありません。「設定 › モデル」でダウンロード済みのモデルを選んでください。",
+    "llmAuth": "{{provider}} に接続を拒否されました。API キーが違うか未入力です。「設定 › モデル」で確認してください。",
+    "llmTimeout": "{{provider}} の応答が遅すぎます。モデルを読み込み中かもしれません。少し待ってからもう一度試してください。"
   }
 }

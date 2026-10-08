@@ -39,6 +39,7 @@ import {
   SwitchField, SelectField, InputField, } from './common';
 import { Button } from '@/components/ui/tw/primitives';
 import { SaveStatus } from '@/components/ui/tw/save-status';
+import { ExtraInstall } from './extra-install';
 import { DraftNumberField } from '@/components/ui/tw/draft-number-field';
 import type { SaveState } from '@/utils/autosave';
 import { useWebSocket } from '@/context/websocket-context';
@@ -509,6 +510,8 @@ function ASR({active = true}: ASRProps): JSX.Element {
               placeholder={t('settings.perf.asrEnginePlaceholder')}
             />
             <SaveStatus state={engineState} />
+            {/* faster-whisper 沒裝：一鍵裝（以前只在選項文字裡寫「選了會靜默退回 sherpa-onnx」）。 */}
+            {displayedEngine === 'faster_whisper' && <ExtraInstall name="faster_whisper" />}
             {/* 常駐提示：選了 groq/azure 但還沒按下面的儲存——畫面上的選擇跟
                 conf.yaml 現在真正生效的引擎不一樣，這件事必須隨時可見，不能只
                 靠使用者自己記得。 */}

@@ -251,14 +251,20 @@ async def process_single_conversation(
             logger.exception(
                 f"Error processing agent response stream: {e}"
             )  # Log with stack trace
-            await websocket_send(
-                json.dumps(
-                    {
-                        "type": "error",
-                        "message": f"Error processing agent response: {str(e)}",
-                    }
-                )
+            # 認得出是模型那邊的問題（沒開、找不到模型、金鑰、逾時）就說清楚是哪個、
+            # 怎麼修；認不出來照舊丟原文。
+            from ..llm_errors import describe_llm_failure, llm_settings_of
+
+            described = describe_llm_failure(e, **llm_settings_of(context))
+            payload = (
+                {"type": "error", **described, "sticky": True}
+                if described
+                else {
+                    "type": "error",
+                    "message": f"Error processing agent response: {str(e)}",
+                }
             )
+            await websocket_send(json.dumps(payload))
             # full_response will contain partial response before error
         # --- End processing agent response ---
 
