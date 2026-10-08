@@ -194,3 +194,52 @@ test("動作中換下一個動作：舊的淡出、新的淡入，總和仍是 1
   assert.equal(action("wave").getEffectiveWeight(), 0);
   assert.ok(Math.abs(action("nod").getEffectiveWeight() - 0.8) < 1e-6);
 });
+
+// 每幀 idle 的權重最多只能變這麼多：再大就是一眨眼換姿勢（看起來像彈回去）。
+const MAX_STEP = 0.1;
+
+function steps(player: MotionPlayer, idle: () => number, frames: number): number {
+  let biggest = 0;
+  let last = idle();
+  for (let i = 0; i < frames; i++) {
+    player.update(1 / 60);
+    biggest = Math.max(biggest, Math.abs(idle() - last));
+    last = idle();
+  }
+  return biggest;
+}
+
+test("同一個動作連著兩句：還在做的時候再叫一次，不會先掉回 idle 再重來", () => {
+  const { player, action, run } = withClips(["idle", 4], ["wave", 2]);
+  player.playIdle();
+  player.playOnce("wave", 1);
+  run(0.8);
+  player.playOnce("wave", 1);
+  const biggest = steps(player, () => action("idle").getEffectiveWeight(), 30);
+  assert.ok(biggest < MAX_STEP, `idle weight jumped ${biggest} in one frame`);
+});
+
+test("同一個動作在淡回 idle 時又被叫：平順地再做一次", () => {
+  const { player, action, run } = withClips(["idle", 4], ["wave", 2]);
+  player.playIdle();
+  player.playOnce("wave", 1);
+  run(1.6); // 正在淡回
+  player.playOnce("wave", 1);
+  const biggest = steps(player, () => action("idle").getEffectiveWeight(), 60);
+  assert.ok(biggest < MAX_STEP, `idle weight jumped ${biggest} in one frame`);
+  assert.ok(action("idle").getEffectiveWeight() < 0.2, "the wave plays again");
+});
+
+test("一連串動作（同的、不同的、強弱不一）過程中，姿勢都不會一幀跳開", () => {
+  const { player, action } = withClips(["idle", 4], ["wave", 1.5], ["nod", 1.2]);
+  player.playIdle();
+  const idle = () => action("idle").getEffectiveWeight();
+  let biggest = 0;
+  for (const [name, intensity, frames] of [
+    ["wave", 1, 20], ["wave", 0.6, 50], ["nod", 1, 10], ["nod", 1, 70], ["wave", 0.3, 120],
+  ] as [string, number, number][]) {
+    player.playOnce(name, intensity);
+    biggest = Math.max(biggest, steps(player, idle, frames));
+  }
+  assert.ok(biggest < MAX_STEP, `idle weight jumped ${biggest} in one frame`);
+});

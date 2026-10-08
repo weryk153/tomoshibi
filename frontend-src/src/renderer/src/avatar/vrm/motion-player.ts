@@ -20,7 +20,14 @@ const FADE_IN = 0.3;
 // 動作結束前多久開始淡回 idle。太短看起來像彈回去。
 const RETURN_FADE = 0.7;
 
-type Gesture = { action: THREE.AnimationAction; peak: number; weight: number };
+// peak 是要的強度，level 是這一幀的強度（往 peak 慢慢靠，強度改了也不會跳）。
+type Gesture = {
+  name: string;
+  action: THREE.AnimationAction;
+  peak: number;
+  level: number;
+  weight: number;
+};
 type Leaving = { action: THREE.AnimationAction; weight: number; rate: number };
 
 export class MotionPlayer {
@@ -28,6 +35,9 @@ export class MotionPlayer {
   private actions = new Map<string, THREE.AnimationAction>();
   private gesture: Gesture | null = null;
   private leaving: Leaving[] = [];
+  // 同一個動作還在淡出時又要做一次，就用它的複本淡入：同一個 action 不能
+  // 同時淡出又從頭開始（reset 會讓它一幀之內跳回第一格、權重歸零）。
+  private copies = new Map<string, THREE.AnimationAction[]>();
   private loader = new GLTFLoader();
   private readonly vrm: VRM;
   // review a0c0ce7 fix 2：VRMAvatar 只在角色載入時預先讀 motionMap 裡當下有的
@@ -134,20 +144,48 @@ export class MotionPlayer {
     // 太小的話動作幾乎看不見，卻仍然佔著「正在播動作」的狀態擋住 idle，
     // 看起來就只是僵住。低於這個值直接當作沒有這個動作。
     if (intensity < 0.05) return false;
+    const peak = Math.max(0, Math.min(1, intensity));
     const previous = this.gesture;
-    if (previous && previous.action !== action && previous.weight > 0) {
-      this.leaving.push({
-        action: previous.action,
-        weight: previous.weight,
-        rate: previous.weight / FADE_IN,
-      });
+    if (previous && previous.name === name && !this.returning(previous)) {
+      // 還在做同一個動作：接著做，只換強度（慢慢換）。
+      previous.peak = peak;
+      return true;
     }
-    this.leaving = this.leaving.filter((item) => item.action !== action);
-    action.reset();
-    action.setEffectiveWeight(0);
-    action.play();
-    this.gesture = { action, peak: Math.max(0, Math.min(1, intensity)), weight: 0 };
+    if (previous) this.letGo(previous.action, previous.weight);
+    const next = this.freeAction(name, action);
+    next.reset();
+    next.setEffectiveWeight(0);
+    next.play();
+    this.gesture = { name, action: next, peak, level: peak, weight: 0 };
     return true;
+  }
+
+  private returning(gesture: Gesture): boolean {
+    const duration = gesture.action.getClip().duration;
+    return duration - gesture.action.time <= Math.min(RETURN_FADE, duration / 2);
+  }
+
+  private letGo(action: THREE.AnimationAction, weight: number): void {
+    if (weight > 0) {
+      this.leaving.push({ action, weight, rate: weight / FADE_IN });
+    } else {
+      action.setEffectiveWeight(0);
+      action.stop();
+    }
+  }
+
+  /** 這個動作沒在用的一份（本尊或複本）；都在用就多複製一份。 */
+  private freeAction(name: string, base: THREE.AnimationAction): THREE.AnimationAction {
+    const busy = new Set<THREE.AnimationAction>(this.leaving.map((item) => item.action));
+    if (this.gesture) busy.add(this.gesture.action);
+    const copies = this.copies.get(name) ?? [];
+    const free = [base, ...copies].find((candidate) => !busy.has(candidate));
+    if (free) return free;
+    const copy = this.mixer.clipAction(base.getClip().clone());
+    copy.setLoop(THREE.LoopOnce, 1);
+    copy.clampWhenFinished = true;
+    this.copies.set(name, [...copies, copy]);
+    return copy;
   }
 
   /** 回覆講完：還在做的動作讓它做完，自己淡回 idle。 */
@@ -161,8 +199,10 @@ export class MotionPlayer {
       const fadeOut = Math.min(RETURN_FADE, duration / 2);
       const elapsed = gesture.action.time;
       const remaining = duration - elapsed;
+      const step = dt / FADE_IN;
+      gesture.level += Math.max(-step, Math.min(step, gesture.peak - gesture.level));
       gesture.weight =
-        gesture.peak *
+        gesture.level *
         Math.min(1, fadeIn > 0 ? elapsed / fadeIn : 1) *
         Math.max(0, Math.min(1, fadeOut > 0 ? remaining / fadeOut : 0));
       gesture.action.setEffectiveWeight(gesture.weight);
@@ -198,5 +238,6 @@ export class MotionPlayer {
     this.actions.clear();
     this.gesture = null;
     this.leaving = [];
+    this.copies.clear();
   }
 }
