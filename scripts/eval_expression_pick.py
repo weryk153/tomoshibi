@@ -39,9 +39,13 @@ from ai_character_engine.companion import (  # noqa: E402
     CompanionSettings,
     ReplyActions,
 )
-from ai_character_engine.llm.models import LLMResponse  # noqa: E402
+from ai_character_engine.llm.local import OpenAICompatibleChatClient  # noqa: E402
 
-from src.open_llm_vtuber.background_llm import ChatClient  # noqa: E402
+from src.open_llm_vtuber.character_engine.factory import (  # noqa: E402
+    LMSTUDIO_CACHE_BLOCK,
+    PICK_MAX_TOKENS,
+    PICK_TEMPERATURE,
+)
 
 TIMEOUT_SECONDS = CompanionSettings().actions_timeout_seconds
 
@@ -99,34 +103,36 @@ def load_model(root: Path, model: str) -> tuple[list[str], dict[str, str]]:
 
 
 class Recording:
-    """ChatClient 當引擎的模型用；記下每次的原始回答與錯誤給人看。"""
+    """引擎的模型 client（跟正式流程同一種，會回報提示 token 數，補齊才算得出來）；
+    記下每次的原始回答與錯誤給人看。"""
 
-    def __init__(self, chat: ChatClient) -> None:
-        self.chat = chat
+    def __init__(self, client) -> None:
+        self.client = client
         self.raw = ""
         self.error = ""
 
     async def generate(self, messages, *, tools=None):
         try:
-            self.raw = await self.chat.complete(
-                [{"role": m.role, "content": m.content} for m in messages]
-            )
+            response = await self.client.generate(messages)
         except Exception as e:  # noqa: BLE001 — 記下來給人看；引擎當成沒挑到
             self.error = f"{type(e).__name__}: {e}"
             raise
-        return LLMResponse(text=self.raw)
+        self.raw = response.text
+        return response
 
 
 async def run(args) -> list[dict]:
-    client = ChatClient(
-        base_url=args.base_url,
+    # 跟正式流程（character_engine/factory.py 的挑表情 client）同一組設定。
+    client = OpenAICompatibleChatClient(
         model=args.model,
-        request_options={
-            "temperature": 0,
-            "max_tokens": 80,
-            "reasoning_effort": "none",
-        },
+        base_url=args.base_url,
+        backend="lmstudio_llm",
         timeout_seconds=WAIT_SECONDS,
+        request_options={
+            "temperature": PICK_TEMPERATURE,
+            "max_tokens": PICK_MAX_TOKENS,
+            "extra_body": {"reasoning_effort": "none"},
+        },
     )
     recording = Recording(client)
     groups = []
@@ -137,6 +143,7 @@ async def run(args) -> list[dict]:
             choices=AvatarChoices(expressions=expressions, motions=motions),
             mood=lambda: ("unknown", 0.0),
             timeout_seconds=WAIT_SECONDS,
+            cache_block=args.cache_block,
         )
         rows = []
         previous = ""
@@ -253,7 +260,7 @@ def render(groups: list[dict], args) -> str:
         "<h1>表情與動作交給背景模型挑：三段真實對話逐句對照</h1>",
         f"<p class='mute'>模型 {html.escape(args.model)} @ "
         f"{html.escape(args.base_url)}；temperature 0、reasoning_effort none、"
-        f"max_tokens 80。每段取前 {LIMIT} 句；前一句是她的上一句。"
+        f"max_tokens 80、提示快取補齊 {args.cache_block}。每段取前 {LIMIT} 句；前一句是她的上一句。"
         "對話紀錄沒有心情，心情一律 unknown。延遲是單獨跑、背景模型閒著時量的；"
         "正式流程會跟 TTS 合成、引擎背景工作搶同一顆模型。</p>",
         "<h2>總計</h2>",
@@ -314,6 +321,8 @@ def main() -> None:
     parser.add_argument("--base-url", default="http://127.0.0.1:1235/v1")
     parser.add_argument("--model", default="qwen/qwen3.5-9b")
     parser.add_argument("--out", type=Path, default=OUT)
+    # 正式流程在 LM Studio 上補齊到 256（見 factory.LMSTUDIO_CACHE_BLOCK）；0＝不補。
+    parser.add_argument("--cache-block", type=int, default=LMSTUDIO_CACHE_BLOCK)
     args = parser.parse_args()
     groups = asyncio.run(run(args))
     args.out.parent.mkdir(parents=True, exist_ok=True)

@@ -604,3 +604,51 @@ def test_waiting_for_the_lines_before_does_not_spin(monkeypatch):
         {"你來啦！": 1.0},
     )
     assert len(rounds) < 20
+
+
+def test_a_line_given_up_while_queued_is_still_the_line_before_the_next():
+    class Skipping(_Actions):
+        def __init__(self):
+            super().__init__(delay=0.5)
+            self.skipped: list[str] = []
+
+        def skip(self, line):
+            self.skipped.append(line)
+
+    actions = Skipping()
+    picker = _picker(actions)
+
+    async def go():
+        first = asyncio.create_task(picker.ask("你來啦！"))
+        await asyncio.sleep(0)
+        second = asyncio.create_task(picker.ask("今天好累。"))
+        await asyncio.sleep(0.05)
+        second.cancel()
+        await asyncio.gather(first, second, return_exceptions=True)
+
+    asyncio.run(go())
+    assert actions.skipped == ["今天好累。"]
+    assert actions.lines == ["你來啦！"]
+
+
+def test_a_line_whose_turn_comes_late_still_gets_a_moment_for_its_pick():
+    """前面那句很晚才送出、念的時間也快到了：輪到這句時至少再給 grace 秒。"""
+
+    async def go():
+        manager = TTSTaskManager()
+        loop = asyncio.get_running_loop()
+
+        async def pick():
+            await asyncio.sleep(1.15)  # 輪到它之後 0.15 秒才好
+            return {"expression": "joy", "motion": None, "intensity": 1.0}
+
+        picking = asyncio.create_task(pick())
+        waiting = asyncio.create_task(manager._wait_for_pick(picking, 1, 0.3))
+        await asyncio.sleep(1.0)
+        manager._play_until = loop.time() + 0.3  # 前一句只剩 0.3 秒
+        manager._next_sequence_to_send = 1
+        async with manager._sent:
+            manager._sent.notify_all()
+        return await waiting
+
+    assert asyncio.run(go()) == {"expression": "joy", "motion": None, "intensity": 1.0}

@@ -270,8 +270,8 @@ class TTSTaskManager:
     ) -> Optional[dict]:
         """這句的挑選結果；等不到就取消（排在後面的句子才挑得到）、回 None。
 
-        至少等 ``grace`` 秒。前面的句子都送出了、還在念的話，等到它們念完前
-        LEAD_SECONDS：這句反正要等前面念完才輪到。前面還沒送出時，這句也送不
+        至少等 ``grace`` 秒（從合成好算；輪到這句時也至少再給 grace 秒，但不超過
+        前面念完）。前面的句子都送出了、還在念的話，等到它們念完前 LEAD_SECONDS：這句反正要等前面念完才輪到。前面還沒送出時，這句也送不
         出去，就一直等到輪到它（前面的句子各自有期限，不會卡住）。
         """
         loop = asyncio.get_running_loop()
@@ -279,7 +279,14 @@ class TTSTaskManager:
         try:
             while not picking.done():
                 if self._next_sequence_to_send >= sequence_number:
-                    deadline = max(ready + grace, self._play_until - LEAD_SECONDS)
+                    now = loop.time()
+                    # 輪到這句時至少再給 grace 秒（不超過前面念完），前一句
+                    # 很晚才送出時，這句的挑選才不會一輪到就被取消。
+                    deadline = max(
+                        ready + grace,
+                        self._play_until - LEAD_SECONDS,
+                        min(now + grace, self._play_until),
+                    )
                     remaining = deadline - loop.time()
                     if remaining > 0:
                         await asyncio.wait({picking}, timeout=remaining)

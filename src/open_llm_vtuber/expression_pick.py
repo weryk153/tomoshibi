@@ -114,8 +114,18 @@ class EnginePicker:
 
     async def ask(self, line: str) -> Optional[dict]:
         """這句挑到的 {"expression", "motion", "intensity"}；挑不到是 None。"""
-        async with self._turn:
+        try:
+            await self._turn.acquire()
+        except asyncio.CancelledError:
+            # 排隊時就不等了：這句沒問，但它還是下一句的「前一句」。
+            skip = getattr(self._actions, "skip", None)
+            if callable(skip):
+                skip(line)
+            raise
+        try:
             picked = await self._actions.pick(line)
+        finally:
+            self._turn.release()
         if picked is None:
             return None
         return {
