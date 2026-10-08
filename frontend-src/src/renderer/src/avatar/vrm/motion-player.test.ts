@@ -100,3 +100,97 @@ test("dispose 之後 ensureLoaded 直接回 false，不再起新的請求", asyn
   assert.equal(result, false);
   assert.deepEqual(calls, []);
 });
+
+// ---------------------------------------------------------------- 回到 idle
+
+// 用真的 AnimationMixer 跑手做的 clip：要看的是每幀的權重，不需要真的 .vrma。
+function clip(name: string, seconds: number): THREE.AnimationClip {
+  return new THREE.AnimationClip(name, seconds, [
+    new THREE.NumberKeyframeTrack(".position[x]", [0, seconds], [0, 1]),
+  ]);
+}
+
+function withClips(...clips: [string, number][]) {
+  const player = makePlayer();
+  const register = (player as unknown as { register(name: string, clip: THREE.AnimationClip): void })
+    .register.bind(player);
+  for (const [name, seconds] of clips) register(name, clip(name, seconds));
+  const action = (name: string) =>
+    (player as unknown as { actions: Map<string, THREE.AnimationAction> }).actions.get(name)!;
+  const run = (seconds: number) => {
+    for (let t = 0; t < seconds - 1e-9; t += 1 / 60) player.update(1 / 60);
+  };
+  return { player, action, run };
+}
+
+test("idle 與動作的權重加起來一直是 1：強度 0.5 不會混進 T-pose", () => {
+  const { player, action, run } = withClips(["idle", 4], ["wave", 2]);
+  player.playIdle();
+  run(0.5);
+  player.playOnce("wave", 0.5);
+  for (let i = 0; i < 150; i++) {
+    run(1 / 60);
+    const sum = action("idle").getEffectiveWeight() + action("wave").getEffectiveWeight();
+    assert.ok(Math.abs(sum - 1) < 1e-6, `sum ${sum} at frame ${i}`);
+  }
+});
+
+test("動作快結束時就開始淡回 idle，播完時已經回到 idle", () => {
+  const { player, action, run } = withClips(["idle", 4], ["wave", 2]);
+  player.playIdle();
+  player.playOnce("wave", 1);
+  run(1.6); // 結束前 0.4 秒
+  const leaving = action("wave").getEffectiveWeight();
+  assert.ok(leaving < 0.9 && leaving > 0, `wave weight ${leaving}`);
+  run(0.5);
+  assert.equal(action("wave").getEffectiveWeight(), 0);
+  assert.equal(action("idle").getEffectiveWeight(), 1);
+});
+
+test("回 idle 是慢慢淡回去，不是一兩幀就彈回去", () => {
+  const { player, action, run } = withClips(["idle", 4], ["wave", 3]);
+  player.playIdle();
+  player.playOnce("wave", 1);
+  const weights: number[] = [];
+  for (let i = 0; i < 200; i++) {
+    run(1 / 60);
+    weights.push(action("wave").getEffectiveWeight());
+  }
+  const falling = weights.filter((w, i) => i > 60 && w > 0.02 && w < 0.98).length;
+  assert.ok(falling >= 30, `only ${falling} frames between full and gone`); // ≥ 0.5 秒
+});
+
+test("idle 不會因為動作而從頭重來", () => {
+  const { player, action, run } = withClips(["idle", 4], ["wave", 1]);
+  player.playIdle();
+  run(1.0);
+  player.playOnce("wave", 1);
+  run(1.5);
+  assert.ok(action("idle").time > 2.0, `idle time ${action("idle").time}`);
+});
+
+test("回覆講完（stop）不會打斷還在做的動作", () => {
+  const { player, action, run } = withClips(["idle", 4], ["wave", 2]);
+  player.playIdle();
+  player.playOnce("wave", 1);
+  run(0.5);
+  player.stop();
+  run(0.3);
+  assert.ok(action("wave").getEffectiveWeight() > 0.9);
+});
+
+test("動作中換下一個動作：舊的淡出、新的淡入，總和仍是 1", () => {
+  const { player, action, run } = withClips(["idle", 4], ["wave", 3], ["nod", 3]);
+  player.playIdle();
+  player.playOnce("wave", 1);
+  run(0.5);
+  player.playOnce("nod", 0.8);
+  run(0.1);
+  const w = action("wave").getEffectiveWeight();
+  const n = action("nod").getEffectiveWeight();
+  assert.ok(w > 0 && w < 1 && n > 0 && n < 0.8, `wave ${w} nod ${n}`);
+  assert.ok(Math.abs(w + n + action("idle").getEffectiveWeight() - 1) < 1e-6);
+  run(1.0);
+  assert.equal(action("wave").getEffectiveWeight(), 0);
+  assert.ok(Math.abs(action("nod").getEffectiveWeight() - 0.8) < 1e-6);
+});

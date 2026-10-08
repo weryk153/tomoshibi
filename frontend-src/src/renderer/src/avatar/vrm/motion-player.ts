@@ -1,5 +1,10 @@
 // frontend-src/src/renderer/src/avatar/vrm/motion-player.ts
-// .vrma 動畫：idle 迴圈 + LLM 觸發的 one-shot，之間 0.3 秒 crossfade。
+// .vrma 動畫：idle 迴圈 + LLM 觸發的 one-shot。
+//
+// idle 一直在播、從不重來；動作疊在上面，每幀的權重由這裡算（不用 three.js
+// 的 fadeIn/fadeOut）：動作淡入 FADE_IN 秒，結束前 RETURN_FADE 秒開始淡回，播
+// 完時剛好回到 idle。idle 的權重永遠是 1 減掉動作的，所以強度 0.5 的揮手是
+// 「一半揮手、一半 idle」，不會混進 T-pose；回覆講完也不打斷還在做的動作。
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { VRM } from "@pixiv/three-vrm";
@@ -10,12 +15,19 @@ import {
 } from "@pixiv/three-vrm-animation";
 
 export const IDLE_CLIP = "idle";
-const FADE = 0.3;
+// 動作淡入的時間；換下一個動作時，舊的也用這麼久淡出。
+const FADE_IN = 0.3;
+// 動作結束前多久開始淡回 idle。太短看起來像彈回去。
+const RETURN_FADE = 0.7;
+
+type Gesture = { action: THREE.AnimationAction; peak: number; weight: number };
+type Leaving = { action: THREE.AnimationAction; weight: number; rate: number };
 
 export class MotionPlayer {
   private mixer: THREE.AnimationMixer;
   private actions = new Map<string, THREE.AnimationAction>();
-  private current: THREE.AnimationAction | null = null;
+  private gesture: Gesture | null = null;
+  private leaving: Leaving[] = [];
   private loader = new GLTFLoader();
   private readonly vrm: VRM;
   // review a0c0ce7 fix 2：VRMAvatar 只在角色載入時預先讀 motionMap 裡當下有的
@@ -46,10 +58,6 @@ export class MotionPlayer {
     this.motionsBaseUrl = motionsBaseUrl;
     this.mixer = new THREE.AnimationMixer(vrm.scene);
     this.loader.register((parser) => new VRMAnimationLoaderPlugin(parser));
-    this.mixer.addEventListener("finished", () => {
-      // one-shot 播完回 idle。
-      this.playIdle();
-    });
   }
 
   async load(name: string, url: string): Promise<boolean> {
@@ -62,20 +70,23 @@ export class MotionPlayer {
       }
       // await 之後才檢查：請求飛行期間可能已經換角色並 dispose 過了。
       if (this.disposed) return false;
-      const clip = createVRMAnimationClip(anims[0], this.vrm);
-      const action = this.mixer.clipAction(clip);
-      if (name === IDLE_CLIP) {
-        action.setLoop(THREE.LoopRepeat, Number.POSITIVE_INFINITY);
-      } else {
-        action.setLoop(THREE.LoopOnce, 1);
-        action.clampWhenFinished = true;
-      }
-      this.actions.set(name, action);
+      this.register(name, createVRMAnimationClip(anims[0], this.vrm));
       return true;
     } catch (e) {
       console.warn(`[VRM] failed to load motion ${name}:`, e);
       return false;
     }
+  }
+
+  private register(name: string, clip: THREE.AnimationClip): void {
+    const action = this.mixer.clipAction(clip);
+    if (name === IDLE_CLIP) {
+      action.setLoop(THREE.LoopRepeat, Number.POSITIVE_INFINITY);
+    } else {
+      action.setLoop(THREE.LoopOnce, 1);
+      action.clampWhenFinished = true;
+    }
+    this.actions.set(name, action);
   }
 
   hasClip(name: string): boolean {
@@ -101,32 +112,18 @@ export class MotionPlayer {
     return promise;
   }
 
-  private crossfadeTo(next: THREE.AnimationAction, weight = 1): void {
-    // 直接設 .weight 而不是 setEffectiveWeight()——後者會順手 stopFading()，
-    // 把下一行的 fadeIn 當場取消掉，動作變成瞬間切換。three.js 每幀算的是
-    // weight × 淡入插值，所以這樣設完再 fadeIn，兩者會正確相乘。
-    next.reset();
-    next.weight = weight;
-    next.fadeIn(FADE).play();
-    if (this.current && this.current !== next) this.current.fadeOut(FADE);
-    this.current = next;
-  }
-
+  /** 讓 idle 開始播（已經在播就不動，不會從頭來）。 */
   playIdle(): void {
     const idle = this.actions.get(IDLE_CLIP);
-    if (!idle) {
-      if (this.current) this.current.fadeOut(FADE);
-      this.current = null;
-      return;
+    if (idle && !idle.isRunning()) {
+      idle.setEffectiveWeight(1 - this.gestureWeight());
+      idle.play();
     }
-    if (this.current === idle) return;
-    this.crossfadeTo(idle);
   }
 
   /**
-   * `intensity` 是「這個動作做多大」，0..1，預設 1。用 setEffectiveWeight 調——
-   * 權重不滿時 idle 會從底下透出來，所以 0.4 的揮手就是小幅度的揮手，而不是另外
-   * 準備一個小幅度的片段。
+   * `intensity` 是「這個動作做多大」，0..1，預設 1：權重不滿時 idle 從底下補
+   * 上，所以 0.4 的揮手就是小幅度的揮手，而不是另外準備一個小幅度的片段。
    */
   playOnce(name: string, intensity = 1): boolean {
     const action = this.actions.get(name);
@@ -137,16 +134,59 @@ export class MotionPlayer {
     // 太小的話動作幾乎看不見，卻仍然佔著「正在播動作」的狀態擋住 idle，
     // 看起來就只是僵住。低於這個值直接當作沒有這個動作。
     if (intensity < 0.05) return false;
-    this.crossfadeTo(action, Math.max(0, Math.min(1, intensity)));
+    const previous = this.gesture;
+    if (previous && previous.action !== action && previous.weight > 0) {
+      this.leaving.push({
+        action: previous.action,
+        weight: previous.weight,
+        rate: previous.weight / FADE_IN,
+      });
+    }
+    this.leaving = this.leaving.filter((item) => item.action !== action);
+    action.reset();
+    action.setEffectiveWeight(0);
+    action.play();
+    this.gesture = { action, peak: Math.max(0, Math.min(1, intensity)), weight: 0 };
     return true;
   }
 
-  stop(): void {
-    this.playIdle();
-  }
+  /** 回覆講完：還在做的動作讓它做完，自己淡回 idle。 */
+  stop(): void {}
 
   update(dt: number): void {
+    const gesture = this.gesture;
+    if (gesture) {
+      const duration = gesture.action.getClip().duration;
+      const fadeIn = Math.min(FADE_IN, duration / 2);
+      const fadeOut = Math.min(RETURN_FADE, duration / 2);
+      const elapsed = gesture.action.time;
+      const remaining = duration - elapsed;
+      gesture.weight =
+        gesture.peak *
+        Math.min(1, fadeIn > 0 ? elapsed / fadeIn : 1) *
+        Math.max(0, Math.min(1, fadeOut > 0 ? remaining / fadeOut : 0));
+      gesture.action.setEffectiveWeight(gesture.weight);
+      if (remaining <= 1e-6 && elapsed > 0) {
+        gesture.action.setEffectiveWeight(0);
+        gesture.action.stop();
+        this.gesture = null;
+      }
+    }
+    for (const item of this.leaving) {
+      item.weight = Math.max(0, item.weight - item.rate * dt);
+      item.action.setEffectiveWeight(item.weight);
+      if (item.weight === 0) item.action.stop();
+    }
+    this.leaving = this.leaving.filter((item) => item.weight > 0);
+    const idle = this.actions.get(IDLE_CLIP);
+    if (idle && idle.isRunning()) idle.setEffectiveWeight(1 - this.gestureWeight());
     this.mixer.update(dt);
+  }
+
+  private gestureWeight(): number {
+    let total = this.gesture?.weight ?? 0;
+    for (const item of this.leaving) total += item.weight;
+    return Math.min(1, total);
   }
 
   dispose(): void {
@@ -156,6 +196,7 @@ export class MotionPlayer {
     this.pendingLoads.clear();
     this.mixer.stopAllAction();
     this.actions.clear();
-    this.current = null;
+    this.gesture = null;
+    this.leaving = [];
   }
 }
