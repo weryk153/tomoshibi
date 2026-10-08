@@ -430,3 +430,115 @@ def test_tags_mode_sends_what_it_always_sent(monkeypatch):
         payload["keep_subtitle"] = False
         expected.append(payload)
     assert json.dumps(off) == json.dumps(expected)
+
+
+# ---------------------------------------------------------------- 不擋聲音、一次一個、語氣
+
+
+class _Voiced(TTSInterface):
+    """記下每句拿到的語氣（emotion_refs 用的那個關鍵字）。"""
+
+    supports_emotion = True
+
+    def __init__(self, delay=0.0):
+        self.delay = delay
+        self.emotions: list = []
+
+    def generate_audio(self, text, file_name_no_ext=None, emotion=None):
+        if self.delay:
+            time.sleep(self.delay)
+        self.emotions.append(emotion)
+        return f"{text}.wav"
+
+    def remove_file(self, filepath, verbose=True):
+        pass
+
+
+class _Paced(_Sentences):
+    """一句一句慢慢來，像主模型邊想邊說。"""
+
+    def __init__(self, lines, gap):
+        super().__init__(lines)
+        self.gap = gap
+
+    async def __aiter__(self):
+        for index, (display, tts) in enumerate(self.lines):
+            if index:
+                await asyncio.sleep(self.gap)
+            yield DisplayText(text=display), tts, Actions()
+
+
+def test_a_slow_pick_holds_the_voice_only_a_moment(monkeypatch):
+    """合成好了、挑選還沒好：最多再等 GRACE_SECONDS，聲音就先走。"""
+    from src.open_llm_vtuber import expression_pick
+
+    started = time.monotonic()
+    (message,) = _run(
+        monkeypatch,
+        [("你來啦！", "你來啦！")],
+        _picker(_Client(delay=3.0), timeout=6.0),
+        engine=_Engine(delay=0.1),
+    )
+    assert time.monotonic() - started < 0.1 + expression_pick.GRACE_SECONDS + 0.3
+    assert message["audio"] == "AUDIO:你來啦！.wav"
+    assert "expressions" not in (message["actions"] or {})
+
+
+def test_a_silent_line_waits_only_a_moment_for_its_pick(monkeypatch):
+    from src.open_llm_vtuber import expression_pick
+
+    started = time.monotonic()
+    (message,) = _run(
+        monkeypatch, [("*歪頭*", "")], _picker(_Client(delay=3.0), timeout=6.0)
+    )
+    assert time.monotonic() - started < expression_pick.SILENT_GRACE_SECONDS + 0.3
+    assert "expressions" not in (message["actions"] or {})
+
+
+def test_one_pick_at_a_time():
+    """背景模型同時只問一句：忙著的時候這句不挑，不在它那裡排隊。"""
+    client = _Client(delay=0.3)
+    picker = _picker(client, timeout=6.0)
+
+    async def both():
+        return await asyncio.gather(picker.ask("你來啦！"), picker.ask("今天好累。"))
+
+    first, second = asyncio.run(both())
+    assert first is not None and second is None
+    assert len(client.asked) == 1
+
+
+def test_the_voice_takes_her_mood_before_anything_is_picked(monkeypatch):
+    engine = _Voiced()
+    picker = _picker(
+        _Client(delay=3.0), mood={"mood": "sadness", "intensity": 0.8}, timeout=6.0
+    )
+    _run(monkeypatch, [("今天好累。", "今天好累。")], picker, engine=engine)
+    assert engine.emotions == ["sadness"]
+
+
+def test_the_first_pick_sets_the_voice_for_the_rest_of_the_reply(monkeypatch):
+    """跟標籤一樣：這則回覆第一個挑到的表情，就是後面幾句的語氣。"""
+    monkeypatch.setattr(
+        tts_manager_module, "prepare_audio_payload", _fake_prepare_audio_payload
+    )
+    engine = _Voiced(delay=0.2)
+    picker = _picker(
+        _Client(delay=0.05), mood={"mood": "sadness", "intensity": 0.8}, timeout=6.0
+    )
+
+    async def go():
+        manager = TTSTaskManager()
+        await handle_sentence_output(
+            _Paced([("你來啦！", "你來啦！"), ("好開心！", "好開心！")], gap=0.3),
+            live2d_model=_model(),
+            tts_engine=engine,
+            websocket_send=_Send(),
+            tts_manager=manager,
+            expression_picker=picker,
+        )
+        await asyncio.gather(*manager.task_list)
+        await manager._payload_queue.join()
+
+    asyncio.run(go())
+    assert engine.emotions == ["sadness", "joy"]

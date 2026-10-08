@@ -6,9 +6,13 @@
 背景模型（background_llm，ASR 還原同一套）：這句、前一句、她現在的心情、這個模型
 有的表情與動作 → {"expression", "motion", "intensity"}。不在清單上的丟掉。
 
-跟合成並行（tts_manager），逾時 TIMEOUT_SECONDS 就當沒挑到：聲音不等它。挑到的
-放進這句原本的 actions（expressions／motions），走原本的 payload。她自己還是寫了
-標籤的話以標籤為準。
+跟合成並行（tts_manager）。聲音不等它：合成好了挑選還沒好，最多再等
+GRACE_SECONDS（沒聲音的句子 SILENT_GRACE_SECONDS），再沒好這句就不帶表情。背景模型
+同時只問一句（忙著就不挑），不在那裡排隊。挑到的放進這句原本的 actions
+（expressions／motions），走原本的 payload。她自己還是寫了標籤的話以標籤為準。
+
+語氣（GPT-SoVITS 的 emotion_refs）：還沒挑到之前用她當下的心情；這則回覆第一個挑到
+的表情就是之後幾句的語氣，跟標籤模式一樣（voice_emotion）。
 
 沒設背景模型時這個模式不成立：提示照舊教標籤、也不挑（uses_background_expressions），
 免得選了 background 卻落得一個表情都沒有。空檔的臉（心情）不歸這裡管。
@@ -27,12 +31,14 @@ from loguru import logger
 
 from .background_llm import background_client
 
-TIMEOUT_SECONDS = 2.5
+TIMEOUT_SECONDS = 6.0  # 一次挑選的上限；聲音不等它（GRACE_SECONDS）
+GRACE_SECONDS = 0.3  # 合成好了，挑選最多再等這麼久
+SILENT_GRACE_SECONDS = 1.0  # 沒聲音的句子（*歪頭*）沒有合成時間可以並行，多等一點
 MAX_TOKENS = 80
 SOURCES = ("tags", "background")
 
 # 一行、不留空白：9B 模型排版過的 JSON 是 30 個 token，一行是 17 個；本機閒著時
-# 一句從 2.2 秒降到 1.8 秒，2.5 秒的上限才放得下。
+# 一句從 2.2 秒降到 1.8 秒。
 SYSTEM_PROMPT = """\
 You direct an animated character's face and body while she speaks. For the line she is saying now, pick the facial expression that fits the feeling of that line, and a gesture only when the line clearly calls for one (a greeting, agreeing, pointing something out); most lines have no gesture. Use the previous line and her current mood only as context: the expression follows the line she is saying now. Pick only from the lists given. intensity is how strongly the expression shows, from 0 (barely) to 1 (fully).
 Reply with JSON only, on one line without spaces:
@@ -132,6 +138,21 @@ class ExpressionPicker:
         self.motions = dict(motions)
         self.mood = mood
         self.timeout_seconds = timeout_seconds
+        self._asking = False
+        # 這則回覆第一個挑到的表情：之後幾句的語氣（voice_emotion）。
+        self.reply_emotion: Optional[str] = None
+
+    def voice_emotion(self) -> Optional[str]:
+        """這句的語氣：這則回覆挑到過表情就用它，還沒有就用她當下的心情。"""
+        if self.reply_emotion:
+            return self.reply_emotion
+        try:
+            message = self.mood()
+        except Exception:
+            return None
+        if isinstance(message, Mapping) and message.get("mood"):
+            return str(message["mood"]).strip().lower()
+        return None
 
     def messages(self, line: str, previous: str) -> list[dict]:
         try:
@@ -159,6 +180,19 @@ class ExpressionPicker:
     async def ask(self, line: str, *, previous: str = "") -> Optional[dict]:
         if not line.strip():
             return None
+        if self._asking:  # 一次一句：不在背景模型那裡排隊
+            logger.debug(f"[expression] busy, not picked: '{line[:30]}'")
+            return None
+        self._asking = True
+        try:
+            picked = await self._ask(line, previous)
+        finally:
+            self._asking = False
+        if picked and picked.get("expression") and not self.reply_emotion:
+            self.reply_emotion = picked["expression"]
+        return picked
+
+    async def _ask(self, line: str, previous: str) -> Optional[dict]:
         started = time.monotonic()
         try:
             raw = await asyncio.wait_for(

@@ -429,6 +429,9 @@ async def handle_sentence_output(
         if silenced:
             speak_kwargs["silenced"] = True
         if expression_picker is not None:
+            # 沒有標籤可以定語氣：用這則回覆挑到過的表情，還沒有就用她的心情。
+            if actions is not None and not getattr(actions, "emotion", None):
+                actions.emotion = expression_picker.voice_emotion()
             speak_kwargs["pick"] = functools.partial(
                 expression_picker.ask,
                 display_text.text,

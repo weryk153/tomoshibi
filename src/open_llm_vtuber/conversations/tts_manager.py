@@ -7,7 +7,7 @@ from loguru import logger
 
 from ..agent.output_types import DisplayText, Actions
 from ..avatar_model import AvatarModel
-from ..expression_pick import apply_pick
+from ..expression_pick import GRACE_SECONDS, SILENT_GRACE_SECONDS, apply_pick
 from ..tts.tts_interface import TTSInterface
 from ..utils.stream_audio import prepare_audio_payload
 from .laughter import is_laughter_only
@@ -16,6 +16,20 @@ from .types import WebSocketSend
 
 # 背景模型挑這句的表情與動作（expression_pick.ExpressionPicker.ask 綁好這句）。
 Pick = Callable[[], Awaitable[Optional[dict]]]
+
+
+async def _settle(
+    pick: "Pick", started: Optional[asyncio.Task], grace: float
+) -> Optional[dict]:
+    """挑選的結果，最多再等 ``grace`` 秒；沒好就當沒挑到（它自己有上限，會自己結束）。"""
+    task = started or asyncio.create_task(pick())
+    done, _ = await asyncio.wait({task}, timeout=grace)
+    if task in done:
+        return task.result()
+    task.add_done_callback(
+        lambda finished: finished.cancelled() or finished.exception()
+    )
+    return None
 
 
 def _is_timeout(error: Optional[BaseException]) -> bool:
@@ -235,7 +249,9 @@ class TTSTaskManager:
         subtitle_text: Optional[str],
         silenced: bool,
     ) -> None:
-        actions = apply_pick(actions, await pick(), live2d_model)
+        actions = apply_pick(
+            actions, await _settle(pick, None, SILENT_GRACE_SECONDS), live2d_model
+        )
         await self._send_silent_payload(
             display_text, actions, sequence_number, subtitle_text, silenced
         )
@@ -270,11 +286,14 @@ class TTSTaskManager:
                     tts_engine, tts_text, emotion
                 )
             else:
-                # 挑表情跟合成同時跑；挑選自己有上限、失敗回 None。
-                (audio_file_path, error), picked = await asyncio.gather(
-                    self._synthesize(tts_engine, tts_text, emotion), pick()
+                # 挑表情跟合成同時跑；合成好了，挑選最多再等 GRACE_SECONDS。
+                picking = asyncio.create_task(pick())
+                audio_file_path, error = await self._synthesize(
+                    tts_engine, tts_text, emotion
                 )
-                actions = apply_pick(actions, picked, live2d_model)
+                actions = apply_pick(
+                    actions, await _settle(pick, picking, GRACE_SECONDS), live2d_model
+                )
             if not audio_file_path:
                 logger.error(
                     f"TTS synthesis failed after {self.SYNTHESIS_ATTEMPTS} attempts,"
