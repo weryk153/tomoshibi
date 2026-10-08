@@ -610,7 +610,7 @@
       "micVadSectionDesc": "これらの設定はこのブラウザのローカルストレージに保存され、マイクと音声アクティビティ検出のみを制御します。バックエンドには送られません。実際に音声をテキストに変換する認識エンジンは下で設定します。",
       "vadTuningHint": "「聞き取れませんでした」が頻繁に出る場合は、音声認識しきい値と負の音声しきい値を下げるか、検証フレーム数を減らしてください。逆に環境音で誤検出する場合は上げてください。",
       "micModePush": "マイクを押して話す",
-      "extraMissing_faster_whisper": "この端末には faster-whisper がまだ入っていないため、今は sherpa-onnx で認識しています。インストールすると再読み込みして faster-whisper に切り替わります。",
+      "extraMissing_faster_whisper": "この端末には faster-whisper がまだ入っていません（別途インストール、NVIDIA GPU があると速い）。今は sherpa-onnx で認識しています。インストールすると再読み込みして faster-whisper に切り替わります。",
       "extraInstall": "{{name}} をインストール（約 {{mb}}MB）",
       "extraInstalled_faster_whisper": "インストールして再読み込みしました。最初の認識では音声モデル（約 1.6GB）をダウンロードするので時間がかかります。",
       "extraFailed": "インストールに失敗しました：{{error}}"
@@ -710,7 +710,7 @@
       "asrEngineSectionNote": "認識エンジンとキーは下の「保存」を押したときに切り替わります。その後、設定上部の通知から再読み込みしてください。",
       "asrEnginePendingNotice": "まだ保存されていません——現在も {{current}} を使用中です。下で認証情報を入力し、保存を押すと切り替わります。",
       "asrSherpa": "sherpa-onnx（ローカル・CPU・軽量、デフォルト）",
-      "asrFasterWhisper": "faster-whisper（ローカル・より正確・別途インストール、NVIDIA GPU があると速い）",
+      "asrFasterWhisper": "faster-whisper（ローカル・より正確）",
       "asrGroq": "Groq Whisper（クラウド・高速・APIキーが必要）",
       "asrAzure": "Azure（クラウド・キーとリージョンが必要）",
       "groqApiKeyLabel": "Groq APIキー",
