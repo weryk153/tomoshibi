@@ -29,11 +29,13 @@ class ImageData:
         source: Source of the image
         data: Base64 encoded image data or URL
         mime_type: MIME type of the image (e.g., 'image/jpeg', 'image/png')
+        unchanged: 前端比過縮圖，跟這個來源上一張幾乎一樣（不用再叫模型看圖）
     """
 
     source: ImageSource
     data: str  # Base64 encoded or URL
     mime_type: str
+    unchanged: bool = False
 
 
 @dataclass

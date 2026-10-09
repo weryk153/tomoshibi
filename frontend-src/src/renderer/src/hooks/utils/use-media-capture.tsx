@@ -8,6 +8,21 @@ import { toaster } from "@/components/ui/tw/toaster";
 import {
   IMAGE_COMPRESSION_QUALITY_KEY, IMAGE_MAX_WIDTH_KEY, loadImageQuality, loadImageMaxWidth,
 } from '@/utils/image-settings';
+import { FINGERPRINT_SIZE, fingerprintFromRgba, isSamePicture } from '@/utils/picture-fingerprint';
+
+// 每個來源最後一張「有變、真的送去看」的畫面指紋。跟它比而不是跟上一張比：
+// 畫面慢慢變（天色、移動）時，一張一張比永遠算「沒變」，描述就一直停在很久以前。
+const lastLookedAt = new Map<'camera' | 'screen', number[]>();
+
+function fingerprintOf(bitmap: ImageBitmap): number[] | null {
+  const canvas = document.createElement('canvas');
+  canvas.width = FINGERPRINT_SIZE.width;
+  canvas.height = FINGERPRINT_SIZE.height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) return null;
+  ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  return fingerprintFromRgba(ctx.getImageData(0, 0, canvas.width, canvas.height).data);
+}
 
 // Add type definition for ImageCapture
 declare class ImageCapture {
@@ -20,6 +35,7 @@ interface ImageData {
   source: 'camera' | 'screen';
   data: string;
   mime_type: string;
+  unchanged: boolean;
 }
 
 export function useMediaCapture() {
@@ -71,7 +87,11 @@ export function useMediaCapture() {
 
       ctx.drawImage(bitmap, 0, 0, width, height);
       const quality = getCompressionQuality();
-      return canvas.toDataURL('image/jpeg', quality);
+      const fingerprint = fingerprintOf(bitmap);
+      const unchanged = fingerprint !== null
+        && isSamePicture(lastLookedAt.get(source) ?? null, fingerprint);
+      if (fingerprint && !unchanged) lastLookedAt.set(source, fingerprint);
+      return { data: canvas.toDataURL('image/jpeg', quality), unchanged };
     } catch (error) {
       console.error(`Error capturing ${source} frame:`, error);
       toaster.create({
@@ -92,8 +112,10 @@ export function useMediaCapture() {
       if (cameraFrame) {
         images.push({
           source: 'camera',
-          data: cameraFrame,
+          data: cameraFrame.data,
           mime_type: 'image/jpeg',
+          // 跟上一張看過的幾乎一樣：後端沿用上一次的描述，不再叫模型看圖。
+          unchanged: cameraFrame.unchanged,
         });
       }
     }
@@ -104,8 +126,10 @@ export function useMediaCapture() {
       if (screenFrame) {
         images.push({
           source: 'screen',
-          data: screenFrame,
+          data: screenFrame.data,
           mime_type: 'image/jpeg',
+          // 跟上一張看過的幾乎一樣：後端沿用上一次的描述，不再叫模型看圖。
+          unchanged: screenFrame.unchanged,
         });
       }
     }

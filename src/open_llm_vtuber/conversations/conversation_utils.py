@@ -180,6 +180,7 @@ def create_batch_input(
                 source=ImageSource(img["source"]),
                 data=img["data"],
                 mime_type=img["mime_type"],
+                unchanged=bool(img.get("unchanged")),
             )
             for img in (images or [])
         ]

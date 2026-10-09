@@ -283,14 +283,16 @@ PNG = (
 )
 
 
-def seeing(tmp_path, llm):
+def seeing(tmp_path, llm, look=None):
     from ai_character_engine.vision import VisionPipeline
     from ai_character_engine.vision.models import VisionAnalysis
     from ai_character_engine.vision.providers import CallableVisionProvider
     from ai_character_engine.vision.sampling import FrameGate
 
-    async def look(image, prompt):
+    async def tea(image, prompt):
         return VisionAnalysis(text="桌上有一杯烏龍茶。", provider="fake")
+
+    look = look or tea
 
     return CharacterCompanion(
         character=CharacterProfile(
@@ -320,15 +322,49 @@ def test_a_picture_from_the_host_is_shown_to_her(tmp_path):
         first = [o async for o in current.chat(with_picture("你看這個"))]
         # 鏡頭每一輪都會送畫面來，常常是同一張。
         second = [o async for o in current.chat(with_picture("還是這個"))]
-        return spoken(first), spoken(second), llm.sent(0)[-1], llm.said_by_both()
+        # 引擎把畫面描述放在她的話前面一則，她的話仍是最後一則。
+        return (
+            spoken(first),
+            spoken(second),
+            llm.sent(0)[-2:],
+            llm.said_by_both(),
+        )
 
-    first, second, newest, conversation = asyncio.run(scenario())
+    first, second, (seen, newest), conversation = asyncio.run(scenario())
 
     assert (first, second) == ("嗯，我知道了。", "嗯，我知道了。")
-    assert "你看這個" in newest
-    assert "桌上有一杯烏龍茶。" in newest
-    assert "(camera)" in newest
+    assert newest == "你看這個"
+    assert "桌上有一杯烏龍茶。" in seen
+    assert "(camera)" in seen
     assert conversation[0] == "你看這個"
+
+
+def test_an_unchanged_picture_is_not_looked_at_again(tmp_path):
+    """前端比過縮圖、說畫面沒變：沿用上一次的描述，不再叫模型看圖（約 2 秒）。"""
+    from ai_character_engine.vision.models import VisionAnalysis
+
+    looked = []
+
+    def look(image, prompt):
+        looked.append(1)
+        return VisionAnalysis("桌上有一杯烏龍茶。", "fake")
+
+    def unchanged(text):
+        batch = with_picture(text)
+        batch.images[0].unchanged = True
+        return batch
+
+    async def scenario():
+        llm = EngineLLM()
+        current = agent(seeing(tmp_path, llm, look=look))
+        [o async for o in current.chat(with_picture("你看這個"))]
+        [o async for o in current.chat(unchanged("還是這個"))]
+        return llm.sent()[-2]
+
+    seen = asyncio.run(scenario())
+
+    assert len(looked) == 1
+    assert "桌上有一杯烏龍茶。" in seen
 
 
 def test_without_eyes_she_is_told_a_picture_came_with_it(tmp_path):

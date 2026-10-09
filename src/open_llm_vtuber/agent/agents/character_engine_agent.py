@@ -559,7 +559,14 @@ class CharacterEngineAgent(AgentInterface):
                 logger.warning(f"[engine] picture skipped ({exc})")
                 continue
             source = _PICTURE_SOURCES.get(picture.source.value, "upload")
-            frames.append(VisionFrame(image=image, source_type=source))
+            # 前端說畫面沒變：引擎沿用這個來源上一次的描述，不再叫模型看圖。
+            frames.append(
+                VisionFrame(
+                    image=image,
+                    source_type=source,
+                    metadata={"unchanged": True} if picture.unchanged else {},
+                )
+            )
         return tuple(frames)
 
     def _bring_up_to_date(self, companion, *, take_back=None) -> None:
