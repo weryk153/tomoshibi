@@ -13,11 +13,13 @@ export const useInterrupt = () => {
   const { subtitleText, setSubtitleText } = useSubtitle();
   const { stopCurrentAudioAndLipSync } = useAudioTask();
 
-  const interrupt = (sendSignal = true) => {
+  // finishSentence：語音插話時，正在播的那一句讓她講完（播到一半的音訊不切，
+  // 之後的句子照樣清掉、後來才到的音訊在 'interrupted' 狀態下也不會再播）。
+  const interrupt = (sendSignal = true, finishSentence = false) => {
     if (aiState !== 'thinking-speaking') return;
     console.log('Interrupting conversation chain');
 
-    stopCurrentAudioAndLipSync();
+    if (!finishSentence) stopCurrentAudioAndLipSync();
 
     audioTaskQueue.clearQueue();
 

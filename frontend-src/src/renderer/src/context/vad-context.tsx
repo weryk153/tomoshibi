@@ -12,6 +12,7 @@ import { AiStateContext, AiState } from './ai-state-context';
 import { useLocalStorage } from '@/hooks/utils/use-local-storage';
 import { toaster } from '@/components/ui/tw/toaster';
 import { microphoneErrorKey } from '@/utils/media-error';
+import { BARGE_IN_AFTER_MS, speechEndAction } from '@/services/barge-in';
 
 /**
  * VAD settings configuration interface
@@ -151,6 +152,13 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
   const setAiStateRef = useRef(setAiState);
 
   const isProcessingRef = useRef(false);
+  // 她講話時你開口：講到 BARGE_IN_AFTER_MS 才算插話（見 services/barge-in.ts）。
+  const bargeInTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const bargedInRef = useRef(false);
+  const clearBargeInTimer = () => {
+    if (bargeInTimerRef.current) clearTimeout(bargeInTimerRef.current);
+    bargeInTimerRef.current = null;
+  };
 
   // Update refs when dependencies change
   useEffect(() => {
@@ -212,14 +220,22 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
    * Handle real speech start event (confirmed speech)
    */
   const handleSpeechRealStart = useCallback(() => {
-    console.log('Real speech confirmed - checking if need to interrupt');
-    // Check if we need to interrupt based on the PREVIOUS state (before speech started)
-    if (previousAiStateRef.current === 'thinking-speaking') {
-      console.log('Interrupting AI speech due to user speaking');
-      interruptRef.current();
+    bargedInRef.current = false;
+    clearBargeInTimer();
+    if (previousAiStateRef.current !== 'thinking-speaking') {
+      setAiStateRef.current('listening');
+      return;
     }
-    // Now change to listening state
-    setAiStateRef.current('listening');
+    // 她正在講：先不打斷。還在講滿 BARGE_IN_AFTER_MS 才算插話——停掉後面的句子，
+    // 這一句讓她講完。
+    bargeInTimerRef.current = setTimeout(() => {
+      bargeInTimerRef.current = null;
+      if (!isProcessingRef.current) return;
+      console.log('Barge-in: stopping after the current sentence');
+      bargedInRef.current = true;
+      interruptRef.current(true, true);
+      setAiStateRef.current('listening');
+    }, BARGE_IN_AFTER_MS);
   }, []);
 
   /**
@@ -237,6 +253,19 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
   const handleSpeechEnd = useCallback((audio: Float32Array) => {
     if (!isProcessingRef.current) return;
     console.log('Speech ended');
+    const action = speechEndAction({
+      duringHerTurn: previousAiStateRef.current === 'thinking-speaking',
+      bargedIn: bargedInRef.current,
+    });
+    clearBargeInTimer();
+    bargedInRef.current = false;
+    if (action === 'drop') {
+      // 附和（「嗯」「對」）：她照樣講下去，這段聲音不送出去。
+      console.log('Short sound while she was talking - not interrupting');
+      setPreviousTriggeredProbability(0);
+      isProcessingRef.current = false;
+      return;
+    }
     audioTaskQueue.clearQueue();
 
     if (autoStopMicRef.current) {
@@ -257,8 +286,13 @@ export function VADProvider({ children }: { children: React.ReactNode }) {
   const handleVADMisfire = useCallback(() => {
     if (!isProcessingRef.current) return;
     console.log('VAD misfire detected');
+    clearBargeInTimer();
+    const herTurnUntouched = previousAiStateRef.current === 'thinking-speaking' && !bargedInRef.current;
+    bargedInRef.current = false;
     setPreviousTriggeredProbability(0);
     isProcessingRef.current = false;
+    // 她講話時的一點雜音：她沒被打斷，字幕也不要被「沒聽清楚」蓋掉。
+    if (herTurnUntouched) return;
 
     // Restore previous AI state and show helpful misfire message
     setAiStateRef.current(previousAiStateRef.current);
