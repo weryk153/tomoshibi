@@ -8,6 +8,10 @@
 <html class="dark" style="color-scheme: dark">
   <head>
     <meta charset="UTF-8" />
+    <!-- 沒有這行，手機瀏覽器會照 980px 寬的電腦版排版再整頁縮小：版面判斷不到
+         窄螢幕，字也小到看不清。maximum-scale=1：雙指縮放是拿來縮放角色的
+         （services/pinch-zoom.ts），不要變成整頁放大。 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover" />
     <title>Tomoshibi</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
   </head>
