@@ -103,6 +103,11 @@ function MobileOverlay(): JSX.Element {
     videoRef, error, isStreaming, stream, toggleCamera,
   } = useCameraPanel();
   const [chatOpen, setChatOpen] = useState(true);
+  // 自己的鏡頭畫面可以收起來（鏡頭照樣開著，她照樣看得到）；每次開鏡頭先顯示。
+  const [previewOpen, setPreviewOpen] = useState(true);
+  useEffect(() => {
+    if (isStreaming) setPreviewOpen(true);
+  }, [isStreaming]);
   const listRef = useRef<HTMLDivElement>(null);
 
   const userName = readUserName() || t('sidebar.defaultUserName');
@@ -145,25 +150,55 @@ function MobileOverlay(): JSX.Element {
       />
 
       {isStreaming && (
+        // video 一直掛著、只切換顯示：srcObject 是掛上時設的，卸載再掛回來就黑掉。
         <Box
+          as="button"
+          aria-label={t(previewOpen ? 'mobile.hidePreview' : 'mobile.showPreview')}
+          title={t(previewOpen ? 'mobile.hidePreview' : 'mobile.showPreview')}
+          onClick={() => setPreviewOpen(!previewOpen)}
           position="absolute"
           top="12px"
           left="12px"
-          width="96px"
-          aspectRatio="3 / 4"
-          borderRadius="12px"
-          overflow="hidden"
-          border="2px solid"
-          borderColor="whiteAlpha.400"
-          bg="black"
+          pointerEvents="auto"
+          p="0"
+          bg="transparent"
+          border="none"
         >
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
-          />
+          <Box
+            display={previewOpen ? 'block' : 'none'}
+            width="96px"
+            aspectRatio="3 / 4"
+            borderRadius="12px"
+            overflow="hidden"
+            border="2px solid"
+            borderColor="whiteAlpha.400"
+            bg="black"
+          >
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
+            />
+          </Box>
+          {!previewOpen && (
+            // 收起來也要看得出鏡頭還開著。
+            <Box
+              display="flex"
+              alignItems="center"
+              gap="1.5"
+              px="2.5"
+              py="1"
+              borderRadius="full"
+              bg="blackAlpha.600"
+              color="white"
+              fontSize="12px"
+            >
+              <Box width="7px" height="7px" borderRadius="full" bg="red.400" />
+              {t('mobile.cameraOn')}
+            </Box>
+          )}
         </Box>
       )}
 

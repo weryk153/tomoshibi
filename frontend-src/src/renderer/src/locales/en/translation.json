@@ -1078,5 +1078,10 @@
     "llmModelMissing": "{{provider}} doesn't have the model “{{model}}”. Pick a downloaded model in Settings › Models.",
     "llmAuth": "{{provider}} refused the connection: the API key is wrong or missing. Check it in Settings › Models.",
     "llmTimeout": "{{provider}} took too long to answer; it may still be loading the model. Try again in a moment."
+  },
+  "mobile": {
+    "hidePreview": "Hide my preview",
+    "showPreview": "Show my preview",
+    "cameraOn": "Camera on"
   }
 }

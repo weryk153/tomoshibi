@@ -1078,5 +1078,10 @@
     "llmModelMissing": "{{provider}}에 모델 「{{model}}」이 없습니다. 「설정 › 모델」에서 다운로드한 모델을 고르세요.",
     "llmAuth": "{{provider}}가 연결을 거부했습니다. API 키가 틀렸거나 비어 있습니다. 「설정 › 모델」에서 확인하세요.",
     "llmTimeout": "{{provider}}의 응답이 너무 늦습니다. 모델을 불러오는 중일 수 있습니다. 잠시 후 다시 시도하세요."
+  },
+  "mobile": {
+    "hidePreview": "내 화면 숨기기",
+    "showPreview": "내 화면 보기",
+    "cameraOn": "카메라 켜짐"
   }
 }
