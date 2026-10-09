@@ -163,7 +163,12 @@ function QueuedMessages({ items, onRemove }: {
 }
 
 // Main component
-function Footer(): JSX.Element {
+interface FooterProps {
+  /** 手機直式：半透明、疊在角色上。 */
+  overlay?: boolean
+}
+
+function Footer({ overlay = false }: FooterProps): JSX.Element {
   const {
     inputValue,
     handleInputChange,
@@ -184,7 +189,7 @@ function Footer(): JSX.Element {
   return (
     // 右欄最底下的輸入列（像直播聊天室）。角色膠囊不顯示——心情與「思考、說話中」
     // 只留給讀螢幕軟體（膠囊裡的 role="status"），畫面上舞台與字幕已經看得出來。
-    <Box {...footerStyles.footer.container}>
+    <Box {...(overlay ? footerStyles.footer.overlayContainer : footerStyles.footer.container)}>
       <VisuallyHidden>
         <CharacterChip />
       </VisuallyHidden>

@@ -14,6 +14,7 @@ const LINE = 'rgba(255, 255, 255, 0.07)';
 
 interface FooterStyles {
   container: SystemStyleObject
+  overlayContainer: SystemStyleObject
   row: SystemStyleObject
   lineSlot: SystemStyleObject
   mic: (micOn: boolean) => SystemStyleObject
@@ -30,6 +31,12 @@ export const footerStyles: { footer: FooterStyles } = {
     container: {
       bg: 'gray.900',
       boxShadow: `inset 0 1px 0 ${LINE}`,
+      flexShrink: 0,
+    },
+    // 手機直式：疊在角色上，只留一層薄薄的底色，角色的腳還看得到。
+    overlayContainer: {
+      bg: 'rgba(10, 10, 14, 0.55)',
+      backdropFilter: 'blur(6px)',
       flexShrink: 0,
     },
     // 一行時 10＋44＋10＝64px。多行時這一列跟著輸入框長高，麥克風貼齊底部那一行

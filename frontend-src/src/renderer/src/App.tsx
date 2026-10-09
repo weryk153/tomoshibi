@@ -7,6 +7,8 @@ import { installAudioUnlock } from "@/utils/audio-unlock";
 import { resumeSharedAudioContext } from "@/utils/voice-gain";
 // import Canvas from './components/canvas/canvas'; // Likely unused now
 import Sidebar from "./components/sidebar/sidebar";
+import MobileOverlay from "./components/mobile/mobile-overlay";
+import { useIsNarrow } from "./hooks/utils/use-is-narrow";
 import { AiStateProvider } from "./context/ai-state-context";
 import { Live2DConfigProvider } from "./context/live2d-config-context";
 import { SubtitleProvider } from "./context/subtitle-context";
@@ -14,7 +16,6 @@ import { BgUrlProvider } from "./context/bgurl-context";
 import {
   SIDEBAR_COLLAPSED_WIDTH,
   SIDEBAR_WIDTH,
-  STAGE_MOBILE_HEIGHT,
   layoutStyles,
 } from "./layout";
 import WebSocketHandler from "./services/websocket-handler";
@@ -52,6 +53,7 @@ function AppContent(): JSX.Element {
   useEffect(() => installAudioUnlock(resumeSharedAudioContext), []);
 
   const [showSidebar, setShowSidebar] = useState(true);
+  const isNarrow = useIsNarrow();
   const { mode } = useMode();
   const { activeEffect } = useStageEffect();
   const isElectron = window.api !== undefined;
@@ -89,8 +91,8 @@ function AppContent(): JSX.Element {
   };
 
   // Define styles specifically for the "window" mode, using responsive syntax
-  // 舞台在左、聊天室在右（像直播）；窄螢幕舞台在上、聊天在下。角色畫布疊在
-  // 舞台那一格上，所以位置跟著右欄的寬度（或窄螢幕時舞台的高度）算。
+  // 寬螢幕：舞台在左、聊天室在右（像直播），角色畫布疊在舞台那一格上，寬度
+  // 扣掉右欄。窄螢幕（手機直式）：角色滿版，聊天疊在上面（MobileOverlay）。
   const getResponsiveLive2DWindowStyle = (sidebarVisible: boolean) => {
     const titleBar = isElectron ? "30px" : "0px";
     const sidebar = sidebarVisible ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
@@ -99,11 +101,8 @@ function AppContent(): JSX.Element {
       top: titleBar,
       left: "0px",
       zIndex: 5, // Ensure it's layered correctly below UI but above background
-      height: {
-        base: `calc((100% - ${titleBar}) * ${parseFloat(STAGE_MOBILE_HEIGHT) / 100})`,
-        md: `calc(100% - ${titleBar})`,
-      },
-      width: { base: "100%", md: `calc(100% - ${sidebar})` },
+      height: `calc(100% - ${titleBar})`,
+      width: isNarrow ? "100%" : `calc(100% - ${sidebar})`,
     };
   };
 
@@ -147,26 +146,33 @@ function AppContent(): JSX.Element {
               <Box position="absolute" top="20px" left="20px" zIndex={10}>
                 <WebSocketStatus />
               </Box>
+              {isNarrow ? (
+                // 手機直式沒有另外的字幕：她正在說的那一則聊天就是字幕。
+                <MobileOverlay />
+              ) : (
+                <Box
+                  position="absolute"
+                  bottom="15px"
+                  left="50%"
+                  transform="translateX(-50%)"
+                  zIndex={10}
+                  width="60%"
+                >
+                  <Subtitle />
+                </Box>
+              )}
+            </Box>
+            {!isNarrow && (
               <Box
-                position="absolute"
-                bottom="15px"
-                left="50%"
-                transform="translateX(-50%)"
-                zIndex={10}
-                width={{ base: "90%", md: "60%" }}
+                {...layoutStyles.sidebar}
+                {...(!showSidebar && { width: SIDEBAR_COLLAPSED_WIDTH })}
               >
-                <Subtitle />
+                <Sidebar
+                  isCollapsed={!showSidebar}
+                  onToggle={() => setShowSidebar(!showSidebar)}
+                />
               </Box>
-            </Box>
-            <Box
-              {...layoutStyles.sidebar}
-              {...(!showSidebar && { width: { base: "100%", md: SIDEBAR_COLLAPSED_WIDTH } })}
-            >
-              <Sidebar
-                isCollapsed={!showSidebar}
-                onToggle={() => setShowSidebar(!showSidebar)}
-              />
-            </Box>
+            )}
           </Flex>
         </>
       )}

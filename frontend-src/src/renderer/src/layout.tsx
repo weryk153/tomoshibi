@@ -4,9 +4,6 @@ const isElectron = window.api !== undefined;
 // 固定 440px 在常見縮放下吃掉快三分之一的瀏覽器寬度，所以跟著視窗縮放。
 export const SIDEBAR_WIDTH = 'clamp(320px, 26vw, 400px)';
 export const SIDEBAR_COLLAPSED_WIDTH = '32px';
-// 窄螢幕（手機、平板直向）舞台在上、聊天在下：舞台佔的高度。
-export const STAGE_MOBILE_HEIGHT = '42%';
-
 const getAppHeight = () => {
   // App.tsx keeps --vh in sync with the *visible* viewport. Unlike a module-load
   // snapshot of window.innerHeight, this also follows browser chrome, the mobile
@@ -27,26 +24,24 @@ export const layoutStyles = {
     overflow: 'hidden',
     position: 'relative',
     display: 'flex',
-    flexDirection: { base: 'column', md: 'row' },
+    flexDirection: 'row',
     mt: isElectron ? '30px' : '0',
   },
   sidebar: {
     position: 'relative' as const,
-    width: { base: '100%', md: SIDEBAR_WIDTH },
-    height: { base: 'auto', md: '100%' },
-    flex: { base: 1, md: 'none' },
+    width: SIDEBAR_WIDTH,
+    height: '100%',
     minHeight: 0,
     bg: 'gray.900',
-    borderLeft: { base: 'none', md: '1px solid' },
-    borderTop: { base: '1px solid', md: 'none' },
+    borderLeft: '1px solid',
     borderColor: 'whiteAlpha.100',
     overflow: 'hidden',
     flexShrink: 0,
     transition: 'all 0.2s',
   },
   mainContent: {
-    flex: { base: 'none', md: 1 },
-    height: { base: STAGE_MOBILE_HEIGHT, md: '100%' },
+    flex: 1,
+    height: '100%',
     minHeight: 0,
     position: 'relative',
     display: 'flex',

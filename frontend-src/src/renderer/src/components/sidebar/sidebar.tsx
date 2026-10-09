@@ -30,7 +30,7 @@ interface HeaderButtonsProps {
 }
 
 // 收合：展開時是按鈕列最右邊的一顆（›），收起後是左緣的一整條把手（‹）。
-// 窄螢幕聊天在舞台下方，不收合。
+// 只有寬螢幕有右欄；手機直式是 components/mobile/mobile-overlay.tsx。
 const CollapseButton = memo(({ onCollapse }: { onCollapse: () => void }) => {
   const { t } = useTranslation();
   const label = t('sidebar.collapsePanel');
@@ -38,7 +38,6 @@ const CollapseButton = memo(({ onCollapse }: { onCollapse: () => void }) => {
     <Button
       type="button"
       {...sidebarStyles.sidebar.headerButton}
-      display={{ base: 'none', md: 'inline-flex' }}
       aria-label={label}
       aria-expanded
       title={label}
@@ -231,12 +230,12 @@ function Sidebar({ isCollapsed = false, onToggle }: SidebarProps): JSX.Element {
 
 
       {/* 收起時只藏起來、不卸載：輸入框裡排隊中的訊息、聊天紀錄的捲動位置都在
-          元件裡，卸載就沒了。窄螢幕不收合（收合鈕也不顯示）。 */}
+          元件裡，卸載就沒了。 */}
       <Box
         flex="1"
         minH="0"
         flexDirection="column"
-        display={isCollapsed ? { base: 'flex', md: 'none' } : 'flex'}
+        display={isCollapsed ? 'none' : 'flex'}
       >
         <SidebarContent
           onCollapse={onToggle}

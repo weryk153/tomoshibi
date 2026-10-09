@@ -40,10 +40,10 @@ export const sidebarStyles = {
       right: 0,
       top: 0,
       height: '100%',
-      width: { base: '100%', md: SIDEBAR_WIDTH },
+      width: SIDEBAR_WIDTH,
       bg: 'gray.900',
       transform: isCollapsed
-        ? { base: 'none', md: `translateX(calc(100% - ${SIDEBAR_COLLAPSED_WIDTH}))` }
+        ? `translateX(calc(100% - ${SIDEBAR_COLLAPSED_WIDTH}))`
         : 'translateX(0)',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       display: 'flex',
@@ -72,7 +72,7 @@ export const sidebarStyles = {
       minWidth: SIDEBAR_COLLAPSED_WIDTH,
       padding: 0,
       height: '100%',
-      display: { base: 'none', md: 'flex' },
+      display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       cursor: 'pointer',
