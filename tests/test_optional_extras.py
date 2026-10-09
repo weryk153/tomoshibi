@@ -8,6 +8,7 @@
 import asyncio
 import json
 import sys
+import types
 
 import pytest
 from fastapi import FastAPI
@@ -187,9 +188,25 @@ def test_folder_size_counts_what_is_on_disk(tmp_path):
 def test_the_model_step_shows_up_before_its_size_is_known(workspace, monkeypatch):
     """問總大小要好幾秒：在那之前就先回報「開始準備下載模型」，畫面不會停在上一行
     安裝訊息上。"""
-    import faster_whisper.utils as whisper_utils
-
     order = []
+    # CI 不裝選裝套件：faster_whisper 與它帶進來的 huggingface_hub 都用假的。
+    fakes = {
+        name: types.ModuleType(name)
+        for name in (
+            "faster_whisper",
+            "faster_whisper.utils",
+            "huggingface_hub",
+            "huggingface_hub.constants",
+        )
+    }
+    fakes["faster_whisper"].utils = fakes["faster_whisper.utils"]
+    fakes["huggingface_hub"].constants = fakes["huggingface_hub.constants"]
+    fakes["faster_whisper.utils"]._MODELS = {}
+    fakes["faster_whisper.utils"].download_model = lambda *a, **k: order.append(
+        "download"
+    )
+    for name, module in fakes.items():
+        monkeypatch.setitem(sys.modules, name, module)
     monkeypatch.setattr(
         optional_extras,
         "whisper_model_settings",
@@ -197,9 +214,6 @@ def test_the_model_step_shows_up_before_its_size_is_known(workspace, monkeypatch
     )
     monkeypatch.setattr(
         optional_extras, "_repo_size", lambda repo: order.append("size") or 1000
-    )
-    monkeypatch.setattr(
-        whisper_utils, "download_model", lambda *a, **k: order.append("download")
     )
 
     async def collect():
