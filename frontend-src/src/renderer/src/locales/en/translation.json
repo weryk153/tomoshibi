@@ -206,7 +206,7 @@
       "imageCompressionQuality": "Image Compression Quality",
       "imageCompressionQualityHelp": "JPEG compression quality (0.1-1.0). Default is 0.8 to reduce file size when transmitting images to AI models, as we don't compress images during API transmission which could result in large file sizes.",
       "imageMaxWidth": "Image Max Width",
-      "imageMaxWidthHelp": "Maximum width for image resizing. Images exceeding this width will be proportionally scaled down. Set to 0 for no size limit. This feature exists because some AI models may have limitations when processing very large images. However, most AI models can handle images automatically, so the default is 0 (no restriction) to preserve your original images.",
+      "imageMaxWidthHelp": "Frames wider than this are scaled down before she looks at them. Bigger images take longer: about 7–9 extra seconds at 1280 wide, and up to 30 seconds for a full-size screenshot. Set to 0 to keep the original size.",
       "wsUrlPlaceholder": "Enter WebSocket URL",
       "baseUrlPlaceholder": "Enter server URL",
       "cameraDenied": "Camera permission denied, so the background was not switched. Allow camera access in your browser or system settings.",

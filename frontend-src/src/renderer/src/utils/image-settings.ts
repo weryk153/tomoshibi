@@ -2,7 +2,8 @@
 export const IMAGE_COMPRESSION_QUALITY_KEY = 'appImageCompressionQuality'
 export const DEFAULT_IMAGE_COMPRESSION_QUALITY = 0.8
 export const IMAGE_MAX_WIDTH_KEY = 'appImageMaxWidth'
-export const DEFAULT_IMAGE_MAX_WIDTH = 0
+// 0 是不縮小。本機 9B 讀一張 1280 寬的圖約 7–9 秒，原尺寸的 Retina 截圖要 30 秒上下。
+export const DEFAULT_IMAGE_MAX_WIDTH = 1280
 
 export const loadImageQuality = (stored: string | null): number => {
   if (stored) {

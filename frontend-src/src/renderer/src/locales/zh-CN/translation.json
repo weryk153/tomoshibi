@@ -206,7 +206,7 @@
       "imageCompressionQuality": "图片压缩质量",
       "imageCompressionQualityHelp": "JPEG压缩质量(0.1-1.0)。默认为0.8以减小文件体积，因为我们在向AI模型传输图片时没有进行压缩，可能导致文件过大。",
       "imageMaxWidth": "图片最大宽度",
-      "imageMaxWidthHelp": "图片缩放的最大宽度。超过此宽度的图片会按比例缩小。设为0表示不限制大小。此功能存在的原因是某些AI模型在处理超大尺寸图片时可能存在限制。但是大部分AI模型都能自动处理图片，因此默认值为0（不限制），以保持您原始图片的完整性。",
+      "imageMaxWidthHelp": "送给她看之前，宽度超过这个值的画面会等比例缩小。图越大她看得越久：1280 宽约多 7–9 秒，原尺寸的屏幕截图可能要 30 秒。设为 0 表示不缩小。",
       "wsUrlPlaceholder": "输入 WebSocket 地址",
       "baseUrlPlaceholder": "输入服务器地址",
       "cameraDenied": "没有摄像头权限，所以背景没有切换。请在浏览器或系统设置里允许这个 App 使用摄像头。",

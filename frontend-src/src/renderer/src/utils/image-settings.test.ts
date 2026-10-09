@@ -21,3 +21,7 @@ test('a stored width of zero or more is used; anything else falls back', () => {
     assert.equal(loadImageMaxWidth(stored), DEFAULT_IMAGE_MAX_WIDTH, String(stored))
   }
 })
+
+test('沒設過時圖片最寬 1280：原尺寸的螢幕截圖要多讀二、三十秒', () => {
+  assert.equal(loadImageMaxWidth(null), 1280)
+})
