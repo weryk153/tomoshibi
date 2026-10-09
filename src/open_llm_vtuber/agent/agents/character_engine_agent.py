@@ -31,6 +31,7 @@ from ...chat_history_manager import get_history
 from ...character_engine.factory import listen_to_mood
 from ...character_mood import mood_message
 from ...config_manager import TTSPreprocessorConfig
+from ... import reply_length
 from ...conversation_quality import (
     STREAM_FACT,
     build_turn_guidance,
@@ -409,6 +410,8 @@ class CharacterEngineAgent(AgentInterface):
         # 她主動說的話已經留在對話裡（remember_remark），不再以一次性的備註帶過去：
         # 那樣她會把引號裡的話照唸一遍。
         notes.append(self._group_note)
+        # 回覆長度（全部角色共用）：「這次回覆最多三句」這類，每一輪都帶。
+        notes.append(reply_length.note())
         # 問她幾點，小模型有一半的機會不呼叫時間工具而是編一個。這是這一輪的事，
         # 不是「她知道的事」：每輪都不一樣，當成後者會每輪去改上一則備註。
         now = self._now()

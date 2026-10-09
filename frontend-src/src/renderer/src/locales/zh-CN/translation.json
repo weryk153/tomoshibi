@@ -934,6 +934,15 @@
       "language": "语言",
       "memory": "记忆",
       "memoryNeedsActive": "记忆属于一段对话；切换到她之后才能看、改她的记忆。"
+    },
+    "replyLength": {
+      "title": "她的回复",
+      "label": "每次回复",
+      "short": "简短（最多三句）",
+      "medium": "中等（最多五句）",
+      "free": "不限",
+      "help": "她讲得越长，每句都要翻译、合成，下一句就越慢。所有角色共用，保存后下一句就生效。",
+      "saveFailed": "无法保存回复长度。"
     }
   },
   "footer": {

@@ -24,6 +24,7 @@ import ASR from './asr';
 import TTS from './tts';
 import Agent from './agent';
 import You from './you';
+import ReplyLengthSetting from './reply-length';
 import Perf from './perf';
 import RemoteAccess from './remote-access';
 import About from './about';
@@ -62,6 +63,7 @@ const RENDERS: Record<SettingsTabId, (a: TabRenderArgs) => JSX.Element> = {
   character: () => <Characters />,
   conversation: ({ active, t }) => (
     <Stack gap={6}>
+      <SettingSection title={t('settings.replyLength.title')}><ReplyLengthSetting /></SettingSection>
       <SettingSection title={t('settings.tabs.agent')}><Agent /></SettingSection>
       <SettingSection><You active={active} /></SettingSection>
       {/* 字幕開關與語音音量是「怎麼聽她說話」，跟對話放一起；舞台留給場景、演出、特效。 */}

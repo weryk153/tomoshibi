@@ -8,6 +8,8 @@
 - **玩家提示**（system_config.player_prompt）：一句關於你的話，會被注入每一個
   角色的 system prompt。
 - **工具開關**（…conversation.use_mcpp）：讓角色能用 MCP 工具（網路搜尋等）。
+- **回覆長度**（system_config.reply_length）：她每次最多回幾句，見 reply_length.py。
+  每一輪才讀，存了馬上生效。
 
 這幾個原本住在 translator_route 裡——那個模組長成了雜物櫃，翻譯設定跟玩家設定
 擠在一起，還順便擁有全域的 conf.yaml 編輯原語。搬出來之後兩邊都只剩自己的事。
@@ -25,7 +27,7 @@ from fastapi import APIRouter, Request
 from loguru import logger
 from starlette.responses import JSONResponse
 
-from . import pending_changes
+from . import pending_changes, reply_length
 from .conf_editor import (
     block_extent,
     read_conf_lines,
@@ -163,6 +165,36 @@ def init_player_route() -> APIRouter:
             what="player-language",
             key="language",
         )
+
+    @router.get("/api/reply-length")
+    async def get_reply_length(request: Request):
+        if not _is_local_request(request):
+            return _forbidden()
+        return _read_or_error(reply_length.current, what="reply-length", key="length")
+
+    @router.post("/api/reply-length")
+    async def save_reply_length(request: Request):
+        if not _is_local_request(request):
+            return _forbidden()
+        body, bad = await _parse_body(request)
+        if bad:
+            return bad
+        length = body.get("length")
+        if length not in reply_length.NOTES:
+            return JSONResponse(
+                status_code=400,
+                content={"ok": False, "error": "length is short, medium or free."},
+            )
+        try:
+            await asyncio.to_thread(_write_system_setting, "reply_length", length)
+        except Exception as e:
+            logger.error(f"[player] reply-length write failed: {type(e).__name__}")
+            return JSONResponse(
+                status_code=500,
+                content={"ok": False, "error": "Could not write config file."},
+            )
+        # 每一輪才讀，不用重啟。
+        return JSONResponse({"ok": True, "length": length, "restart_required": False})
 
     @router.get("/api/player-prompt")
     async def get_player_prompt(request: Request):

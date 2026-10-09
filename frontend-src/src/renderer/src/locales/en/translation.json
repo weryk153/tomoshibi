@@ -934,6 +934,15 @@
       "language": "Language",
       "memory": "Memory",
       "memoryNeedsActive": "Memories belong to a conversation — switch to her to view or edit them."
+    },
+    "replyLength": {
+      "title": "Her replies",
+      "label": "Each reply",
+      "short": "Short (up to three sentences)",
+      "medium": "Medium (up to five sentences)",
+      "free": "No limit",
+      "help": "The longer she talks, the more each sentence has to be translated and voiced, and the slower the next reply. Shared by all characters; applies from her next reply.",
+      "saveFailed": "Could not save the reply length."
     }
   },
   "footer": {
