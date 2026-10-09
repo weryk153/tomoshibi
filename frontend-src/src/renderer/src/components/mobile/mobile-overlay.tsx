@@ -14,6 +14,7 @@ import { useCameraPanel } from '@/hooks/sidebar/use-camera-panel';
 import { useChatHistory } from '@/context/chat-history-context';
 import { useConfig } from '@/context/character-config-context';
 import { useAiState, AiStateEnum } from '@/context/ai-state-context';
+import { useSubtitle } from '@/context/subtitle-context';
 import { toaster } from '@/components/ui/tw/toaster';
 import { chatLines, type ChatLine } from './mobile-chat';
 
@@ -96,6 +97,7 @@ function MobileOverlay(): JSX.Element {
   const { messages } = useChatHistory();
   const { confName } = useConfig();
   const { aiState } = useAiState();
+  const { subtitleText } = useSubtitle();
   const {
     settingsOpen, onSettingsOpen, onSettingsClose, createNewHistory,
   } = useSidebar();
@@ -120,11 +122,8 @@ function MobileOverlay(): JSX.Element {
     }),
     [messages, aiState],
   );
-  // 收起聊天時只留她最後說的那一則（像字幕，說完還留著，直到下一句）。
-  const last = lines[lines.length - 1];
-  const shown = chatOpen
-    ? lines
-    : (last && last.role === 'ai' ? [{ ...last, live: true }] : []);
+  // 收起聊天時就是一般的字幕：只有她正在唸的那一句，不是整段回覆。
+  const shown = chatOpen ? lines : [];
 
   useEffect(() => {
     const list = listRef.current;
@@ -208,9 +207,18 @@ function MobileOverlay(): JSX.Element {
         >
           {/* 第一則前面留白，淡出的遮罩才不會吃掉只有一兩則時的文字。 */}
           <Box flexShrink={0} height="4vh" />
-          {shown.map((line) => (
-            <Line key={line.id} line={line} userName={userName} aiName={aiName} />
+          {/* key 帶上位置：語音轉文字的訊息可能拿到同一個 id，key 撞了 React 會把舊的
+              那幾行留在畫面上。 */}
+          {shown.map((line, index) => (
+            <Line key={`${index}-${line.id}`} line={line} userName={userName} aiName={aiName} />
           ))}
+          {!chatOpen && subtitleText && (
+            <Line
+              line={{ id: 'subtitle', role: 'ai', content: subtitleText, live: true }}
+              userName={userName}
+              aiName={aiName}
+            />
+          )}
         </Box>
 
         <Box ml="auto" display="flex" flexDirection="column" gap="3" pointerEvents="auto">
