@@ -937,7 +937,7 @@
     }
   },
   "footer": {
-    "queuedNote": "대기 중: 말이 끝나면 보냅니다",
+    "queuedNote": "대기 중: 말이 끝나면 보냄. 보내기를 한 번 더 누르면 이 문장까지만 말하고 답해요",
     "cancelQueued": "이 메시지 취소",
     "typeYourMessage": "메시지를 입력하세요...",
     "send": "전송",
@@ -953,7 +953,8 @@
     "attachFile": "이미지 또는 문서 첨부",
     "removeFile": "문서 제거",
     "interrupt": "말을 끊기",
-    "streamingPaused": "방송 중에는 개인 채팅이 멈춥니다"
+    "streamingPaused": "방송 중에는 개인 채팅이 멈춥니다",
+    "sendNow": "지금 보내기"
   },
   "sidebar": {
     "camera": "카메라",

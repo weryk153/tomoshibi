@@ -937,7 +937,7 @@
     }
   },
   "footer": {
-    "queuedNote": "送信待ち：話し終わったら送ります",
+    "queuedNote": "待機中：話し終えたら送信。もう一度送信を押すと、この一文で区切って返事します",
     "cancelQueued": "これを取り消す",
     "typeYourMessage": "メッセージを入力...",
     "send": "送信",
@@ -953,7 +953,8 @@
     "attachFile": "画像や文書を添付",
     "removeFile": "文書を削除",
     "interrupt": "話を遮る",
-    "streamingPaused": "配信中は個別チャットを一時停止しています"
+    "streamingPaused": "配信中は個別チャットを一時停止しています",
+    "sendNow": "今すぐ送信"
   },
   "sidebar": {
     "camera": "カメラ",

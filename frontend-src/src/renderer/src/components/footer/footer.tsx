@@ -27,6 +27,9 @@ interface MessageInputProps {
   onCompositionStart: () => void
   onCompositionEnd: () => void
   onSend: () => void | Promise<void>
+  // 有排隊中的訊息、輸入框是空的：送出鍵變成「現在送出」。
+  hasQueued: boolean
+  onSendQueuedNow: () => void
   onInterrupt: () => void
   // 她正在說話：打斷鍵出現、輸入框描邊亮起。placeholder 不換——空輸入框裡一句
   // 「她在說話…」讀起來像系統訊息（使用者反映很怪）；送出後排隊的事由字幕與她接著講來表示。
@@ -66,6 +69,8 @@ const MessageInput = memo(({
   onCompositionStart,
   onCompositionEnd,
   onSend,
+  hasQueued,
+  onSendQueuedNow,
   onInterrupt,
   speaking,
   allowRaiseHand,
@@ -73,6 +78,7 @@ const MessageInput = memo(({
 }: MessageInputProps) => {
   const { t } = useTranslation();
   const hasText = value.trim() !== '';
+  const sendNow = !hasText && hasQueued;
   // 打斷鍵只在有東西可打斷時出現——原本那顆黃色方塊大半時間沒事可做，
   // 卻一直在畫面上搶注意力。
   const showHand = speaking || allowRaiseHand;
@@ -108,11 +114,11 @@ const MessageInput = memo(({
           </IconButton>
         )}
         <IconButton
-          aria-label={t('footer.send')}
-          title={t('footer.send')}
-          disabled={disabled || !hasText}
-          onClick={onSend}
-          {...footerStyles.footer.sendButton(hasText)}
+          aria-label={sendNow ? t('footer.sendNow') : t('footer.send')}
+          title={sendNow ? t('footer.sendNow') : t('footer.send')}
+          disabled={disabled || (!hasText && !sendNow)}
+          onClick={sendNow ? onSendQueuedNow : onSend}
+          {...footerStyles.footer.sendButton(hasText || sendNow)}
         >
           <LuSend size="16" aria-hidden="true" />
         </IconButton>
@@ -177,6 +183,7 @@ function Footer({ overlay = false }: FooterProps): JSX.Element {
     handleCompositionEnd,
     handleSend,
     handleInterrupt,
+    handleSendQueuedNow,
     handleMicToggle,
     micOn,
     queued,
@@ -208,6 +215,8 @@ function Footer({ overlay = false }: FooterProps): JSX.Element {
           onCompositionStart={handleCompositionStart}
           onCompositionEnd={handleCompositionEnd}
           onSend={handleSend}
+          hasQueued={queued.length > 0}
+          onSendQueuedNow={handleSendQueuedNow}
           onInterrupt={handleInterrupt}
           speaking={aiState === AiStateEnum.THINKING_SPEAKING}
           allowRaiseHand={settings.allowButtonTrigger}

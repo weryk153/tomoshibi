@@ -61,6 +61,13 @@ export const useFooter = () => {
     }
   };
 
+  // 排隊中再按一次送出：不等她整段講完，讓她講完這一句就停，然後送出排隊的訊息
+  // （跟語音插話一樣，見 services/barge-in.ts）。
+  const handleSendQueuedNow = () => {
+    if (aiState === AiStateEnum.THINKING_SPEAKING) interrupt(true, true);
+    flushPending();
+  };
+
   return {
     inputValue,
     handleInputChange,
@@ -69,6 +76,7 @@ export const useFooter = () => {
     handleCompositionEnd,
     handleSend,
     handleInterrupt,
+    handleSendQueuedNow,
     handleMicToggle,
     micOn,
     queued,

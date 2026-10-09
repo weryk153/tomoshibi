@@ -937,7 +937,7 @@
     }
   },
   "footer": {
-    "queuedNote": "Queued: sent when she finishes speaking",
+    "queuedNote": "Queued: sent when she finishes. Press send again and she stops after this sentence.",
     "cancelQueued": "Cancel this one",
     "typeYourMessage": "Type your message...",
     "send": "Send",
@@ -953,7 +953,8 @@
     "attachFile": "Attach image or document",
     "removeFile": "Remove document",
     "interrupt": "Interrupt her",
-    "streamingPaused": "Live stream in progress — chat paused"
+    "streamingPaused": "Live stream in progress — chat paused",
+    "sendNow": "Send now"
   },
   "sidebar": {
     "camera": "Camera",

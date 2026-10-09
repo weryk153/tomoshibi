@@ -937,7 +937,7 @@
     }
   },
   "footer": {
-    "queuedNote": "排队中：等她讲完就送出",
+    "queuedNote": "排队中：等她讲完就发送；再按一次发送键，她讲完这句就回你",
     "cancelQueued": "取消这则",
     "typeYourMessage": "输入您的消息……",
     "send": "发送",
@@ -953,7 +953,8 @@
     "attachFile": "附加图片或文件",
     "removeFile": "移除文件",
     "interrupt": "打断她说话",
-    "streamingPaused": "直播中，私人聊天暂停"
+    "streamingPaused": "直播中，私人聊天暂停",
+    "sendNow": "现在发送"
   },
   "sidebar": {
     "camera": "摄像头",
