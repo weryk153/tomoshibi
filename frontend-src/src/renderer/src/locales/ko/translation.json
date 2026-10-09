@@ -1080,8 +1080,6 @@
     "llmTimeout": "{{provider}}의 응답이 너무 늦습니다. 모델을 불러오는 중일 수 있습니다. 잠시 후 다시 시도하세요."
   },
   "mobile": {
-    "hidePreview": "내 화면 숨기기",
-    "showPreview": "내 화면 보기",
-    "cameraOn": "카메라 켜짐"
+    "hidePreview": "내 화면 숨기기"
   }
 }

@@ -1080,8 +1080,6 @@
     "llmTimeout": "語言模型 {{provider}} 太久沒回應，可能還在載入模型。稍等一下再試。"
   },
   "mobile": {
-    "hidePreview": "收起自己的畫面",
-    "showPreview": "顯示自己的畫面",
-    "cameraOn": "鏡頭開著"
+    "hidePreview": "收起自己的畫面"
   }
 }

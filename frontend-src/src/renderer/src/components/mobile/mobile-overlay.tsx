@@ -103,7 +103,8 @@ function MobileOverlay(): JSX.Element {
     videoRef, error, isStreaming, stream, toggleCamera,
   } = useCameraPanel();
   const [chatOpen, setChatOpen] = useState(true);
-  // 自己的鏡頭畫面可以收起來（鏡頭照樣開著，她照樣看得到）；每次開鏡頭先顯示。
+  // 自己的鏡頭畫面點一下就收起來（鏡頭照樣開著，她照樣看得到）；右邊的鏡頭鍵
+  // 亮著就代表還在拍。下次開鏡頭時再顯示。
   const [previewOpen, setPreviewOpen] = useState(true);
   useEffect(() => {
     if (isStreaming) setPreviewOpen(true);
@@ -153,9 +154,10 @@ function MobileOverlay(): JSX.Element {
         // video 一直掛著、只切換顯示：srcObject 是掛上時設的，卸載再掛回來就黑掉。
         <Box
           as="button"
-          aria-label={t(previewOpen ? 'mobile.hidePreview' : 'mobile.showPreview')}
-          title={t(previewOpen ? 'mobile.hidePreview' : 'mobile.showPreview')}
-          onClick={() => setPreviewOpen(!previewOpen)}
+          aria-label={t('mobile.hidePreview')}
+          title={t('mobile.hidePreview')}
+          onClick={() => setPreviewOpen(false)}
+          display={previewOpen ? 'block' : 'none'}
           position="absolute"
           top="12px"
           left="12px"
@@ -165,7 +167,6 @@ function MobileOverlay(): JSX.Element {
           border="none"
         >
           <Box
-            display={previewOpen ? 'block' : 'none'}
             width="96px"
             aspectRatio="3 / 4"
             borderRadius="12px"
@@ -182,23 +183,6 @@ function MobileOverlay(): JSX.Element {
               style={{ width: '100%', height: '100%', objectFit: 'cover', transform: 'scaleX(-1)' }}
             />
           </Box>
-          {!previewOpen && (
-            // 收起來也要看得出鏡頭還開著。
-            <Box
-              display="flex"
-              alignItems="center"
-              gap="1.5"
-              px="2.5"
-              py="1"
-              borderRadius="full"
-              bg="blackAlpha.600"
-              color="white"
-              fontSize="12px"
-            >
-              <Box width="7px" height="7px" borderRadius="full" bg="red.400" />
-              {t('mobile.cameraOn')}
-            </Box>
-          )}
         </Box>
       )}
 

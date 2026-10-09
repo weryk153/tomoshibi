@@ -1080,8 +1080,6 @@
     "llmTimeout": "{{provider}} took too long to answer; it may still be loading the model. Try again in a moment."
   },
   "mobile": {
-    "hidePreview": "Hide my preview",
-    "showPreview": "Show my preview",
-    "cameraOn": "Camera on"
+    "hidePreview": "Hide my preview"
   }
 }
