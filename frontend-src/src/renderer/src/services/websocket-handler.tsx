@@ -176,6 +176,9 @@ function WebSocketHandler({ children }: { children: React.ReactNode }) {
       case 'full-text':
         // 舞台頁的字幕在直播畫面上：連線、思考中這類狀態通知不放上去。
         if (IS_STAGE) break;
+        // 「已連線」不放字幕：她還沒開口，舞台下方就掛著一條系統訊息。連線狀態由
+        // 舞台左上角的連線標記管（剛連上亮 3 秒，斷線時一直在、點了重連）。
+        if (message.text_key === 'connectionEstablished') break;
         if (message.text || message.text_key) {
           // 後端只送英文字面值（"Thinking..."、"Connection established"），照
           // 原樣顯示的話中文介面上會冒出英文。text_key 是可翻譯的穩定代號；
