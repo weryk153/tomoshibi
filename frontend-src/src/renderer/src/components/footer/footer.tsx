@@ -136,7 +136,7 @@ function QueuedMessages({ items, onRemove }: {
   const { t } = useTranslation();
   return (
     <Box display="flex" flexDirection="column" gap="4px" px="12px" pt="6px">
-      <Box fontSize="xs" color="whiteAlpha.600">{t('footer.queuedNote')}</Box>
+      <Box fontSize="xs" color="#80768d">{t('footer.queuedNote')}</Box>
       {items.map((text, index) => (
         <Box
           // 同一句可能排兩次，索引才分得開
@@ -146,8 +146,8 @@ function QueuedMessages({ items, onRemove }: {
           alignItems="center"
           gap="6px"
           fontSize="sm"
-          color="whiteAlpha.700"
-          bg="whiteAlpha.100"
+          color="#80768d"
+          bg="#f0eaf7"
           borderRadius="md"
           px="8px"
           py="4px"

@@ -39,6 +39,7 @@ function BottomTab(): JSX.Element {
 
   return (
     <Tabs.Root
+      className="moonlight-media"
       value={tab}
       onValueChange={(details) => setTab(details.value as MediaTab)}
       variant="plain"
@@ -46,15 +47,15 @@ function BottomTab(): JSX.Element {
     >
       <Box display="flex" alignItems="center">
         <Tabs.List {...sidebarStyles.bottomTab.list} flex="1">
-          <Tabs.Trigger value="camera" onClick={() => setExpanded(true)} {...sidebarStyles.bottomTab.trigger}>
+          <Tabs.Trigger value="camera" onClick={() => setExpanded(tab === 'camera' ? !expanded : true)} {...sidebarStyles.bottomTab.trigger}>
             <FiCamera />
             {t('sidebar.camera')}
           </Tabs.Trigger>
-          <Tabs.Trigger value="screen" onClick={() => setExpanded(true)} {...sidebarStyles.bottomTab.trigger}>
+          <Tabs.Trigger value="screen" onClick={() => setExpanded(tab === 'screen' ? !expanded : true)} {...sidebarStyles.bottomTab.trigger}>
             <FiMonitor />
             {t('sidebar.screen')}
           </Tabs.Trigger>
-          <Tabs.Trigger value="browser" onClick={() => setExpanded(true)} {...sidebarStyles.bottomTab.trigger}>
+          <Tabs.Trigger value="browser" onClick={() => setExpanded(tab === 'browser' ? !expanded : true)} {...sidebarStyles.bottomTab.trigger}>
             <FiGlobe />
             {t('sidebar.browser')}
           </Tabs.Trigger>
@@ -73,7 +74,7 @@ function BottomTab(): JSX.Element {
         </Button>
       </Box>
 
-      <Box display={expanded ? 'block' : 'none'}>
+      <Box className="moonlight-media-preview" display={expanded ? 'block' : 'none'}>
         <Tabs.Content value="camera">
           <CameraPanel />
         </Tabs.Content>

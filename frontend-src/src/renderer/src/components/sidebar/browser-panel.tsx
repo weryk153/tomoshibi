@@ -18,7 +18,7 @@ function BrowserPlaceholder() {
       gap={2}
     >
       <FiGlobe size={24} />
-      <Text color="whiteAlpha.600" fontSize="sm" textAlign="center">
+      <Text color="#80768d" fontSize="sm" textAlign="center">
         {t('sidebar.noBrowserSession')}
       </Text>
     </Box>
@@ -37,7 +37,7 @@ function BrowserPanel(): JSX.Element {
     <Box {...sidebarStyles.browserPanel.container}>
       <Box {...sidebarStyles.browserPanel.header}>
         {browserViewData && (
-          <Text fontSize="sm" color="blue.300">{t('sidebar.browserSession')}</Text>
+          <Text fontSize="sm" color="#7761ae">{t('sidebar.browserSession')}</Text>
         )}
       </Box>
 

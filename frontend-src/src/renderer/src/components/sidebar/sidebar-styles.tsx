@@ -1,6 +1,5 @@
 import { css } from '@emotion/react';
 import { SIDEBAR_COLLAPSED_WIDTH, SIDEBAR_WIDTH } from '@/layout';
-import { ACCENT_INK, ACCENT2_INK } from '@/theme/tomoshibi';
 
 const isElectron = window.api !== undefined;
 
@@ -58,10 +57,11 @@ export const sidebarStyles = {
     headerButton: {
       variant: 'ghost' as const,
       size: 'sm' as const,
-      color: 'whiteAlpha.800',
+      color: '#7761ae',
       bg: 'transparent',
-      _hover: { bg: 'whiteAlpha.200', color: 'white' },
-      _active: { bg: 'whiteAlpha.300' },
+      borderRadius: '12px',
+      _hover: { bg: '#e6ddf3', color: '#5c468c' },
+      _active: { bg: '#d0c5e1' },
     },
     // 收起後左緣那一整條把手；展開時改用按鈕列最右邊的那顆。
     collapsedRail: {
@@ -260,22 +260,22 @@ export const sidebarStyles = {
 
   cameraPanel: {
     container: {
-      width: '97%',
+      width: '100%',
       overflow: 'hidden',
-      px: 4,
-      minH: '240px',
+      px: 0,
+      minH: '0',
     },
     header: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      mb: 4,
+      mb: 1,
     },
     title: commonStyles.title,
     videoContainer: {
-      ...commonStyles.panel,
+      border: '1px solid #d0c5e1', borderRadius: '12px', bg: '#f2edf8', color: '#80768d',
       width: '100%',
-      height: '240px',
+      height: 'clamp(100px, 18vh, 160px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -294,22 +294,22 @@ export const sidebarStyles = {
 
   screenPanel: {
     container: {
-      width: '97%',
+      width: '100%',
       overflow: 'hidden',
-      px: 4,
-      minH: '240px',
+      px: 0,
+      minH: '0',
     },
     header: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      mb: 4,
+      mb: 1,
     },
     title: commonStyles.title,
     screenContainer: {
-      ...commonStyles.panel,
+      border: '1px solid #d0c5e1', borderRadius: '12px', bg: '#f2edf8', color: '#80768d',
       width: '100%',
-      height: '240px',
+      height: 'clamp(100px, 18vh, 160px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -328,22 +328,22 @@ export const sidebarStyles = {
   // Add Browser Panel Styles
   browserPanel: {
     container: {
-      width: '97%',
+      width: '100%',
       overflow: 'hidden',
-      px: 4,
-      minH: '240px',
+      px: 0,
+      minH: '0',
     },
     header: {
       display: 'flex',
       justifyContent: 'space-between',
       alignItems: 'center',
-      mb: 4,
+      mb: 1,
     },
     title: commonStyles.title,
     browserContainer: {
-      ...commonStyles.panel,
+      border: '1px solid #d0c5e1', borderRadius: '12px', bg: '#f2edf8', color: '#80768d',
       width: '100%',
-      height: '240px',
+      height: 'clamp(100px, 18vh, 160px)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
@@ -372,29 +372,31 @@ export const sidebarStyles = {
     },
     tabs: {
       width: '100%',
-      bg: 'whiteAlpha.50',
+      bg: '#f2edf8',
       borderRadius: 'lg',
       p: '1',
     },
     list: {
       borderBottom: 'none',
-      gap: '2',
+      gap: '1',
     },
     trigger: {
-      color: 'whiteAlpha.700',
+      color: '#80768d',
       display: 'flex',
       alignItems: 'center',
-      gap: 2,
-      px: 3,
+      gap: 1.5,
+      px: 2,
       py: 2,
+      fontSize: '12px',
+      flex: 1,
       borderRadius: 'md',
       _hover: {
-        color: 'white',
-        bg: 'whiteAlpha.50',
+        color: '#5c468c',
+        bg: '#f2edf8',
       },
       _selected: {
-        color: 'white',
-        bg: 'whiteAlpha.200',
+        color: '#5c468c',
+        bg: '#e6ddf3',
       },
     },
   },
@@ -476,21 +478,21 @@ export const sidebarStyles = {
       justifyContent: 'center', // Center items horizontally
     },
     icon: {
-      color: 'blue.300',
+      color: '#7761ae',
       boxSize: '14px',
     },
     text: {
       fontSize: 'xs',
-      color: 'whiteAlpha.700',
+      color: '#80768d',
       fontStyle: 'italic',
     },
     spinner: {
       size: 'xs',
-      color: 'blue.300',
+      color: '#7761ae',
       ml: 0,
     },
     completedIcon: {
-      color: 'green.300',
+      color: '#658774',
       boxSize: '14px',
       ml: 0,
     },
@@ -503,88 +505,26 @@ export const sidebarStyles = {
 };
 
 export const chatPanelStyles = css`
-  .cs-message-list {
-    background: var(--chakra-colors-gray-900) !important;
-    padding: var(--chakra-space-4);
-  }
-  
-  .cs-message {
-    margin: 12px 0;
-    // padding-top: 20px !important;
-  }
-
-  /* 她的泡泡：panel2 底。你的泡泡：主色粉底配深色墨水（白字在粉上對比不夠）。 */
+  .cs-message-list { background: #fffcf7 !important; padding: 12px 16px !important; }
+  .cs-message { margin: 16px 0 !important; }
   .cs-message__content {
-    background-color: var(--chakra-colors-gray-800) !important;
-    border-radius: var(--chakra-radii-lg);
-    padding: 8px !important;
-    color: var(--chakra-colors-gray-50) !important;
-    font-size: 0.95rem !important;
-    line-height: 1.5 !important;
-    margin-top: 4px !important;
+    background-color: #f0eaf7 !important; border: 1px solid #e0d6ed;
+    border-radius: 16px !important; padding: 12px 14px !important;
+    color: #342d49 !important; font-size: 14px !important; line-height: 1.7 !important;
+    margin-top: 5px !important;
   }
-
-  .cs-message__text {
-    padding: 8px 0 !important;
-  }
-
-  .cs-message--outgoing .cs-message__content {
-    background-color: var(--chakra-colors-green-500) !important;
-    color: ${ACCENT_INK} !important;
-  }
-
-  .cs-message--outgoing .cs-message__html-content {
-    color: ${ACCENT_INK} !important;
-  }
-
-  .cs-chat-container {
-    background: transparent !important;
-    border: 1px solid var(--chakra-colors-whiteAlpha-200);
-    border-radius: var(--chakra-radii-lg);
-    padding: var(--chakra-space-2);
-  }
-
-  .cs-main-container {
-    border: none !important;
-    background: transparent !important;
-    width: 100% !important;
-    margin-left: 0 !important;
-  }
-
-  .cs-message__sender {
-    position: absolute !important;
-    top: 0 !important;
-    left: 36px !important;
-    font-size: 0.875rem !important;
-    font-weight: 600 !important;
-    color: var(--chakra-colors-whiteAlpha-900) !important;
-  }
-
-  .cs-message__content-wrapper {
-    max-width: 80%;
-    margin: 0 8px;
-  }
-
+  .cs-message--outgoing .cs-message__content { background-color: #f8dfd2 !important; border-color: #edcdbd; }
+  .cs-message--outgoing .cs-message__html-content { color: #342d49 !important; }
+  .cs-chat-container { background: transparent !important; border: none !important; padding: 0 !important; }
+  .cs-main-container { border: none !important; background: transparent !important; width: 100% !important; margin-left: 0 !important; }
+  .cs-message__sender { font-size: 12px !important; font-weight: 600 !important; color: #80768d !important; }
+  .cs-message__content-wrapper { max-width: 84%; margin: 0 8px; }
   .cs-avatar {
-    background-color: var(--chakra-colors-blue-500) !important;
-    color: ${ACCENT2_INK} !important;
-    width: 28px !important;
-    height: 28px !important;
-    font-size: 14px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    border-radius: 50% !important;
+    background-color: #e6ddf3 !important; color: #5c468c !important;
+    width: 28px !important; height: 28px !important; font-size: 14px !important;
+    display: flex !important; align-items: center !important; justify-content: center !important; border-radius: 50% !important;
   }
-
-  .cs-message--outgoing .cs-avatar {
-    background-color: var(--chakra-colors-green-500) !important;
-    color: ${ACCENT_INK} !important;
-  }
-
-  .cs-message__header {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-  }
+  .cs-message--outgoing .cs-avatar { background-color: #f5c9b5 !important; color: #694938 !important; }
+  .cs-message__header { display: block !important; visibility: visible !important; opacity: 1 !important; }
+  .cs-message-list .ps__thumb-y { background: #c5b7d8 !important; }
 `;

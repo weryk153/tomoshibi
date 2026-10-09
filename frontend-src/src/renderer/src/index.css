@@ -50,10 +50,8 @@
   --color-walpha-600: rgba(255, 255, 255, 0.48);
   --color-walpha-800: rgba(255, 255, 255, 0.8);
 
-  /* Tomoshibi 主題（方向 02「直播間・霓虹」）。值跟 theme/tomoshibi.ts 一模一樣，
-   * 兩邊要一起改。上面說「Chakra 灰階＝Tailwind zinc」那條對應關係仍然成立——
-   * 只是兩邊同時換成了冷灰：Tailwind 元件裡寫的 zinc-800 依然等於 Chakra 的
-   * gray.800。green→主色粉、blue→副色青，理由見 tomoshibi.ts 檔頭。 */
+  /* Shared palette: keep accents in sync with theme/tomoshibi.ts.
+   * Light portal neutrals are scoped in theme/moonlight-surfaces.css. */
   --color-zinc-50: #f2f2f6;
   --color-zinc-100: #e2e2ea;
   --color-zinc-200: #c8c8d4;
@@ -66,33 +64,33 @@
   --color-zinc-900: #111118;
   --color-zinc-950: #0a0a0e;
 
-  --color-green-50: #fff0f6;
-  --color-green-100: #ffd6e8;
-  --color-green-200: #ffb3d4;
-  --color-green-300: #ff8bbd;
-  --color-green-400: #ff6daa;
-  --color-green-500: #ff4f9a;
-  --color-green-600: #e0307d;
-  --color-green-700: #b81f63;
-  --color-green-800: #8a174a;
-  --color-green-900: #5c0f31;
-  --color-green-950: #3a0820;
+  --color-green-50: #f6f1fc;
+  --color-green-100: #e6ddf3;
+  --color-green-200: #d0c0e5;
+  --color-green-300: #b6a1d0;
+  --color-green-400: #695198;
+  --color-green-500: #7761ae;
+  --color-green-600: #695198;
+  --color-green-700: #574181;
+  --color-green-800: #49366d;
+  --color-green-900: #382952;
+  --color-green-950: #2a203f;
 
-  --color-blue-50: #e8fdfb;
-  --color-blue-100: #c3f9f4;
-  --color-blue-200: #8ff3ea;
-  --color-blue-300: #5aebdf;
-  --color-blue-400: #3be6d9;
-  --color-blue-500: #27e2d4;
-  --color-blue-600: #1bb8ac;
-  --color-blue-700: #158e85;
-  --color-blue-800: #10665f;
-  --color-blue-900: #0a403c;
-  --color-blue-950: #062826;
+  --color-blue-50: #f6f1fc;
+  --color-blue-100: #e6ddf3;
+  --color-blue-200: #d0c0e5;
+  --color-blue-300: #b6a1d0;
+  --color-blue-400: #695198;
+  --color-blue-500: #7761ae;
+  --color-blue-600: #695198;
+  --color-blue-700: #574181;
+  --color-blue-800: #49366d;
+  --color-blue-900: #382952;
+  --color-blue-950: #2a203f;
 
   /* 主色／副色上的字（tomoshibi.ts 的 ACCENT_INK／ACCENT2_INK）。 */
-  --color-accent-ink: #1a0611;
-  --color-accent2-ink: #04201d;
+  --color-accent-ink: #ffffff;
+  --color-accent2-ink: #ffffff;
 
   --radius-sm: 4px;
   --radius-md: 6px;

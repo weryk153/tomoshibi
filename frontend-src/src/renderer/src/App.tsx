@@ -1,23 +1,20 @@
 /* eslint-disable no-shadow */
 // import { StrictMode } from 'react';
-import { Box, Flex, ChakraProvider } from "@chakra-ui/react";
+import { Box, ChakraProvider } from "@chakra-ui/react";
 import { tomoshibiSystem } from "./theme/tomoshibi";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { installAudioUnlock } from "@/utils/audio-unlock";
 import { resumeSharedAudioContext } from "@/utils/voice-gain";
 // import Canvas from './components/canvas/canvas'; // Likely unused now
-import Sidebar from "./components/sidebar/sidebar";
+import Sidebar, { AppHeader } from "./components/sidebar/sidebar";
 import MobileOverlay from "./components/mobile/mobile-overlay";
 import { useIsNarrow } from "./hooks/utils/use-is-narrow";
+import "./theme/moonlight.css";
+import "./theme/moonlight-surfaces.css";
 import { AiStateProvider } from "./context/ai-state-context";
 import { Live2DConfigProvider } from "./context/live2d-config-context";
 import { SubtitleProvider } from "./context/subtitle-context";
 import { BgUrlProvider } from "./context/bgurl-context";
-import {
-  SIDEBAR_COLLAPSED_WIDTH,
-  SIDEBAR_WIDTH,
-  layoutStyles,
-} from "./layout";
 import WebSocketHandler from "./services/websocket-handler";
 import { CameraProvider } from "./context/camera-context";
 import { ChatHistoryProvider } from "./context/chat-history-context";
@@ -57,7 +54,6 @@ function AppContent(): JSX.Element {
   const { mode } = useMode();
   const { activeEffect } = useStageEffect();
   const isElectron = window.api !== undefined;
-  const live2dContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleResize = () => {
@@ -82,103 +78,59 @@ function AppContent(): JSX.Element {
   document.documentElement.style.width = '100%';
   document.body.style.width = '100%';
 
-  // Define base style properties shared across modes/breakpoints
-  const live2dBaseStyle = {
-    position: "absolute" as const,
-    overflow: "hidden",
-    transition: "all 0.3s ease-in-out", // Optional transition
-    pointerEvents: "auto" as const,
-  };
+  const avatar = (
+    <Box
+      position="absolute" inset="0" zIndex={5} overflow="hidden"
+      data-stage-effect={activeEffect?.id}
+      data-stage-effect-character={activeEffect?.characterId}
+      data-stage-effect-scale={activeEffect?.options.scale}
+    >
+      <Avatar />
+      <StageEffects />
+    </Box>
+  );
 
-  // Define styles specifically for the "window" mode, using responsive syntax
-  // 寬螢幕：舞台在左、聊天室在右（像直播），角色畫布疊在舞台那一格上，寬度
-  // 扣掉右欄。窄螢幕（手機直式）：角色滿版，聊天疊在上面（MobileOverlay）。
-  const getResponsiveLive2DWindowStyle = (sidebarVisible: boolean) => {
-    const titleBar = isElectron ? "30px" : "0px";
-    const sidebar = sidebarVisible ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
-    return {
-      ...live2dBaseStyle,
-      top: titleBar,
-      left: "0px",
-      zIndex: 5, // Ensure it's layered correctly below UI but above background
-      height: `calc(100% - ${titleBar})`,
-      width: isNarrow ? "100%" : `calc(100% - ${sidebar})`,
-    };
-  };
+  if (mode === "pet") return <>{avatar}<InputSubtitle /></>;
 
-  // Define styles specifically for the "pet" mode
-  const live2dPetStyle = {
-    ...live2dBaseStyle,
-    top: 0, // Override position for pet mode
-    left: 0,
-    width: "100vw", // Full viewport
-    height: "100vh",
-    zIndex: 15, // Higher zIndex for pet mode overlay
-  };
+  // 手機直式：像 YouTube 直式直播——角色滿版，聊天疊在下方（MobileOverlay）。
+  // 不用寬螢幕的上下排版：舞台只剩一小條、角色被切到，使用者看過說比例太怪。
+  if (isNarrow) {
+    return (
+      <>
+        {isElectron && <TitleBar />}
+        <div className="moonlight-mobile">
+          <Scene />
+          {avatar}
+          <Box position="absolute" top="12px" left="50%" transform="translateX(-50%)" zIndex={12}>
+            <WebSocketStatus />
+          </Box>
+          <MobileOverlay />
+        </div>
+      </>
+    );
+  }
 
   return (
     <>
-      <Box
-        ref={live2dContainerRef}
-        data-stage-effect={activeEffect?.id}
-        data-stage-effect-character={activeEffect?.characterId}
-        data-stage-effect-scale={activeEffect?.options.scale}
-        // Apply styles conditionally based on mode
-        // Use the function to get dynamic responsive styles for window mode
-        {...(mode === "window"
-          ? getResponsiveLive2DWindowStyle(showSidebar)
-          : live2dPetStyle)}
-      >
-        <Avatar />
-        <StageEffects />
-      </Box>
-
-      {/* Conditional Rendering of Window UI */}
-      {mode === "window" && (
-        <>
-          {isElectron && <TitleBar />}
-          {/* Apply styles by spreading */}
-          <Flex {...layoutStyles.appContainer}>
-            <Box {...layoutStyles.mainContent}>
-              <Box {...layoutStyles.canvas}>
-                <Scene />
-              </Box>
-              <Box position="absolute" top="20px" left="20px" zIndex={10}>
+      {isElectron && <TitleBar />}
+      <div className={`moonlight-app${isElectron ? " is-electron" : ""}${showSidebar ? "" : " chat-collapsed"}`}>
+        <AppHeader isCollapsed={!showSidebar} onToggle={() => setShowSidebar(!showSidebar)} />
+        <main className="moonlight-layout">
+          <section className="moonlight-stage-frame">
+            <div className="moonlight-stage">
+              <Scene />
+              {avatar}
+              <Box position="absolute" top="16px" left="16px" zIndex={10}>
                 <WebSocketStatus />
               </Box>
-              {isNarrow ? (
-                // 手機直式沒有另外的字幕：她正在說的那一則聊天就是字幕。
-                <MobileOverlay />
-              ) : (
-                <Box
-                  position="absolute"
-                  bottom="15px"
-                  left="50%"
-                  transform="translateX(-50%)"
-                  zIndex={10}
-                  width="60%"
-                >
-                  <Subtitle />
-                </Box>
-              )}
-            </Box>
-            {!isNarrow && (
-              <Box
-                {...layoutStyles.sidebar}
-                {...(!showSidebar && { width: SIDEBAR_COLLAPSED_WIDTH })}
-              >
-                <Sidebar
-                  isCollapsed={!showSidebar}
-                  onToggle={() => setShowSidebar(!showSidebar)}
-                />
-              </Box>
-            )}
-          </Flex>
-        </>
-      )}
-
-      {/* Conditional Rendering of Pet Mode UI */}
-      {mode === "pet" && <InputSubtitle />}
+              <div className="moonlight-subtitle"><Subtitle /></div>
+            </div>
+          </section>
+          <aside className="moonlight-sidebar">
+            <Sidebar isCollapsed={!showSidebar} />
+          </aside>
+        </main>
+      </div>
     </>
   );
 }

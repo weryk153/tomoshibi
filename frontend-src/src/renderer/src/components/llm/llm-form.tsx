@@ -563,7 +563,7 @@ function LlmForm({ onSaved, onApplied }: LlmFormProps): JSX.Element {
                             cursor="pointer"
                             borderWidth="1px"
                             borderColor={selected ? 'blue.400' : 'whiteAlpha.200'}
-                            bg={selected ? 'blue.900' : 'whiteAlpha.50'}
+                            bg={selected ? 'blue.100' : 'whiteAlpha.50'}
                             borderRadius="md"
                             px={3}
                             py={2}

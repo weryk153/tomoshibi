@@ -85,7 +85,7 @@ function FirstRunWizard(): JSX.Element | null {
       position="fixed"
       inset={0}
       zIndex={2000}
-      bg="blackAlpha.900"
+      bg="rgba(61, 44, 84, 0.32)"
       overflowY="auto"
       display="flex"
       alignItems="center"
@@ -93,11 +93,13 @@ function FirstRunWizard(): JSX.Element | null {
       p={6}
     >
       <Stack
+        className="moonlight-surface"
         maxW="480px"
         width="100%"
         gap={6}
         bg="gray.900"
-        borderRadius="lg"
+        borderRadius="24px"
+        border="1px solid #d0c5e1"
         p={8}
         boxShadow="dark-lg"
       >

@@ -17,6 +17,7 @@
 import type { ReactNode } from 'react';
 import { Dialog as ArkDialog, Portal } from '@ark-ui/react';
 import { cx } from './primitives';
+import { useTranslation } from 'react-i18next';
 
 // 抽屜的水平內距。標題、頁尾、以及內容區都必須用這一個值——先前標題是 px-6、
 // 分頁列與內容是 px-4，於是標題比下面所有東西往右縮排 8px，右緣也對不齊。
@@ -25,8 +26,8 @@ export const DRAWER_PX = 'px-6';
 
 // Electron 有一條 30px 的自訂標題列，抽屜不能蓋住它。網頁版沒有這回事。
 const isElectron = typeof window !== 'undefined' && window.api !== undefined;
-const TOP_OFFSET = isElectron ? '30px' : '0px';
-const PANEL_HEIGHT = isElectron ? 'calc(100vh - 30px)' : '100vh';
+const TOP_OFFSET = isElectron ? '42px' : '12px';
+const PANEL_HEIGHT = isElectron ? 'calc(100dvh - 54px)' : 'calc(100dvh - 24px)';
 
 interface DrawerProps {
   open: boolean;
@@ -59,6 +60,7 @@ export function Drawer({
   backdrop = 'dim', size = 'default', children,
 }: DrawerProps): JSX.Element {
   const fromLeft = placement === 'start';
+  const { t } = useTranslation();
 
   return (
     <ArkDialog.Root open={open} onOpenChange={(e) => onOpenChange(e.open)}>
@@ -73,14 +75,14 @@ export function Drawer({
           )}
         />
         <ArkDialog.Positioner
-          className={cx('fixed z-[1400] flex', fromLeft ? 'left-0' : 'right-0')}
+          className={cx('fixed z-[1400] flex', fromLeft ? 'left-3' : 'right-3')}
           style={{ top: TOP_OFFSET, height: PANEL_HEIGHT }}
         >
           <ArkDialog.Content
             className={cx(
-              'flex h-full max-w-[100vw] flex-col bg-zinc-900 shadow-2xl outline-none',
+              'moonlight-drawer flex h-full max-w-[calc(100vw-24px)] flex-col bg-zinc-900 shadow-2xl outline-none',
               size === 'wide'
-                ? 'w-[100vw] sm:w-[clamp(600px,44vw,680px)]'
+                ? 'w-[calc(100vw-24px)] sm:w-[clamp(660px,60vw,960px)]'
                 : 'w-[440px]',
               fromLeft ? 'border-r border-walpha-200' : 'border-l border-walpha-200',
               fromLeft
@@ -88,13 +90,14 @@ export function Drawer({
                 : 'data-[state=open]:animate-[slideInRight_180ms_ease-out] data-[state=closed]:animate-[slideOutRight_150ms_ease-in]',
             )}
           >
-            <div className={cx('flex items-center justify-between py-4', DRAWER_PX)}>
-              <ArkDialog.Title className="text-lg font-semibold text-white">
+            <div className={cx('moonlight-drawer-header flex items-center justify-between py-5', DRAWER_PX)}>
+              <ArkDialog.Title className="text-xl font-semibold text-white">
                 {title}
               </ArkDialog.Title>
               <ArkDialog.CloseTrigger
+                aria-label={t('common.close')}
                 className={cx(
-                  'rounded p-1 text-white/70 outline-none transition-colors',
+                  'rounded-xl p-2 text-white/70 outline-none transition-colors',
                   'hover:bg-walpha-200 hover:text-white',
                   'focus-visible:ring-2 focus-visible:ring-blue-500/40',
                 )}
@@ -116,7 +119,7 @@ export function Drawer({
             <div className="flex min-h-0 flex-1 flex-col overflow-hidden">{children}</div>
 
             {footer && (
-              <div className={cx('flex justify-end gap-2 border-t border-walpha-200 py-4', DRAWER_PX)}>
+              <div className={cx('moonlight-drawer-footer flex justify-end gap-2 border-t border-walpha-200 py-4', DRAWER_PX)}>
                 {footer}
               </div>
             )}

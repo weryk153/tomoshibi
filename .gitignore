@@ -23,6 +23,9 @@ conf.yaml.bak*
 # backgrounds/ 的圖（含有版權角色場景）不會被 git add -A 掃進來。
 # 真的要新增隨附背景時，用 git add -f 明確表態。
 /backgrounds/*
+# Generated, character-free backgrounds used by the Moonlight interface.
+!/backgrounds/moonlight-witch-room.png
+!/backgrounds/starlight-train-room.png
 
 # 只附帶 Live2D 官方的免費範例。任何有版權的角色美術（同人模型、動畫角色）
 # 都不進版控——那是 NOTICE 裡「Not included — bring your own」那一條的實作，
@@ -140,3 +143,6 @@ docs/superpowers/
 
 # 選裝套件的安裝紀錄（optional_extras.py）；使用者狀態，不進版控也不打包
 extras.json
+
+# Local design scratch files
+.superdesign/tmp/

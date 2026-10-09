@@ -36,7 +36,7 @@ function ScreenPlaceholder() {
       gap={2}
     >
       <FiMonitor size={24} />
-      <Text color="whiteAlpha.600" fontSize="sm" textAlign="center">
+      <Text color="#80768d" fontSize="sm" textAlign="center">
         {t('footer.screenControl')}
       </Text>
     </Box>
@@ -96,7 +96,7 @@ function ScreenPanel(): JSX.Element {
           cursor="pointer"
           position="relative"
           _hover={{
-            bg: "whiteAlpha.100",
+            bg: "#e6ddf3",
           }}
         >
           {error ? (

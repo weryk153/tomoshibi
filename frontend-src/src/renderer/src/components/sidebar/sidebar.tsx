@@ -1,8 +1,6 @@
 /* eslint-disable react/require-default-props */
-import { Box, Button, Menu, Text } from '@chakra-ui/react';
-import {
-  FiSettings, FiClock, FiPlus, FiChevronLeft, FiChevronRight, FiUsers, FiLayers
-} from 'react-icons/fi';
+import { Box, Button, Menu } from '@chakra-ui/react';
+import { FiSettings, FiClock, FiPlus, FiChevronLeft, FiChevronRight, FiUsers, FiLayers, FiMessageCircle } from 'react-icons/fi';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { sidebarStyles } from './sidebar-styles';
@@ -14,61 +12,7 @@ import { useSidebar } from '@/hooks/sidebar/use-sidebar';
 import GroupDrawer from './group-drawer';
 import Footer from '../footer/footer';
 import { ModeType } from '@/context/mode-context';
-
-// Type definitions
-interface SidebarProps {
-  isCollapsed?: boolean
-  onToggle: () => void
-}
-
-interface HeaderButtonsProps {
-  onSettingsOpen: () => void
-  onNewHistory: () => void
-  setMode: (mode: ModeType) => void
-  currentMode: 'window' | 'pet'
-  isElectron: boolean
-}
-
-// 收合：展開時是按鈕列最右邊的一顆（›），收起後是左緣的一整條把手（‹）。
-// 只有寬螢幕有右欄；手機直式是 components/mobile/mobile-overlay.tsx。
-const CollapseButton = memo(({ onCollapse }: { onCollapse: () => void }) => {
-  const { t } = useTranslation();
-  const label = t('sidebar.collapsePanel');
-  return (
-    <Button
-      type="button"
-      {...sidebarStyles.sidebar.headerButton}
-      aria-label={label}
-      aria-expanded
-      title={label}
-      onClick={onCollapse}
-    >
-      <FiChevronRight aria-hidden="true" />
-    </Button>
-  );
-});
-
-CollapseButton.displayName = 'CollapseButton';
-
-const ExpandRail = memo(({ onExpand }: { onExpand: () => void }) => {
-  const { t } = useTranslation();
-  const label = t('sidebar.expandPanel');
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      {...sidebarStyles.sidebar.collapsedRail}
-      aria-label={label}
-      aria-expanded={false}
-      title={label}
-      onClick={onExpand}
-    >
-      <FiChevronLeft aria-hidden="true" />
-    </Button>
-  );
-});
-
-ExpandRail.displayName = 'ExpandRail';
+import { useConfig } from '@/context/character-config-context';
 
 const ModeMenu = memo(({ setMode, currentMode, isElectron }: {
   setMode: (mode: ModeType) => void
@@ -117,145 +61,48 @@ const ModeMenu = memo(({ setMode, currentMode, isElectron }: {
 
 ModeMenu.displayName = 'ModeMenu';
 
-const HeaderButtons = memo(({
-  onSettingsOpen, onNewHistory, setMode, currentMode, isElectron,
-}: HeaderButtonsProps) => {
+export function AppHeader({ isCollapsed, onToggle }: {
+  isCollapsed: boolean; onToggle: () => void;
+}): JSX.Element {
   const { t } = useTranslation();
+  const { settingsOpen, onSettingsOpen, onSettingsClose, setMode, currentMode, isElectron } = useSidebar();
+  const toggleLabel = t(isCollapsed ? 'sidebar.expandPanel' : 'sidebar.collapsePanel');
   return (
-    <Box display="flex" gap={1}>
-      <Button
-        onClick={onSettingsOpen}
-        aria-label={t('common.settings')}
-        title={t('common.settings')}
-        {...sidebarStyles.sidebar.headerButton}
-      >
-        <FiSettings />
-      </Button>
-
-      <GroupDrawer>
-        <Button
-          aria-label={t('sidebar.group')}
-          title={t('sidebar.group')}
-          {...sidebarStyles.sidebar.headerButton}
-        >
-          <FiUsers />
+    <header className="moonlight-header">
+      <div className="moonlight-brand">tomoshibi</div>
+      <Box display="flex" gap="1" alignItems="center">
+        <Button onClick={onSettingsOpen} aria-label={t('common.settings')} title={t('common.settings')} {...sidebarStyles.sidebar.headerButton}><FiSettings /></Button>
+        <GroupDrawer><Button aria-label={t('sidebar.group')} title={t('sidebar.group')} {...sidebarStyles.sidebar.headerButton}><FiUsers /></Button></GroupDrawer>
+        <ModeMenu setMode={setMode} currentMode={currentMode} isElectron={isElectron} />
+        <Button onClick={onToggle} aria-label={toggleLabel} title={toggleLabel} aria-expanded={!isCollapsed} {...sidebarStyles.sidebar.headerButton}>
+          {isCollapsed ? <FiChevronLeft /> : <FiChevronRight />}
         </Button>
-      </GroupDrawer>
-
-      <HistoryDrawer>
-        <Button
-          aria-label={t('sidebar.history')}
-          title={t('sidebar.history')}
-          {...sidebarStyles.sidebar.headerButton}
-        >
-          <FiClock />
-        </Button>
-      </HistoryDrawer>
-
-      <Button
-        onClick={onNewHistory}
-        aria-label={t('sidebar.newChat')}
-        title={t('sidebar.newChat')}
-        {...sidebarStyles.sidebar.headerButton}
-      >
-        <FiPlus />
-      </Button>
-
-      <ModeMenu setMode={setMode} currentMode={currentMode} isElectron={isElectron} />
-    </Box>
-  );
-});
-
-HeaderButtons.displayName = 'HeaderButtons';
-
-const SidebarContent = memo(({
-  onCollapse,
-  onSettingsOpen,
-  onNewHistory,
-  setMode,
-  currentMode,
-  isElectron
-}: HeaderButtonsProps & { onCollapse: () => void }) => (
-  <Box {...sidebarStyles.sidebar.content}>
-    <Box {...sidebarStyles.sidebar.header}>
-      <HeaderButtons
-        onSettingsOpen={onSettingsOpen}
-        onNewHistory={onNewHistory}
-        setMode={setMode}
-        currentMode={currentMode}
-        isElectron={isElectron}
-      />
-      {/* 品牌記號，只是裝飾。 */}
-      <Text
-        aria-hidden="true"
-        ml="auto"
-        mr="1"
-        fontFamily="mono"
-        fontSize="11px"
-        fontWeight="500"
-        letterSpacing="0.14em"
-        color="blue.500"
-        userSelect="none"
-      >
-        TMSB
-      </Text>
-      <CollapseButton onCollapse={onCollapse} />
-    </Box>
-    {/* 像直播的聊天室：上面攝影機／螢幕（平常收起），中間聊天紀錄，最下面輸入框。 */}
-    <BottomTab />
-    <Box flex="1" minH="0" display="flex" flexDirection="column">
-      <ChatHistoryPanel />
-    </Box>
-    <Footer />
-  </Box>
-));
-
-SidebarContent.displayName = 'SidebarContent';
-
-// Main component
-function Sidebar({ isCollapsed = false, onToggle }: SidebarProps): JSX.Element {
-  const {
-    settingsOpen,
-    onSettingsOpen,
-    onSettingsClose,
-    createNewHistory,
-    setMode,
-    currentMode,
-    isElectron,
-  } = useSidebar();
-
-  return (
-    <Box {...sidebarStyles.sidebar.container(isCollapsed)}>
-      {isCollapsed && <ExpandRail onExpand={onToggle} />}
-
-
-      {/* 收起時只藏起來、不卸載：輸入框裡排隊中的訊息、聊天紀錄的捲動位置都在
-          元件裡，卸載就沒了。 */}
-      <Box
-        flex="1"
-        minH="0"
-        flexDirection="column"
-        display={isCollapsed ? 'none' : 'flex'}
-      >
-        <SidebarContent
-          onCollapse={onToggle}
-          onSettingsOpen={onSettingsOpen}
-          onNewHistory={createNewHistory}
-          setMode={setMode}
-          currentMode={currentMode}
-          isElectron={isElectron}
-        />
       </Box>
-
-      {settingsOpen && (
-        <SettingUI
-          open={settingsOpen}
-          onClose={onSettingsClose}
-          onToggle={onToggle}
-        />
-      )}
-    </Box>
+      {settingsOpen && <SettingUI open={settingsOpen} onClose={onSettingsClose} onToggle={onToggle} />}
+    </header>
   );
 }
 
+function Sidebar({ isCollapsed = false }: { isCollapsed?: boolean }): JSX.Element {
+  const { t } = useTranslation();
+  const { createNewHistory } = useSidebar();
+  const { confName } = useConfig();
+  // Keep the same component tree across collapse and screen sizes: drafts,
+  // queued messages and active media streams remain available when reopened.
+  return (
+    <Box height="100%" minH="0" display={isCollapsed ? 'none' : 'flex'} flexDirection="column">
+      <div className="moonlight-chat-header">
+        <FiMessageCircle aria-hidden="true" />
+        <span>{confName || 'tomoshibi'}</span>
+        <Box display="flex" ml="auto" gap="1">
+          <HistoryDrawer><Button aria-label={t('sidebar.history')} title={t('sidebar.history')} {...sidebarStyles.sidebar.headerButton}><FiClock /></Button></HistoryDrawer>
+          <Button onClick={createNewHistory} aria-label={t('sidebar.newChat')} title={t('sidebar.newChat')} {...sidebarStyles.sidebar.headerButton}><FiPlus /></Button>
+        </Box>
+      </div>
+      <BottomTab />
+      <Box flex="1" minH="0" display="flex" flexDirection="column"><ChatHistoryPanel /></Box>
+      <Footer />
+    </Box>
+  );
+}
 export default Sidebar;

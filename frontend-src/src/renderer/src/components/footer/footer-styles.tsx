@@ -1,16 +1,14 @@
 import { SystemStyleObject } from '@chakra-ui/react';
-import { ACCENT_INK } from '@/theme/tomoshibi';
 
-// 右欄最底下的輸入列（方向 02「直播間・霓虹」）：圓形麥克風＋輸入框，像直播聊天室。顏色全用 token：gray.900＝panel、gray.800＝panel2、
-// green.*＝主色粉、gray.400＝次文字（fg2），見 theme/tomoshibi.ts。
+// Composer uses the same paper and lavender palette as the chat panel.
 
 /** 一行的輸入框高度；麥克風對齊這條中線。 */
 const INPUT_HEIGHT = '44px';
 /** 長到三行為止，再多就在框內捲動。15px 字 × 1.45 行高 ≈ 22px 一行。 */
 const INPUT_MAX_HEIGHT = '88px';
 /** 主色 18% 透明：麥克風開著時的外圈光暈。 */
-const ACCENT_GLOW = 'rgba(255, 79, 154, 0.18)';
-const LINE = 'rgba(255, 255, 255, 0.07)';
+const ACCENT_GLOW = 'rgba(119, 97, 174, 0.18)';
+const LINE = '#d0c5e1';
 
 interface FooterStyles {
   container: SystemStyleObject
@@ -29,7 +27,7 @@ export const footerStyles: { footer: FooterStyles } = {
   footer: {
     // 在右欄的 flex 欄裡排在最後：輸入框長到多行時整列跟著長高，把聊天紀錄往上擠。
     container: {
-      bg: 'gray.900',
+      bg: '#fffcf7',
       boxShadow: `inset 0 1px 0 ${LINE}`,
       flexShrink: 0,
     },
@@ -63,13 +61,13 @@ export const footerStyles: { footer: FooterStyles } = {
       borderRadius: 'full',
       bg: 'transparent',
       border: '1.5px solid',
-      borderColor: micOn ? 'green.500' : 'gray.400',
-      color: micOn ? 'green.500' : 'gray.400',
+      borderColor: micOn ? '#7761ae' : '#80768d',
+      color: micOn ? '#7761ae' : '#80768d',
       boxShadow: micOn ? `0 0 0 4px ${ACCENT_GLOW}` : 'none',
       transition: 'border-color 0.2s, color 0.2s, box-shadow 0.2s',
       _hover: {
-        bg: 'gray.800',
-        color: micOn ? 'green.400' : 'gray.50',
+        bg: '#f7f3fb',
+        color: micOn ? '#5c468c' : '#342d49',
       },
     }),
     inputSlot: {
@@ -80,12 +78,12 @@ export const footerStyles: { footer: FooterStyles } = {
     input: (hasInterrupt) => ({
       display: 'block',
       width: '100%',
-      bg: 'gray.800',
+      bg: '#f7f3fb',
       border: `1px solid ${LINE}`,
-      borderRadius: 'lg',
+      borderRadius: '14px',
       fontSize: '15px',
       lineHeight: '1.45',
-      color: 'gray.50',
+      color: '#342d49',
       pl: '3.5',
       // 送出鍵 32px＋右邊距；打斷鍵出現時再讓出一顆的位置。
       pr: hasInterrupt ? '84px' : '48px',
@@ -97,11 +95,11 @@ export const footerStyles: { footer: FooterStyles } = {
       // 內容多高框就多高（Chromium 123+，Electron 31 是 126）；不支援的瀏覽器
       // 停在一行、超過就捲動，功能不受影響。
       css: { fieldSizing: 'content' },
-      _placeholder: { color: 'gray.400' },
+      _placeholder: { color: '#80768d' },
       _focus: { outline: 'none' },
       _focusVisible: {
         outline: 'none',
-        borderColor: 'green.500',
+        borderColor: '#7761ae',
         boxShadow: 'none',
       },
       _disabled: { opacity: 0.6, cursor: 'not-allowed' },
@@ -118,31 +116,31 @@ export const footerStyles: { footer: FooterStyles } = {
       width: '32px',
       height: '32px',
       minW: '32px',
-      borderRadius: 'md',
+      borderRadius: '10px',
       bg: 'transparent',
       border: '1px solid',
-      borderColor: 'green.500',
-      color: 'green.400',
-      _hover: { bg: 'green.950' },
+      borderColor: '#7761ae',
+      color: '#5c468c',
+      _hover: { bg: '#e6ddf3' },
     },
     sendButton: (hasText) => ({
       width: '32px',
       height: '32px',
       minW: '32px',
-      borderRadius: 'md',
+      borderRadius: '10px',
       transition: 'background-color 0.2s, color 0.2s, opacity 0.2s',
       ...(hasText
         ? {
-          bg: 'green.500',
-          color: ACCENT_INK,
+          bg: '#7761ae',
+          color: '#ffffff',
           border: '1px solid transparent',
-          _hover: { bg: 'green.400' },
+          _hover: { bg: '#5c468c' },
         }
         : {
           bg: 'transparent',
-          color: 'gray.400',
+          color: '#80768d',
           border: '1px solid',
-          borderColor: 'gray.600',
+          borderColor: '#d0c5e1',
           opacity: 0.7,
         }),
       _disabled: {

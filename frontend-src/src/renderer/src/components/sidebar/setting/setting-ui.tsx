@@ -14,6 +14,7 @@ import { useState, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tabs as ArkTabs } from '@ark-ui/react';
 import { Stack } from '@chakra-ui/react';
+import { FiUser, FiMessageCircle, FiLayers, FiRadio, FiCpu, FiActivity, FiSettings } from 'react-icons/fi';
 import type { TFunction } from 'i18next';
 import { Drawer, DRAWER_PX } from '@/components/ui/tw/drawer';
 import { Button, cx } from '@/components/ui/tw/primitives';
@@ -40,6 +41,8 @@ import StageEffects from './stage-effects';
 import { SettingSection } from './setting-section';
 import { PendingBanner } from './pending-banner';
 import { SETTINGS_TABS, DEFAULT_SETTINGS_TAB, type SettingsTabId } from './settings-tabs';
+
+const TAB_ICONS = { character: FiUser, conversation: FiMessageCircle, stage: FiLayers, stream: FiRadio, models: FiCpu, perf: FiActivity, system: FiSettings };
 
 interface SettingUIProps {
   open: boolean;
@@ -78,7 +81,7 @@ const RENDERS: Record<SettingsTabId, (a: TabRenderArgs) => JSX.Element> = {
       <SettingSection><StageEffects /></SettingSection>
     </Stack>
   ),
-  stream: ({ active }) => <Stream active={active} />,
+  stream: ({ active }) => <SettingSection><Stream active={active} /></SettingSection>,
   models: ({ active, t }) => (
     <Stack gap={6}>
       <SettingSection title={t('settings.tabs.llm')}><LLM /></SettingSection>
@@ -126,7 +129,7 @@ function SettingUI({ open, onClose }: SettingUIProps): JSX.Element {
       <ArkTabs.Content
         key={tab.id}
         value={tab.id}
-        className={cx('py-4 outline-none', DRAWER_PX)}
+        className={cx('moonlight-settings-content py-6 outline-none', DRAWER_PX)}
       >
         {RENDERS[tab.id]({ onCancel: handleCancelCallback, active: activeTab === tab.id, t })}
       </ArkTabs.Content>
@@ -163,7 +166,7 @@ function SettingUI({ open, onClose }: SettingUIProps): JSX.Element {
       >
         <ArkTabs.List
           className={cx(
-            'flex shrink-0 gap-1 overflow-x-auto border-b border-walpha-200 px-4 pb-3',
+            'moonlight-settings-nav flex shrink-0 gap-1 overflow-x-auto border-b border-walpha-200 px-4 py-3',
             'sm:w-[156px] sm:flex-col sm:overflow-y-auto sm:border-b-0 sm:border-r sm:px-3 sm:py-3',
           )}
           aria-label={t('common.settings')}
@@ -173,13 +176,14 @@ function SettingUI({ open, onClose }: SettingUIProps): JSX.Element {
               key={tab.id}
               value={tab.id}
               className={cx(
-                'shrink-0 cursor-pointer rounded-md px-3 py-2 text-left text-sm outline-none transition-colors',
-                'text-walpha-600 hover:bg-walpha-100 hover:text-white',
+                'flex items-center gap-2.5 shrink-0 cursor-pointer rounded-xl px-3 py-3 text-left text-sm outline-none transition-colors',
+                'text-walpha-800 hover:bg-walpha-100 hover:text-white',
                 'data-[selected]:bg-blue-500/15 data-[selected]:font-semibold data-[selected]:text-blue-200',
                 'focus-visible:ring-2 focus-visible:ring-blue-500/40',
                 'sm:w-full',
               )}
             >
+              {(() => { const Icon = TAB_ICONS[tab.id]; return <Icon aria-hidden="true" size={17} />; })()}
               {t(tab.labelKey)}
             </ArkTabs.Trigger>
           ))}

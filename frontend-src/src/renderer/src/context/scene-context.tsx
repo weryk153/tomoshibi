@@ -28,6 +28,8 @@ import {
   SceneAssetError,
 } from "@/scenes/scene-asset";
 
+import { withThemeBackground } from "@/scenes/character-background";
+
 const STORAGE_KEY = "tomoshibi-scene-store-v1";
 
 interface SceneContextValue {
@@ -119,7 +121,10 @@ export function SceneProvider({
   const [temporarySceneId, setTemporarySceneId] = useState<string | null>(null);
   const [resolvedSourceUrl, setResolvedSourceUrl] = useState("");
   const temporaryTimerRef = useRef<number | null>(null);
-  const scenes = useMemo(() => getScenePresets(store), [store]);
+  const scenes = useMemo(
+    () => getScenePresets(store).map(withThemeBackground),
+    [store],
+  );
   const activeSceneId = temporarySceneId || store.activeSceneId;
   const activeScene =
     scenes.find((scene) => scene.id === activeSceneId) || scenes[0];

@@ -36,7 +36,7 @@ export const cx = (...parts: (string | false | null | undefined)[]): string =>
 // setting-styles.tsx 的 common.input：bg whiteAlpha.100、border whiteAlpha.200、
 // hover 時 bg 轉 whiteAlpha.200。focus 環是新加的——Chakra 版本靠瀏覽器預設的
 // outline，在深色底上幾乎看不見。
-const CONTROL = 'w-full rounded-md border border-walpha-200 bg-walpha-100 px-3 py-2 '
+const CONTROL = 'moonlight-control w-full rounded-md border border-walpha-200 bg-walpha-100 px-3 py-2 '
   + 'text-sm text-white placeholder:text-walpha-400 outline-none transition-colors '
   + 'hover:bg-walpha-200 focus-visible:border-blue-500 focus-visible:ring-2 '
   + 'focus-visible:ring-blue-500/40 disabled:cursor-not-allowed disabled:opacity-50';
@@ -302,7 +302,7 @@ export function Button({
       type="button"
       disabled={disabled || loading}
       className={cx(
-        'inline-flex items-center justify-center rounded-md font-medium',
+        'moonlight-button inline-flex items-center justify-center rounded-xl font-medium',
         'transition-colors outline-none focus-visible:ring-2 focus-visible:ring-blue-500/40',
         'disabled:cursor-not-allowed disabled:opacity-40',
         BUTTON_SIZE[size],

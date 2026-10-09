@@ -7,7 +7,7 @@ export function SettingSection({ title, note, children }: {
   children: ReactNode
 }): JSX.Element {
   return (
-    <section className="flex flex-col gap-3 border-t border-walpha-200 pt-4 first:border-t-0 first:pt-0">
+    <section className="moonlight-setting-section flex flex-col gap-4">
       {title && <h3 className="text-sm font-semibold text-white">{title}</h3>}
       {note && <p className="text-xs text-walpha-600">{note}</p>}
       {children}
