@@ -134,6 +134,26 @@ def contains_comma(text: str) -> bool:
     return any(comma in text for comma in COMMAS)
 
 
+# 一句寫到這麼長還沒結束，就在接下來的逗號先切一段送去翻譯、合成。只認句號的話，
+# 一整段只有逗號的回覆要等她全部寫完才開始（實測第一個聲音 24 秒）。
+LONG_CLAUSE_CHARS = 20
+
+
+def long_clause_split(text: str) -> Optional[Tuple[str, str]]:
+    """在第 LONG_CLAUSE_CHARS 個字之後的第一個逗號切開（逗號留在前段）。
+
+    還沒寫到那麼長、後面還沒出現逗號、或切點在還沒收尾的標籤裡，回 None。
+    """
+    for index, ch in enumerate(text):
+        if index + 1 < LONG_CLAUSE_CHARS or ch not in COMMAS:
+            continue
+        head = text[: index + 1]
+        if has_unclosed_bracket(head):
+            return None
+        return head.strip(), text[index + 1 :].lstrip()
+    return None
+
+
 def comma_splitter(text: str) -> Tuple[str, str]:
     """
     Process text and split it at the first comma.
@@ -557,6 +577,19 @@ class SentenceDivider:
                                     tags=current_tags or [TagInfo("", TagState.NONE)],
                                 )
                         continue  # Restart processing loop
+
+                # 太長還沒結束的句子：在逗號先切一段（見 LONG_CLAUSE_CHARS）。
+                split = long_clause_split(self._buffer)
+                if split is not None and split[0]:
+                    head, remaining = split
+                    yield SentenceWithTags(
+                        text=head,
+                        tags=current_tags or [TagInfo("", TagState.NONE)],
+                    )
+                    self._buffer = remaining
+                    self._is_first_sentence = False
+                    processed_something = True
+                    continue  # Restart processing loop
 
             # If we reached here without processing anything, break the loop
             if not processed_something:
