@@ -11,6 +11,7 @@ import functools
 import inspect
 import json
 import sys
+import weakref
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
@@ -214,6 +215,24 @@ def storage_dir(conf_uid: str) -> Path:
     return Path(safe_join("chat_history", name, "engine"))
 
 
+# 每個 companion 的「她在回話」開關（引擎的 ModelAccess）。主機把它延長到這一輪
+# 的語音合成完：worker 上背景工作跟語音翻譯共用一顆 GPU，她一寫完回覆引擎就開始
+# 背景工作，第一句的翻譯從 1–4 秒被拖到 10–15 秒（2026-10-09 實測）。
+_ACCESS: "weakref.WeakKeyDictionary[Any, Any]" = weakref.WeakKeyDictionary()
+
+
+def remember_access(companion: Any, access: Any) -> None:
+    _ACCESS[companion] = access
+
+
+def model_access_of(companion: Any) -> Any:
+    """這個 companion 的 ModelAccess；不是這裡建的就是 None。"""
+    try:
+        return _ACCESS.get(companion)
+    except TypeError:  # 不能當弱參照的替身
+        return None
+
+
 @dataclass
 class _Live:
     signature: str
@@ -406,6 +425,22 @@ def build_companion(
     )
     if live:
         _let_go(live.companion)
+    companion_settings = CompanionSettings(
+        **{
+            "max_history_messages": HISTORY_MESSAGES,
+            "language": language,
+            **_known_settings(
+                CompanionSettings, {**_cache_block(provider), **settings}
+            ),
+        }
+    )
+    if "model_access" in inspect.signature(CharacterCompanion).parameters:
+        from ai_character_engine.companion.access import ModelAccess
+
+        access = ModelAccess(companion_settings.foreground_patience_seconds)
+        extra["model_access"] = access
+    else:
+        access = None
     companion = CharacterCompanion(
         character=CharacterProfile(
             id=conf_uid,
@@ -416,20 +451,14 @@ def build_companion(
         llm=talking,
         background_llm=thinking,
         storage_dir=directory,
-        settings=CompanionSettings(
-            **{
-                "max_history_messages": HISTORY_MESSAGES,
-                "language": language,
-                **_known_settings(
-                    CompanionSettings, {**_cache_block(provider), **settings}
-                ),
-            }
-        ),
+        settings=companion_settings,
         context_builder=ContextBuilder(budget=budget),
         vision=eyes,
         bridge_config=HostBridgeConfig(turn_timeout_seconds=TURN_TIMEOUT_SECONDS),
         **extra,
     )
+    if access is not None:
+        remember_access(companion, access)
     # 背景結果改了她的心情：告訴正在看這個角色的每個頁面。
     companion.on_mood_change = functools.partial(_tell_mood, key)
     _LIVE[key] = _Live(

@@ -1247,3 +1247,27 @@ def test_with_actions_on_they_stay(tmp_path):
         return spoken(await say(current, "你好"))
 
     assert "相機" in asyncio.run(scenario())
+
+
+def test_background_work_waits_until_her_voice_is_made(tmp_path):
+    """worker 上背景工作（9B）跟語音翻譯（另一顆模型）共用一顆 GPU。她一寫完回覆
+    引擎就開始背景工作，第一句的翻譯從 1–4 秒被拖到 10–15 秒。主機把「她在回話」
+    延長到這一輪的語音合成完。"""
+    from ai_character_engine.companion.access import ModelAccess
+
+    from src.open_llm_vtuber.character_engine import factory
+
+    async def scenario():
+        access = ModelAccess(120.0)
+        current = companion(tmp_path, EngineLLM())
+        factory.remember_access(current, access)
+        speaking = agent(current)
+        speaking.hold_background()
+        held = access.foreground_active
+        speaking.release_background()
+        speaking.release_background()  # 多放一次不會把引擎自己的計數扣成負的
+        return held, access.foreground_active
+
+    held, after = asyncio.run(scenario())
+    assert held is True
+    assert after is False

@@ -28,7 +28,7 @@ from ai_character_engine.vision.models import VisionFrame
 from loguru import logger
 
 from ...chat_history_manager import get_history
-from ...character_engine.factory import listen_to_mood
+from ...character_engine.factory import listen_to_mood, model_access_of
 from ...character_mood import mood_message
 from ...config_manager import TTSPreprocessorConfig
 from ... import reply_length
@@ -158,6 +158,8 @@ class CharacterEngineAgent(AgentInterface):
         時通知頁面）。
         """
         self._companion_source = companion
+        # 這一輪讓背景工作讓路的那個 ModelAccess（hold_background）；沒有就是 None。
+        self._holding = None
         self._player_language = player_language
         self._conf_uid = conf_uid
         self._character_name = character_name
@@ -202,6 +204,25 @@ class CharacterEngineAgent(AgentInterface):
     def _companion(self):
         source = self._companion_source
         return source if hasattr(source, "reply") else source()
+
+    # --- 背景工作讓路 ---------------------------------------------------------
+
+    def hold_background(self) -> None:
+        """這一輪開始：背景工作讓路，直到 release_background（語音都合成完）。
+
+        worker 上背景工作與語音翻譯共用一顆 GPU；引擎自己只在生成回覆時讓路，
+        翻譯與合成還在進行時背景工作就開始了。引擎的計時（120 秒）照樣有效：
+        忘了放，背景工作也不會永遠停著。
+        """
+        access = model_access_of(self._companion())
+        if access is not None and self._holding is None:
+            access.foreground_started()
+            self._holding = access
+
+    def release_background(self) -> None:
+        access, self._holding = self._holding, None
+        if access is not None:
+            access.foreground_finished()
 
     # --- 主機交代的事 ---------------------------------------------------------
 

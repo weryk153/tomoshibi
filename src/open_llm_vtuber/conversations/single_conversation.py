@@ -89,6 +89,12 @@ async def _speak(
     return str(response_part) if response_part is not None else ""
 
 
+def _release_background(context: ServiceContext) -> None:
+    release = getattr(context.agent_engine, "release_background", None)
+    if release is not None:
+        release()
+
+
 async def process_single_conversation(
     context: ServiceContext,
     websocket_send: WebSocketSend,
@@ -188,6 +194,10 @@ async def process_single_conversation(
 
         try:
             # agent.chat yields Union[SentenceOutput, Dict[str, Any]]
+            # 背景工作讓路到這一輪的語音合成完（翻譯與背景工作在 worker 共用一顆 GPU）。
+            hold = getattr(context.agent_engine, "hold_background", None)
+            if hold is not None:
+                hold()
             agent_output_stream = context.agent_engine.chat(batch_input)
 
             async for output_item in agent_output_stream:
@@ -296,6 +306,11 @@ async def process_single_conversation(
         # 而前端收到第一則就開始倒數回報播放完成——那時後端還沒掛上等待者，回報
         # 直接被丟掉，接著前端的旗標已被清掉不會再送第二次，於是後端在下面那個
         # wait 上無限等待，conversation-chain-end 永遠不送。
+        # 語音都合成完：背景工作可以開始了（不必等前端播完）。
+        if tts_manager.task_list:
+            await asyncio.gather(*tts_manager.task_list, return_exceptions=True)
+        _release_background(context)
+
         await finalize_conversation_turn(
             tts_manager=tts_manager,
             websocket_send=websocket_send,
@@ -343,4 +358,5 @@ async def process_single_conversation(
         )
         raise
     finally:
+        _release_background(context)
         cleanup_conversation(tts_manager, session_emoji)
