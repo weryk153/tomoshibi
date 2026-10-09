@@ -61,11 +61,8 @@ async def _speak(
     websocket_send: WebSocketSend,
     tts_manager: TTSTaskManager,
     subtitle_response_parts: List[str],
-    after: Optional[asyncio.Task] = None,
 ) -> str:
     """把一句送去 TTS 與前端，回傳它貢獻給 full_response 的文字。
-
-    ``after`` 是前一句：翻譯同時進行，交給語音合成照順序（見 handle_sentence_output）。
 
     簡繁正規化在這裡做：送出去的每一句都經過同一個出口。
     """
@@ -88,7 +85,6 @@ async def _speak(
         subtitle_translate_engine=context.subtitle_translate_engine,
         subtitle_collector=subtitle_response_parts,
         agent=context.agent_engine,
-        after=after,
     )
     return str(response_part) if response_part is not None else ""
 
@@ -190,9 +186,6 @@ async def process_single_conversation(
         if images:
             logger.info(f"With {len(images)} images")
 
-        # 每一句一個 task：句子一出來就開始翻譯（worker 的 9B 同時接 4 個請求），
-        # 交給語音合成照順序——每一句等前一句交出去才交（after）。
-        spoken: List[asyncio.Task] = []
         try:
             # agent.chat yields Union[SentenceOutput, Dict[str, Any]]
             agent_output_stream = context.agent_engine.chat(batch_input)
@@ -241,17 +234,12 @@ async def process_single_conversation(
                         )
                         continue
 
-                    spoken.append(
-                        asyncio.create_task(
-                            _speak(
-                                output_item,
-                                context=context,
-                                websocket_send=websocket_send,
-                                tts_manager=tts_manager,
-                                subtitle_response_parts=subtitle_response_parts,
-                                after=spoken[-1] if spoken else None,
-                            )
-                        )
+                    full_response += await _speak(
+                        output_item,
+                        context=context,
+                        websocket_send=websocket_send,
+                        tts_manager=tts_manager,
+                        subtitle_response_parts=subtitle_response_parts,
                     )
                 else:
                     logger.warning(
@@ -278,19 +266,6 @@ async def process_single_conversation(
             )
             await websocket_send(json.dumps(payload))
             # full_response will contain partial response before error
-        except asyncio.CancelledError:
-            # 被打斷：還在翻譯、還沒交給合成的句子一起停。
-            for task in spoken:
-                task.cancel()
-            raise
-        # 照順序收每一句的文字（它們也是照這個順序交給合成的）。
-        try:
-            for task in spoken:
-                full_response += await task
-        except asyncio.CancelledError:
-            for task in spoken:
-                task.cancel()
-            raise
         # --- End processing agent response ---
 
         # 她講完了（主模型不忙了）：這一輪排著的語音翻譯在背景審。開關關著不做事。

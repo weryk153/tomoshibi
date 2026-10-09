@@ -201,11 +201,8 @@ async def process_agent_output(
     subtitle_translate_engine: Optional[Any] = None,
     subtitle_collector: Optional[List[str]] = None,
     agent: Optional[Any] = None,
-    after: Optional[Awaitable] = None,
 ) -> str:
     """把回覆補上角色資訊，必要時翻譯，然後送出去。
-
-    ``after``：前一句的處理，見 handle_sentence_output。
 
     agent 是說這句話的 agent：表情交給背景模型挑時（expression_pick）讀她的心情。
     """
@@ -253,11 +250,8 @@ async def process_agent_output(
                 bilingual_subtitle=bilingual_subtitle,
                 translation_auditor=auditor,
                 expression_picker=picker,
-                after=after,
             )
         elif isinstance(output, AudioOutput):
-            if after is not None:
-                await asyncio.wait({asyncio.ensure_future(after)})
             full_response = await handle_audio_output(output, websocket_send)
         else:
             logger.warning(f"Unknown output type: {type(output)}")
@@ -286,13 +280,8 @@ async def handle_sentence_output(
     bilingual_subtitle: bool = False,
     translation_auditor: Optional[Any] = None,
     expression_picker: Optional[Any] = None,
-    after: Optional[Awaitable] = None,
 ) -> str:
     """處理一句輸出：需要時翻譯，然後交給語音合成。
-
-    ``after`` 是前一句的處理：翻譯（慢的那一段）不等它，照原本順序交給語音合成、
-    寫進字幕之前才等它。句子因此可以同時翻（worker 的 LM Studio 一顆 9B 同時接
-    4 個請求），播出來的順序不變。
 
     ``expression_picker``（expression_pick.EnginePicker）有給時，每一句交給
     tts_manager，跟合成並行請引擎挑表情與動作；沒給時 speak 的參數跟以前一樣。
@@ -420,11 +409,6 @@ async def handle_sentence_output(
                         )
                         subtitle_text = display_text.text
             logger.info(f"🏃 Subtitle after translation: '''{subtitle_text}'''...")
-
-        if after is not None:
-            # 翻好了；前一句交給合成之後才輪到這一句。前一句失敗或被取消也不影響這一句。
-            await asyncio.wait({asyncio.ensure_future(after)})
-            after = None
 
         if subtitle_collector is not None:
             subtitle_collector.append(subtitle_text)
