@@ -1,7 +1,7 @@
 /* eslint-disable react/require-default-props */
 import { Box, Button, Menu, Text } from '@chakra-ui/react';
 import {
-  FiSettings, FiClock, FiPlus, FiChevronLeft, FiUsers, FiLayers
+  FiSettings, FiClock, FiPlus, FiChevronLeft, FiChevronRight, FiUsers, FiLayers
 } from 'react-icons/fi';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -12,8 +12,8 @@ import BottomTab from './bottom-tab';
 import HistoryDrawer from './history-drawer';
 import { useSidebar } from '@/hooks/sidebar/use-sidebar';
 import GroupDrawer from './group-drawer';
+import Footer from '../footer/footer';
 import { ModeType } from '@/context/mode-context';
-import { SIDEBAR_COLLAPSED_WIDTH } from '@/layout';
 
 // Type definitions
 interface SidebarProps {
@@ -29,32 +29,47 @@ interface HeaderButtonsProps {
   isElectron: boolean
 }
 
-// Reusable components
-const ToggleButton = memo(({ isCollapsed, onToggle }: {
-  isCollapsed: boolean
-  onToggle: () => void
-}) => {
+// 收合：展開時是按鈕列最右邊的一顆（›），收起後是左緣的一整條把手（‹）。
+// 窄螢幕聊天在舞台下方，不收合。
+const CollapseButton = memo(({ onCollapse }: { onCollapse: () => void }) => {
   const { t } = useTranslation();
-  const label = t(isCollapsed ? 'sidebar.expandPanel' : 'sidebar.collapsePanel');
+  const label = t('sidebar.collapsePanel');
+  return (
+    <Button
+      type="button"
+      {...sidebarStyles.sidebar.headerButton}
+      display={{ base: 'none', md: 'inline-flex' }}
+      aria-label={label}
+      aria-expanded
+      title={label}
+      onClick={onCollapse}
+    >
+      <FiChevronRight aria-hidden="true" />
+    </Button>
+  );
+});
+
+CollapseButton.displayName = 'CollapseButton';
+
+const ExpandRail = memo(({ onExpand }: { onExpand: () => void }) => {
+  const { t } = useTranslation();
+  const label = t('sidebar.expandPanel');
   return (
     <Button
       type="button"
       variant="ghost"
-      {...sidebarStyles.sidebar.toggleButton}
+      {...sidebarStyles.sidebar.collapsedRail}
       aria-label={label}
-      aria-expanded={!isCollapsed}
+      aria-expanded={false}
       title={label}
-      style={{
-        transform: isCollapsed ? 'rotate(180deg)' : 'rotate(0deg)',
-      }}
-      onClick={onToggle}
+      onClick={onExpand}
     >
       <FiChevronLeft aria-hidden="true" />
     </Button>
   );
 });
 
-ToggleButton.displayName = 'ToggleButton';
+ExpandRail.displayName = 'ExpandRail';
 
 const ModeMenu = memo(({ setMode, currentMode, isElectron }: {
   setMode: (mode: ModeType) => void
@@ -154,13 +169,14 @@ const HeaderButtons = memo(({
 
 HeaderButtons.displayName = 'HeaderButtons';
 
-const SidebarContent = memo(({ 
-  onSettingsOpen, 
-  onNewHistory, 
-  setMode, 
+const SidebarContent = memo(({
+  onCollapse,
+  onSettingsOpen,
+  onNewHistory,
+  setMode,
   currentMode,
   isElectron
-}: HeaderButtonsProps) => (
+}: HeaderButtonsProps & { onCollapse: () => void }) => (
   <Box {...sidebarStyles.sidebar.content}>
     <Box {...sidebarStyles.sidebar.header}>
       <HeaderButtons
@@ -170,11 +186,11 @@ const SidebarContent = memo(({
         currentMode={currentMode}
         isElectron={isElectron}
       />
-      {/* 品牌記號，只是裝飾。右邊讓出收合把手那一欄（它疊在整條側欄的最右邊）。 */}
+      {/* 品牌記號，只是裝飾。 */}
       <Text
         aria-hidden="true"
         ml="auto"
-        mr={SIDEBAR_COLLAPSED_WIDTH}
+        mr="1"
         fontFamily="mono"
         fontSize="11px"
         fontWeight="500"
@@ -184,9 +200,14 @@ const SidebarContent = memo(({
       >
         TMSB
       </Text>
+      <CollapseButton onCollapse={onCollapse} />
     </Box>
-    <ChatHistoryPanel />
+    {/* 像直播的聊天室：上面攝影機／螢幕（平常收起），中間聊天紀錄，最下面輸入框。 */}
     <BottomTab />
+    <Box flex="1" minH="0" display="flex" flexDirection="column">
+      <ChatHistoryPanel />
+    </Box>
+    <Footer />
   </Box>
 ));
 
@@ -206,19 +227,28 @@ function Sidebar({ isCollapsed = false, onToggle }: SidebarProps): JSX.Element {
 
   return (
     <Box {...sidebarStyles.sidebar.container(isCollapsed)}>
-      <ToggleButton isCollapsed={isCollapsed} onToggle={onToggle} />
+      {isCollapsed && <ExpandRail onExpand={onToggle} />}
 
-      {!isCollapsed && !settingsOpen && (
+
+      {/* 收起時只藏起來、不卸載：輸入框裡排隊中的訊息、聊天紀錄的捲動位置都在
+          元件裡，卸載就沒了。窄螢幕不收合（收合鈕也不顯示）。 */}
+      <Box
+        flex="1"
+        minH="0"
+        flexDirection="column"
+        display={isCollapsed ? { base: 'flex', md: 'none' } : 'flex'}
+      >
         <SidebarContent
+          onCollapse={onToggle}
           onSettingsOpen={onSettingsOpen}
           onNewHistory={createNewHistory}
           setMode={setMode}
           currentMode={currentMode}
           isElectron={isElectron}
         />
-      )}
+      </Box>
 
-      {!isCollapsed && settingsOpen && (
+      {settingsOpen && (
         <SettingUI
           open={settingsOpen}
           onClose={onSettingsClose}

@@ -1,13 +1,11 @@
 const isElectron = window.api !== undefined;
 
-// Keep the conversation tools useful without letting them dominate the stage.
-// A fixed 440px sidebar consumed almost a third of the usable browser viewport at
-// common zoom levels, while the 24px collapsed rail was too small to target.
+// 右欄（像直播的聊天室）：按鈕列、攝影機／螢幕、聊天紀錄、輸入框都在這一欄。
+// 固定 440px 在常見縮放下吃掉快三分之一的瀏覽器寬度，所以跟著視窗縮放。
 export const SIDEBAR_WIDTH = 'clamp(320px, 26vw, 400px)';
 export const SIDEBAR_COLLAPSED_WIDTH = '32px';
-// 28px 收合把手＋64px 一列（角色膠囊／麥克風／單行輸入框）。
-export const FOOTER_HEIGHT = '92px';
-export const FOOTER_COLLAPSED_HEIGHT = '28px';
+// 窄螢幕（手機、平板直向）舞台在上、聊天在下：舞台佔的高度。
+export const STAGE_MOBILE_HEIGHT = '42%';
 
 const getAppHeight = () => {
   // App.tsx keeps --vh in sync with the *visible* viewport. Unlike a module-load
@@ -36,16 +34,19 @@ export const layoutStyles = {
     position: 'relative' as const,
     width: { base: '100%', md: SIDEBAR_WIDTH },
     height: { base: 'auto', md: '100%' },
+    flex: { base: 1, md: 'none' },
+    minHeight: 0,
     bg: 'gray.900',
-    borderRight: '1px solid',
+    borderLeft: { base: 'none', md: '1px solid' },
+    borderTop: { base: '1px solid', md: 'none' },
     borderColor: 'whiteAlpha.100',
     overflow: 'hidden',
     flexShrink: 0,
     transition: 'all 0.2s',
   },
   mainContent: {
-    flex: 1,
-    height: { base: `calc(100% - ${FOOTER_HEIGHT})`, md: '100%' },
+    flex: { base: 'none', md: 1 },
+    height: { base: STAGE_MOBILE_HEIGHT, md: '100%' },
     minHeight: 0,
     position: 'relative',
     display: 'flex',
@@ -63,15 +64,6 @@ export const layoutStyles = {
     overflow: 'hidden',
     willChange: 'transform',
   },
-  footer: {
-    width: '100%',
-    height: FOOTER_HEIGHT,
-    flexShrink: 0,
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    willChange: 'transform',
-    position: 'relative',
-    zIndex: 1,
-  },
   toggleButton: {
     position: 'absolute',
     left: 0,
@@ -84,11 +76,6 @@ export const layoutStyles = {
     borderRightRadius: 'md',
     zIndex: 10,
   },
-  canvasHeight: (isFooterCollapsed: boolean) => ({
-    height: isFooterCollapsed
-      ? `calc(100% - ${FOOTER_COLLAPSED_HEIGHT})`
-      : `calc(100% - ${FOOTER_HEIGHT})`,
-  }),
   sidebarToggleButton: {
     position: 'absolute',
     left: 0,
@@ -99,10 +86,6 @@ export const layoutStyles = {
     borderLeftRadius: 0,
     borderRightRadius: 'md',
     zIndex: 10,
-  },
-  collapsedFooter: {
-    height: FOOTER_COLLAPSED_HEIGHT,
-    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
   },
   windowsTitleBar: {
     position: 'fixed',

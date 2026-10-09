@@ -87,7 +87,7 @@ function HistoryDrawer({ children }: HistoryDrawerProps): JSX.Element {
     <Drawer
       open={open}
       onOpenChange={setOpen}
-      placement="start"
+      placement="end"
       title={t('history.chatHistoryList')}
       trigger={children}
       footer={(

@@ -953,8 +953,6 @@
     "attachFile": "이미지 또는 문서 첨부",
     "removeFile": "문서 제거",
     "interrupt": "말을 끊기",
-    "collapseControls": "입력 컨트롤 접기",
-    "expandControls": "입력 컨트롤 펼치기",
     "streamingPaused": "방송 중에는 개인 채팅이 멈춥니다"
   },
   "sidebar": {
@@ -973,8 +971,10 @@
     "windowMode": "창 모드",
     "petMode": "데스크톱 펫 모드",
     "petModeDesktopOnly": "펫 모드는 데스크톱 앱에서만 사용할 수 있습니다",
-    "collapsePanel": "사이드바 접기",
-    "expandPanel": "사이드바 펼치기"
+    "collapsePanel": "채팅 숨기기",
+    "expandPanel": "채팅 보기",
+    "collapseMedia": "카메라 / 화면 숨기기",
+    "expandMedia": "카메라 / 화면 보기"
   },
   "group": {
     "management": "그룹 관리",

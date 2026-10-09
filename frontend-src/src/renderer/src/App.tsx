@@ -7,16 +7,14 @@ import { installAudioUnlock } from "@/utils/audio-unlock";
 import { resumeSharedAudioContext } from "@/utils/voice-gain";
 // import Canvas from './components/canvas/canvas'; // Likely unused now
 import Sidebar from "./components/sidebar/sidebar";
-import Footer from "./components/footer/footer";
 import { AiStateProvider } from "./context/ai-state-context";
 import { Live2DConfigProvider } from "./context/live2d-config-context";
 import { SubtitleProvider } from "./context/subtitle-context";
 import { BgUrlProvider } from "./context/bgurl-context";
 import {
-  FOOTER_COLLAPSED_HEIGHT,
-  FOOTER_HEIGHT,
   SIDEBAR_COLLAPSED_WIDTH,
   SIDEBAR_WIDTH,
+  STAGE_MOBILE_HEIGHT,
   layoutStyles,
 } from "./layout";
 import WebSocketHandler from "./services/websocket-handler";
@@ -54,7 +52,6 @@ function AppContent(): JSX.Element {
   useEffect(() => installAudioUnlock(resumeSharedAudioContext), []);
 
   const [showSidebar, setShowSidebar] = useState(true);
-  const [isFooterCollapsed, setIsFooterCollapsed] = useState(false);
   const { mode } = useMode();
   const { activeEffect } = useStageEffect();
   const isElectron = window.api !== undefined;
@@ -92,20 +89,23 @@ function AppContent(): JSX.Element {
   };
 
   // Define styles specifically for the "window" mode, using responsive syntax
-  const getResponsiveLive2DWindowStyle = (sidebarVisible: boolean) => ({
-    ...live2dBaseStyle,
-    top: isElectron ? "30px" : "0px",
-    height: `calc(100% - ${isElectron ? "30px" : "0px"})`,
-    zIndex: 5, // Ensure it's layered correctly below UI but above background
-    left: {
-      base: "0px", // Column layout (base): Start from left edge
-      md: sidebarVisible ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH,
-    },
-    width: {
-      base: "100%", // Column layout (base): Full width
-      md: `calc(100% - ${sidebarVisible ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH})`,
-    },
-  });
+  // 舞台在左、聊天室在右（像直播）；窄螢幕舞台在上、聊天在下。角色畫布疊在
+  // 舞台那一格上，所以位置跟著右欄的寬度（或窄螢幕時舞台的高度）算。
+  const getResponsiveLive2DWindowStyle = (sidebarVisible: boolean) => {
+    const titleBar = isElectron ? "30px" : "0px";
+    const sidebar = sidebarVisible ? SIDEBAR_WIDTH : SIDEBAR_COLLAPSED_WIDTH;
+    return {
+      ...live2dBaseStyle,
+      top: titleBar,
+      left: "0px",
+      zIndex: 5, // Ensure it's layered correctly below UI but above background
+      height: {
+        base: `calc((100% - ${titleBar}) * ${parseFloat(STAGE_MOBILE_HEIGHT) / 100})`,
+        md: `calc(100% - ${titleBar})`,
+      },
+      width: { base: "100%", md: `calc(100% - ${sidebar})` },
+    };
+  };
 
   // Define styles specifically for the "pet" mode
   const live2dPetStyle = {
@@ -140,15 +140,6 @@ function AppContent(): JSX.Element {
           {isElectron && <TitleBar />}
           {/* Apply styles by spreading */}
           <Flex {...layoutStyles.appContainer}>
-            <Box
-              {...layoutStyles.sidebar}
-              {...(!showSidebar && { width: SIDEBAR_COLLAPSED_WIDTH })}
-            >
-              <Sidebar
-                isCollapsed={!showSidebar}
-                onToggle={() => setShowSidebar(!showSidebar)}
-              />
-            </Box>
             <Box {...layoutStyles.mainContent}>
               <Box {...layoutStyles.canvas}>
                 <Scene />
@@ -158,27 +149,23 @@ function AppContent(): JSX.Element {
               </Box>
               <Box
                 position="absolute"
-                // --footer-extra：輸入框長到第二、三行時底部列面板往上多長出來的
-                // 高度（footer.tsx 量了寫進來，收合時是 0），字幕跟著讓開不被蓋住。
-                bottom={`calc(${isFooterCollapsed ? FOOTER_COLLAPSED_HEIGHT : FOOTER_HEIGHT} + 15px + var(--footer-extra, 0px))`}
-                transition="bottom 0.12s ease-out"
+                bottom="15px"
                 left="50%"
                 transform="translateX(-50%)"
                 zIndex={10}
-                width="60%"
+                width={{ base: "90%", md: "60%" }}
               >
                 <Subtitle />
               </Box>
-              <Box
-                {...layoutStyles.footer}
-                zIndex={10}
-                {...(isFooterCollapsed && layoutStyles.collapsedFooter)}
-              >
-                <Footer
-                  isCollapsed={isFooterCollapsed}
-                  onToggle={() => setIsFooterCollapsed(!isFooterCollapsed)}
-                />
-              </Box>
+            </Box>
+            <Box
+              {...layoutStyles.sidebar}
+              {...(!showSidebar && { width: { base: "100%", md: SIDEBAR_COLLAPSED_WIDTH } })}
+            >
+              <Sidebar
+                isCollapsed={!showSidebar}
+                onToggle={() => setShowSidebar(!showSidebar)}
+              />
             </Box>
           </Flex>
         </>

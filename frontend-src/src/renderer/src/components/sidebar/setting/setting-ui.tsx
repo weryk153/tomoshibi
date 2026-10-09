@@ -137,7 +137,7 @@ function SettingUI({ open, onClose }: SettingUIProps): JSX.Element {
       open={open}
       // 關閉一律走 handleCancel：各分頁註冊的還原邏輯要跑，草稿才會被丟掉。
       onOpenChange={(next) => { if (!next) handleCancel(); }}
-      placement="start"
+      placement="end"
       size="wide"
       // 透明遮罩：Live2D 與背景分頁調的就是右邊畫布，不能把它調暗。
       backdrop="clear"

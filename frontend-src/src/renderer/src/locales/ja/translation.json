@@ -953,8 +953,6 @@
     "attachFile": "画像や文書を添付",
     "removeFile": "文書を削除",
     "interrupt": "話を遮る",
-    "collapseControls": "入力コントロールを折りたたむ",
-    "expandControls": "入力コントロールを展開する",
     "streamingPaused": "配信中は個別チャットを一時停止しています"
   },
   "sidebar": {
@@ -973,8 +971,10 @@
     "windowMode": "ウィンドウモード",
     "petMode": "デスクトップマスコットモード",
     "petModeDesktopOnly": "マスコットモードはデスクトップ版でのみ利用できます",
-    "collapsePanel": "サイドバーを折りたたむ",
-    "expandPanel": "サイドバーを展開する"
+    "collapsePanel": "チャットを隠す",
+    "expandPanel": "チャットを表示",
+    "collapseMedia": "カメラ／画面を隠す",
+    "expandMedia": "カメラ／画面を表示"
   },
   "group": {
     "management": "グループ管理",

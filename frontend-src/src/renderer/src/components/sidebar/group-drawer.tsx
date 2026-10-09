@@ -40,7 +40,7 @@ function GroupDrawer({ children }: GroupDrawerProps) {
         setIsOpen(open);
         if (open) requestGroupInfo();
       }}
-      placement="start"
+      placement="end"
       title={t('group.management')}
       trigger={children}
       footer={(

@@ -1,32 +1,20 @@
 /* eslint-disable react/require-default-props */
 import {
-  Box, Button, Textarea, IconButton,
+  Box, Textarea, IconButton, VisuallyHidden,
 } from '@chakra-ui/react';
 import { BsMicFill, BsMicMuteFill } from 'react-icons/bs';
 import { IoClose, IoHandRightSharp } from 'react-icons/io5';
-import { FiChevronDown } from 'react-icons/fi';
 import { LuSend } from 'react-icons/lu';
-import { memo, useEffect, useRef } from 'react';
+import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { footerStyles } from './footer-styles';
 import CharacterChip from './character-chip';
 import { useFooter } from '@/hooks/footer/use-footer';
-import { footerExtra } from '@/hooks/footer/footer-extra';
 import { useAiState, AiStateEnum } from '@/context/ai-state-context';
 import { useStream } from '@/context/stream-context';
 import { useProactiveSpeak } from '@/context/proactive-speak-context';
 
 // Type definitions
-interface FooterProps {
-  isCollapsed?: boolean
-  onToggle?: () => void
-}
-
-interface ToggleButtonProps {
-  isCollapsed: boolean
-  onToggle?: () => void
-}
-
 interface MicButtonProps {
   micOn: boolean
   onMicToggle: () => void
@@ -51,29 +39,6 @@ interface MessageInputProps {
 }
 
 // Reusable components
-const ToggleButton = memo(({ isCollapsed, onToggle }: ToggleButtonProps) => {
-  const { t } = useTranslation();
-  const label = t(isCollapsed ? 'footer.expandControls' : 'footer.collapseControls');
-  return (
-    <Button
-      type="button"
-      variant="ghost"
-      {...footerStyles.footer.toggleButton}
-      onClick={onToggle}
-      aria-label={label}
-      aria-expanded={!isCollapsed}
-      title={label}
-      style={{
-        transform: isCollapsed ? 'rotate(180deg)' : 'rotate(0deg)',
-      }}
-    >
-      <FiChevronDown aria-hidden="true" />
-    </Button>
-  );
-});
-
-ToggleButton.displayName = 'ToggleButton';
-
 // 圓形開關：開＝主色描邊加光暈，關＝灰描邊加靜音圖示。不再是紅／綠方塊——
 // 紅色留給錯誤，靜音不是錯誤。
 const MicButton = memo(({ micOn, onMicToggle }: MicButtonProps) => {
@@ -197,39 +162,8 @@ function QueuedMessages({ items, onRemove }: {
   );
 }
 
-/**
- * 把面板往上長出來的高度寫進根節點的 --footer-extra，讓字幕（App.tsx）跟著
- * 往上讓開。寫在根節點而不是共同祖先：只有一個 footer，跟 App.tsx 的 --vh 同一種做法。
- */
-function useFooterExtraVar(isCollapsed: boolean) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const panel = panelRef.current;
-    const slot = panel?.parentElement;
-    if (!panel || !slot) return undefined;
-    const root = document.documentElement;
-    const update = () => {
-      const extra = footerExtra({
-        panelHeight: panel.offsetHeight,
-        slotHeight: slot.offsetHeight,
-        collapsed: isCollapsed,
-      });
-      root.style.setProperty('--footer-extra', `${extra}px`);
-    };
-    update();
-    const observer = new ResizeObserver(update);
-    observer.observe(panel);
-    observer.observe(slot);
-    return () => {
-      observer.disconnect();
-      root.style.removeProperty('--footer-extra');
-    };
-  }, [isCollapsed]);
-  return panelRef;
-}
-
 // Main component
-function Footer({ isCollapsed = false, onToggle }: FooterProps): JSX.Element {
+function Footer(): JSX.Element {
   const {
     inputValue,
     handleInputChange,
@@ -246,19 +180,19 @@ function Footer({ isCollapsed = false, onToggle }: FooterProps): JSX.Element {
   const { aiState } = useAiState();
   const { live } = useStream();
   const { settings } = useProactiveSpeak();
-  const panelRef = useFooterExtraVar(isCollapsed);
 
   return (
-    <Box ref={panelRef} {...footerStyles.footer.container(isCollapsed)}>
-      <ToggleButton isCollapsed={isCollapsed} onToggle={onToggle} />
+    // 右欄最底下的輸入列（像直播聊天室）。角色膠囊不顯示——心情與「思考、說話中」
+    // 只留給讀螢幕軟體（膠囊裡的 role="status"），畫面上舞台與字幕已經看得出來。
+    <Box {...footerStyles.footer.container}>
+      <VisuallyHidden>
+        <CharacterChip />
+      </VisuallyHidden>
 
       {/* 她講話時送出的訊息：排隊中，等她講完才真的送出、才進對話。 */}
       {queued.length > 0 && <QueuedMessages items={queued} onRemove={removeQueued} />}
 
       <Box {...footerStyles.footer.row}>
-        <Box {...footerStyles.footer.lineSlot}>
-          <CharacterChip />
-        </Box>
         <Box {...footerStyles.footer.lineSlot}>
           <MicButton micOn={micOn} onMicToggle={handleMicToggle} />
         </Box>

@@ -953,8 +953,6 @@
     "attachFile": "Attach image or document",
     "removeFile": "Remove document",
     "interrupt": "Interrupt her",
-    "collapseControls": "Collapse input controls",
-    "expandControls": "Expand input controls",
     "streamingPaused": "Live stream in progress — chat paused"
   },
   "sidebar": {
@@ -973,8 +971,10 @@
     "windowMode": "Window mode",
     "petMode": "Desktop pet mode",
     "petModeDesktopOnly": "Desktop pet mode is only available in the desktop app",
-    "collapsePanel": "Collapse sidebar",
-    "expandPanel": "Expand sidebar"
+    "collapsePanel": "Hide chat",
+    "expandPanel": "Show chat",
+    "collapseMedia": "Hide camera / screen",
+    "expandMedia": "Show camera / screen"
   },
   "group": {
     "management": "Group Management",

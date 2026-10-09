@@ -34,22 +34,21 @@ const commonStyles = {
 
 export const sidebarStyles = {
   sidebar: {
+    // 右欄。收起時整欄往右推出去，只留左緣一條把手（SIDEBAR_COLLAPSED_WIDTH）。
     container: (isCollapsed: boolean) => ({
       position: 'absolute' as const,
-      left: 0,
+      right: 0,
       top: 0,
       height: '100%',
       width: { base: '100%', md: SIDEBAR_WIDTH },
       bg: 'gray.900',
       transform: isCollapsed
-        ? `translateX(calc(-100% + ${SIDEBAR_COLLAPSED_WIDTH}))`
+        ? { base: 'none', md: `translateX(calc(100% - ${SIDEBAR_COLLAPSED_WIDTH}))` }
         : 'translateX(0)',
       transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
       display: 'flex',
       flexDirection: 'column' as const,
-      gap: 4,
       overflow: isCollapsed ? 'visible' : 'hidden',
-      pb: '4',
     }),
     // Icon-only actions on the dark sidebar. These carried no styling at all
     // and rendered as Chakra's default `solid` chip, which only looked right
@@ -64,30 +63,32 @@ export const sidebarStyles = {
       _hover: { bg: 'whiteAlpha.200', color: 'white' },
       _active: { bg: 'whiteAlpha.300' },
     },
-    toggleButton: {
+    // 收起後左緣那一整條把手；展開時改用按鈕列最右邊的那顆。
+    collapsedRail: {
       position: 'absolute',
-      right: 0,
+      left: 0,
       top: 0,
       width: SIDEBAR_COLLAPSED_WIDTH,
       minWidth: SIDEBAR_COLLAPSED_WIDTH,
       padding: 0,
       height: '100%',
-      display: 'flex',
+      display: { base: 'none', md: 'flex' },
       alignItems: 'center',
       justifyContent: 'center',
       cursor: 'pointer',
       color: 'whiteAlpha.700',
-      _hover: { color: 'white' },
+      _hover: { color: 'white', bg: 'whiteAlpha.50' },
       bg: 'transparent',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+      borderRadius: 0,
       zIndex: 1,
     },
     content: {
       flex: 1,
+      minHeight: 0,
       width: '100%',
       display: 'flex',
       flexDirection: 'column' as const,
-      gap: 4,
+      gap: 3,
       overflow: 'hidden',
     },
     header: {
@@ -96,14 +97,17 @@ export const sidebarStyles = {
       alignItems: 'center',
       gap: 1,
       p: 2,
+      borderBottom: '1px solid',
+      borderColor: 'whiteAlpha.100',
     },
   },
 
   chatHistoryPanel: {
     container: {
       flex: 1,
+      minHeight: 0,
       overflow: 'hidden',
-      px: 4,
+      px: 3,
       display: 'flex',
       flexDirection: 'column',
     },
@@ -111,7 +115,7 @@ export const sidebarStyles = {
     messageList: {
       ...commonStyles.panel,
       p: 4,
-      width: '97%',
+      width: '100%',
       flex: 1,
       overflowY: 'auto',
       css: {
@@ -360,8 +364,9 @@ export const sidebarStyles = {
 
   bottomTab: {
     container: {
-      width: '97%',
-      px: 4,
+      width: '100%',
+      px: 3,
+      flexShrink: 0,
       position: 'relative' as const,
       zIndex: 0,
     },
@@ -542,7 +547,7 @@ export const chatPanelStyles = css`
   .cs-main-container {
     border: none !important;
     background: transparent !important;
-    width: calc(100% - ${SIDEBAR_COLLAPSED_WIDTH}) !important;
+    width: 100% !important;
     margin-left: 0 !important;
   }
 

@@ -953,8 +953,6 @@
     "attachFile": "附加圖片或文件",
     "removeFile": "移除文件",
     "interrupt": "打斷她說話",
-    "collapseControls": "收合輸入控制列",
-    "expandControls": "展開輸入控制列",
     "streamingPaused": "直播中，私人聊天暫停"
   },
   "sidebar": {
@@ -973,8 +971,10 @@
     "windowMode": "視窗模式",
     "petMode": "桌寵模式",
     "petModeDesktopOnly": "桌寵模式只有桌面版才能用",
-    "collapsePanel": "收合側邊欄",
-    "expandPanel": "展開側邊欄"
+    "collapsePanel": "收合聊天室",
+    "expandPanel": "展開聊天室",
+    "collapseMedia": "收起攝影機／螢幕",
+    "expandMedia": "展開攝影機／螢幕"
   },
   "group": {
     "management": "群組管理",

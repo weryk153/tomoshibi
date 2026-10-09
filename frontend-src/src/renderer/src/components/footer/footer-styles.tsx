@@ -1,11 +1,10 @@
 import { SystemStyleObject } from '@chakra-ui/react';
 import { ACCENT_INK } from '@/theme/tomoshibi';
 
-// 底部列（方向 02「直播間・霓虹」）：一列 64px——角色膠囊、圓形麥克風、單行輸入框，
-// 上面照舊是 28px 的收合把手。顏色全用 token：gray.900＝panel、gray.800＝panel2、
+// 右欄最底下的輸入列（方向 02「直播間・霓虹」）：圓形麥克風＋輸入框，像直播聊天室。顏色全用 token：gray.900＝panel、gray.800＝panel2、
 // green.*＝主色粉、gray.400＝次文字（fg2），見 theme/tomoshibi.ts。
 
-/** 一行的輸入框高度；麥克風、膠囊都對齊這條中線。 */
+/** 一行的輸入框高度；麥克風對齊這條中線。 */
 const INPUT_HEIGHT = '44px';
 /** 長到三行為止，再多就在框內捲動。15px 字 × 1.45 行高 ≈ 22px 一行。 */
 const INPUT_MAX_HEIGHT = '88px';
@@ -14,8 +13,7 @@ const ACCENT_GLOW = 'rgba(255, 79, 154, 0.18)';
 const LINE = 'rgba(255, 255, 255, 0.07)';
 
 interface FooterStyles {
-  container: (isCollapsed: boolean) => SystemStyleObject
-  toggleButton: SystemStyleObject
+  container: SystemStyleObject
   row: SystemStyleObject
   lineSlot: SystemStyleObject
   mic: (micOn: boolean) => SystemStyleObject
@@ -28,45 +26,19 @@ interface FooterStyles {
 
 export const footerStyles: { footer: FooterStyles } = {
   footer: {
-    container: (isCollapsed) => ({
-      bg: isCollapsed ? 'transparent' : 'gray.900',
-      // 上緣的分隔線用 inset 陰影畫，不用 border：border 會讓面板比 footer 那格
-      // 多 1px，--footer-extra（字幕讓開的高度）在一行時就變成 1 而不是 0。
-      boxShadow: isCollapsed ? 'none' : `inset 0 1px 0 ${LINE}`,
-      transform: isCollapsed ? 'translateY(calc(100% - 28px))' : 'translateY(0)',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-      // 貼著底部、至少佔滿 footer 那一格，內容變高就往上長：輸入框長到第二、
-      // 三行時整塊面板（連同收合把手）一起往上蓋到畫布上，把手永遠在最上面、
-      // 點得到；畫布本身不縮，角色不會跟著打字一抖一抖地重新排版。
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      bottom: 0,
-      minHeight: '100%',
-      overflow: 'visible',
-      pb: '0',
-    }),
-    toggleButton: {
-      height: '28px',
-      minHeight: '28px',
-      minWidth: '100%',
-      padding: 0,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-      cursor: 'pointer',
-      color: 'gray.400',
-      _hover: { color: 'gray.50' },
-      bg: 'transparent',
-      transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+    // 在右欄的 flex 欄裡排在最後：輸入框長到多行時整列跟著長高，把聊天紀錄往上擠。
+    container: {
+      bg: 'gray.900',
+      boxShadow: `inset 0 1px 0 ${LINE}`,
+      flexShrink: 0,
     },
-    // 一行時 10＋44＋10＝64px。多行時這一列跟著輸入框長高，膠囊與麥克風
-    // 貼齊底部那一行（lineSlot 各佔一行高、在裡面置中）。
+    // 一行時 10＋44＋10＝64px。多行時這一列跟著輸入框長高，麥克風貼齊底部那一行
+    // （lineSlot 佔一行高、在裡面置中）。
     row: {
       minHeight: '64px',
-      px: '4',
+      px: '3',
       py: '10px',
-      gap: '3',
+      gap: '2',
       display: 'flex',
       alignItems: 'flex-end',
     },
