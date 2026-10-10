@@ -15,6 +15,8 @@ import {
   IMAGE_COMPRESSION_QUALITY_KEY, IMAGE_MAX_WIDTH_KEY, loadImageQuality, loadImageMaxWidth,
 } from '@/utils/image-settings';
 import { SelectField, InputField, TabActions } from './common';
+import { useTheme } from '@/context/theme-context';
+import { THEME_OPTIONS, normalizeThemePreference } from '@/theme/theme-preference';
 
 const LANGUAGES = [
   { label: 'English', value: 'en' },
@@ -32,6 +34,10 @@ interface SystemBasicsProps {
 
 function SystemBasics({ onCancel }: SystemBasicsProps): JSX.Element {
   const { t, i18n } = useTranslation();
+  const { preference, setPreference } = useTheme();
+  const themes = useMemo(() => createListCollection({
+    items: THEME_OPTIONS.map((value): { value: string; label: string } => ({ value, label: t(`settings.appearance.${value}`) })),
+  }), [t]);
   const {
     wsUrl, setWsUrl, baseUrl, setBaseUrl,
   } = useWebSocket();
@@ -79,6 +85,13 @@ function SystemBasics({ onCancel }: SystemBasicsProps): JSX.Element {
 
   return (
     <Stack gap={4}>
+      <SelectField
+        label={t('settings.appearance.theme')}
+        value={[preference]}
+        onChange={(value) => setPreference(normalizeThemePreference(value[0]))}
+        collection={themes}
+        help={t('settings.appearance.themeHelp')}
+      />
       {/* 介面語言：這個 App 的選單與按鈕。她說話的語言在角色頁。 */}
       <SelectField
         label={t('settings.general.interfaceLanguage')}

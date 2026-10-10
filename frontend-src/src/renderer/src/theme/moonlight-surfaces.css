@@ -3,156 +3,156 @@
    inherit the same appearance, while broadcast subtitles retain their contrast.
    Legacy dark-theme token names remain until the component migration is done. */
 :is(.moonlight-surface, .moonlight-drawer, [data-scope="dialog"][data-part="content"], [data-scope="select"][data-part="content"], [data-scope="menu"][data-part="content"], [data-scope="tooltip"][data-part="content"], [data-scope="popover"][data-part="content"], [data-scope="toast"][data-part="root"]) {
-  color-scheme: light;
-  color: #342d49;
-  --color-white: #342d49;
-  --chakra-colors-white: #342d49;
-  --color-zinc-50: #342d49;
-  --chakra-colors-gray-50: #342d49;
-  --color-zinc-100: #463b58;
-  --chakra-colors-gray-100: #463b58;
-  --color-zinc-200: #574b69;
-  --chakra-colors-gray-200: #574b69;
-  --color-zinc-300: #6c607b;
-  --chakra-colors-gray-300: #6c607b;
-  --color-zinc-400: #80718e;
-  --chakra-colors-gray-400: #80718e;
-  --color-zinc-500: #8f809d;
-  --chakra-colors-gray-500: #8f809d;
-  --color-zinc-600: #bbaecb;
-  --chakra-colors-gray-600: #bbaecb;
-  --color-zinc-700: #e6ddf3;
-  --chakra-colors-gray-700: #e6ddf3;
-  --color-zinc-800: #f5effa;
-  --chakra-colors-gray-800: #f5effa;
-  --color-zinc-900: #fffcf7;
-  --chakra-colors-gray-900: #fffcf7;
-  --color-zinc-950: #ede9f5;
-  --chakra-colors-gray-950: #ede9f5;
-  --color-blue-50: #f6f1fc;
-  --chakra-colors-blue-50: #f6f1fc;
-  --color-blue-100: #e6ddf3;
-  --chakra-colors-blue-100: #e6ddf3;
-  --color-blue-200: #5c468c;
-  --chakra-colors-blue-200: #5c468c;
-  --color-blue-300: #654f95;
-  --chakra-colors-blue-300: #654f95;
-  --color-blue-400: #69509a;
-  --chakra-colors-blue-400: #69509a;
-  --color-blue-500: #7761ae;
-  --chakra-colors-blue-500: #7761ae;
-  --color-blue-600: #695198;
-  --chakra-colors-blue-600: #695198;
-  --color-blue-700: #574181;
-  --chakra-colors-blue-700: #574181;
-  --color-blue-800: #49366d;
-  --chakra-colors-blue-800: #49366d;
-  --color-blue-900: #382952;
-  --chakra-colors-blue-900: #382952;
-  --color-blue-950: #2a203f;
-  --chakra-colors-blue-950: #2a203f;
-  --chakra-colors-blue-contrast: #fff;
-  --chakra-colors-blue-fg: #5c468c;
-  --chakra-colors-blue-subtle: #eee6f7;
-  --chakra-colors-blue-muted: #e6ddf3;
-  --chakra-colors-blue-emphasized: #d0c5e1;
-  --chakra-colors-blue-solid: #7761ae;
-  --color-green-50: #f6f1fc;
-  --chakra-colors-green-50: #f6f1fc;
-  --color-green-100: #e6ddf3;
-  --chakra-colors-green-100: #e6ddf3;
-  --color-green-200: #5c468c;
-  --chakra-colors-green-200: #5c468c;
-  --color-green-300: #654f95;
-  --chakra-colors-green-300: #654f95;
-  --color-green-400: #69509a;
-  --chakra-colors-green-400: #69509a;
-  --color-green-500: #7761ae;
-  --chakra-colors-green-500: #7761ae;
-  --color-green-600: #695198;
-  --chakra-colors-green-600: #695198;
-  --color-green-700: #574181;
-  --chakra-colors-green-700: #574181;
-  --color-green-800: #49366d;
-  --chakra-colors-green-800: #49366d;
-  --color-green-900: #382952;
-  --chakra-colors-green-900: #382952;
-  --color-green-950: #2a203f;
-  --chakra-colors-green-950: #2a203f;
-  --chakra-colors-green-contrast: #fff;
-  --chakra-colors-green-fg: #5c468c;
-  --chakra-colors-green-subtle: #eee6f7;
-  --chakra-colors-green-muted: #e6ddf3;
-  --chakra-colors-green-emphasized: #d0c5e1;
-  --chakra-colors-green-solid: #7761ae;
-  --color-walpha-50: rgba(67, 49, 89, .04);
-  --chakra-colors-white-alpha-50: rgba(67, 49, 89, .04);
-  --color-walpha-100: rgba(67, 49, 89, .05);
-  --chakra-colors-white-alpha-100: rgba(67, 49, 89, .05);
-  --color-walpha-200: rgba(67, 49, 89, .13);
-  --chakra-colors-white-alpha-200: rgba(67, 49, 89, .13);
-  --color-walpha-300: rgba(67, 49, 89, .20);
-  --chakra-colors-white-alpha-300: rgba(67, 49, 89, .20);
-  --color-walpha-400: rgba(67, 49, 89, .32);
-  --chakra-colors-white-alpha-400: rgba(67, 49, 89, .32);
-  --color-walpha-500: rgba(67, 49, 89, .55);
-  --chakra-colors-white-alpha-500: rgba(67, 49, 89, .55);
-  --color-walpha-600: rgba(67, 49, 89, .72);
-  --chakra-colors-white-alpha-600: rgba(67, 49, 89, .72);
-  --color-walpha-700: rgba(67, 49, 89, .80);
-  --chakra-colors-white-alpha-700: rgba(67, 49, 89, .80);
-  --color-walpha-800: rgba(67, 49, 89, .88);
-  --chakra-colors-white-alpha-800: rgba(67, 49, 89, .88);
-  --color-walpha-900: rgba(67, 49, 89, .96);
-  --chakra-colors-white-alpha-900: rgba(67, 49, 89, .96);
-  --color-walpha-950: rgba(67, 49, 89, 1);
-  --chakra-colors-white-alpha-950: rgba(67, 49, 89, 1);
-  --color-red-200: #b33c51;
-  --chakra-colors-red-200: #b33c51;
-  --color-red-300: #b33c51;
-  --chakra-colors-red-300: #b33c51;
-  --color-red-400: #b33c51;
-  --chakra-colors-red-400: #b33c51;
-  --color-orange-200: #a65321;
-  --chakra-colors-orange-200: #a65321;
-  --color-orange-300: #a65321;
-  --chakra-colors-orange-300: #a65321;
-  --color-orange-400: #a65321;
-  --chakra-colors-orange-400: #a65321;
-  --color-yellow-200: #916418;
-  --chakra-colors-yellow-200: #916418;
-  --color-yellow-300: #916418;
-  --chakra-colors-yellow-300: #916418;
-  --color-yellow-400: #916418;
-  --chakra-colors-yellow-400: #916418;
-  --color-teal-200: #387665;
-  --chakra-colors-teal-200: #387665;
-  --color-teal-300: #387665;
-  --chakra-colors-teal-300: #387665;
-  --color-teal-400: #387665;
-  --chakra-colors-teal-400: #387665;
-  --color-cyan-200: #44737d;
-  --chakra-colors-cyan-200: #44737d;
-  --color-cyan-300: #44737d;
-  --chakra-colors-cyan-300: #44737d;
-  --color-cyan-400: #44737d;
-  --chakra-colors-cyan-400: #44737d;
-  --chakra-colors-purple-300: #695198;
-  --color-purple-300: #695198;
-  --color-accent-ink: #fff;
-  --color-accent2-ink: #fff;
-  --chakra-colors-fg: #342d49;
-  --chakra-colors-fg-muted: #80718e;
-  --chakra-colors-fg-subtle: #80718e;
-  --chakra-colors-fg-inverted: #fff;
-  --chakra-colors-bg: #fffcf7;
-  --chakra-colors-bg-panel: #fffcf7;
-  --chakra-colors-bg-subtle: #f5effa;
-  --chakra-colors-bg-muted: #eee6f7;
-  --chakra-colors-bg-emphasized: #e6ddf3;
-  --chakra-colors-border: #d0c5e1;
-  --chakra-colors-border-muted: #e5dced;
-  --chakra-colors-border-emphasized: #b6a5cf;
+  color-scheme: var(--moon-color-scheme);
+  color: var(--moon-ink);
+  --color-white: var(--moon-ink);
+  --chakra-colors-white: var(--moon-ink);
+  --color-zinc-50: var(--moon-ink);
+  --chakra-colors-gray-50: var(--moon-ink);
+  --color-zinc-100: var(--moon-ink-2);
+  --chakra-colors-gray-100: var(--moon-ink-2);
+  --color-zinc-200: var(--moon-ink-3);
+  --chakra-colors-gray-200: var(--moon-ink-3);
+  --color-zinc-300: var(--moon-ink-4);
+  --chakra-colors-gray-300: var(--moon-ink-4);
+  --color-zinc-400: var(--moon-muted-ui);
+  --chakra-colors-gray-400: var(--moon-muted-ui);
+  --color-zinc-500: var(--moon-muted-faint);
+  --chakra-colors-gray-500: var(--moon-muted-faint);
+  --color-zinc-600: var(--moon-line-emphasis);
+  --chakra-colors-gray-600: var(--moon-line-emphasis);
+  --color-zinc-700: var(--moon-lilac);
+  --chakra-colors-gray-700: var(--moon-lilac);
+  --color-zinc-800: var(--moon-nav);
+  --chakra-colors-gray-800: var(--moon-nav);
+  --color-zinc-900: var(--moon-paper);
+  --chakra-colors-gray-900: var(--moon-paper);
+  --color-zinc-950: var(--moon-background);
+  --chakra-colors-gray-950: var(--moon-background);
+  --color-blue-50: var(--moon-purple-faint);
+  --chakra-colors-blue-50: var(--moon-purple-faint);
+  --color-blue-100: var(--moon-lilac);
+  --chakra-colors-blue-100: var(--moon-lilac);
+  --color-blue-200: var(--moon-dark);
+  --chakra-colors-blue-200: var(--moon-dark);
+  --color-blue-300: var(--moon-accent-text);
+  --chakra-colors-blue-300: var(--moon-accent-text);
+  --color-blue-400: var(--moon-accent-text-2);
+  --chakra-colors-blue-400: var(--moon-accent-text-2);
+  --color-blue-500: var(--moon-action);
+  --chakra-colors-blue-500: var(--moon-action);
+  --color-blue-600: var(--moon-action-hover);
+  --chakra-colors-blue-600: var(--moon-action-hover);
+  --color-blue-700: var(--moon-accent-deep);
+  --chakra-colors-blue-700: var(--moon-accent-deep);
+  --color-blue-800: var(--moon-accent-deeper);
+  --chakra-colors-blue-800: var(--moon-accent-deeper);
+  --color-blue-900: var(--moon-accent-dark);
+  --chakra-colors-blue-900: var(--moon-accent-dark);
+  --color-blue-950: var(--moon-accent-darkest);
+  --chakra-colors-blue-950: var(--moon-accent-darkest);
+  --chakra-colors-blue-contrast: var(--moon-action-ink);
+  --chakra-colors-blue-fg: var(--moon-dark);
+  --chakra-colors-blue-subtle: var(--moon-surface-muted);
+  --chakra-colors-blue-muted: var(--moon-lilac);
+  --chakra-colors-blue-emphasized: var(--moon-line);
+  --chakra-colors-blue-solid: var(--moon-action);
+  --color-green-50: var(--moon-purple-faint);
+  --chakra-colors-green-50: var(--moon-purple-faint);
+  --color-green-100: var(--moon-lilac);
+  --chakra-colors-green-100: var(--moon-lilac);
+  --color-green-200: var(--moon-dark);
+  --chakra-colors-green-200: var(--moon-dark);
+  --color-green-300: var(--moon-accent-text);
+  --chakra-colors-green-300: var(--moon-accent-text);
+  --color-green-400: var(--moon-accent-text-2);
+  --chakra-colors-green-400: var(--moon-accent-text-2);
+  --color-green-500: var(--moon-action);
+  --chakra-colors-green-500: var(--moon-action);
+  --color-green-600: var(--moon-action-hover);
+  --chakra-colors-green-600: var(--moon-action-hover);
+  --color-green-700: var(--moon-accent-deep);
+  --chakra-colors-green-700: var(--moon-accent-deep);
+  --color-green-800: var(--moon-accent-deeper);
+  --chakra-colors-green-800: var(--moon-accent-deeper);
+  --color-green-900: var(--moon-accent-dark);
+  --chakra-colors-green-900: var(--moon-accent-dark);
+  --color-green-950: var(--moon-accent-darkest);
+  --chakra-colors-green-950: var(--moon-accent-darkest);
+  --chakra-colors-green-contrast: var(--moon-action-ink);
+  --chakra-colors-green-fg: var(--moon-dark);
+  --chakra-colors-green-subtle: var(--moon-surface-muted);
+  --chakra-colors-green-muted: var(--moon-lilac);
+  --chakra-colors-green-emphasized: var(--moon-line);
+  --chakra-colors-green-solid: var(--moon-action);
+  --color-walpha-50: rgba(var(--moon-ink-rgb), .04);
+  --chakra-colors-white-alpha-50: rgba(var(--moon-ink-rgb), .04);
+  --color-walpha-100: rgba(var(--moon-ink-rgb), .05);
+  --chakra-colors-white-alpha-100: rgba(var(--moon-ink-rgb), .05);
+  --color-walpha-200: rgba(var(--moon-ink-rgb), .13);
+  --chakra-colors-white-alpha-200: rgba(var(--moon-ink-rgb), .13);
+  --color-walpha-300: rgba(var(--moon-ink-rgb), .20);
+  --chakra-colors-white-alpha-300: rgba(var(--moon-ink-rgb), .20);
+  --color-walpha-400: rgba(var(--moon-ink-rgb), .32);
+  --chakra-colors-white-alpha-400: rgba(var(--moon-ink-rgb), .32);
+  --color-walpha-500: rgba(var(--moon-ink-rgb), .55);
+  --chakra-colors-white-alpha-500: rgba(var(--moon-ink-rgb), .55);
+  --color-walpha-600: rgba(var(--moon-ink-rgb), .72);
+  --chakra-colors-white-alpha-600: rgba(var(--moon-ink-rgb), .72);
+  --color-walpha-700: rgba(var(--moon-ink-rgb), .80);
+  --chakra-colors-white-alpha-700: rgba(var(--moon-ink-rgb), .80);
+  --color-walpha-800: rgba(var(--moon-ink-rgb), .88);
+  --chakra-colors-white-alpha-800: rgba(var(--moon-ink-rgb), .88);
+  --color-walpha-900: rgba(var(--moon-ink-rgb), .96);
+  --chakra-colors-white-alpha-900: rgba(var(--moon-ink-rgb), .96);
+  --color-walpha-950: rgba(var(--moon-ink-rgb), 1);
+  --chakra-colors-white-alpha-950: rgba(var(--moon-ink-rgb), 1);
+  --color-red-200: var(--moon-error);
+  --chakra-colors-red-200: var(--moon-error);
+  --color-red-300: var(--moon-error);
+  --chakra-colors-red-300: var(--moon-error);
+  --color-red-400: var(--moon-error);
+  --chakra-colors-red-400: var(--moon-error);
+  --color-orange-200: var(--moon-warning-orange);
+  --chakra-colors-orange-200: var(--moon-warning-orange);
+  --color-orange-300: var(--moon-warning-orange);
+  --chakra-colors-orange-300: var(--moon-warning-orange);
+  --color-orange-400: var(--moon-warning-orange);
+  --chakra-colors-orange-400: var(--moon-warning-orange);
+  --color-yellow-200: var(--moon-warning);
+  --chakra-colors-yellow-200: var(--moon-warning);
+  --color-yellow-300: var(--moon-warning);
+  --chakra-colors-yellow-300: var(--moon-warning);
+  --color-yellow-400: var(--moon-warning);
+  --chakra-colors-yellow-400: var(--moon-warning);
+  --color-teal-200: var(--moon-success-green);
+  --chakra-colors-teal-200: var(--moon-success-green);
+  --color-teal-300: var(--moon-success-green);
+  --chakra-colors-teal-300: var(--moon-success-green);
+  --color-teal-400: var(--moon-success-green);
+  --chakra-colors-teal-400: var(--moon-success-green);
+  --color-cyan-200: var(--moon-info);
+  --chakra-colors-cyan-200: var(--moon-info);
+  --color-cyan-300: var(--moon-info);
+  --chakra-colors-cyan-300: var(--moon-info);
+  --color-cyan-400: var(--moon-info);
+  --chakra-colors-cyan-400: var(--moon-info);
+  --chakra-colors-purple-300: var(--moon-accent-text);
+  --color-purple-300: var(--moon-accent-text);
+  --color-accent-ink: var(--moon-action-ink);
+  --color-accent2-ink: var(--moon-action-ink);
+  --chakra-colors-fg: var(--moon-ink);
+  --chakra-colors-fg-muted: var(--moon-muted-ui);
+  --chakra-colors-fg-subtle: var(--moon-muted-ui);
+  --chakra-colors-fg-inverted: var(--moon-action-ink);
+  --chakra-colors-bg: var(--moon-paper);
+  --chakra-colors-bg-panel: var(--moon-paper);
+  --chakra-colors-bg-subtle: var(--moon-nav);
+  --chakra-colors-bg-muted: var(--moon-surface-muted);
+  --chakra-colors-bg-emphasized: var(--moon-lilac);
+  --chakra-colors-border: var(--moon-line);
+  --chakra-colors-border-muted: var(--moon-line-soft);
+  --chakra-colors-border-emphasized: var(--moon-line-focus);
   --chakra-radii-sm: 6px;
   --chakra-radii-md: 10px;
   --chakra-radii-lg: 14px;
@@ -160,55 +160,55 @@
 }
 
 .moonlight-drawer {
-  border: 1px solid #d0c5e1;
-  border-radius: 24px;
+  border: 1px solid var(--moon-line);
+  border-radius: var(--moon-radius);
   overflow: hidden;
-  box-shadow: 0 12px 60px #49366d25, 0 3px 0 #d8cde580;
+  box-shadow: 0 12px 60px var(--moon-shadow-drawer), 0 3px 0 var(--moon-shadow-drawer-rim);
 }
-.moonlight-drawer-header { border-bottom: 1px solid #e5dced; background: #fffcf7; }
-.moonlight-drawer-header h2 { color: #5c468c; letter-spacing: .02em; }
-.moonlight-drawer-footer { background: #faf6fd; }
-.moonlight-settings-nav { background: #f5effa; }
-.moonlight-settings-nav [data-selected] { box-shadow: inset 3px 0 0 #7761ae; }
-.moonlight-settings-content { background: #fffcf7; }
+.moonlight-drawer-header { border-bottom: 1px solid var(--moon-line-soft); background: var(--moon-paper); }
+.moonlight-drawer-header h2 { color: var(--moon-dark); letter-spacing: .02em; }
+.moonlight-drawer-footer { background: var(--moon-footer); }
+.moonlight-settings-nav { background: var(--moon-nav); }
+.moonlight-settings-nav [data-selected] { box-shadow: inset 3px 0 0 var(--moon-purple); }
+.moonlight-settings-content { background: var(--moon-paper); }
 .moonlight-setting-section {
-  min-width: 0; padding: 20px; border: 1px solid #e5dced;
-  border-radius: 18px; background: #fffdfa;
+  min-width: 0; padding: 20px; border: 1px solid var(--moon-line-soft);
+  border-radius: var(--moon-radius-inner); background: var(--moon-card);
 }
 .moonlight-setting-section .moonlight-setting-section {
   padding: 16px 0 0; border-width: 1px 0 0; border-radius: 0; background: transparent;
 }
 .moonlight-control { border-radius: 12px; min-height: 40px; }
 .moonlight-button { min-height: 34px; }
-.moonlight-drawer :is(input, textarea)::placeholder { color: #8c7f99; }
+.moonlight-drawer :is(input, textarea)::placeholder { color: var(--moon-placeholder); }
 .moonlight-drawer [data-scope="switch"][data-part="thumb"],
 .moonlight-drawer [data-scope="slider"][data-part="thumb"] {
-  background: #fffcf7; border: 1px solid #c5b7d8;
+  background: #fffcf7; border: 1px solid var(--moon-scrollbar);
 }
 .moonlight-drawer [data-scope="slider"][data-part="thumb"] { width: 18px; height: 18px; }
 /* The literal white utility is used for both text and switch knobs in legacy
    controls. Solid danger buttons still need white text on their darker fill. */
 .moonlight-drawer :is(.bg-red-600, .bg-orange-600) { color: #fff; }
 .moonlight-drawer :is(button, input, textarea, select):focus-visible {
-  outline: 2px solid #7761ae; outline-offset: 2px;
+  outline: 2px solid var(--moon-purple); outline-offset: 2px;
 }
 :is([data-scope="select"], [data-scope="menu"], [data-scope="tooltip"], [data-scope="popover"])[data-part="content"] {
-  background: #fffcf7; color: #342d49; border: 1px solid #d0c5e1;
-  border-radius: 14px; box-shadow: 0 8px 28px #49366d20;
+  background: var(--moon-paper); color: var(--moon-ink); border: 1px solid var(--moon-line);
+  border-radius: 14px; box-shadow: 0 8px 28px var(--moon-shadow-menu);
 }
-:is([data-scope="select"], [data-scope="menu"])[data-part="item"][data-highlighted] { background: #e6ddf3; }
-[data-scope="dialog"][data-part="content"]:not(.moonlight-drawer) { background: #fffcf7; border: 1px solid #d0c5e1; border-radius: 18px; }
-[data-scope="toast"][data-part="root"] { background: #fffcf7; border-radius: 18px; }
-.moonlight-drawer * { scrollbar-color: #c5b7d8 transparent; scrollbar-width: thin; }
+:is([data-scope="select"], [data-scope="menu"])[data-part="item"][data-highlighted] { background: var(--moon-lilac); }
+[data-scope="dialog"][data-part="content"]:not(.moonlight-drawer) { background: var(--moon-paper); border: 1px solid var(--moon-line); border-radius: 18px; }
+[data-scope="toast"][data-part="root"] { background: var(--moon-paper); border-radius: 18px; }
+.moonlight-drawer * { scrollbar-color: var(--moon-scrollbar) transparent; scrollbar-width: thin; }
 @media (max-width: 639px) {
   .moonlight-drawer { border-radius: 18px; }
   .moonlight-settings-content { padding: 16px 12px; }
   .moonlight-setting-section { padding: 14px; }
-  .moonlight-settings-nav [data-selected] { box-shadow: inset 0 -3px 0 #7761ae; }
+  .moonlight-settings-nav [data-selected] { box-shadow: inset 0 -3px 0 var(--moon-purple); }
   .moonlight-settings-nav [data-part="trigger"] { padding: 10px; gap: 6px; }
   .moonlight-settings-nav [data-part="trigger"] svg { width: 14px; }
 }
 
-.moonlight-settings-content [data-scope="tabs"][data-part="list"] { gap: 4px; border-color: #e5dced; }
-.moonlight-settings-content [data-scope="tabs"][data-part="trigger"] { border-radius: 10px; color: #80718e; }
-.moonlight-settings-content [data-scope="tabs"][data-part="trigger"][data-selected] { background: #e6ddf3; color: #5c468c; }
+.moonlight-settings-content [data-scope="tabs"][data-part="list"] { gap: 4px; border-color: var(--moon-line-soft); }
+.moonlight-settings-content [data-scope="tabs"][data-part="trigger"] { border-radius: 10px; color: var(--moon-muted-ui); }
+.moonlight-settings-content [data-scope="tabs"][data-part="trigger"][data-selected] { background: var(--moon-lilac); color: var(--moon-dark); }

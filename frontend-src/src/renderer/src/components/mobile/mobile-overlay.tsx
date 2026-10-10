@@ -39,9 +39,9 @@ const RailButton = forwardRef<HTMLButtonElement, ButtonProps & {
     minW="42px"
     p="0"
     borderRadius="full"
-    bg={active ? 'green.500' : 'blackAlpha.500'}
-    color={active ? 'gray.950' : 'whiteAlpha.900'}
-    _hover={{ bg: active ? 'green.400' : 'blackAlpha.700' }}
+    bg={active ? 'var(--moon-action)' : 'blackAlpha.500'}
+    color={active ? 'var(--moon-action-ink)' : 'whiteAlpha.900'}
+    _hover={{ bg: active ? 'var(--moon-action-hover)' : 'blackAlpha.700' }}
     fontSize="18px"
     {...rest}
   >
@@ -50,6 +50,30 @@ const RailButton = forwardRef<HTMLButtonElement, ButtonProps & {
 ));
 
 RailButton.displayName = 'RailButton';
+
+// 名字做成小標籤，配色照電腦版的聊天泡泡（她：--moon-bubble，我：--moon-user-bubble），
+// 換主題也跟著變。直接當文字顏色的話，亮色主題兩種都太淡、疊在暗底上分不出來。
+function NameTag({ name, mine }: { name: string, mine: boolean }): JSX.Element {
+  return (
+    <Text
+      as="span"
+      display="inline-block"
+      fontSize="12px"
+      fontWeight="600"
+      lineHeight="1.4"
+      px="1.5"
+      mr="1.5"
+      borderRadius="6px"
+      textShadow="none"
+      bg={mine ? 'var(--moon-user-bubble)' : 'var(--moon-bubble)'}
+      border="1px solid"
+      borderColor={mine ? 'var(--moon-user-line)' : 'var(--moon-bubble-line)'}
+      color="var(--moon-ink)"
+    >
+      {name}
+    </Text>
+  );
+}
 
 function Line({ line, userName, aiName }: {
   line: ChatLine
@@ -62,21 +86,19 @@ function Line({ line, userName, aiName }: {
       <Box
         bg="rgba(10, 10, 14, 0.72)"
         borderLeft="3px solid"
-        borderColor="green.500"
+        borderColor="var(--moon-purple)"
         borderRadius="10px"
         px="3"
         py="2"
       >
-        <Text fontSize="12px" fontWeight="600" color="blue.300" mb="0.5">{name}</Text>
+        <Box mb="1"><NameTag name={name} mine={false} /></Box>
         <Text fontSize="16.5px" lineHeight="1.5" fontWeight="500" color="white">{line.content}</Text>
       </Box>
     );
   }
   return (
     <Text fontSize="13px" lineHeight="1.45" color="whiteAlpha.800" textShadow="0 1px 2px rgba(0,0,0,.9)">
-      <Text as="span" fontWeight="600" mr="1.5" color={line.role === 'ai' ? 'blue.300' : 'green.300'}>
-        {name}
-      </Text>
+      <NameTag name={name} mine={line.role !== 'ai'} />
       {line.content}
     </Text>
   );

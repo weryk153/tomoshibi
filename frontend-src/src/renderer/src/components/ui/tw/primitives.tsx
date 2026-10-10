@@ -272,7 +272,7 @@ const BUTTON_SIZE = {
 const BUTTON_TONE = {
   blue: {
     // blue 已換成副色青（index.css 的 @theme），白字在青上只有 2:1 上下，改深色墨水。
-    solid: 'bg-blue-500 text-accent2-ink hover:bg-blue-400',
+    solid: 'bg-blue-500 text-accent2-ink hover:bg-blue-600',
     outline: 'border border-blue-500/60 text-blue-300 hover:bg-blue-500/10',
     ghost: 'text-blue-300 hover:bg-blue-500/10',
   },

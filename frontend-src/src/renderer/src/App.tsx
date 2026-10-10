@@ -9,7 +9,9 @@ import { resumeSharedAudioContext } from "@/utils/voice-gain";
 import Sidebar, { AppHeader } from "./components/sidebar/sidebar";
 import MobileOverlay from "./components/mobile/mobile-overlay";
 import { useIsNarrow } from "./hooks/utils/use-is-narrow";
+import "./theme/theme-palette.css";
 import "./theme/moonlight.css";
+import { ThemeProvider } from "./context/theme-context";
 import "./theme/moonlight-surfaces.css";
 import { AiStateProvider } from "./context/ai-state-context";
 import { Live2DConfigProvider } from "./context/live2d-config-context";
@@ -139,9 +141,11 @@ function App(): JSX.Element {
   return (
     <ChakraProvider value={tomoshibiSystem}>
       {/* ModeProvider needs to wrap AppContent to provide mode to getGlobalStyles */}
-      <ModeProvider>
-        <AppWithGlobalStyles />
-      </ModeProvider>
+      <ThemeProvider>
+        <ModeProvider>
+          <AppWithGlobalStyles />
+        </ModeProvider>
+      </ThemeProvider>
     </ChakraProvider>
   );
 }

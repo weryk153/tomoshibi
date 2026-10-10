@@ -943,6 +943,17 @@
       "free": "No limit",
       "help": "The longer she talks, the more each sentence has to be translated and voiced, and the slower the next reply. Shared by all characters; applies from her next reply.",
       "saveFailed": "Could not save the reply length."
+    },
+    "appearance": {
+      "theme": "Theme",
+      "light": "Lavender light",
+      "dark": "Dark",
+      "system": "Follow system",
+      "themeHelp": "Applies immediately and remembers your choice. Follow system matches your device’s light or dark appearance.",
+      "sakura": "Sakura Cream",
+      "mint": "Mint Glass",
+      "abyss": "Deep Sea Starlight",
+      "caramel": "Caramel Study"
     }
   },
   "footer": {

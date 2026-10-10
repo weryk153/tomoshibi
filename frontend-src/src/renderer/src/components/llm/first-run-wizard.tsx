@@ -99,7 +99,7 @@ function FirstRunWizard(): JSX.Element | null {
         gap={6}
         bg="gray.900"
         borderRadius="24px"
-        border="1px solid #d0c5e1"
+        border="1px solid var(--moon-line)"
         p={8}
         boxShadow="dark-lg"
       >

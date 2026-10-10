@@ -10,6 +10,7 @@ import '@fontsource/ibm-plex-mono/latin-500.css';
 import '@fontsource-variable/noto-sans-tc/wght.css';
 import './index.css';
 import App from './App';
+import { initializeAppTheme } from './context/theme-context';
 import { LAppAdapter } from '../WebSDK/src/lappadapter';
 import './i18n';
 
@@ -36,6 +37,7 @@ console.error = (...args: any[]) => {
 };
 
 if (typeof window !== 'undefined') {
+  initializeAppTheme();
   (window as any).getLAppAdapter = () => LAppAdapter.getInstance();
 
   // Dynamically load the Live2D Core script

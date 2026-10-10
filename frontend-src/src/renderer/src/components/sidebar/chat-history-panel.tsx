@@ -82,7 +82,7 @@ function ChatHistoryPanel(): JSX.Element {
     <Box
       h="full"
       overflow="hidden"
-      bg="#fffcf7"
+      bg="var(--moon-paper)"
     >
       <Global styles={chatPanelStyles} />
       <MainContainer>
@@ -94,7 +94,7 @@ function ChatHistoryPanel(): JSX.Element {
                 alignItems="center"
                 justifyContent="center"
                 height="100%"
-                color="#80768d"
+                color="var(--moon-muted)"
                 fontSize="sm"
               >
                 {t('sidebar.noMessages')}
@@ -160,7 +160,7 @@ function ChatHistoryPanel(): JSX.Element {
                         {/* 這個 Box 在 ChatMessage 之外，繼承不到聊天氣泡的
                             文字顏色，不指定就會是深色疊在深色面板上。跟隔壁
                             的 toolCallIndicator 用同一個色階。 */}
-                        <Text fontSize="xs" color="#80768d" flex="1">
+                        <Text fontSize="xs" color="var(--moon-muted)" flex="1">
                           {msg.content}
                         </Text>
                         {/* 桌面版的右鍵選單（menu-manager.ts）沒有「儲存圖片」，
@@ -173,7 +173,7 @@ function ChatHistoryPanel(): JSX.Element {
                           aria-label={t('history.downloadImage')}
                           style={{ display: 'flex' }}
                         >
-                          <Icon as={FaDownload} boxSize={3} color="#80768d" />
+                          <Icon as={FaDownload} boxSize={3} color="var(--moon-muted)" />
                         </a>
                       </Flex>
                     </Box>
@@ -215,7 +215,7 @@ function ChatHistoryPanel(): JSX.Element {
                             onError={(e) => {
                               const target = e.target as HTMLImageElement;
                               const fallbackName = msg.name || confName || 'A';
-                              target.outerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 50%; background-color: #e6ddf3; color: #5c468c; font-size: 14px;">${fallbackName[0].toUpperCase()}</div>`;
+                              target.outerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 50%; background-color: var(--moon-lilac); color: var(--moon-dark); font-size: 14px;">${fallbackName[0].toUpperCase()}</div>`;
                             }}
                           />
                         ) : (
@@ -230,7 +230,7 @@ function ChatHistoryPanel(): JSX.Element {
                           style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
-                            target.outerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 50%; background-color: #e6ddf3; color: #5c468c; font-size: 14px;">${userName[0].toUpperCase()}</div>`;
+                            target.outerHTML = `<div style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; border-radius: 50%; background-color: var(--moon-lilac); color: var(--moon-dark); font-size: 14px;">${userName[0].toUpperCase()}</div>`;
                           }}
                         />
                       ) : (

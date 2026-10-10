@@ -7,8 +7,8 @@ const INPUT_HEIGHT = '44px';
 /** 長到三行為止，再多就在框內捲動。15px 字 × 1.45 行高 ≈ 22px 一行。 */
 const INPUT_MAX_HEIGHT = '88px';
 /** 主色 18% 透明：麥克風開著時的外圈光暈。 */
-const ACCENT_GLOW = 'rgba(119, 97, 174, 0.18)';
-const LINE = '#d0c5e1';
+const ACCENT_GLOW = 'var(--moon-accent-glow)';
+const LINE = 'var(--moon-line)';
 
 interface FooterStyles {
   container: SystemStyleObject
@@ -27,7 +27,7 @@ export const footerStyles: { footer: FooterStyles } = {
   footer: {
     // 在右欄的 flex 欄裡排在最後：輸入框長到多行時整列跟著長高，把聊天紀錄往上擠。
     container: {
-      bg: '#fffcf7',
+      bg: 'var(--moon-paper)',
       boxShadow: `inset 0 1px 0 ${LINE}`,
       flexShrink: 0,
     },
@@ -61,13 +61,13 @@ export const footerStyles: { footer: FooterStyles } = {
       borderRadius: 'full',
       bg: 'transparent',
       border: '1.5px solid',
-      borderColor: micOn ? '#7761ae' : '#80768d',
-      color: micOn ? '#7761ae' : '#80768d',
+      borderColor: micOn ? 'var(--moon-purple)' : 'var(--moon-muted)',
+      color: micOn ? 'var(--moon-purple)' : 'var(--moon-muted)',
       boxShadow: micOn ? `0 0 0 4px ${ACCENT_GLOW}` : 'none',
       transition: 'border-color 0.2s, color 0.2s, box-shadow 0.2s',
       _hover: {
-        bg: '#f7f3fb',
-        color: micOn ? '#5c468c' : '#342d49',
+        bg: 'var(--moon-input)',
+        color: micOn ? 'var(--moon-dark)' : 'var(--moon-ink)',
       },
     }),
     inputSlot: {
@@ -78,12 +78,12 @@ export const footerStyles: { footer: FooterStyles } = {
     input: (hasInterrupt) => ({
       display: 'block',
       width: '100%',
-      bg: '#f7f3fb',
+      bg: 'var(--moon-input)',
       border: `1px solid ${LINE}`,
       borderRadius: '14px',
       fontSize: '15px',
       lineHeight: '1.45',
-      color: '#342d49',
+      color: 'var(--moon-ink)',
       pl: '3.5',
       // 送出鍵 32px＋右邊距；打斷鍵出現時再讓出一顆的位置。
       pr: hasInterrupt ? '84px' : '48px',
@@ -95,11 +95,11 @@ export const footerStyles: { footer: FooterStyles } = {
       // 內容多高框就多高（Chromium 123+，Electron 31 是 126）；不支援的瀏覽器
       // 停在一行、超過就捲動，功能不受影響。
       css: { fieldSizing: 'content' },
-      _placeholder: { color: '#80768d' },
+      _placeholder: { color: 'var(--moon-muted)' },
       _focus: { outline: 'none' },
       _focusVisible: {
         outline: 'none',
-        borderColor: '#7761ae',
+        borderColor: 'var(--moon-purple)',
         boxShadow: 'none',
       },
       _disabled: { opacity: 0.6, cursor: 'not-allowed' },
@@ -119,9 +119,9 @@ export const footerStyles: { footer: FooterStyles } = {
       borderRadius: '10px',
       bg: 'transparent',
       border: '1px solid',
-      borderColor: '#7761ae',
-      color: '#5c468c',
-      _hover: { bg: '#e6ddf3' },
+      borderColor: 'var(--moon-purple)',
+      color: 'var(--moon-dark)',
+      _hover: { bg: 'var(--moon-lilac)' },
     },
     sendButton: (hasText) => ({
       width: '32px',
@@ -131,16 +131,16 @@ export const footerStyles: { footer: FooterStyles } = {
       transition: 'background-color 0.2s, color 0.2s, opacity 0.2s',
       ...(hasText
         ? {
-          bg: '#7761ae',
-          color: '#ffffff',
+          bg: 'var(--moon-action)',
+          color: 'var(--moon-action-ink)',
           border: '1px solid transparent',
-          _hover: { bg: '#5c468c' },
+          _hover: { bg: 'var(--moon-action-hover)' },
         }
         : {
           bg: 'transparent',
-          color: '#80768d',
+          color: 'var(--moon-muted)',
           border: '1px solid',
-          borderColor: '#d0c5e1',
+          borderColor: 'var(--moon-line)',
           opacity: 0.7,
         }),
       _disabled: {

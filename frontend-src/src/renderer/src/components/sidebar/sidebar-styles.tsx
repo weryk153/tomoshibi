@@ -57,11 +57,11 @@ export const sidebarStyles = {
     headerButton: {
       variant: 'ghost' as const,
       size: 'sm' as const,
-      color: '#7761ae',
+      color: 'var(--moon-purple)',
       bg: 'transparent',
       borderRadius: '12px',
-      _hover: { bg: '#e6ddf3', color: '#5c468c' },
-      _active: { bg: '#d0c5e1' },
+      _hover: { bg: 'var(--moon-lilac)', color: 'var(--moon-dark)' },
+      _active: { bg: 'var(--moon-line)' },
     },
     // 收起後左緣那一整條把手；展開時改用按鈕列最右邊的那顆。
     collapsedRail: {
@@ -273,7 +273,7 @@ export const sidebarStyles = {
     },
     title: commonStyles.title,
     videoContainer: {
-      border: '1px solid #d0c5e1', borderRadius: '12px', bg: '#f2edf8', color: '#80768d',
+      border: '1px solid var(--moon-line)', borderRadius: '12px', bg: 'var(--moon-media)', color: 'var(--moon-muted)',
       width: '100%',
       height: 'clamp(100px, 18vh, 160px)',
       display: 'flex',
@@ -307,7 +307,7 @@ export const sidebarStyles = {
     },
     title: commonStyles.title,
     screenContainer: {
-      border: '1px solid #d0c5e1', borderRadius: '12px', bg: '#f2edf8', color: '#80768d',
+      border: '1px solid var(--moon-line)', borderRadius: '12px', bg: 'var(--moon-media)', color: 'var(--moon-muted)',
       width: '100%',
       height: 'clamp(100px, 18vh, 160px)',
       display: 'flex',
@@ -341,7 +341,7 @@ export const sidebarStyles = {
     },
     title: commonStyles.title,
     browserContainer: {
-      border: '1px solid #d0c5e1', borderRadius: '12px', bg: '#f2edf8', color: '#80768d',
+      border: '1px solid var(--moon-line)', borderRadius: '12px', bg: 'var(--moon-media)', color: 'var(--moon-muted)',
       width: '100%',
       height: 'clamp(100px, 18vh, 160px)',
       display: 'flex',
@@ -372,7 +372,7 @@ export const sidebarStyles = {
     },
     tabs: {
       width: '100%',
-      bg: '#f2edf8',
+      bg: 'var(--moon-media)',
       borderRadius: 'lg',
       p: '1',
     },
@@ -381,7 +381,7 @@ export const sidebarStyles = {
       gap: '1',
     },
     trigger: {
-      color: '#80768d',
+      color: 'var(--moon-muted)',
       display: 'flex',
       alignItems: 'center',
       gap: 1.5,
@@ -391,12 +391,12 @@ export const sidebarStyles = {
       flex: 1,
       borderRadius: 'md',
       _hover: {
-        color: '#5c468c',
-        bg: '#f2edf8',
+        color: 'var(--moon-dark)',
+        bg: 'var(--moon-media)',
       },
       _selected: {
-        color: '#5c468c',
-        bg: '#e6ddf3',
+        color: 'var(--moon-dark)',
+        bg: 'var(--moon-lilac)',
       },
     },
   },
@@ -478,21 +478,21 @@ export const sidebarStyles = {
       justifyContent: 'center', // Center items horizontally
     },
     icon: {
-      color: '#7761ae',
+      color: 'var(--moon-purple)',
       boxSize: '14px',
     },
     text: {
       fontSize: 'xs',
-      color: '#80768d',
+      color: 'var(--moon-muted)',
       fontStyle: 'italic',
     },
     spinner: {
       size: 'xs',
-      color: '#7761ae',
+      color: 'var(--moon-purple)',
       ml: 0,
     },
     completedIcon: {
-      color: '#658774',
+      color: 'var(--moon-success)',
       boxSize: '14px',
       ml: 0,
     },
@@ -505,26 +505,26 @@ export const sidebarStyles = {
 };
 
 export const chatPanelStyles = css`
-  .cs-message-list { background: #fffcf7 !important; padding: 12px 16px !important; }
+  .cs-message-list { background: var(--moon-paper) !important; padding: 12px 16px !important; }
   .cs-message { margin: 16px 0 !important; }
   .cs-message__content {
-    background-color: #f0eaf7 !important; border: 1px solid #e0d6ed;
+    background-color: var(--moon-bubble) !important; border: 1px solid var(--moon-bubble-line);
     border-radius: 16px !important; padding: 12px 14px !important;
-    color: #342d49 !important; font-size: 14px !important; line-height: 1.7 !important;
+    color: var(--moon-ink) !important; font-size: 14px !important; line-height: 1.7 !important;
     margin-top: 5px !important;
   }
-  .cs-message--outgoing .cs-message__content { background-color: #f8dfd2 !important; border-color: #edcdbd; }
-  .cs-message--outgoing .cs-message__html-content { color: #342d49 !important; }
+  .cs-message--outgoing .cs-message__content { background-color: var(--moon-user-bubble) !important; border-color: var(--moon-user-line); }
+  .cs-message--outgoing .cs-message__html-content { color: var(--moon-ink) !important; }
   .cs-chat-container { background: transparent !important; border: none !important; padding: 0 !important; }
   .cs-main-container { border: none !important; background: transparent !important; width: 100% !important; margin-left: 0 !important; }
-  .cs-message__sender { font-size: 12px !important; font-weight: 600 !important; color: #80768d !important; }
+  .cs-message__sender { font-size: 12px !important; font-weight: 600 !important; color: var(--moon-muted) !important; }
   .cs-message__content-wrapper { max-width: 84%; margin: 0 8px; }
   .cs-avatar {
-    background-color: #e6ddf3 !important; color: #5c468c !important;
+    background-color: var(--moon-lilac) !important; color: var(--moon-dark) !important;
     width: 28px !important; height: 28px !important; font-size: 14px !important;
     display: flex !important; align-items: center !important; justify-content: center !important; border-radius: 50% !important;
   }
-  .cs-message--outgoing .cs-avatar { background-color: #f5c9b5 !important; color: #694938 !important; }
+  .cs-message--outgoing .cs-avatar { background-color: var(--moon-peach) !important; color: var(--moon-user-ink) !important; }
   .cs-message__header { display: block !important; visibility: visible !important; opacity: 1 !important; }
-  .cs-message-list .ps__thumb-y { background: #c5b7d8 !important; }
+  .cs-message-list .ps__thumb-y { background: var(--moon-scrollbar) !important; }
 `;
