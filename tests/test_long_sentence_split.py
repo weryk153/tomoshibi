@@ -46,3 +46,36 @@ def test_no_cut_inside_an_open_tag():
 
 def test_no_cut_before_the_limit():
     assert long_clause_split("短短的，還沒到") is None
+
+
+def divide_chunks(chunks):
+    async def tokens():
+        for chunk in chunks:
+            yield chunk
+
+    async def collect():
+        divider = SentenceDivider(faster_first_response=False, segment_method="regex")
+        return [s.text async for s in divider.process_stream(tokens())]
+
+    return asyncio.run(collect())
+
+
+def test_a_long_sentence_handed_over_whole_is_cut_too():
+    """引擎檢查過才放行，是一整句一整句交過來的：句子已經收尾，走的是整句那條路，
+    在逗號先切那段從來輪不到。實測「我剛把相機從口袋裡拿出來，想拍拍窗外……
+    嘿嘿，說真的，你晚餐的拉麵裡有沒有加蔥花？」整句先翻再合成，第一個聲音 14 秒。"""
+    reply = (
+        "我剛把相機從口袋裡拿出來，想拍拍窗外那棵長得歪七扭八的樹……嘿嘿，"
+        "說真的，你晚餐的拉麵裡有沒有加蔥花？"
+    )
+    parts = divide_chunks([reply])
+    assert "".join(parts) == reply
+    assert len(parts) >= 2
+    assert parts[0].endswith("，")
+
+
+def test_short_whole_sentences_are_left_alone():
+    assert divide_chunks(["好喔，那就這樣吧。", "我們走！"]) == [
+        "好喔，那就這樣吧。",
+        "我們走！",
+    ]

@@ -154,6 +154,24 @@ def long_clause_split(text: str) -> Optional[Tuple[str, str]]:
     return None
 
 
+def cut_long_sentence(sentence: str) -> List[str]:
+    """一句已經寫完、但太長的句子，照 long_clause_split 切成幾段。
+
+    引擎是一整句一整句交過來的（檢查過才放行），句子到手時已經收尾，邊寫邊切的
+    那條路輪不到它；整句一起翻譯與合成，第一個聲音要等整句做完。
+    """
+    parts = []
+    rest = sentence
+    while True:
+        split = long_clause_split(rest)
+        if split is None or not split[0] or not split[1].strip():
+            break
+        parts.append(split[0])
+        rest = split[1]
+    parts.append(rest)
+    return parts
+
+
 def comma_splitter(text: str) -> Tuple[str, str]:
     """
     Process text and split it at the first comma.
@@ -571,11 +589,13 @@ class SentenceDivider:
                         self._is_first_sentence = False
                         processed_something = True
                         for sentence in sentences:
-                            if sentence.strip():
-                                yield SentenceWithTags(
-                                    text=sentence.strip(),
-                                    tags=current_tags or [TagInfo("", TagState.NONE)],
-                                )
+                            for part in cut_long_sentence(sentence.strip()):
+                                if part.strip():
+                                    yield SentenceWithTags(
+                                        text=part.strip(),
+                                        tags=current_tags
+                                        or [TagInfo("", TagState.NONE)],
+                                    )
                         continue  # Restart processing loop
 
                 # 太長還沒結束的句子：在逗號先切一段（見 LONG_CLAUSE_CHARS）。
