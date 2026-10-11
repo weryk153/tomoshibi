@@ -191,24 +191,29 @@ def test_her_background_work_can_run_on_another_model():
     assert agent._companion().settings.goal_every == 9
 
 
-def test_her_faces_are_picked_with_a_short_answer_at_temperature_0():
-    """每句的表情與動作（reply_actions）只要一行 JSON：溫度 0、最多 80 token，
-    跟背景工作同一個端點；評測頁（scripts/eval_expression_pick.py）也是這組設定。"""
+def test_her_faces_are_picked_by_the_model_she_talks_with():
+    """每句的表情與動作（reply_actions）只要一行 JSON：溫度 0、最多 80 token；
+    評測頁（scripts/eval_expression_pick.py）也是這組設定。
+
+    用她講話的模型挑，不用背景模型：背景模型在另一台（worker）時，挑表情跟語音翻譯
+    搶同一顆 GPU。實測 4 組 28 輪：每句翻譯 3.0→2.0 秒、句子之間 4→3 秒，挑得及的
+    句子 38%→71%；第一個聲音沒變（她講話的模型寫完回覆就閒著）。"""
     arguments = factory_arguments()
     arguments["agent_settings"]["character_engine_agent"] = {
         "background_base_url": "http://127.0.0.1:1235/v1",
         "background_model": "qwen/qwen3.5-9b",
     }
     agent = AgentFactory.create_agent(**arguments)
-    _talking, thinking, picking = Offline.built
+    talking, _thinking, picking = Offline.built
 
     assert picking.request_options == {
         "temperature": 0,
         "max_tokens": 80,
         "extra_body": {"reasoning_effort": "none"},
     }
-    assert picking.options["base_url"] == thinking.options["base_url"]
-    assert picking.options["model"] == "qwen/qwen3.5-9b"
+    assert picking.options["base_url"] == talking.options["base_url"]
+    assert picking.options["model"] == talking.options["model"]
+    assert picking.options["base_url"] != "http://127.0.0.1:1235/v1"
     if "actions_llm" in inspect.signature(CharacterCompanion).parameters:
         assert agent._companion()._actions_llm is picking
 

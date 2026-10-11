@@ -4,7 +4,9 @@
 提示要解釋標籤、標籤偶爾漏進台詞、小模型常忘記帶。background 模式下系統提示不教
 標籤（service_context.construct_system_prompt），改成每一句送 TTS 的同時問引擎：
 這個模型有的表情與動作交給 ``companion.reply_actions``（引擎 1.3.0 起），引擎用她的
-心情、前一句與這句，叫它的背景模型挑。挑選本身（提示、讀 JSON、一次一句、語氣）
+心情、前一句與這句叫模型挑——實際上是她講話的那個模型（character_engine/factory.py：
+背景模型在另一台時，挑表情會跟語音翻譯搶 GPU），模式名稱沿用 background，
+而且仍要設了背景模型才開（uses_background_expressions）。挑選本身（提示、讀 JSON、一次一句、語氣）
 都在引擎；這裡只管 Tomoshibi 這一側：從 Live2D／VRM 模型做出清單與「心情→表情」
 對照，把挑到的放進這句的 actions（apply_pick），以及聲音等多久（GRACE_SECONDS）。
 

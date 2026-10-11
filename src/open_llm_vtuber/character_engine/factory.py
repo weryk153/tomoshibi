@@ -182,8 +182,10 @@ def _clients(
         # 逾時由引擎的背景排程自己管。
         _engine_client(**elsewhere, timeout_seconds=None, request_options=thinking),
         _vision(provider, llm_config, thinking),
-        # 跟背景工作同一個端點；逾時由引擎的 actions_timeout_seconds 管。
-        _engine_client(**elsewhere, timeout_seconds=None, request_options=picking),
+        # 挑表情用她講話的模型，不跟背景工作同一個端點：背景模型在另一台時，挑表情
+        # 跟語音翻譯搶同一顆 GPU（每句翻譯 3→2 秒、挑得及的句子 38%→71%）。她講話
+        # 的模型寫完回覆就閒著。逾時由引擎的 actions_timeout_seconds 管。
+        _engine_client(**shared, timeout_seconds=None, request_options=picking),
     )
 
 
