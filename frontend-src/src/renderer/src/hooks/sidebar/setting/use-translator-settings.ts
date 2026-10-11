@@ -20,6 +20,7 @@ import {
   type TranslatorConfigEdits,
   type TranslatorEngine,
   type TranslatorConfigSaveResult,
+  type LlmSource,
 } from '../../../api/translator-config.ts'
 import type { ApiResult } from '../../../api/http.ts'
 
@@ -30,6 +31,12 @@ export interface UseTranslatorSettingsResult {
   saveEngine: (
     engine: TranslatorEngine,
     deeplxEndpoint?: string,
+  ) => Promise<ApiResult<TranslatorConfigSaveResult>>
+  // 改用 llm 引擎並指定翻譯用的模型。player 不帶位址與名稱（後端推導）。
+  saveLlmSource: (
+    source: LlmSource,
+    endpoint?: string,
+    model?: string,
   ) => Promise<ApiResult<TranslatorConfigSaveResult>>
 }
 
@@ -43,6 +50,8 @@ export function useTranslatorSettings(
   const [config, setConfig] = useState<TranslatorConfigState | null>(null)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [engineSaving, setEngineSaving] = useState(false)
+  // 存完翻譯模型的來源要重抓一次：player 的位址與名稱是後端推導的，畫面不知道。
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
     if (!active) return undefined
@@ -64,7 +73,7 @@ export function useTranslatorSettings(
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseUrl, active])
+  }, [baseUrl, active, reloadToken])
 
   // 共用的送出邏輯：呼叫 API、成功時把 state
   // 更新成「這次實際送出的值」（不是重新 GET 一次）——跟 asr.tsx 的
@@ -95,7 +104,22 @@ export function useTranslatorSettings(
     [save],
   )
 
+  const saveLlmSource = useCallback(
+    async (source: LlmSource, endpoint?: string, model?: string) => {
+      setEngineSaving(true)
+      const result = await save({
+        engine: 'llm',
+        llm_source: source,
+        ...(source === 'custom' ? { llm_endpoint: endpoint, llm_model: model } : {}),
+      })
+      setEngineSaving(false)
+      if (result.ok) setReloadToken((n) => n + 1)
+      return result
+    },
+    [save],
+  )
+
   return {
-    config, loadError, engineSaving, saveEngine,
+    config, loadError, engineSaving, saveEngine, saveLlmSource,
   }
 }

@@ -653,7 +653,13 @@
       "autoHint": "Her speaking language comes from her voice; when it differs from the language she replies in, the reply is translated before it is spoken. Whether subtitles are translated is set per character on the Characters page.",
       "engine": "Translation method",
       "engineLlm": "Use your current AI to translate",
-      "engineLlmHelp": "No install — uses the AI you already configured; but each sentence takes ~17-21s and is noticeably slow.",
+      "engineLlmHelp": "No install — translates with the model you chat with. Translation and her replies share that model, so replies get a little slower.",
+      "engineCustom": "Another model",
+      "engineCustomHelp": "Use a separate model just for translation, such as a translation model on another computer, so the chat model isn't interrupted. It must be an OpenAI-compatible service (LM Studio and Ollama both are).",
+      "customEndpoint": "Model address",
+      "customEndpointHelp": "For example http://127.0.0.1:1234/v1 (LM Studio) or http://127.0.0.1:11434/v1 (Ollama).",
+      "customModel": "Model name",
+      "customModelHelp": "Exactly as the service lists it, for example hunyuan-mt-7b.",
       "engineDeeplx": "DeepLX (fast, separate install)",
       "engineDeeplxHelp": "Fast (<1s per sentence), but you must run a local DeepLX service yourself (:1188). Translation fails if it isn't running.",
       "deeplxEndpoint": "DeepLX endpoint",
@@ -667,7 +673,8 @@
       "testFail_config": "Could not read the configuration: {{error}}",
       "testFail_wrong_language": "Test failed: the model answered in English instead of the target language, and again on retry. Try another model, or a target language this model can write.",
       "testFail_error": "Test failed: {{error}}",
-      "endpointEmpty": "The address can't be empty"
+      "endpointEmpty": "The address can't be empty",
+      "modelEmpty": "The model name can't be empty"
     },
     "playerLanguage": {
       "label": "Reading / Player language",

@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import {
   buildTranslatorSavePayload,
+  choiceOf,
   isTranslatorEngine,
   VALID_ENGINES,
   type TranslatorConfigState,
@@ -17,6 +18,7 @@ const CURRENT: TranslatorConfigState = {
   llm_target_lang: '英文', // 使用者手動改過，不是預設的「日文」
   llm_endpoint: 'http://localhost:9999/v1/chat/completions',
   llm_model: 'custom/model-name',
+  llm_follows_player: false,
   deeplx_target_lang: 'DE', // 使用者手動改過，不是預設的 'JA'
   deeplx_endpoint: 'http://localhost:1188/v2/translate',
   speak_voice: 'zh-CN-XiaoyiNeural',
@@ -52,4 +54,28 @@ test('isTranslatorEngine：只接受 llm／deeplx', () => {
 
 test('VALID_ENGINES 跟後端 translator_route.py 的 VALID_ENGINES 一致', () => {
   assert.deepEqual([...VALID_ENGINES], ['llm', 'deeplx'])
+})
+
+test('choiceOf：llm 分成「用你現在的 AI」與「另一個模型」', () => {
+  assert.equal(choiceOf({ ...CURRENT, engine: 'llm', llm_follows_player: true }), 'llm')
+  assert.equal(choiceOf({ ...CURRENT, engine: 'llm', llm_follows_player: false }), 'custom')
+  assert.equal(choiceOf({ ...CURRENT, engine: 'deeplx', llm_follows_player: false }), 'deeplx')
+})
+
+test('buildTranslatorSavePayload：另一個模型帶上這次填的位址與名稱', () => {
+  const payload = buildTranslatorSavePayload(CURRENT, {
+    engine: 'llm',
+    llm_source: 'custom',
+    llm_endpoint: 'http://127.0.0.1:1235/v1',
+    llm_model: 'hunyuan-mt-7b',
+  })
+  assert.equal(payload.llm_source, 'custom')
+  assert.equal(payload.llm_endpoint, 'http://127.0.0.1:1235/v1')
+  assert.equal(payload.llm_model, 'hunyuan-mt-7b')
+  assert.equal(payload.llm_target_lang, '英文')
+})
+
+test('buildTranslatorSavePayload：沒指定來源就不送 llm_source', () => {
+  const payload = buildTranslatorSavePayload(CURRENT, { engine: 'deeplx' })
+  assert.equal('llm_source' in payload, false)
 })

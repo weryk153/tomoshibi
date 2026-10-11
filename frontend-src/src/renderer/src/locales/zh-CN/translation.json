@@ -653,7 +653,13 @@
       "autoHint": "发声语言由角色的声音决定；跟她回复的语言不同时会先翻译再念。字幕要不要翻译，在「角色」页各自设置。",
       "engine": "翻译方式",
       "engineLlm": "用你现在的 AI 翻译",
-      "engineLlmHelp": "免安装，直接用你已设置的 AI 翻译；但每句约 17～21 秒、会明显变慢。",
+      "engineLlmHelp": "免安装，直接用聊天的那个模型翻译；翻译跟她回话共用同一个模型，回话会慢一点。",
+      "engineCustom": "另一个模型",
+      "engineCustomHelp": "用另一个模型专门翻译，例如另一台电脑上的翻译模型，聊天的模型就不用分心。需要是 OpenAI 兼容的服务（LM Studio、Ollama 都是）。",
+      "customEndpoint": "模型地址",
+      "customEndpointHelp": "例如 http://127.0.0.1:1234/v1（LM Studio）或 http://127.0.0.1:11434/v1（Ollama）。",
+      "customModel": "模型名称",
+      "customModelHelp": "跟服务里显示的名称一样，例如 hunyuan-mt-7b。",
       "engineDeeplx": "DeepLX（快，需另外安装）",
       "engineDeeplxHelp": "快（每句不到 1 秒），但需要你自己在本机跑一个 DeepLX 服务（:1188）。没有跑就会翻译失败。",
       "deeplxEndpoint": "DeepLX 地址",
@@ -667,7 +673,8 @@
       "testFail_config": "配置读不起来：{{error}}",
       "testFail_wrong_language": "测试失败：模型回来的不是目标语言（答成英文），重试一次仍然如此。换一个模型、或把目标语言改成模型会写的语言。",
       "testFail_error": "测试失败：{{error}}",
-      "endpointEmpty": "地址不能为空"
+      "endpointEmpty": "地址不能为空",
+      "modelEmpty": "模型名称不能为空"
     },
     "playerLanguage": {
       "label": "阅读／玩家语言",

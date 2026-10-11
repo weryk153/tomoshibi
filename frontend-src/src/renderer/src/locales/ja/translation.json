@@ -653,7 +653,13 @@
       "autoHint": "話す言語は声で決まります。返答の言語と違うときは、話す前に翻訳します。字幕を翻訳するかどうかはキャラクターごとに「キャラクター」で設定します。",
       "engine": "翻訳方法",
       "engineLlm": "今のAIを使って翻訳する",
-      "engineLlmHelp": "インストール不要で、すでに設定済みのAIを使います。ただし1文あたり約17〜21秒かかり、目に見えて遅くなります。",
+      "engineLlmHelp": "インストール不要で、会話に使っているモデルで翻訳します。翻訳と返事が同じモデルを使うので、返事が少し遅くなります。",
+      "engineCustom": "別のモデル",
+      "engineCustomHelp": "翻訳専用に別のモデルを使います（例：別のパソコンの翻訳モデル）。会話用のモデルの手を止めません。OpenAI互換のサービスが必要です（LM Studio、Ollamaはどちらも対応）。",
+      "customEndpoint": "モデルのアドレス",
+      "customEndpointHelp": "例：http://127.0.0.1:1234/v1（LM Studio）、http://127.0.0.1:11434/v1（Ollama）。",
+      "customModel": "モデル名",
+      "customModelHelp": "サービスに表示されている名前のとおりに。例：hunyuan-mt-7b。",
       "engineDeeplx": "DeepLX（高速・別途インストールが必要）",
       "engineDeeplxHelp": "高速（1文1秒未満）ですが、ローカルでDeepLXサービス（:1188）を自分で動かす必要があります。起動していないと翻訳に失敗します。",
       "deeplxEndpoint": "DeepLXエンドポイント",
@@ -667,7 +673,8 @@
       "testFail_config": "設定を読み込めません：{{error}}",
       "testFail_wrong_language": "テスト失敗：モデルが目標言語ではなく英語で答え、再試行でも同じでした。別のモデルにするか、このモデルが書ける言語を目標にしてください。",
       "testFail_error": "テスト失敗：{{error}}",
-      "endpointEmpty": "アドレスを空にはできません"
+      "endpointEmpty": "アドレスを空にはできません",
+      "modelEmpty": "モデル名を空にはできません"
     },
     "playerLanguage": {
       "label": "読む言語／プレイヤー言語",

@@ -21,6 +21,16 @@ export function isTranslatorEngine(value: string): value is TranslatorEngine {
   return (VALID_ENGINES as readonly string[]).includes(value)
 }
 
+// 畫面上的三個選項。後端只有 llm／deeplx 兩種引擎；llm 再依翻譯用的模型分成
+// 「用你現在的 AI」（llm）跟「另一個模型」（custom）。
+export type TranslatorChoice = 'llm' | 'custom' | 'deeplx'
+export type LlmSource = 'player' | 'custom'
+
+export function choiceOf(config: TranslatorConfigState): TranslatorChoice {
+  if (config.engine === 'deeplx') return 'deeplx'
+  return config.llm_follows_player ? 'llm' : 'custom'
+}
+
 // GET /api/translator-config 的完整回應形狀（translator_route.py 367-424）。
 export interface TranslatorConfigState {
   enabled: boolean
@@ -34,6 +44,8 @@ export interface TranslatorConfigState {
   llm_target_lang: string
   llm_endpoint: string
   llm_model: string
+  // 翻譯是不是用聊天的那個模型（後端用值判斷：沒設或一樣就是）。
+  llm_follows_player: boolean
   deeplx_target_lang: string
   deeplx_endpoint: string
   speak_voice: string
@@ -62,9 +74,15 @@ export interface TranslatorConfigSaveResult {
 // 這兩個欄位只是後端在 V 推導不出來時的 fallback，不是使用者要調的東西）。
 // 也不包含 speak_voice——後端已經不再用它（POST handler 永遠傳 None，
 // 見 translator_route.py 487-492 附近），送了也沒作用。
+//
+// 例外是「另一個模型」：llm_endpoint／llm_model 這時有輸入框，跟 llm_source
+// 一起送。llm_source=player 時後端一律重新推導，不看送去的舊值。
 export interface TranslatorConfigEdits {
   engine?: TranslatorEngine
   deeplx_endpoint?: string
+  llm_source?: LlmSource
+  llm_endpoint?: string
+  llm_model?: string
 }
 
 // 把「目前從 GET 拿到的完整設定」＋「這次使用者實際改的欄位」合併成 POST
@@ -87,10 +105,11 @@ export function buildTranslatorSavePayload(
     enabled: current.enabled,
     engine: edits.engine ?? current.engine,
     llm_target_lang: current.llm_target_lang,
-    llm_endpoint: current.llm_endpoint,
-    llm_model: current.llm_model,
+    llm_endpoint: edits.llm_endpoint ?? current.llm_endpoint,
+    llm_model: edits.llm_model ?? current.llm_model,
     deeplx_target_lang: current.deeplx_target_lang,
     deeplx_endpoint: edits.deeplx_endpoint ?? current.deeplx_endpoint,
+    ...(edits.llm_source ? { llm_source: edits.llm_source } : {}),
   }
 }
 

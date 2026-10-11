@@ -41,8 +41,8 @@ import {
 import {
   fetchCharacters, AVATAR_MAX_CLIENT_BYTES, type CharacterRecord,
 } from '@/api/characters.ts';
-import type { TranslatorEngine, TranslatorTestResult } from '@/api/translator-config.ts';
-import { testTranslator } from '@/api/translator-config.ts';
+import type { TranslatorChoice, TranslatorTestResult } from '@/api/translator-config.ts';
+import { choiceOf, testTranslator } from '@/api/translator-config.ts';
 import { useTranslatorSettings } from '@/hooks/sidebar/setting/use-translator-settings.ts';
 
 // chat-history-panel.tsx 現在會讀這兩個 localStorage 鍵（userName 取
@@ -273,14 +273,23 @@ function You({ active = true }: YouProps): JSX.Element {
     loadError: translatorLoadError,
     engineSaving,
     saveEngine,
+    saveLlmSource,
   } = useTranslatorSettings(baseUrl, active);
 
   const engineCollection = useMemo(() => createListCollection({
     items: [
       { label: t('settings.translator.engineLlm'), value: 'llm' },
+      { label: t('settings.translator.engineCustom'), value: 'custom' },
       { label: t('settings.translator.engineDeeplx'), value: 'deeplx' },
     ],
   }), [t]);
+
+  // 選了「另一個模型」但位址和名稱還沒存進去時，後端看起來仍是原本的選項；
+  // 畫面先照使用者選的顯示，存檔成功或重新載入後再以後端為準。
+  const [pickedChoice, setPickedChoice] = useState<TranslatorChoice | null>(null);
+  const translatorChoice: TranslatorChoice | null = translatorConfig
+    ? (pickedChoice ?? choiceOf(translatorConfig))
+    : null;
 
   // 引擎切換：兩個選項都不需要憑證就能動作（deeplx 只是一個網址，已經有預設
   // 值），不用像 asr.tsx 的 groq/azure 那樣先當草稿——選了就立刻送出，效果
@@ -288,18 +297,66 @@ function You({ active = true }: YouProps): JSX.Element {
   // 讓 saveEngine 用目前已知的值原樣回填（見 use-translator-settings.ts 的
   // save() 呼叫 buildTranslatorSavePayload 的說明），不因為切換引擎就意外
   // 改動它。
-  const engineSaver = useAutosave(async (engine: TranslatorEngine) => {
-    const result = await saveEngine(engine);
+  // 「另一個模型」選了不馬上存：位址和名稱填好才存（見下面的 customSaver）。
+  const engineSaver = useAutosave(async (choice: 'llm' | 'deeplx') => {
+    const result = choice === 'llm' ? await saveLlmSource('player') : await saveEngine('deeplx');
+    if (result.ok) setPickedChoice(null);
     return result.ok
       ? { ok: true } as const
       : { ok: false, error: result.error || t('settings.translator.saveFailed') } as const;
   }, { delayMs: 0 });
 
+
+  // 另一個模型的位址與名稱：一起存，停手或離開欄位才送。草稿第一次拿到設定時
+  // 用目前的值帶入（翻譯本來就用某個模型的話，從它開始改比較省事）。
+  const [customDraft, setCustomDraft] = useState({ endpoint: '', model: '' });
+  const customDraftLoadedRef = useRef(false);
+  useEffect(() => {
+    if (!translatorConfig || customDraftLoadedRef.current) return;
+    customDraftLoadedRef.current = true;
+    setCustomDraft({ endpoint: translatorConfig.llm_endpoint, model: translatorConfig.llm_model });
+  }, [translatorConfig]);
+
+  const customSaver = useAutosave(async (draft: { endpoint: string, model: string }) => {
+    const result = await saveLlmSource('custom', draft.endpoint.trim(), draft.model.trim());
+    if (!result.ok) {
+      return { ok: false, error: result.error || t('settings.translator.saveFailed') } as const;
+    }
+    setPickedChoice(null);
+    return { ok: true } as const;
+  }, {
+    validate: (draft) => {
+      if (!draft.endpoint.trim()) return t('settings.translator.endpointEmpty');
+      if (!draft.model.trim()) return t('settings.translator.modelEmpty');
+      return null;
+    },
+  });
+
+  const changeCustomDraft = useCallback((patch: Partial<{ endpoint: string, model: string }>) => {
+    const next = { ...customDraft, ...patch };
+    setCustomDraft(next);
+    customSaver.change(next);
+  }, [customDraft, customSaver]);
+
   const handleEngineChange = useCallback((value: string[]) => {
-    const engine = value[0];
-    if (!engine || (engine !== 'llm' && engine !== 'deeplx')) return;
-    engineSaver.change(engine as TranslatorEngine);
-  }, [engineSaver]);
+    const choice = value[0];
+    if (choice === 'custom') {
+      setPickedChoice('custom');
+      // 之前填過另一個模型（跟現在用的不同）就直接用回它，不必再改一次欄位才存。
+      if (
+        translatorConfig
+        && customDraft.endpoint.trim() && customDraft.model.trim()
+        && (customDraft.endpoint !== translatorConfig.llm_endpoint
+          || customDraft.model !== translatorConfig.llm_model)
+      ) {
+        customSaver.change(customDraft);
+      }
+      return;
+    }
+    if (choice !== 'llm' && choice !== 'deeplx') return;
+    setPickedChoice(choice);
+    engineSaver.change(choice);
+  }, [engineSaver, customSaver, customDraft, translatorConfig]);
 
   // DeepLX 位址：停手或離開欄位才存（不逐鍵送出）。草稿只在
   // 「使用者還沒開始編輯」時跟著後端值刷新（用 ref 記錄上一次同步進來的值，
@@ -465,19 +522,39 @@ function You({ active = true }: YouProps): JSX.Element {
               <SaveStatus state={engineSaver.state} />
               <SelectField
                 label={t('settings.translator.engine')}
-                value={[translatorConfig.engine]}
+                value={translatorChoice ? [translatorChoice] : []}
                 onChange={handleEngineChange}
                 collection={engineCollection}
                 placeholder={t('settings.translator.engine')}
               />
             </Box>
             <Text fontSize="xs" color="whiteAlpha.600">
-              {translatorConfig.engine === 'deeplx'
-                ? t('settings.translator.engineDeeplxHelp')
-                : t('settings.translator.engineLlmHelp')}
+              {translatorChoice === 'deeplx' && t('settings.translator.engineDeeplxHelp')}
+              {translatorChoice === 'custom' && t('settings.translator.engineCustomHelp')}
+              {translatorChoice === 'llm' && t('settings.translator.engineLlmHelp')}
             </Text>
 
-            {translatorConfig.engine === 'deeplx' && (
+            {translatorChoice === 'custom' && (
+              <Stack gap={2}>
+                <InputField
+                  label={t('settings.translator.customEndpoint')}
+                  value={customDraft.endpoint}
+                  onChange={(value) => changeCustomDraft({ endpoint: value })}
+                  onBlur={customSaver.flush}
+                  help={t('settings.translator.customEndpointHelp')}
+                />
+                <InputField
+                  label={t('settings.translator.customModel')}
+                  value={customDraft.model}
+                  onChange={(value) => changeCustomDraft({ model: value })}
+                  onBlur={customSaver.flush}
+                  help={t('settings.translator.customModelHelp')}
+                />
+                <SaveStatus state={customSaver.state} />
+              </Stack>
+            )}
+
+            {translatorChoice === 'deeplx' && (
               <Stack gap={2}>
                 <InputField
                   label={t('settings.translator.deeplxEndpoint')}

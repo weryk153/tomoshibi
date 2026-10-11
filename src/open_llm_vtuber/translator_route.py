@@ -48,6 +48,8 @@ from .conf_editor import (
     read_conf_lines as _read_conf_lines,
     rewrite_bool_leaf as _rewrite_bool_leaf,
     rewrite_str_leaf as _rewrite_leaf,
+    sub_block_extent,
+    upsert_nested_block,
     write_conf as _write_conf,
 )
 
@@ -69,6 +71,12 @@ VALID_ENGINES = {"llm", "deeplx"}
 DEFAULT_DEEPLX_ENDPOINT = "http://localhost:1188/v2/translate"
 DEFAULT_DEEPLX_TARGET = "JA"
 DEFAULT_LLM_TARGET = "日文"
+# 新建 llm 區塊時給的逾時。程式端預設 30 秒，慢一點的模型撞到就靜默退回原文。
+NEW_LLM_BLOCK_TIMEOUT = 60
+
+# 翻譯用的模型從哪來：player＝跟著聊天的模型（每次存檔都重新推導），custom＝
+# 另外指定一個（例如另一台電腦上的翻譯專用模型）。
+VALID_LLM_SOURCES = {"player", "custom"}
 
 
 # --- 讀設定 ----------------------------------------------------------------- #
@@ -135,6 +143,35 @@ def _derive_llm_endpoint(base_url: Optional[str]) -> Optional[str]:
     return b + "/chat/completions"
 
 
+def _player_llm_target(data: Any) -> tuple[Optional[str], Optional[str]]:
+    """聊天的模型換算成翻譯要用的 (端點, 模型)。讀不到就回 (None, None)。"""
+    block = _get_openai_llm(data)
+    if block is None:
+        return None, None
+    model = block.get("model")
+    return _derive_llm_endpoint(block.get("base_url")), (
+        str(model) if model is not None else None
+    )
+
+
+def _llm_follows_player(data: Any, block: Any) -> bool:
+    """翻譯是不是用聊天的那個模型——畫面要知道該顯示哪個選項。
+
+    conf.yaml 不記「來源」，只記端點與模型，所以用值來判斷：沒設、或跟聊天的
+    模型一樣，就是「用你現在的 AI」；其餘都算另外指定的模型。
+    """
+    endpoint = _nested(block, "llm", "api_endpoint")
+    model = _nested(block, "llm", "model")
+    if not endpoint or not model:
+        return True
+    player_endpoint, player_model = _player_llm_target(data)
+    return (
+        player_endpoint is not None
+        and _derive_llm_endpoint(endpoint) == player_endpoint
+        and model == player_model
+    )
+
+
 # Translation-test sample + verdict. Kept at module level, out of the route
 # closure, so the rule that actually matters can be tested without a live LLM.
 #
@@ -196,6 +233,10 @@ def _engine_settings_from(body: dict, engine: str) -> dict:
 
     llm 引擎沒給端點與模型時，從玩家已經設好的 LLM 推導——這樣打開翻譯不需要
     任何額外設定就能用。
+
+    llm_source 說的是翻譯用哪個模型：player 一律重新推導（畫面會把舊值原樣帶上
+    來，從另一個模型切回聊天的模型時不能沿用它們）；custom 用呼叫端給的，端點
+    可以只填到 /v1，這裡補成完整的 chat/completions。
     """
 
     def text(key: str, default=None):
@@ -204,6 +245,11 @@ def _engine_settings_from(body: dict, engine: str) -> dict:
 
     llm_endpoint = text("llm_endpoint")
     llm_model = text("llm_model")
+    llm_source = text("llm_source")
+    if llm_source == "player":
+        llm_endpoint = llm_model = None
+    elif llm_source == "custom":
+        llm_endpoint = _derive_llm_endpoint(llm_endpoint)
     if engine == "llm" and (not llm_endpoint or not llm_model):
         try:
             block = _get_openai_llm(_load_conf())
@@ -274,16 +320,36 @@ def _write_translator_config(
             ("deeplx_api_endpoint", deeplx_endpoint),
         ],
     }
+    # 預設範本沒有 llm 區塊。選了 llm 卻不建，translate_provider 已經是 llm、
+    # 驗證器要求 llm 區塊存在，下次開機整個後端起不來。
+    if (
+        engine == "llm"
+        and llm_api_endpoint
+        and llm_model
+        and sub_block_extent(lines, tc_start, tc_end, "llm")[0] is None
+    ):
+        tc_end = upsert_nested_block(
+            lines,
+            tc_start,
+            tc_end,
+            "llm",
+            {
+                "target_lang": _quote_yaml_scalar(
+                    llm_target_lang or DEFAULT_LLM_TARGET
+                ),
+                "api_endpoint": _quote_yaml_scalar(llm_api_endpoint),
+                "model": _quote_yaml_scalar(llm_model),
+                "timeout": str(NEW_LLM_BLOCK_TIMEOUT),
+            },
+        )
+        written["llm"] = "created"
+
     for block, leaves in nested.items():
         if not any(value for _, value in leaves):
             continue
-        try:
-            b_start, b_end = block_extent(lines, block, start_from=tc_start)
-        except KeyError:
+        b_start, b_end = sub_block_extent(lines, tc_start, tc_end, block)
+        if b_start is None:
             logger.warning(f"[translator] {block} block not found; left unchanged")
-            continue
-        # 區塊必須仍在 translator_config 之內——同名的鍵在檔案別處也可能有。
-        if b_start > tc_end:
             continue
         for key, value in leaves:
             if value and _rewrite_leaf(lines, b_start, b_end, key, value):
@@ -351,6 +417,7 @@ def init_translator_route() -> APIRouter:
                 ),
                 "llm_endpoint": _nested(block, "llm", "api_endpoint"),
                 "llm_model": _nested(block, "llm", "model"),
+                "llm_follows_player": _llm_follows_player(data, block),
                 "deeplx_target_lang": _nested(
                     block, "deeplx", "deeplx_target_lang", DEFAULT_DEEPLX_TARGET
                 ),
@@ -381,6 +448,27 @@ def init_translator_route() -> APIRouter:
             return JSONResponse(
                 status_code=400,
                 content={"ok": False, "error": "engine must be 'llm' or 'deeplx'."},
+            )
+
+        llm_source = str(body.get("llm_source") or "").strip().lower()
+        if llm_source and llm_source not in VALID_LLM_SOURCES:
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "ok": False,
+                    "error": "llm_source must be 'player' or 'custom'.",
+                },
+            )
+        if llm_source == "custom" and not (
+            str(body.get("llm_endpoint") or "").strip()
+            and str(body.get("llm_model") or "").strip()
+        ):
+            return JSONResponse(
+                status_code=400,
+                content={
+                    "ok": False,
+                    "error": "llm_endpoint and llm_model are required.",
+                },
             )
 
         try:

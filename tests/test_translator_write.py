@@ -213,3 +213,149 @@ def test_explicit_values_are_not_overridden_by_derivation(tmp_path, monkeypatch)
 
     assert settings["llm_api_endpoint"] == "http://mine/v1/chat/completions"
     assert settings["llm_model"] == "mine"
+
+
+# --- 翻譯用的模型：跟著聊天的模型，或另外指定 -----------------------------------
+
+CUSTOM_TRANSLATOR = ACTIVE_LMSTUDIO.replace(
+    "        api_endpoint: ''\n        model: ''\n",
+    "        api_endpoint: 'http://127.0.0.1:1235/v1/chat/completions'\n"
+    "        model: 'hunyuan-mt-7b'\n",
+)
+
+
+def _conf_at(tmp_path, monkeypatch, text):
+    path = tmp_path / "conf.yaml"
+    path.write_text(text, encoding="utf-8")
+    monkeypatch.setattr(ce, "CONF_PATH", str(path))
+    monkeypatch.setattr(tr, "CONF_PATH", str(path))
+    return path
+
+
+def test_player_source_rederives_even_when_old_values_are_sent(tmp_path, monkeypatch):
+    """從「另一個模型」切回「用你現在的 AI」：畫面會把舊值原樣帶上來，
+    但這次要的是聊天的模型，不是剛才那個翻譯模型。"""
+    _conf_at(tmp_path, monkeypatch, CUSTOM_TRANSLATOR)
+
+    settings = tr._engine_settings_from(
+        {
+            "llm_source": "player",
+            "llm_endpoint": "http://127.0.0.1:1235/v1/chat/completions",
+            "llm_model": "hunyuan-mt-7b",
+        },
+        "llm",
+    )
+
+    assert settings["llm_api_endpoint"] == "http://127.0.0.1:1234/v1/chat/completions"
+    assert settings["llm_model"] == "qwen/qwen3.5-9b"
+
+
+def test_custom_source_accepts_a_base_url(tmp_path, monkeypatch):
+    # 使用者會照 LM Studio 畫面上的寫法填 .../v1，翻譯要打的是完整的 chat/completions。
+    _conf_at(tmp_path, monkeypatch, ACTIVE_LMSTUDIO)
+
+    settings = tr._engine_settings_from(
+        {
+            "llm_source": "custom",
+            "llm_endpoint": " http://127.0.0.1:1235/v1/ ",
+            "llm_model": "hunyuan-mt-7b",
+        },
+        "llm",
+    )
+
+    assert settings["llm_api_endpoint"] == "http://127.0.0.1:1235/v1/chat/completions"
+    assert settings["llm_model"] == "hunyuan-mt-7b"
+
+
+def test_follows_player_when_values_match(tmp_path, monkeypatch):
+    _conf_at(
+        tmp_path,
+        monkeypatch,
+        ACTIVE_LMSTUDIO.replace(
+            "        api_endpoint: ''\n        model: ''\n",
+            "        api_endpoint: 'http://127.0.0.1:1234/v1/chat/completions'\n"
+            "        model: 'qwen/qwen3.5-9b'\n",
+        ),
+    )
+    data = tr._load_conf()
+
+    assert tr._llm_follows_player(data, tr._get_translator_block(data)) is True
+
+
+def test_does_not_follow_player_with_its_own_model(tmp_path, monkeypatch):
+    _conf_at(tmp_path, monkeypatch, CUSTOM_TRANSLATOR)
+    data = tr._load_conf()
+
+    assert tr._llm_follows_player(data, tr._get_translator_block(data)) is False
+
+
+def test_empty_llm_block_counts_as_following_player(tmp_path, monkeypatch):
+    _conf_at(tmp_path, monkeypatch, ACTIVE_LMSTUDIO)
+    data = tr._load_conf()
+
+    assert tr._llm_follows_player(data, tr._get_translator_block(data)) is True
+
+
+# 預設範本（也是 App 第一次開機拿到的 conf.yaml）的 translator_config 沒有 llm
+# 區塊。選「用 AI 翻譯」時寫入器找不到區塊就跳過，translate_provider 卻已經改成
+# llm、translate_audio 是 True——下次開機驗證器要求 llm 區塊存在，整個後端起不來。
+NO_LLM_BLOCK = """\
+character_config:
+  agent_config:
+    agent_settings:
+      conversation:
+        llm_provider: 'lmstudio_llm'
+    llm_configs:
+      lmstudio_llm:
+        base_url: 'http://127.0.0.1:1234/v1'
+        model: 'qwen/qwen3.5-9b'
+  tts_preprocessor_config:
+    translator_config:
+      translate_audio: False
+      translate_provider: 'deeplx'
+
+      deeplx:
+        deeplx_target_lang: 'JA'
+        deeplx_api_endpoint: 'http://localhost:1188/v2/translate'
+
+      tencent:
+        secret_id: ''
+        secret_key: ''
+        region: 'ap-guangzhou'
+        source_lang: 'zh'
+        target_lang: 'ja'
+
+# Live Streaming Integration
+live_config:
+  port: 1
+"""
+
+
+def test_missing_llm_block_is_created(tmp_path, monkeypatch):
+    path = _conf_at(tmp_path, monkeypatch, NO_LLM_BLOCK)
+
+    _write(
+        engine="llm",
+        **{
+            k: v
+            for k, v in tr._engine_settings_from(
+                {"llm_source": "player"}, "llm"
+            ).items()
+        },
+    )
+
+    from src.open_llm_vtuber.config_manager.tts_preprocessor import TranslatorConfig
+
+    translator = _translator(path)
+    assert (
+        translator["llm"]["api_endpoint"] == "http://127.0.0.1:1234/v1/chat/completions"
+    )
+    assert translator["llm"]["model"] == "qwen/qwen3.5-9b"
+    assert translator["llm"]["target_lang"] == "日文"
+    # 留給慢一點的模型；預設 30 秒逾時會靜默退回原文。
+    assert translator["llm"]["timeout"] == 60
+    # 驗證器那關（開機時跑的就是它）要過。
+    TranslatorConfig.model_validate(translator)
+    # 別人的區塊與後面的段落不受影響。
+    assert translator["tencent"]["region"] == "ap-guangzhou"
+    assert _parsed(path)["live_config"]["port"] == 1
