@@ -1271,3 +1271,30 @@ def test_background_work_waits_until_her_voice_is_made(tmp_path):
     held, after = asyncio.run(scenario())
     assert held is True
     assert after is False
+
+
+def test_opening_a_conversation_warms_up_her_model(tmp_path):
+    """新對話的第一輪，LM Studio 要重讀系統提示之後的 2100 個 token（本機 9B 約
+    6 秒）：它只在每個提示的尾端留快取點，新對話正好在系統提示之後分岔。打開一段
+    對話時先讓她的模型讀一次「下一輪的開頭」，第一輪就從那裡接。"""
+    if not hasattr(CharacterCompanion, "warm_up"):
+        pytest.skip("engine without warm_up")
+
+    async def scenario():
+        llm = EngineLLM()
+        current = companion(tmp_path, llm)
+        speaking = agent(current)
+        speaking.set_system("你是紅莉栖。這是主機的系統提示。")
+        speaking.set_memory_from_history("conf", "first")
+        for _ in range(20):
+            await asyncio.sleep(0)
+            if llm.calls:
+                break
+        warmed = list(llm.calls)
+        await say(speaking, "你好")
+        return warmed, llm.calls[-1]
+
+    warmed, turn = asyncio.run(scenario())
+    assert len(warmed) == 1
+    assert warmed[0][0].content == turn[0].content  # 系統提示跟這一輪的一樣
+    assert "主機的系統提示" in warmed[0][0].content

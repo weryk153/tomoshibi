@@ -67,6 +67,8 @@ _OUTPUTS: "contextvars.ContextVar[Optional[asyncio.Queue]]" = contextvars.Contex
     "character_engine_outputs", default=None
 )
 WEEKDAYS = "一二三四五六日"
+# 還在跑的暖機（_warm_up）：留著參照，免得 task 被回收。
+_WARMING: set = set()
 MAX_PICTURES = 4
 MAX_PICTURE_BYTES = 8 * 1024 * 1024
 _PICTURE_SOURCES = {"camera": "camera", "screen": "screenshot"}
@@ -284,6 +286,26 @@ class CharacterEngineAgent(AgentInterface):
         self._conf_uid = conf_uid
         self._conversation = history_uid
         self._hand_over(self._companion(), history_uid)
+        self._warm_up()
+
+    def _warm_up(self) -> None:
+        """在背景先讓她講話的模型讀一次這段對話下一輪的開頭（系統提示、工具、到目前
+        的對話）。新對話的第一輪，LM Studio 要重讀系統提示之後約 2100 個 token（本機
+        9B 約 6 秒）：它只在每個提示的尾端留快取點，新對話正好在系統提示後分岔。
+        引擎太舊、沒有在跑的事件迴圈時不做；失敗不影響什麼。"""
+        companion = self._companion()
+        warm = getattr(companion, "warm_up", None)
+        if warm is None:
+            return
+        try:
+            loop = asyncio.get_running_loop()
+        except RuntimeError:
+            return
+        # 系統提示與工具平常在每一輪開頭才交給引擎；暖機讀的要跟那一輪一樣。
+        self._bring_up_to_date(companion)
+        task = loop.create_task(warm(self._conversation))
+        _WARMING.add(task)
+        task.add_done_callback(_WARMING.discard)
 
     def _hand_over(self, companion, history_uid: Optional[str]) -> None:
         if not history_uid or not self._conf_uid:
