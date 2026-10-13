@@ -256,3 +256,27 @@ def test_super_chat_and_members_are_marked_for_her(kind, expected):
     )
     asyncio.run(host.turn_runner("s")(message))
     assert calls[0]["user_input"] == expected
+
+
+def test_each_stream_turn_makes_sure_the_stage_has_the_minecraft_tool():
+    seen = []
+
+    async def process(**kwargs):
+        return "好"
+
+    ws, host = setup(process)
+    ws.minecraft = SimpleNamespace(ensure_tool=seen.append)
+    runner = host.turn_runner("stream-1")
+    asyncio.run(runner(comment()))
+    asyncio.run(runner(None))
+    stage = ws.client_contexts["stage"]
+    assert seen == [stage, stage]
+
+
+def test_a_handler_without_minecraft_still_runs_stream_turns():
+    async def process(**kwargs):
+        return "好"
+
+    ws, host = setup(process)
+    assert not hasattr(ws, "minecraft")
+    assert asyncio.run(host.turn_runner("stream-1")(comment())) == "ok"

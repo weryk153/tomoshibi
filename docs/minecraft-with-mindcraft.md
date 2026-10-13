@@ -1,0 +1,130 @@
+# 用 Mindcraft 讓她玩 Minecraft
+
+Tomoshibi 的 Minecraft 模式不直接操作遊戲。她只決定「接下來要做什麼」，用 `minecraft_do` 工具把目標送給 [Mindcraft](https://github.com/mindcraft-bots/mindcraft) 的 MindServer（socket.io），由 Mindcraft 的機器人去執行；機器人的回報與遊戲事件再回到她這邊，由她開口講。
+
+## 三台機器的配置
+
+| 機器 | 跑什麼 |
+|---|---|
+| PC（Windows） | Minecraft Java 版、OBS |
+| 這台 Mac（M4 16GB） | Tomoshibi、她的 9B（LM Studio :1234）、GPT-SoVITS、**Mindcraft** |
+| worker（M1 Pro 16GB，`kuren@comfy-worker`） | Andy-4.2（機器人的腦）、Hy-MT2-7B（翻譯） |
+
+MindServer 只綁 localhost（埠 8080），所以 **Mindcraft 一定要跟 Tomoshibi 跑在同一台 Mac**。
+
+## 一次性準備
+
+### 1. PC：Minecraft
+
+- 買並安裝 Minecraft Java 版。Mindcraft 支援到 1.21.11，建議用 1.21.6。
+- 進單人世界，「對區域網路開放」，埠填 `55916`（作弊開不開都行）。
+- 記下 PC 的名字（Windows 開終端機打 `hostname`）。之後用 `<名字>.local` 或 Tailscale 名，不要寫 IP。
+
+### 2. 這台 Mac：Mindcraft
+
+Node 建議 18 或 20 LTS；22 預期可用（尚未實機驗證）；24 以上原生相依套件會出問題。
+
+```bash
+git clone https://github.com/mindcraft-bots/mindcraft ~/dev/mindcraft
+cd ~/dev/mindcraft && npm install
+cp keys.example.json keys.json   # 用本地模型，不用填
+```
+
+`settings.js` 改這幾個：
+
+```js
+"minecraft_version": "1.21.6",
+"host": "<PC名字>.local",   // 或 Tailscale 名；不要寫 IP
+"port": 55916,
+"auth": "offline",
+"profiles": ["./frieren.json"],
+"base_profile": "survival",
+"only_chat_with": [],        // 要留空，不然 MindServer 收不到 bot-output
+"chat_ingame": false,        // 遊戲聊天欄不出現她身體的英文
+"language": "en",
+"allow_insecure_coding": false,
+"load_memory": false,
+"init_message": "Say hello in one short sentence.",
+"auto_open_ui": false,
+```
+
+`mindserver_port` 保持預設 8080（要改的話，Tomoshibi 的 MindServer 網址也要跟著改）。
+
+### 3. 機器人的 profile
+
+`~/dev/mindcraft/frieren.json`，`name` 要跟 Tomoshibi 設定頁的「機器人名字」一模一樣：
+
+```json
+{
+  "name": "frieren",
+  "model": { "api": "ollama", "url": "http://127.0.0.1:1236", "model": "andy-4.2", "params": { "think": false, "temperature": 0.3 } },
+  "conversing": "You are $NAME's body in Minecraft. $NAME herself talks elsewhere; you only carry out the goals she sends you, as a capable survival player. Reply in one short English sentence saying what you will do, then act with commands right away. Do not role-play a personality, do not ask questions back, do not refuse. $SELF_PROMPT $STATS $INVENTORY $COMMAND_DOCS $EXAMPLES Conversation: $CONVO"
+}
+```
+
+- `conversing` 裡的 `$NAME $SELF_PROMPT $STATS $INVENTORY $COMMAND_DOCS $EXAMPLES $CONVO` 要全留（對照 `profiles/defaults/_default.json`），漏掉機器人就看不到狀態或指令說明。
+- `url` 的 1236 是下面 tunnel 的本機端（worker 的 Ollama）；`params.think: false` 一定要有。
+- 實際裝好的檔在 `~/dev/mindcraft/frieren.json`，`conversing` 另外多了 `$MEMORY` 與「沒事就回一個 tab」那句（照 `_default.json`）。
+- 不需要 embedding 模型；Mindcraft 沒有時會退回用字詞重疊挑範例。
+
+### 4. worker：Andy-4.2（Ollama）
+
+Andy-4.2 是 Mindcraft-CE（Mindcraft 的社群分支）以 Qwen3.5 9B 微調、專為 Mindcraft 做的模型。2026-10-13 對照過 Qwen3.5 27B 和舊版 Andy-4：關掉思考後是三者中唯一知道「先做木鎬才能挖石頭」的；在 worker 的 Ollama 上每步約 2 秒、100% GPU。
+
+已經裝好的東西（2026-10-13）：
+
+- 模型檔：`~/.lmstudio/models/Mindcraft-CE/Andy-4.2-GGUF/andy-4.2.q6_k.gguf`（7.4 GB，sha256 驗過）。
+- Ollama：`~/ollama/ollama`（官方 macOS CLI 壓縮檔解開），已用 `ollama create andy-4.2` 從上面的 GGUF 建好模型，不用再下載。
+- 開機自啟：`~/Library/LaunchAgents/com.kuren.ollama.plist`，只綁 `127.0.0.1:11434`，模型載入後閒置 30 分鐘卸載。沒在跑就 `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.kuren.ollama.plist`。
+
+- **一定要關掉思考。** 它帶思考鏈，開著時每步會先想三千多字、十幾秒，還常常想到超過長度沒回答。Ollama 用 profile `params` 的 `"think": false` 就乾淨；LM Studio 試過 `chat_template_kwargs`、`reasoning.effort`、`/no_think` 都關不乾淨（每步仍 15 秒以上），所以不用 LM Studio 跑它。
+- 記憶體：Ollama 載 Andy-4.2 約 7.2 GB，加 LM Studio 的 Hy-MT2-7B 約 4.2 GB；**玩的時候 worker 上自己的那份 9B 要卸掉**（`lms unload qwen/qwen3.5-9b`），不然會擠爆。
+
+備選：Colab L4 跑 `qwen3.5:27b`（`colab new --gpu L4 -s mc`，裝 Ollama，`ssh -f -N -L 1236:127.0.0.1:11434 colab-mc`，profile 的 `model` 改 `qwen3.5:27b`）。每步約 2 秒、每小時 1.54 點，不玩記得 `colab stop -s mc`。
+
+### 5. 直播／OBS（PC）
+
+- 遊戲視窗擷取 + 瀏覽器來源：`http://<這台 Mac 的名字>:12393/?stage=1&bg=none`，勾「透過 OBS 控制音訊」。
+- Tomoshibi 設定要開「允許區網連線」，PC 上的瀏覽器才連得到。
+
+## 每次開玩
+
+1. PC：開世界，對區域網路開放（埠 55916）。
+2. worker：`lms unload qwen/qwen3.5-9b`（Ollama 會自己載 Andy-4.2，第一次要幾秒）。
+3. 這台 Mac：
+
+   ```bash
+   ssh -f -N -o ServerAliveInterval=15 -L 1236:127.0.0.1:11434 kuren@comfy-worker
+   cd ~/dev/mindcraft && node main.js
+   ```
+
+   看到機器人進入世界再往下。（worker 的 Ollama 只綁迴環，一定要走 tunnel；`ServerAliveInterval` 不能省，不加會斷。翻譯用的 1235 tunnel 是另一條，照舊。）
+4. Tomoshibi 設定 → Minecraft：確認 MindServer 網址、機器人名字，按「開始」。要直播就照直播分頁開播，她會邊玩邊回留言。
+
+設定頁欄位對應 `conf.yaml` 的 `minecraft_config`：
+
+| 設定頁 | 欄位 | 預設 |
+|---|---|---|
+| MindServer 網址 | `mindserver_url` | `http://localhost:8080` |
+| 機器人名字 | `bot_name` | 空 |
+| 閒置秒數 | `idle_seconds` | 15 |
+| 值得講的物品 | `notable_items` | `diamond`、`iron_ingot`、`bread` 等（Minecraft 物品 id） |
+
+只在 `conf.yaml` 調的：`idle_cooldown_seconds`（兩次決定目標至少間隔，預設 60）、`event_cooldown_seconds`（同類事件不重複講，預設 30）、`failure_limit`（連續失敗幾輪就暫停，預設 3）、`tool_timeout_seconds`（她的目標工具等 Mindcraft 回覆的秒數，預設 12；要小於引擎的 15 秒工具上限，別調超過）。
+
+## 安全
+
+- `allow_insecure_coding` 保持 `false`（打開後機器人會執行模型寫出的任意程式碼）。
+- 不連公開伺服器；只連自己開放的單人世界。
+- `only_chat_with` 留空的代價：任何人在遊戲聊天欄打字，她的身體也會照做。只在自己的區網世界玩。
+
+## 排錯
+
+| 現象 | 原因 |
+|---|---|
+| 按開始回「Mindcraft 沒在跑」 | `node main.js` 沒起來，或 `mindserver_port` 不是 8080／Tomoshibi 的網址沒對上 |
+| 「機器人不在遊戲裡」 | PC 的世界沒開放，或 `host`／`port` 錯；`.local` 名字解析不到時改用 Tailscale 名 |
+| 她講話，但工具回 "No reply" | Andy-4.2 太慢（多半是 `think: false` 掉了）（超過 `tool_timeout_seconds`）或 tunnel 斷了；看 Mindcraft 終端。連線 refused 是 tunnel 沒開，timeout 是網路不通 |
+| 機器人動了但她沒反應 | `only_chat_with` 不是 `[]`，MindServer 收不到 `bot-output` |
+| worker 模型載不起來或翻譯回 400 | 9B 沒卸，GPU 超過 13312 MB |
+| 遊戲聊天欄出現一堆英文 | `chat_ingame` 沒設成 `false` |

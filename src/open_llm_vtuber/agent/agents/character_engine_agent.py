@@ -170,6 +170,9 @@ class CharacterEngineAgent(AgentInterface):
         self._mood_key = mood_key
         self._tools = self._tool_definitions(tool_manager) if use_mcpp else []
         self._tool_executor = tool_executor
+        # 模式開著時才存在的工具（例如 Minecraft 的 minecraft_do）：隨時加減，
+        # 跟 MCP 的工具一起在 _bring_up_to_date 註冊到 companion。
+        self._extra_tools: dict[str, tuple[ToolDefinition, Callable[..., Any]]] = {}
         self._conversation: Optional[str] = None
         # 還沒結束的每一輪：(等著它的 task, 它屬於哪段對話, 它的名字)。
         self._turns: list = []
@@ -450,6 +453,9 @@ class CharacterEngineAgent(AgentInterface):
         # 對話裡寫一次，不是每一輪都提醒（每輪照送，主機不送了引擎才會收回）。
         if metadata.get("stream"):
             notes.append(STREAM_FACT)
+        # 主機給這一輪的備註（遊戲裡剛發生的事、目前狀態）：一次性的，不是她知道的事。
+        for note in metadata.get("notes") or []:
+            notes.append(str(note))
         # 她主動說的話已經留在對話裡（remember_remark），不再以一次性的備註帶過去：
         # 那樣她會把引號裡的話照唸一遍。
         notes.append(self._group_note)
@@ -638,9 +644,28 @@ class CharacterEngineAgent(AgentInterface):
             companion.tools.unregister(registered.definition.name)
         for definition in self._tools:
             companion.tools.register(definition, self._tool_handler(definition.name))
+        for definition, handler in self._extra_tools.values():
+            companion.tools.register(definition, handler)
         _TOOLS_REGISTERED_BY[companion] = id(self)
 
     # --- 工具 -----------------------------------------------------------------
+
+    def _companions_synced_to_me(self) -> list:
+        return [
+            c for c, owner in list(_TOOLS_REGISTERED_BY.items()) if owner == id(self)
+        ]
+
+    def add_tool(self, definition: ToolDefinition, handler: Callable[..., Any]) -> None:
+        """加一個只在某個模式開著時才有的工具。已經同步過的 companion 立刻生效。"""
+        self._extra_tools[definition.name] = (definition, handler)
+        for companion in self._companions_synced_to_me():
+            companion.tools.unregister(definition.name)
+            companion.tools.register(definition, handler)
+
+    def remove_tool(self, name: str) -> None:
+        self._extra_tools.pop(name, None)
+        for companion in self._companions_synced_to_me():
+            companion.tools.unregister(name)
 
     @staticmethod
     def _tool_definitions(tool_manager) -> List[ToolDefinition]:

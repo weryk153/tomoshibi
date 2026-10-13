@@ -2,10 +2,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { SETTINGS_TABS, DEFAULT_SETTINGS_TAB } from './settings-tabs.ts'
 
-test('seven tabs, character first, stream on its own page', () => {
+test('eight tabs, character first, stream and minecraft on their own pages', () => {
   assert.deepEqual(
     SETTINGS_TABS.map((tab) => tab.id),
-    ['character', 'conversation', 'stage', 'stream', 'models', 'perf', 'system'],
+    ['character', 'conversation', 'stage', 'stream', 'minecraft', 'models', 'perf', 'system'],
   )
   assert.equal(DEFAULT_SETTINGS_TAB, 'character')
 })

@@ -156,6 +156,7 @@
       "perf": "パフォーマンス",
       "about": "について",
       "stream": "配信",
+      "minecraft": "Minecraft",
       "conversation": "会話",
       "stage": "ステージ",
       "models": "モデル",
@@ -890,6 +891,37 @@
         "no_url": "配信動画の URL がまだありません",
         "bad_url": "配信動画の URL ではありません",
         "no_history": "配信用の会話記録を作成できません"
+      }
+    },
+    "minecraft": {
+      "title": "Minecraft（Mindcraft 経由）",
+      "intro": "彼女は Mindcraft のボットを通して自分でプレイし、起きたことを話します。先に Minecraft と Mindcraft を起動してください。手順は docs/minecraft-with-mindcraft.md を参照。",
+      "urlLabel": "MindServer の URL",
+      "botNameLabel": "ボット名",
+      "botNameHelp": "Mindcraft のプロファイル名と完全に一致させてください。",
+      "idleLabel": "アイドル秒数",
+      "idleHelp": "ボットがこの秒数ほど何もしていないと、彼女が次にやることを決めます（3–600）。",
+      "itemsLabel": "話題にしたいアイテム",
+      "itemsHelp": "1 行に 1 つ、Minecraft のアイテム ID。これらが持ち物に入ると彼女が話し始めます。",
+      "start": "開始",
+      "stop": "停止",
+      "loading": "読み込み中…",
+      "needBotName": "先にボット名を入力してください",
+      "connected": "Mindcraft：接続済み",
+      "disconnected": "Mindcraft：未接続",
+      "inGame": "ボットはゲーム内にいます",
+      "notInGame": "ボットはゲーム内にいません",
+      "state": "体力 {{health}}/20 · 実行中：{{action}} · 話す待ちのこと {{pending}} 件",
+      "stopped": {
+        "failures": "連続で失敗したため一時停止しました",
+        "stopped": "停止しました",
+        "error": "内部エラーのため停止しました"
+      },
+      "lastError": "直近のエラー：{{error}}",
+      "errors": {
+        "already_live": "すでに実行中です",
+        "no_bot_name": "先にボット名を入力してください",
+        "not_running": "Mindcraft が動いていません（MindServer に接続できません）"
       }
     },
     "values": {

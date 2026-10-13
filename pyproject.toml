@@ -44,6 +44,7 @@ dependencies = [
     "opencc>=1.1.0",
     "imageio-ffmpeg>=0.6.0",
     "pypinyin>=0.55.0",
+    "python-socketio[asyncio-client]>=5.11",
 ]
 
 [project.optional-dependencies]

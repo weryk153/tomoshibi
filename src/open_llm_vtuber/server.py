@@ -31,6 +31,9 @@ from .voice_route import init_voice_route
 from .memory_route import init_memory_route
 from .perf_route import init_perf_route
 from .gpt_sovits_route import init_gpt_sovits_route
+from .minecraft.controller import MinecraftController
+from .minecraft.host import WebSocketMinecraftHost
+from .minecraft_route import init_minecraft_route
 from .stream.controller import StreamController
 from .stream.host import WebSocketStreamHost
 from .stream_route import init_stream_route
@@ -174,6 +177,19 @@ class WebSocketServer:
         @self.app.on_event("shutdown")
         async def _stop_stream():  # noqa: D401
             await self.stream_controller.stop()
+
+        # Minecraft 模式：她透過 Mindcraft 自己玩；私聊時由 host 替主視窗跑主動開口，
+        # 直播中事件交給直播流程。
+        minecraft_host = WebSocketMinecraftHost(ws_handler)
+        self.minecraft_controller = MinecraftController(
+            minecraft_host, stream=self.stream_controller
+        )
+        ws_handler.minecraft = minecraft_host
+        self.app.include_router(init_minecraft_route(self.minecraft_controller))
+
+        @self.app.on_event("shutdown")
+        async def _stop_minecraft():  # noqa: D401
+            await self.minecraft_controller.stop()
 
         # Live2D 的動作與點擊區設定。多帶兩個參數是為了「存檔後立刻生效」：
         # PUT 成功時可以就地更新每一個正在顯示這個模型的連線，不必重啟或切角色。

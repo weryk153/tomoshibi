@@ -156,6 +156,7 @@
       "perf": "效能",
       "about": "關於",
       "stream": "直播",
+      "minecraft": "Minecraft",
       "conversation": "對話",
       "stage": "舞台",
       "models": "模型",
@@ -890,6 +891,37 @@
         "no_url": "還沒貼直播網址",
         "bad_url": "這不是直播影片的網址",
         "no_history": "沒辦法建立直播用的對話紀錄"
+      }
+    },
+    "minecraft": {
+      "title": "Minecraft（透過 Mindcraft）",
+      "intro": "她透過 Mindcraft 的機器人自己玩，邊玩邊講。先開 Minecraft 和 Mindcraft；步驟見 docs/minecraft-with-mindcraft.md。",
+      "urlLabel": "MindServer 網址",
+      "botNameLabel": "機器人名字",
+      "botNameHelp": "要跟 Mindcraft 的 profile 名字一模一樣。",
+      "idleLabel": "閒置秒數",
+      "idleHelp": "機器人閒著超過這麼久，她就決定接下來做什麼（3–600）。",
+      "itemsLabel": "值得講的物品",
+      "itemsHelp": "一行一個 Minecraft 物品 id；背包多了這些她會開口。",
+      "start": "開始",
+      "stop": "停止",
+      "loading": "載入中…",
+      "needBotName": "先填機器人名字",
+      "connected": "Mindcraft：已連上",
+      "disconnected": "Mindcraft：未連線",
+      "inGame": "機器人在遊戲裡",
+      "notInGame": "機器人不在遊戲裡",
+      "state": "血量 {{health}}/20 · 正在：{{action}} · 等著講的事 {{pending}} 件",
+      "stopped": {
+        "failures": "連續失敗，已暫停",
+        "stopped": "已停止",
+        "error": "程式出錯，已停止"
+      },
+      "lastError": "最近的錯誤：{{error}}",
+      "errors": {
+        "already_live": "已經在跑了",
+        "no_bot_name": "先填機器人名字",
+        "not_running": "Mindcraft 沒在跑（連不上 MindServer）"
       }
     },
     "values": {

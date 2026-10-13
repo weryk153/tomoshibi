@@ -7,14 +7,14 @@ host.py）。舞台頁同時只認一個，新的連上就取代舊的；舞台�
 from __future__ import annotations
 
 import asyncio
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Awaitable, Callable, Optional, Protocol
 
 from loguru import logger
 
 from ..config_manager.stream import StreamConfig
 from .chat_source import ChatSource, open_chat_source
 from .comment_picker import CommentPicker, PickerRules
-from .session import StreamSession, TurnRunner
+from .session import StreamSession, TurnResult, TurnRunner
 from .settings import read_stream_settings, write_stream_settings
 
 
@@ -32,6 +32,10 @@ class StreamHost(Protocol):
     def character_names(self, stage_uid: str) -> tuple[str, ...]: ...
 
     def turn_runner(self, history_uid: str) -> TurnRunner: ...
+
+    def extra_runner(
+        self, history_uid: str
+    ) -> Callable[[Any], Awaitable[TurnResult]]: ...
 
     async def live_changed(self, live: bool) -> None: ...
 
@@ -59,6 +63,7 @@ class StreamController:
         self._task: Optional[asyncio.Task] = None
         self._history_uid: Optional[str] = None
         self._end_announced = True
+        self.extra_source: Optional[Any] = None
 
     @property
     def live(self) -> bool:
@@ -109,6 +114,12 @@ class StreamController:
             self._host.turn_runner(self._history_uid),
             quiet_seconds=settings.quiet_seconds,
             failure_limit=settings.failure_limit,
+            extra=self.extra_source,
+            run_extra=(
+                self._host.extra_runner(self._history_uid)
+                if self.extra_source is not None
+                else None
+            ),
             **self._session_options,
         )
         session.stage_ready.set()
@@ -118,6 +129,18 @@ class StreamController:
         self._task = asyncio.create_task(self._run(session))
         await self._host.live_changed(True)
         return self.status()
+
+    def attach_extra(self, source: Any) -> None:
+        """直播中多一個講話的來源（Minecraft 的事件）；沒開播就等開播時帶上。"""
+        self.extra_source = source
+        if self._session is not None and self._history_uid:
+            self._session.run_extra = self._host.extra_runner(self._history_uid)
+            self._session.extra = source
+
+    def detach_extra(self) -> None:
+        self.extra_source = None
+        if self._session is not None:
+            self._session.extra = None
 
     def _rules(self, settings: StreamConfig) -> PickerRules:
         return PickerRules(

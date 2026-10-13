@@ -14,7 +14,7 @@ import { useState, useMemo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tabs as ArkTabs } from '@ark-ui/react';
 import { Stack } from '@chakra-ui/react';
-import { FiUser, FiMessageCircle, FiLayers, FiRadio, FiCpu, FiActivity, FiSettings } from 'react-icons/fi';
+import { FiUser, FiMessageCircle, FiLayers, FiRadio, FiBox, FiCpu, FiActivity, FiSettings } from 'react-icons/fi';
 import type { TFunction } from 'i18next';
 import { Drawer, DRAWER_PX } from '@/components/ui/tw/drawer';
 import { Button, cx } from '@/components/ui/tw/primitives';
@@ -32,6 +32,7 @@ import About from './about';
 import Performances from './performances';
 import Scenes from './scenes';
 import Stream from './stream';
+import Minecraft from './minecraft';
 import StageDisplay from './stage-display';
 import SystemBasics from './system-basics';
 import ModelExtras from './model-extras';
@@ -42,7 +43,7 @@ import { SettingSection } from './setting-section';
 import { PendingBanner } from './pending-banner';
 import { SETTINGS_TABS, DEFAULT_SETTINGS_TAB, type SettingsTabId } from './settings-tabs';
 
-const TAB_ICONS = { character: FiUser, conversation: FiMessageCircle, stage: FiLayers, stream: FiRadio, models: FiCpu, perf: FiActivity, system: FiSettings };
+const TAB_ICONS = { character: FiUser, conversation: FiMessageCircle, stage: FiLayers, stream: FiRadio, minecraft: FiBox, models: FiCpu, perf: FiActivity, system: FiSettings };
 
 interface SettingUIProps {
   open: boolean;
@@ -82,6 +83,7 @@ const RENDERS: Record<SettingsTabId, (a: TabRenderArgs) => JSX.Element> = {
     </Stack>
   ),
   stream: ({ active }) => <SettingSection><Stream active={active} /></SettingSection>,
+  minecraft: ({ active }) => <SettingSection><Minecraft active={active} /></SettingSection>,
   models: ({ active, t }) => (
     <Stack gap={6}>
       <SettingSection title={t('settings.tabs.llm')}><LLM /></SettingSection>

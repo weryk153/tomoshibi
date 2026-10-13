@@ -581,3 +581,22 @@ stream_config:
   same_viewer_cooldown_seconds: 120
   # Pause after this many failed turns in a row
   failure_limit: 3
+
+# Minecraft mode: she plays through Mindcraft (the Minecraft tab in Settings edits this block)
+minecraft_config:
+  # Mindcraft's MindServer (must run on this machine; it binds localhost only, and on macOS that can mean IPv6 ::1, so use the name not 127.0.0.1)
+  mindserver_url: 'http://localhost:8080'
+  # Her Mindcraft bot profile name
+  bot_name: ''
+  # Seconds the bot has to be idle before she decides the next goal
+  idle_seconds: 15
+  # Minimum seconds between two goal decisions
+  idle_cooldown_seconds: 60
+  # The same kind of event is not mentioned again within this many seconds
+  event_cooldown_seconds: 30
+  # Seconds to wait for the bot's reply to a goal (must stay under the engine's 15 s tool limit)
+  tool_timeout_seconds: 12
+  # Pause after this many failed turns in a row
+  failure_limit: 3
+  # Items worth mentioning when they appear in her inventory
+  notable_items: ["diamond", "iron_ingot", "raw_iron", "gold_ingot", "raw_gold", "emerald", "ender_pearl", "blaze_rod", "bread", "cooked_beef", "cooked_porkchop"]

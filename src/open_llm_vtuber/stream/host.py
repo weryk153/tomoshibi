@@ -79,13 +79,20 @@ class WebSocketStreamHost:
         return tuple(names)
 
     def turn_runner(self, history_uid: str):
-        async def run_turn(comment: Optional[ChatMessage]) -> TurnResult:
+        async def run_turn(
+            comment: Optional[ChatMessage], *, notes: tuple = ()
+        ) -> TurnResult:
             uid, context, socket = self._stage()
             if context is None or socket is None:
                 return "interrupted"
             context.history_uid = history_uid
             if comment is None:
-                metadata = {**proactive_turn_metadata(context, uid), "stream": True}
+                # notes 是遊戲事件的描述（agent 讀 metadata["notes"]）；冷場開口沒有。
+                metadata = {
+                    **proactive_turn_metadata(context, uid),
+                    "stream": True,
+                    **({"notes": list(notes)} if notes else {}),
+                }
                 user_input = PROACTIVE_TEXT
                 shown = {"type": "stream-comment", "author": "", "text": ""}
             else:
@@ -104,6 +111,12 @@ class WebSocketStreamHost:
                 await socket.send_text(json.dumps(shown, ensure_ascii=False))
             except Exception:
                 return "interrupted"
+
+            # 舞台 agent 常在 Start 之後才建（或換角色重建），而直播的輪次不走
+            # _handle_conversation_trigger，所以每輪都補一次，不然她拿不到 minecraft_do。
+            minecraft = getattr(self._ws, "minecraft", None)
+            if minecraft is not None:
+                minecraft.ensure_tool(context)
 
             task = asyncio.create_task(
                 self._process(
@@ -135,6 +148,15 @@ class WebSocketStreamHost:
             return "ok" if comment is None else "failed"
 
         return run_turn
+
+    def extra_runner(self, history_uid: str):
+        """第二個來源的事件走主動開口那條路，把事件的描述當每輪備註帶進去。"""
+        run = self.turn_runner(history_uid)
+
+        async def run_extra(item: Any) -> TurnResult:
+            return await run(None, notes=tuple(getattr(item, "notes", ())))
+
+        return run_extra
 
     @staticmethod
     def _tell_interrupted(context: Any) -> None:
