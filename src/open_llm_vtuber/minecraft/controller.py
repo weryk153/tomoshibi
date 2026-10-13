@@ -15,7 +15,7 @@ from loguru import logger
 
 from ..config_manager.minecraft import MinecraftConfig
 from .events import EventRules
-from .feed import FeedRules, GameFeed, suggest_goal
+from .feed import FeedRules, GameFeed
 from . import goal_text
 from .commands import compile_goal
 from .goal_tool import make_goal_handler
@@ -53,7 +53,6 @@ class MinecraftController:
         # 身體在忙時她下的目標先排著，閒下來才送：送了 Mindcraft 會中斷手上的動作。
         self._queue: deque[str] = deque()
         self._sent_at = float("-inf")
-        self._safety_at = float("-inf")
         self._task: Optional[asyncio.Task] = None
         self._settings: MinecraftConfig = MinecraftConfig()
         self.stopped_reason: Optional[str] = None
@@ -123,17 +122,14 @@ class MinecraftController:
                 # 身體在忙就排著，閒下來才一步一步送（送了 Mindcraft 會中斷手上的動作）。
                 steps = compile_goal(goal)
                 if not steps:
-                    # 聽不懂她的目標就做程式算好的下一步，身體不能空著。
-                    latest = self._session.latest if self._session is not None else None
-                    fallback = suggest_goal(latest)
-                    steps = compile_goal(fallback)
-                    logger.info(
-                        f"[minecraft] goal {goal!r} not understood -> {fallback}"
-                    )
-                else:
-                    logger.info(f"[minecraft] goal {goal!r} -> {steps}")
-                if not steps:
+                    # 不替她決定：聽不懂就告訴她，讓她換個具體的說法。
+                    logger.info(f"[minecraft] goal {goal!r} not understood")
+                    if self._session is not None:
+                        self._session.handle_output(
+                            f"I don't understand '{goal}'. Tell me one concrete thing, like 'collect 10 oak logs' or 'craft a stone pickaxe'."
+                        )
                     return
+                logger.info(f"[minecraft] goal {goal!r} -> {steps}")
                 self._queue.clear()
                 self._queue.extend(steps)
                 await self._pump()
@@ -203,18 +199,6 @@ class MinecraftController:
         if session is None:
             return
         session.handle_state(raw)
-        latest = session.latest
-        # 保命：天黑或血快沒了、身體又閒著，不等她決定，先往下挖三格躲。兩分鐘內只做一次。
-        if (
-            latest is not None
-            and latest.is_idle
-            and not self._queue
-            and (latest.time_label == "Night" or latest.health <= 6)
-            and time.monotonic() - self._safety_at > 120.0
-        ):
-            self._safety_at = time.monotonic()
-            logger.info("[minecraft] night/low health and idle -> digging in")
-            self._queue.append("!digDown(3)")
         if self._queue:
             asyncio.create_task(self._pump())
 

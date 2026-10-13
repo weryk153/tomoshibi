@@ -89,10 +89,7 @@ def suggest_goal(state) -> str:
 
 
 def idle_note(state) -> str:
-    return (
-        IDLE_NOTE
-        + f" 照目前的背包，建議下一步：[minecraft_do: {suggest_goal(state)}]（直接照抄這一行就對了）。"
-    )
+    return IDLE_NOTE
 
 
 @dataclass(frozen=True)
@@ -173,21 +170,11 @@ class GameFeed:
             if ask_idle:
                 self._last_idle_turn = now
                 notes = notes + (idle_note(self.latest),)
-            return GameTurn(
-                "event",
-                notes,
-                urgent,
-                now,
-                suggest_goal(self.latest) if ask_idle else "",
-            )
+            return GameTurn("event", notes, urgent, now)
         if ask_idle:
             self._last_idle_turn = now
             return GameTurn(
-                "idle",
-                self._with_state(()) + (idle_note(self.latest),),
-                False,
-                now,
-                suggest_goal(self.latest),
+                "idle", self._with_state(()) + (idle_note(self.latest),), False, now
             )
         return None
 
