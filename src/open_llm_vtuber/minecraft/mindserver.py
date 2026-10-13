@@ -37,6 +37,8 @@ class MindServerClient:
         self._sio = make_client()
         self._in_game = False
         self._waiter: Optional[asyncio.Future] = None
+        self._ask_lock = asyncio.Lock()
+        self._closed = False
         self._sio.on("connect", self._connected)
         self._sio.on("disconnect", self._disconnected)
         self._sio.on("state-update", self._state_update)
@@ -52,14 +54,18 @@ class MindServerClient:
         return self._in_game
 
     async def connect(self) -> None:
+        self._closed = False
         try:
             await self._sio.connect(self.url, transports=["websocket"], wait_timeout=5)
         except Exception as error:
             raise ConnectionError(f"{type(error).__name__}: {error}") from error
 
     async def close(self) -> None:
+        self._closed = True
+        # shutdown() 連背景的重連迴圈也一起停；只有 disconnect() 停不掉重連等待
+        stop = getattr(self._sio, "shutdown", None) or self._sio.disconnect
         try:
-            await self._sio.disconnect()
+            await stop()
         except Exception as error:
             logger.debug(f"[minecraft] disconnect: {error}")
 
@@ -70,15 +76,27 @@ class MindServerClient:
         )
 
     async def ask(self, from_name: str, message: str, timeout: float) -> Optional[str]:
-        loop = asyncio.get_running_loop()
-        self._waiter = loop.create_future()
+        # 一次只讓一個人等，否則後來的會蓋掉前面的 waiter
+        async with self._ask_lock:
+            fut = asyncio.get_running_loop().create_future()
+            self._waiter = fut
+            try:
+                await self.send(from_name, message)
+                return await asyncio.wait_for(asyncio.shield(fut), timeout)
+            except asyncio.TimeoutError:
+                return None
+            finally:
+                if self._waiter is fut:
+                    self._waiter = None
+
+    def _call(self, callback: Optional[Callable[..., None]], *args: Any) -> None:
+        # callback 丟例外不能害到 socketio 內部（例如 disconnect 後的重連流程）
+        if callback is None or self._closed:
+            return
         try:
-            await self.send(from_name, message)
-            return await asyncio.wait_for(asyncio.shield(self._waiter), timeout)
-        except asyncio.TimeoutError:
-            return None
-        finally:
-            self._waiter = None
+            callback(*args)
+        except Exception:
+            logger.exception("[minecraft] callback 丟了例外")
 
     async def _connected(self) -> None:
         # 重連後也要重新訂閱，否則不會再收到 state-update
@@ -86,16 +104,11 @@ class MindServerClient:
 
     async def _disconnected(self, *_: Any) -> None:
         self._in_game = False
-        if self.on_disconnect is not None:
-            self.on_disconnect()
+        self._call(self.on_disconnect)
 
     async def _state_update(self, states: Any) -> None:
-        if (
-            isinstance(states, dict)
-            and self.bot_name in states
-            and self.on_state is not None
-        ):
-            self.on_state(states[self.bot_name])
+        if isinstance(states, dict) and self.bot_name in states:
+            self._call(self.on_state, states[self.bot_name])
 
     async def _agents_status(self, agents: Any) -> None:
         for agent in agents if isinstance(agents, list) else []:
@@ -110,5 +123,4 @@ class MindServerClient:
         if waiter is not None and not waiter.done():
             waiter.set_result(text)
             return
-        if self.on_output is not None:
-            self.on_output(text)
+        self._call(self.on_output, text)

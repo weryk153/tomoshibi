@@ -42,6 +42,10 @@ class FakeSio:
     async def disconnect(self):
         self.connected = False
 
+    async def shutdown(self):
+        self.shut_down = True
+        self.connected = False
+
     async def fire(self, event, *args):
         result = self.handlers[event](*args)
         if asyncio.iscoroutine(result):
@@ -141,3 +145,51 @@ def test_disconnect_callback_and_resubscribe_on_reconnect():
     asyncio.run(go())
     assert dropped == [1]
     assert [e for e, _ in sio.emits].count("listen-to-agents") == 2
+
+
+def test_close_calls_shutdown_and_silences_callbacks():
+    sio, client = make()
+    seen = []
+    client.on_state = seen.append
+
+    async def go():
+        await client.connect()
+        await client.close()
+        await sio.fire("state-update", {"frieren": {}})
+
+    asyncio.run(go())
+    assert sio.shut_down
+    assert seen == []
+
+
+def test_raising_callback_does_not_break_disconnect_handler():
+    sio, client = make()
+
+    def boom():
+        raise RuntimeError("x")
+
+    client.on_disconnect = boom
+
+    async def go():
+        await client.connect()
+        await sio.fire("disconnect")
+
+    asyncio.run(go())
+    assert not client.in_game
+
+
+def test_concurrent_asks_each_get_their_own_reply():
+    sio, client = make()
+
+    async def go():
+        a = asyncio.create_task(client.ask("她", "one", timeout=5))
+        b = asyncio.create_task(client.ask("她", "two", timeout=5))
+        await asyncio.sleep(0)
+        await asyncio.sleep(0)
+        await sio.fire("bot-output", "frieren", "reply-1")
+        assert await a == "reply-1"
+        await asyncio.sleep(0)
+        await sio.fire("bot-output", "frieren", "reply-2")
+        assert await b == "reply-2"
+
+    asyncio.run(go())
