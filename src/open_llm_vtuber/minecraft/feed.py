@@ -44,6 +44,52 @@ def game_turn_metadata(notes) -> dict:
     }
 
 
+def suggest_goal(state) -> str:
+    """照背包和時段算生存的下一步。27B 自己想的目標太虛（look around、punch tree），
+    給它一句能照抄的。"""
+    inv = state.inventory if state is not None else {}
+
+    def have(*names):
+        return sum(v for k, v in inv.items() if any(n in k for n in names))
+
+    logs = have("_log")
+    planks = have("_planks")
+    if state is not None and state.time_label == "Night" and have("torch") < 1:
+        return "dig into the hillside and make a small shelter"
+    if have("crafting_table") < 1 and logs + planks // 4 < 4:
+        return "collect 10 oak logs"
+    if have("crafting_table") < 1:
+        return "craft a crafting table"
+    if have("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe") < 1:
+        if logs + planks // 4 < 2:
+            return "collect 6 oak logs"
+        return "craft a wooden pickaxe"
+    if have("stone_pickaxe", "iron_pickaxe") < 1:
+        if have("cobblestone") < 3:
+            return "collect 8 cobblestone"
+        return "craft a stone pickaxe"
+    if have("torch") < 4:
+        if have("coal") < 1:
+            return "collect 5 coal"
+        return "craft 8 torches"
+    if (
+        state is not None
+        and state.hunger < 12
+        and have("beef", "porkchop", "bread", "apple", "mutton", "chicken") < 1
+    ):
+        return "kill a cow and collect the beef"
+    if have("iron_ingot", "raw_iron") < 3:
+        return "mine 5 raw iron underground"
+    return "collect 10 oak logs"
+
+
+def idle_note(state) -> str:
+    return (
+        IDLE_NOTE
+        + f" 照目前的背包，建議下一步：[minecraft_do: {suggest_goal(state)}]（直接照抄這一行就對了）。"
+    )
+
+
 @dataclass(frozen=True)
 class FeedRules:
     idle_seconds: float = 15.0
@@ -120,11 +166,13 @@ class GameFeed:
             notes = self._with_state((EVENTS_HEADING + "\n" + lines,))
             if ask_idle:
                 self._last_idle_turn = now
-                notes = notes + (IDLE_NOTE,)
+                notes = notes + (idle_note(self.latest),)
             return GameTurn("event", notes, urgent, now)
         if ask_idle:
             self._last_idle_turn = now
-            return GameTurn("idle", self._with_state(()) + (IDLE_NOTE,), False, now)
+            return GameTurn(
+                "idle", self._with_state(()) + (idle_note(self.latest),), False, now
+            )
         return None
 
     def _with_state(self, notes: tuple[str, ...]) -> tuple[str, ...]:

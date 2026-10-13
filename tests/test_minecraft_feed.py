@@ -1,7 +1,12 @@
 """事件怎麼排隊、節流、合併成一輪；閒下來什麼時候算。"""
 
 from src.open_llm_vtuber.minecraft.events import GameEvent, GameState
-from src.open_llm_vtuber.minecraft.feed import IDLE_NOTE, FeedRules, GameFeed
+from src.open_llm_vtuber.minecraft.feed import (
+    IDLE_NOTE,
+    FeedRules,
+    GameFeed,
+    suggest_goal,
+)
 
 RULES = FeedRules(idle_seconds=15, idle_cooldown=60, event_cooldown=30)
 IDLE = GameState(is_idle=True, action="Idle")
@@ -48,7 +53,7 @@ def test_idle_turn_after_idle_seconds_then_cooldown():
     feed.observe(IDLE, 15)
     turn = feed.pick(15)
     assert turn is not None and turn.kind == "idle"
-    assert turn.notes[-1] == IDLE_NOTE
+    assert turn.notes[-1].startswith(IDLE_NOTE)
     for t in range(16, 75):
         feed.observe(IDLE, t)
         assert feed.pick(t) is None
@@ -74,7 +79,7 @@ def test_events_come_before_idle():
     feed.offer(GameEvent("night", "天黑了"), 16)
     turn = feed.pick(16)
     # 事件先講，但身體閒著就順便問要做什麼；問過就不再另開一輪
-    assert turn.kind == "event" and IDLE_NOTE in turn.notes
+    assert turn.kind == "event" and any(n.startswith(IDLE_NOTE) for n in turn.notes)
     assert feed.pick(17) is None
 
 
@@ -119,7 +124,42 @@ def test_event_turn_also_asks_for_a_goal_when_idle_is_due():
         feed.observe(IDLE, t)
     feed.offer(GameEvent("night", "天黑了"), 16)
     turn = feed.pick(16)
-    assert turn.kind == "event" and turn.notes[-1] == IDLE_NOTE
+    assert turn.kind == "event" and turn.notes[-1].startswith(IDLE_NOTE)
     # 問過了就進冷卻，下一個事件輪不再問
     feed.offer(GameEvent("hostile", "殭屍"), 17)
-    assert IDLE_NOTE not in feed.pick(17).notes
+    assert not any(n.startswith(IDLE_NOTE) for n in feed.pick(17).notes)
+
+
+def test_suggest_goal_follows_the_survival_order():
+    assert suggest_goal(GameState()) == "collect 10 oak logs"
+    assert suggest_goal(GameState(inventory={"oak_log": 6})) == "craft a crafting table"
+    assert (
+        suggest_goal(GameState(inventory={"oak_log": 4, "crafting_table": 1}))
+        == "craft a wooden pickaxe"
+    )
+    assert (
+        suggest_goal(GameState(inventory={"crafting_table": 1, "wooden_pickaxe": 1}))
+        == "collect 8 cobblestone"
+    )
+    assert (
+        suggest_goal(
+            GameState(
+                inventory={"crafting_table": 1, "wooden_pickaxe": 1, "cobblestone": 5}
+            )
+        )
+        == "craft a stone pickaxe"
+    )
+    assert (
+        suggest_goal(GameState(inventory={"stone_pickaxe": 1, "crafting_table": 1}))
+        == "collect 5 coal"
+    )
+    assert (
+        suggest_goal(
+            GameState(inventory={"stone_pickaxe": 1, "crafting_table": 1, "coal": 3})
+        )
+        == "craft 8 torches"
+    )
+    assert (
+        suggest_goal(GameState(time_label="Night"))
+        == "dig into the hillside and make a small shelter"
+    )
