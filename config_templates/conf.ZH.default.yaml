@@ -571,7 +571,7 @@ stream_config:
 # Minecraft 模式（设置页「Minecraft」分页会改这里）
 minecraft_config:
   # Mindcraft 的 MindServer（必须跑在这台机器上，它只绑 localhost）
-  mindserver_url: 'http://127.0.0.1:8080'
+  mindserver_url: 'http://localhost:8080'
   # 她的 Mindcraft 机器人名字
   bot_name: ''
   # 闲多久算闲下来

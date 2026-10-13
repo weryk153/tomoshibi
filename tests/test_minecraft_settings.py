@@ -23,7 +23,7 @@ def _conf(tmp_path, monkeypatch):
 
 def test_defaults_when_block_missing():
     settings = read_minecraft_settings()
-    assert settings.mindserver_url == "http://127.0.0.1:8080"
+    assert settings.mindserver_url == "http://localhost:8080"
     assert settings.bot_name == ""
     assert settings.idle_seconds == 15
     assert settings.idle_cooldown_seconds == 60

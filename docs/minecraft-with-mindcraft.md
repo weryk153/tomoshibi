@@ -100,7 +100,7 @@ Andy-4.2 是 Mindcraft-CE（Mindcraft 的社群分支）以 Qwen3.5 9B 微調、
 
 | 設定頁 | 欄位 | 預設 |
 |---|---|---|
-| MindServer 網址 | `mindserver_url` | `http://127.0.0.1:8080` |
+| MindServer 網址 | `mindserver_url` | `http://localhost:8080` |
 | 機器人名字 | `bot_name` | 空 |
 | 閒置秒數 | `idle_seconds` | 15 |
 | 值得講的物品 | `notable_items` | `diamond`、`iron_ingot`、`bread` 等（Minecraft 物品 id） |

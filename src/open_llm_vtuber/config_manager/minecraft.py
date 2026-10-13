@@ -27,7 +27,7 @@ DEFAULT_NOTABLE_ITEMS = [
 class MinecraftConfig(I18nMixin):
     """Minecraft 模式：連哪個 MindServer、閒多久換目標、哪些東西值得講。"""
 
-    mindserver_url: str = Field("http://127.0.0.1:8080", alias="mindserver_url")
+    mindserver_url: str = Field("http://localhost:8080", alias="mindserver_url")
     bot_name: str = Field("", alias="bot_name")
     idle_seconds: int = Field(15, alias="idle_seconds", ge=3, le=600)
     idle_cooldown_seconds: int = Field(60, alias="idle_cooldown_seconds", ge=0, le=3600)

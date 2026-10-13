@@ -584,8 +584,8 @@ stream_config:
 
 # Minecraft mode: she plays through Mindcraft (the Minecraft tab in Settings edits this block)
 minecraft_config:
-  # Mindcraft's MindServer (must run on this machine; it only binds localhost)
-  mindserver_url: 'http://127.0.0.1:8080'
+  # Mindcraft's MindServer (must run on this machine; it binds localhost only, and on macOS that can mean IPv6 ::1, so use the name not 127.0.0.1)
+  mindserver_url: 'http://localhost:8080'
   # Her Mindcraft bot profile name
   bot_name: ''
   # Seconds the bot has to be idle before she decides the next goal

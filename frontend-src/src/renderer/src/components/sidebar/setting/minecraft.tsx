@@ -105,7 +105,7 @@ function Minecraft({ active = true }: MinecraftProps): JSX.Element {
         value={url}
         onChange={(value) => { setUrl(value); urlSaver.change(value); }}
         onBlur={urlSaver.flush}
-        placeholder="http://127.0.0.1:8080"
+        placeholder="http://localhost:8080"
         disabled={status?.live}
       />
       <SaveStatus state={urlSaver.state} />
