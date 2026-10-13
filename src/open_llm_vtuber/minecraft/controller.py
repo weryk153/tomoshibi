@@ -1,0 +1,163 @@
+"""Minecraft 模式的開始、停止與狀態。
+
+控制器不認得 WebSocket：跟主視窗的接點全在 host（host.py）；跟直播的接點是
+StreamController.attach_extra——開播時直播流程從同一個 feed 拿事件，私聊迴圈讓位。
+"""
+
+from __future__ import annotations
+
+import asyncio
+from typing import Any, Callable, Optional
+
+from loguru import logger
+
+from ..config_manager.minecraft import MinecraftConfig
+from .events import EventRules
+from .feed import FeedRules, GameFeed
+from .goal_tool import make_goal_handler
+from .mindserver import MindServerClient
+from .session import MinecraftSession
+from .settings import read_minecraft_settings, write_minecraft_settings
+
+
+class MinecraftError(Exception):
+    def __init__(self, reason: str):
+        super().__init__(reason)
+        self.reason = reason
+
+
+class MinecraftController:
+    def __init__(
+        self,
+        host: Any,
+        *,
+        stream: Any = None,
+        make_client: Callable[[str, str], Any] = MindServerClient,
+        read_settings: Callable[[], MinecraftConfig] = read_minecraft_settings,
+        write_settings: Callable[[dict], MinecraftConfig] = write_minecraft_settings,
+        session_options: Optional[dict[str, Any]] = None,
+    ):
+        self._host = host
+        self.stream = stream
+        self._make_client = make_client
+        self._read_settings = read_settings
+        self._write_settings = write_settings
+        self._session_options = session_options or {}
+        self._client: Any = None
+        self._feed: Optional[GameFeed] = None
+        self._session: Optional[MinecraftSession] = None
+        self._task: Optional[asyncio.Task] = None
+        self._settings: MinecraftConfig = MinecraftConfig()
+        self.stopped_reason: Optional[str] = None
+        self.last_error = ""
+
+    @property
+    def live(self) -> bool:
+        return self._task is not None and not self._task.done()
+
+    @staticmethod
+    def _feed_rules(settings: MinecraftConfig) -> FeedRules:
+        return FeedRules(
+            idle_seconds=float(settings.idle_seconds),
+            idle_cooldown=float(settings.idle_cooldown_seconds),
+            event_cooldown=float(settings.event_cooldown_seconds),
+        )
+
+    async def start(self) -> dict:
+        if self.live:
+            raise MinecraftError("already_live")
+        settings = self._read_settings()
+        if not settings.bot_name:
+            raise MinecraftError("no_bot_name")
+        client = self._make_client(settings.mindserver_url, settings.bot_name)
+        try:
+            await client.connect()
+        except ConnectionError as error:
+            self.last_error = str(error)
+            raise MinecraftError("not_running") from error
+        self._settings = settings
+        self._client = client
+        self._feed = GameFeed(self._feed_rules(settings))
+        self._session = MinecraftSession(
+            self._feed,
+            self._host.run_private_turn,
+            rules=EventRules(notable_items=tuple(settings.notable_items)),
+            stream_live=lambda: bool(self.stream is not None and self.stream.live),
+            failure_limit=settings.failure_limit,
+            **self._session_options,
+        )
+        client.on_state = self._session.handle_state
+        client.on_output = self._session.handle_output
+        client.on_disconnect = self._session.handle_disconnect
+        self._host.install_tool(
+            make_goal_handler(
+                client,
+                self._host.speaker_name(),
+                lambda: float(self._settings.tool_timeout_seconds),
+            )
+        )
+        if self.stream is not None:
+            self.stream.attach_extra(self._feed)
+        self.stopped_reason = None
+        self.last_error = ""
+        self._task = asyncio.create_task(self._run(self._session))
+        return self.status()
+
+    async def _run(self, session: MinecraftSession) -> None:
+        reason = "error"
+        try:
+            reason = await session.run()
+        except asyncio.CancelledError:
+            reason = "stopped"
+            raise
+        except Exception as error:
+            self.last_error = f"{type(error).__name__}: {error}"
+            logger.exception("[minecraft] session crashed")
+        finally:
+            self.stopped_reason = reason
+            await self._teardown()
+
+    async def _teardown(self) -> None:
+        self._host.uninstall_tool()
+        if self.stream is not None:
+            self.stream.detach_extra()
+        client, self._client = self._client, None
+        if client is not None:
+            await client.close()
+
+    async def stop(self) -> dict:
+        task, self._task = self._task, None
+        if task is not None and not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        # 任務還沒跑到第一個 await 就被取消時，_run 的 finally 根本不會執行；
+        # 這裡補收尾（_run 收過的話 _client 已是 None，不會重複）。
+        if self._client is not None:
+            await self._teardown()
+        if self.stopped_reason is None:
+            self.stopped_reason = "stopped"
+        return self.status()
+
+    def apply_settings(self, settings: MinecraftConfig) -> None:
+        self._settings = settings
+        if self._feed is not None:
+            self._feed.rules = self._feed_rules(settings)
+        if self._session is not None:
+            self._session.rules = EventRules(
+                notable_items=tuple(settings.notable_items)
+            )
+
+    def status(self) -> dict:
+        latest = self._session.latest if self._session is not None else None
+        current = self._session.current if self._session is not None else None
+        return {
+            "live": self.live,
+            "connected": bool(self._client is not None and self._client.connected),
+            "in_game": bool(self._client is not None and self._client.in_game),
+            "pending": self._feed.pending() if self._feed is not None else 0,
+            "health": latest.health if latest is not None else None,
+            "action": latest.action if latest is not None else "",
+            "current": current.kind if current is not None else None,
+            "stopped_reason": self.stopped_reason,
+            "last_error": self.last_error,
+        }

@@ -175,6 +175,7 @@ class WebSocketHandler:
         self.received_data_buffers: Dict[str, np.ndarray] = {}
         # 直播控制器（server.py 建好後設定）。沒開直播功能時是 None。
         self.stream = None
+        self.minecraft = None  # WebSocketMinecraftHost，server.py 設
         # 用 ?stage=1 連上來的連線。被新的舞台頁取代的也還在這裡：它仍然不是一般連線。
         self.stage_clients: set[str] = set()
 
@@ -938,6 +939,10 @@ class WebSocketHandler:
             )
             return
 
+        # Minecraft 模式開著時，這一輪的 agent 要有 minecraft_do（換角色會建新 agent）。
+        minecraft = getattr(self, "minecraft", None)
+        if minecraft is not None:
+            minecraft.ensure_tool(self.client_contexts[client_uid])
         await handle_conversation_trigger(
             msg_type=data.get("type", ""),
             data=data,
