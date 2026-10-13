@@ -150,7 +150,13 @@ def test_a_hand_written_file_keeps_its_comments_and_order(tmp_path, monkeypatch)
     ]
     # 原有的欄位維持原順序；存檔時替角色補上的自有設定（own_everything）接在後面。
     assert keys[:8] == [
-        "conf_name", "conf_uid", "live2d_model_name", "persona_prompt",
-        "character_name", "long_term_memory_enabled", "tts_config", "reply_language",
+        "conf_name",
+        "conf_uid",
+        "live2d_model_name",
+        "persona_prompt",
+        "character_name",
+        "long_term_memory_enabled",
+        "tts_config",
+        "reply_language",
     ]
     assert yaml.safe_load(text)["character_config"]["character_name"] == "小燈x"

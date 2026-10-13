@@ -105,7 +105,9 @@ def test_opening_up_needs_a_restart(conf, monkeypatch, no_pending):
     assert pending_changes.needs_restart() is True
 
 
-def test_toggling_back_before_restarting_leaves_nothing_pending(conf, monkeypatch, no_pending):
+def test_toggling_back_before_restarting_leaves_nothing_pending(
+    conf, monkeypatch, no_pending
+):
     client = _app(monkeypatch, conf)
 
     client.post("/api/network/host", json={"allow_other_devices": True})
@@ -114,7 +116,9 @@ def test_toggling_back_before_restarting_leaves_nothing_pending(conf, monkeypatc
     assert pending_changes.pending() == []
 
 
-def test_closing_a_backend_that_started_open_needs_a_restart(conf, monkeypatch, no_pending):
+def test_closing_a_backend_that_started_open_needs_a_restart(
+    conf, monkeypatch, no_pending
+):
     conf.write_text(CONF.replace("127.0.0.1", "0.0.0.0"), encoding="utf-8")
     client = _app(monkeypatch, conf)  # 啟動時是 0.0.0.0
 
@@ -123,7 +127,9 @@ def test_closing_a_backend_that_started_open_needs_a_restart(conf, monkeypatch, 
     assert pending_changes.needs_restart() is True
 
 
-def test_a_backend_bound_to_one_lan_address_needs_a_restart_to_open_up(conf, monkeypatch, no_pending):
+def test_a_backend_bound_to_one_lan_address_needs_a_restart_to_open_up(
+    conf, monkeypatch, no_pending
+):
     conf.write_text(CONF.replace("127.0.0.1", "192.168.1.10"), encoding="utf-8")
     client = _app(monkeypatch, conf)
 
@@ -132,7 +138,9 @@ def test_a_backend_bound_to_one_lan_address_needs_a_restart_to_open_up(conf, mon
     assert pending_changes.needs_restart() is True
 
 
-def test_network_info_separates_the_setting_from_the_running_bind(conf, monkeypatch, no_pending):
+def test_network_info_separates_the_setting_from_the_running_bind(
+    conf, monkeypatch, no_pending
+):
     client = _app(monkeypatch, conf)
     client.post("/api/network/host", json={"allow_other_devices": True})
 

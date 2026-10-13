@@ -7,9 +7,7 @@ from src.open_llm_vtuber import persona_route, persona_store
 def _client(tmp_path, monkeypatch):
     persona_dir = tmp_path / "personas"
     monkeypatch.setattr(persona_store, "PERSONAS_DIR", str(persona_dir))
-    monkeypatch.setattr(
-        persona_store, "STORE_PATH", str(persona_dir / "personas.json")
-    )
+    monkeypatch.setattr(persona_store, "STORE_PATH", str(persona_dir / "personas.json"))
     monkeypatch.setattr(persona_route, "_is_local_request", lambda request: True)
     app = FastAPI()
     app.include_router(persona_route.init_persona_route())
@@ -75,4 +73,3 @@ def test_a_persona_never_gets_the_id_the_choose_route_uses(tmp_path, monkeypatch
         f"/api/personas/{by_name['id']}", json={"name": "改名", "prompt": "改了。"}
     )
     assert response.status_code == 200
-

@@ -23,6 +23,7 @@ GOAL_RE = re.compile(
 
 sink: Optional[Callable[[str], Awaitable[None]]] = None
 _recent: dict[str, float] = {}
+dispatched = 0  # 送出過幾個（主持人用來判斷這一輪她有沒有下目標）
 REPEAT_WINDOW = 15.0  # 同一個目標幾秒內不重送（她常在一輪裡寫兩三次）
 
 
@@ -45,6 +46,8 @@ def dispatch(goals: list[str]) -> None:
         if now - _recent.get(key, float("-inf")) < REPEAT_WINDOW:
             continue
         _recent[key] = now
+        global dispatched
+        dispatched += 1
         if sink is None:
             logger.debug(f"[minecraft] goal in text but mode is off: {goal}")
             continue

@@ -280,9 +280,13 @@ def test_text_goal_waits_until_the_body_is_idle():
             {"gameplay": {"health": 20}, "action": {"current": "Idle", "isIdle": True}}
         )
         await asyncio.sleep(0)
-        assert client.sent == ["craft a crafting table"]
-        await goal_text.sink("collect 8 cobblestone")  # 閒著就直接送
-        assert client.sent[-1] == "collect 8 cobblestone"
+        assert client.sent == ['!craftRecipe("oak_planks", 1)']  # 編成指令，一次一步
+        c._sent_at = float("-inf")  # 假裝幾秒過去
+        client.on_state(
+            {"gameplay": {"health": 20}, "action": {"current": "Idle", "isIdle": True}}
+        )
+        await asyncio.sleep(0)
+        assert client.sent[-1] == '!craftRecipe("crafting_table", 1)'
         await c.stop()
 
     asyncio.run(go())

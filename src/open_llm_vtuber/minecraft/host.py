@@ -16,6 +16,7 @@ from typing import Any, Awaitable, Callable, Optional
 from loguru import logger
 
 from ..conversations.conversation_handler import handle_conversation_trigger
+from . import goal_text
 from .feed import GameTurn, game_turn_metadata
 from .goal_tool import GOAL_TOOL
 from .session import TurnResult
@@ -127,6 +128,7 @@ class WebSocketMinecraftHost:
         task = self._ws.current_conversation_tasks.get(uid)
         if task is None:
             return "interrupted"
+        dispatched_before = goal_text.dispatched
         try:
             # shield：關閉模式取消的是這個協程，不該連帶把她正在講的話切掉；
             # 使用者打斷是直接取消 task 本身，仍會走到下面的 interrupted。
@@ -139,6 +141,12 @@ class WebSocketMinecraftHost:
         except Exception as error:
             logger.warning(f"[minecraft] turn failed: {type(error).__name__}: {error}")
             return "failed"
+        if turn.suggested and goal_text.dispatched == dispatched_before:
+            # 她講了話但沒給身體具體目標：照程式算好的下一步做，身體不能一直站著。
+            logger.info(
+                f"[minecraft] no goal from her, doing the suggested one: {turn.suggested}"
+            )
+            goal_text.dispatch([turn.suggested])
         push = getattr(self._ws, "_push_history_to_peers", None)
         if push is not None:
             await push(uid)

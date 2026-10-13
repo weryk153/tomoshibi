@@ -7,6 +7,8 @@ StreamController.attach_extra——開播時直播流程從同一個 feed 拿事
 from __future__ import annotations
 
 import asyncio
+import time
+from collections import deque
 from typing import Any, Callable, Optional
 
 from loguru import logger
@@ -15,6 +17,7 @@ from ..config_manager.minecraft import MinecraftConfig
 from .events import EventRules
 from .feed import FeedRules, GameFeed
 from . import goal_text
+from .commands import compile_goal
 from .goal_tool import make_goal_handler
 from .mindserver import MindServerClient
 from .session import MinecraftSession
@@ -48,7 +51,8 @@ class MinecraftController:
         self._feed: Optional[GameFeed] = None
         self._session: Optional[MinecraftSession] = None
         # 身體在忙時她下的目標先排著，閒下來才送：送了 Mindcraft 會中斷手上的動作。
-        self._queued_goal: Optional[str] = None
+        self._queue: deque[str] = deque()
+        self._sent_at = float("-inf")
         self._task: Optional[asyncio.Task] = None
         self._settings: MinecraftConfig = MinecraftConfig()
         self.stopped_reason: Optional[str] = None
@@ -114,14 +118,13 @@ class MinecraftController:
             # 她在台詞裡寫的 [minecraft_do: ...] 也送給身體（goal_text）；回話會從
             # bot-output 變成回報事件。
             async def _send_text_goal(goal: str) -> None:
-                latest = self._session.latest if self._session is not None else None
-                if latest is not None and not latest.is_idle:
-                    # 她講話時身體不停：新目標排著，等這件做完再送（後來的蓋掉先來的）。
-                    self._queued_goal = goal
-                    logger.info(f"[minecraft] body busy, goal queued: {goal}")
-                    return
-                # 名字每次現取：開始時主視窗可能還沒連上，那時會拿到預設名。
-                await client.send(self._host.speaker_name(), goal)
+                # 編成 Mindcraft 指令（可能好幾步）；她的新目標蓋掉舊目標剩下的步驟。
+                # 身體在忙就排著，閒下來才一步一步送（送了 Mindcraft 會中斷手上的動作）。
+                steps = compile_goal(goal)
+                self._queue.clear()
+                self._queue.extend(steps)
+                logger.info(f"[minecraft] goal {goal!r} -> {steps}")
+                await self._pump()
 
             goal_text.sink = _send_text_goal
             self.stopped_reason = None
@@ -149,7 +152,7 @@ class MinecraftController:
 
     async def _teardown(self) -> None:
         goal_text.sink = None
-        self._queued_goal = None
+        self._queue.clear()
         self._host.uninstall_tool()
         if self.stream is not None:
             self.stream.detach_extra()
@@ -188,11 +191,24 @@ class MinecraftController:
         if session is None:
             return
         session.handle_state(raw)
-        goal, latest, client = self._queued_goal, session.latest, self._client
-        if goal and latest is not None and latest.is_idle and client is not None:
-            self._queued_goal = None
-            logger.info(f"[minecraft] body idle, sending queued goal: {goal}")
-            asyncio.create_task(client.send(self._host.speaker_name(), goal))
+        if self._queue:
+            asyncio.create_task(self._pump())
+
+    async def _pump(self) -> None:
+        """身體閒著就送佇列的下一步；剛送的那步給它幾秒開始動，別一口氣全倒進去。"""
+        session, client = self._session, self._client
+        if session is None or client is None or not self._queue:
+            return
+        latest = session.latest
+        if latest is not None and not latest.is_idle:
+            return
+        if time.monotonic() - self._sent_at < 4.0:
+            return
+        step = self._queue.popleft()
+        self._sent_at = time.monotonic()
+        logger.info(f"[minecraft] -> body: {step} ({len(self._queue)} more queued)")
+        # 名字每次現取：開始時主視窗可能還沒連上，那時會拿到預設名。
+        await client.send(self._host.speaker_name(), step)
 
     def status(self) -> dict:
         latest = self._session.latest if self._session is not None else None

@@ -103,6 +103,7 @@ class GameTurn:
     notes: tuple[str, ...]
     urgent: bool
     timestamp: float
+    suggested: str = ""  # 身體閒著時程式算好的下一步；她沒給具體目標就照這個做
 
 
 class GameFeed:
@@ -167,11 +168,21 @@ class GameFeed:
             if ask_idle:
                 self._last_idle_turn = now
                 notes = notes + (idle_note(self.latest),)
-            return GameTurn("event", notes, urgent, now)
+            return GameTurn(
+                "event",
+                notes,
+                urgent,
+                now,
+                suggest_goal(self.latest) if ask_idle else "",
+            )
         if ask_idle:
             self._last_idle_turn = now
             return GameTurn(
-                "idle", self._with_state(()) + (idle_note(self.latest),), False, now
+                "idle",
+                self._with_state(()) + (idle_note(self.latest),),
+                False,
+                now,
+                suggest_goal(self.latest),
             )
         return None
 
