@@ -140,6 +140,12 @@ def state_summary(state: GameState) -> str:
         parts.append(f"時段 {state.time_label}")
     if state.entities:
         parts.append("附近有 " + "、".join(state.entities[:6]))
+    if state.inventory:
+        # 她要靠這個決定下一步（木頭夠不夠、能不能合成），只列最多的八樣。
+        top = sorted(state.inventory.items(), key=lambda kv: -kv[1])[:8]
+        parts.append("背包：" + "、".join(f"{name}×{count}" for name, count in top))
+    else:
+        parts.append("背包是空的")
     return "、".join(parts)
 
 

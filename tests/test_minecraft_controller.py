@@ -239,3 +239,50 @@ def test_the_stream_path_gets_no_idle_turn_while_the_bot_is_out_of_game():
         await c.stop()
 
     asyncio.run(go())
+
+
+def test_text_goal_waits_until_the_body_is_idle():
+    """她講話時身體不停：身體在忙，目標先排著，閒下來那一秒才送。"""
+    from src.open_llm_vtuber.minecraft import goal_text
+
+    class SendingClient(FakeClient):
+        def __init__(self, url, bot_name):
+            super().__init__(url, bot_name)
+            self.sent = []
+
+        async def send(self, from_name, message):
+            self.sent.append(message)
+
+    host = FakeHost()
+    settings = MinecraftConfig(
+        bot_name="frieren", idle_seconds=3, idle_cooldown_seconds=0
+    )
+    c = MinecraftController(
+        host,
+        make_client=lambda url, name: SendingClient(url, name),
+        read_settings=lambda: settings,
+        write_settings=lambda changes: settings,
+        session_options={"clock": lambda: 0.0, "sleep": lambda s: asyncio.sleep(0)},
+    )
+
+    async def go():
+        await c.start()
+        client = c._client
+        client.on_state(
+            {
+                "gameplay": {"health": 20},
+                "action": {"current": "collectBlocks", "isIdle": False},
+            }
+        )
+        await goal_text.sink("craft a crafting table")
+        assert client.sent == []  # 身體在忙，先排著
+        client.on_state(
+            {"gameplay": {"health": 20}, "action": {"current": "Idle", "isIdle": True}}
+        )
+        await asyncio.sleep(0)
+        assert client.sent == ["craft a crafting table"]
+        await goal_text.sink("collect 8 cobblestone")  # 閒著就直接送
+        assert client.sent[-1] == "collect 8 cobblestone"
+        await c.stop()
+
+    asyncio.run(go())

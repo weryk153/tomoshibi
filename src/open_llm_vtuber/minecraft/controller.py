@@ -47,6 +47,8 @@ class MinecraftController:
         self._client: Any = None
         self._feed: Optional[GameFeed] = None
         self._session: Optional[MinecraftSession] = None
+        # 身體在忙時她下的目標先排著，閒下來才送：送了 Mindcraft 會中斷手上的動作。
+        self._queued_goal: Optional[str] = None
         self._task: Optional[asyncio.Task] = None
         self._settings: MinecraftConfig = MinecraftConfig()
         self.stopped_reason: Optional[str] = None
@@ -96,7 +98,7 @@ class MinecraftController:
                 failure_limit=settings.failure_limit,
                 **self._session_options,
             )
-            client.on_state = self._session.handle_state
+            client.on_state = self._on_state
             client.on_output = self._session.handle_output
             client.on_disconnect = self._session.handle_disconnect
             self._host.install_tool(
@@ -112,6 +114,12 @@ class MinecraftController:
             # 她在台詞裡寫的 [minecraft_do: ...] 也送給身體（goal_text）；回話會從
             # bot-output 變成回報事件。
             async def _send_text_goal(goal: str) -> None:
+                latest = self._session.latest if self._session is not None else None
+                if latest is not None and not latest.is_idle:
+                    # 她講話時身體不停：新目標排著，等這件做完再送（後來的蓋掉先來的）。
+                    self._queued_goal = goal
+                    logger.info(f"[minecraft] body busy, goal queued: {goal}")
+                    return
                 # 名字每次現取：開始時主視窗可能還沒連上，那時會拿到預設名。
                 await client.send(self._host.speaker_name(), goal)
 
@@ -141,6 +149,7 @@ class MinecraftController:
 
     async def _teardown(self) -> None:
         goal_text.sink = None
+        self._queued_goal = None
         self._host.uninstall_tool()
         if self.stream is not None:
             self.stream.detach_extra()
@@ -173,6 +182,17 @@ class MinecraftController:
             self._session.rules = EventRules(
                 notable_items=tuple(settings.notable_items)
             )
+
+    def _on_state(self, raw: object) -> None:
+        session = self._session
+        if session is None:
+            return
+        session.handle_state(raw)
+        goal, latest, client = self._queued_goal, session.latest, self._client
+        if goal and latest is not None and latest.is_idle and client is not None:
+            self._queued_goal = None
+            logger.info(f"[minecraft] body idle, sending queued goal: {goal}")
+            asyncio.create_task(client.send(self._host.speaker_name(), goal))
 
     def status(self) -> dict:
         latest = self._session.latest if self._session is not None else None

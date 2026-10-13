@@ -61,6 +61,8 @@ def test_parse_tolerates_missing_and_odd_shapes():
 def test_summary_mentions_the_numbers_she_needs():
     text = state_summary(parse_state(raw(gameplay__health=7)))
     assert "7/20" in text and "forest" in text and "Morning" in text and "Idle" in text
+    assert "oak_log×5" in text
+    assert "背包是空的" in state_summary(parse_state({"gameplay": {"health": 20}}))
 
 
 def test_first_state_produces_no_events():
