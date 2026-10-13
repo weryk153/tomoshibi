@@ -27,10 +27,10 @@ EVENTS_HEADING = "遊戲裡剛發生："
 STATE_HEADING = "你在遊戲裡目前的狀態："
 # 遊戲那一輪給引擎的指令，取代主動開口原本的（找話題、聊新聞）：不然她會丟下遊戲聊別的。
 GAME_TURN_INSTRUCTION = (
-    "你正在開 Minecraft 生存實況。備註是遊戲裡剛發生的事和你目前的狀態。像實況主一樣對著"
-    "看台講一句、最多兩句，動作比話重要，只講備註裡真的有的事；備註沒提到的（礦、動物、村莊、物品）就當沒看到，"
-    "不要編，也不要換到別的話題。要讓身體做事，就在台詞裡"
-    "自己一行寫 [minecraft_do: 一句英文]，例如 [minecraft_do: craft a stone pickaxe]；"
+    "你正在開 Minecraft 生存實況。備註是遊戲裡剛發生的事和你目前的狀態。只講一句，說你"
+    "現在在做什麼或剛發生了什麼；備註沒提到的（礦、動物、村莊、物品）就當沒看到，不要編，"
+    "不要問觀眾問題，不要重複上一輪講過的話，沒有新鮮事就只講半句帶過。要讓身體做事，就在"
+    "台詞裡自己一行寫 [minecraft_do: 一句英文]，例如 [minecraft_do: craft a stone pickaxe]；"
     "一輪最多一個目標，身體正在做事就不要再下。"
 )
 
@@ -41,6 +41,8 @@ def game_turn_metadata(notes) -> dict:
         "notes": list(notes),
         "proactive_material": [],
         "proactive_instruction": GAME_TURN_INSTRUCTION,
+        # 不要一直問觀眾「你們覺得呢」：引擎會把問句濾掉。
+        "proactive_forbid_question": True,
     }
 
 

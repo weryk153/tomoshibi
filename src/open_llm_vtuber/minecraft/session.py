@@ -8,6 +8,7 @@ MindServerClient 的回呼都接到這裡：每秒的狀態差分成事件丟進
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from typing import Awaitable, Callable, Literal, Optional
 
@@ -19,6 +20,11 @@ from .feed import GameFeed, GameTurn
 TurnResult = Literal["ok", "failed", "interrupted"]
 GameTurnRunner = Callable[[GameTurn], Awaitable[TurnResult]]
 POLL_SECONDS = 0.5
+_REPORT_WORTH = re.compile(
+    r"can'?t|cannot|couldn'?t|unable|fail|no .* (found|nearby)|not found|don'?t have|missing|"
+    r"done|finished|collected|crafted|placed|died|killed",
+    re.IGNORECASE,
+)
 
 
 class MinecraftSession:
@@ -64,6 +70,10 @@ class MinecraftSession:
 
     def handle_output(self, text: str) -> None:
         text = text.strip()
+        # 身體的回話大多是「Searching for another oak_log」這種流水帳，每句都讓她講一輪
+        # 太吵；只有做不到、失敗、找不到、做完了才值得講。
+        if text and not _REPORT_WORTH.search(text):
+            return
         if text:
             self.feed.offer(GameEvent("report", f"你的身體回報：{text}"), self._clock())
 

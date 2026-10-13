@@ -78,14 +78,16 @@ def test_idle_turn_and_report_event():
     async def go():
         task = asyncio.create_task(session.run())
         await tick(session, clock, 6, lambda: state())
-        session.handle_output("I built a shelter.")
+        session.handle_output("Done, I finished the shelter.")
         await tick(session, clock, 2)
         task.cancel()
 
     asyncio.run(go())
     kinds = [t.kind for t in turns]
     assert kinds[0] == "idle"
-    assert any("I built a shelter." in "\n".join(t.notes) for t in turns)
+    assert any("finished the shelter" in "\n".join(t.notes) for t in turns)
+    session.handle_output("Searching for another oak_log.")  # 流水帳不講
+    assert session.feed.pending() == 0
 
 
 def test_waits_while_stream_is_live():
@@ -114,7 +116,7 @@ def test_disconnect_once_and_failures_stop():
         session.handle_disconnect()
         session.handle_disconnect()
         await tick(session, clock, 2)
-        session.handle_output("x")
+        session.handle_output("Cannot find any x.")
         await tick(session, clock, 2)
         return await task
 
