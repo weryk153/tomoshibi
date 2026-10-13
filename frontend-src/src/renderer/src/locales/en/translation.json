@@ -156,6 +156,7 @@
       "perf": "Performance",
       "about": "About",
       "stream": "Stream",
+      "minecraft": "Minecraft",
       "conversation": "Conversation",
       "stage": "Stage",
       "models": "Models",
@@ -890,6 +891,37 @@
         "no_url": "No live video URL yet",
         "bad_url": "That is not a live video URL",
         "no_history": "Could not create the stream conversation"
+      }
+    },
+    "minecraft": {
+      "title": "Minecraft (via Mindcraft)",
+      "intro": "She plays by herself through a Mindcraft bot and talks about what happens. Start Minecraft and Mindcraft first; see docs/minecraft-with-mindcraft.md.",
+      "urlLabel": "MindServer URL",
+      "botNameLabel": "Bot name",
+      "botNameHelp": "Must match the Mindcraft profile name exactly.",
+      "idleLabel": "Idle seconds",
+      "idleHelp": "After the bot has been idle this long she decides what to do next (3–600).",
+      "itemsLabel": "Items worth mentioning",
+      "itemsHelp": "One Minecraft item id per line; she speaks up when one of these appears in her inventory.",
+      "start": "Start",
+      "stop": "Stop",
+      "loading": "Loading…",
+      "needBotName": "Enter the bot name first",
+      "connected": "Mindcraft: connected",
+      "disconnected": "Mindcraft: not connected",
+      "inGame": "bot in the game",
+      "notInGame": "bot not in the game",
+      "state": "Health {{health}}/20 · doing: {{action}} · {{pending}} event(s) waiting",
+      "stopped": {
+        "failures": "Paused after repeated failures",
+        "stopped": "Stopped",
+        "error": "Stopped after an internal error"
+      },
+      "lastError": "Last error: {{error}}",
+      "errors": {
+        "already_live": "Already running",
+        "no_bot_name": "Enter the bot name first",
+        "not_running": "Mindcraft is not running (could not reach the MindServer)"
       }
     },
     "values": {
