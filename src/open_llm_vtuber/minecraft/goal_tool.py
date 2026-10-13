@@ -12,7 +12,9 @@ from ai_character_engine.tools.models import ToolDefinition
 GOAL_TOOL = ToolDefinition(
     name="minecraft_do",
     description=(
-        "Tell your body in Minecraft what to do next. Write the goal as one short "
+        "Make your body in Minecraft do something. Your body ONLY moves when this "
+        "tool is called; saying it in words does nothing. Call it whenever you decide "
+        "to do anything in the game or someone asks you to. Write the goal as one short "
         "English sentence, e.g. 'collect 10 oak logs', 'build a small shelter before "
         "night', 'go mine iron underground'. Your body replies with what it will do."
     ),
