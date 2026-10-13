@@ -12,7 +12,8 @@ from typing import Callable, Optional
 from .events import GameEvent, GameState, state_summary
 
 IDLE_NOTE = (
-    "你的身體在遊戲裡閒著沒事做。想做什麼就用 minecraft_do 工具、用一句英文交代；"
+    "你的身體在遊戲裡閒著沒事做。決定要做什麼，就在台詞裡自己一行寫 "
+    "[minecraft_do: 一句英文]（例如 [minecraft_do: collect 10 oak logs]），身體才會動；"
     "也可以只聊聊再說。"
 )
 EVENTS_HEADING = "遊戲裡剛發生："
@@ -20,8 +21,8 @@ STATE_HEADING = "你在遊戲裡目前的狀態："
 # 遊戲那一輪給引擎的指令，取代主動開口原本的（找話題、聊新聞）：不然她會丟下遊戲聊別的。
 GAME_TURN_INSTRUCTION = (
     "你正在開 Minecraft 生存實況。備註是遊戲裡剛發生的事和你目前的狀態。像實況主一樣對著"
-    "看台講一到三句，只講備註裡真的有的事，不要換到別的話題。要讓身體做事就呼叫 "
-    "minecraft_do 工具，用一句英文交代。"
+    "看台講一到三句，只講備註裡真的有的事，不要換到別的話題。要讓身體做事，就在台詞裡"
+    "自己一行寫 [minecraft_do: 一句英文]，例如 [minecraft_do: craft a stone pickaxe]。"
 )
 
 

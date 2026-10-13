@@ -14,6 +14,7 @@ from loguru import logger
 from ..config_manager.minecraft import MinecraftConfig
 from .events import EventRules
 from .feed import FeedRules, GameFeed
+from . import goal_text
 from .goal_tool import make_goal_handler
 from .mindserver import MindServerClient
 from .session import MinecraftSession
@@ -107,6 +108,14 @@ class MinecraftController:
             )
             if self.stream is not None:
                 self.stream.attach_extra(self._feed)
+            # 她在台詞裡寫的 [minecraft_do: ...] 也送給身體（goal_text）；回話會從
+            # bot-output 變成回報事件。
+            speaker = self._host.speaker_name()
+
+            async def _send_text_goal(goal: str) -> None:
+                await client.send(speaker, goal)
+
+            goal_text.sink = _send_text_goal
             self.stopped_reason = None
             self.last_error = ""
         except BaseException:
@@ -131,6 +140,7 @@ class MinecraftController:
             await self._teardown()
 
     async def _teardown(self) -> None:
+        goal_text.sink = None
         self._host.uninstall_tool()
         if self.stream is not None:
             self.stream.detach_extra()

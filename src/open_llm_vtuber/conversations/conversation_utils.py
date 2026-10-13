@@ -1,12 +1,14 @@
 import asyncio
 import functools
 import re
+from dataclasses import replace
 from typing import Awaitable, Callable, Optional, Union, Any, List, Dict
 import numpy as np
 import json
 from loguru import logger
 
 from ..message_handler import message_handler
+from ..minecraft import goal_text
 from .types import WebSocketSend, BroadcastContext
 from .bilingual import spoken_line
 from .tts_manager import TTSTaskManager
@@ -318,6 +320,18 @@ async def handle_sentence_output(
     full_response = ""
     async for display_text, tts_text, actions in output:
         logger.debug(f"🏃 Processing output: '''{tts_text}'''...")
+        # 她在台詞裡下給遊戲身體的目標（[minecraft_do: ...]）：抓出來送走，講話和字幕
+        # 裡拿掉；整句只有標記就整句不出聲。紀錄（full_response）保留原句，她下過什麼
+        # 目標要留在對話裡。
+        said_text = display_text.text
+        shown_text, goals = goal_text.extract_goals(display_text.text)
+        if goals:
+            goal_text.dispatch(goals)
+            tts_text = goal_text.extract_goals(tts_text)[0]
+            display_text = replace(display_text, text=shown_text)
+            if not re.sub(r'[\s.,!?，。！？\'"』」）】]+', "", shown_text):
+                full_response += said_text
+                continue
         original_tts = tts_text
         silenced = False
         model_translated = False
@@ -374,7 +388,7 @@ async def handle_sentence_output(
             logger.debug("🚫 No translation engine available. Skipping translation.")
 
         # 這是正典的回覆文字，記憶與對話紀錄用的就是它。**絕對不能改動。**
-        full_response += display_text.text
+        full_response += said_text
 
         # 字幕翻譯只影響畫面：算進另一個欄位，不碰正典文字。沒有字幕引擎時
         # 字幕就等於原文。
