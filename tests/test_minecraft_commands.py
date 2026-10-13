@@ -50,3 +50,8 @@ def test_danger_moves():
     assert compile_goal("run away from zombie") == ["!moveAway(15)"]
     assert compile_goal("attack the zombie") == ['!attack("zombie")']
     assert compile_goal("go to bed") == ["!goToBed()"]
+
+
+def test_place_block():
+    assert compile_goal("place crafting table") == ['!placeHere("crafting_table")']
+    assert compile_goal("put down the crafting table here") == ['!placeHere("crafting_table")']

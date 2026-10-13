@@ -21,7 +21,7 @@ TurnResult = Literal["ok", "failed", "interrupted"]
 GameTurnRunner = Callable[[GameTurn], Awaitable[TurnResult]]
 POLL_SECONDS = 0.5
 _REPORT_WORTH = re.compile(
-    r"can'?t|cannot|couldn'?t|unable|fail|no .* (found|nearby)|not found|don'?t have|missing|"
+    r"can'?t|cannot|couldn'?t|unable|fail|no .* (found|nearby)|not found|do(?:n'?t| not) have|missing|requires?|need|invalid|understand|"
     r"done|finished|collected|crafted|placed|died|killed",
     re.IGNORECASE,
 )

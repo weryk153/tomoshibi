@@ -89,6 +89,10 @@ def compile_goal(goal: str) -> list[str]:
             lambda m: [f'!attack("{m.group(1)}")'],
         ),
         (r"go to bed|sleep", lambda m: ["!goToBed()"]),
+        (
+            r"(?:place|put down|set up|put)\s+(?:the\s+|a\s+|my\s+)?([a-z_ ]+?)(?:\s+(?:here|down|nearby))?$",
+            lambda m: [f'!placeHere("{m.group(1).strip().replace(" ", "_")}")'],
+        ),
         (r"\bstop\b|stay here|wait here", lambda m: ["!stop"]),
         (r"follow (?:me|the player)", lambda m: ['!followPlayer("Player", 3)']),
         (
