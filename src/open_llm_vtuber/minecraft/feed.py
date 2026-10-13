@@ -40,7 +40,10 @@ def game_turn_metadata(notes) -> dict:
     return {
         "notes": list(notes),
         "proactive_material": [],
-        "proactive_instruction": GAME_TURN_INSTRUCTION,
+        # 事件和狀態直接接在指令後面（模型最看重最後那段），不然 27B 會丟著不講。
+        "proactive_instruction": GAME_TURN_INSTRUCTION
+        + "\n\n第一句一定要回應下面這些：\n"
+        + "\n".join(notes),
         # 不要一直問觀眾「你們覺得呢」：引擎會把問句濾掉。
         "proactive_forbid_question": True,
     }
