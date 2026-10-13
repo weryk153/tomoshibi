@@ -53,6 +53,7 @@ class MinecraftController:
         # 身體在忙時她下的目標先排著，閒下來才送：送了 Mindcraft 會中斷手上的動作。
         self._queue: deque[str] = deque()
         self._sent_at = float("-inf")
+        self._safety_at = float("-inf")
         self._task: Optional[asyncio.Task] = None
         self._settings: MinecraftConfig = MinecraftConfig()
         self.stopped_reason: Optional[str] = None
@@ -202,6 +203,18 @@ class MinecraftController:
         if session is None:
             return
         session.handle_state(raw)
+        latest = session.latest
+        # 保命：天黑或血快沒了、身體又閒著，不等她決定，先往下挖三格躲。兩分鐘內只做一次。
+        if (
+            latest is not None
+            and latest.is_idle
+            and not self._queue
+            and (latest.time_label == "Night" or latest.health <= 6)
+            and time.monotonic() - self._safety_at > 120.0
+        ):
+            self._safety_at = time.monotonic()
+            logger.info("[minecraft] night/low health and idle -> digging in")
+            self._queue.append("!digDown(3)")
         if self._queue:
             asyncio.create_task(self._pump())
 
