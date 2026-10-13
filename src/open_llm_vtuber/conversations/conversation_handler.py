@@ -106,19 +106,23 @@ async def handle_conversation_trigger(
     received_data_buffers: Dict[str, np.ndarray],
     current_conversation_tasks: Dict[str, Optional[asyncio.Task]],
     broadcast_to_group: Callable,
+    extra_metadata: Optional[dict] = None,
 ) -> None:
     """Handle triggers that start a conversation"""
     metadata = None
     images_for_generation = data.get("images")
 
     if msg_type == "ai-speak-signal":
-        if not _speaks_up_now(context, client_uid):
+        # 後端自己觸發的（Minecraft 的事件）不受「等你」模式擋：那是在講遊戲，不是在催人。
+        if extra_metadata is None and not _speaks_up_now(context, client_uid):
             return
         raw_images = data.get("images")
         image_sources = [
             image.get("source") for image in raw_images or [] if isinstance(image, dict)
         ]
         metadata = proactive_turn_metadata(context, client_uid, image_sources)
+        if extra_metadata:
+            metadata = {**metadata, **extra_metadata}
         user_input = PROACTIVE_TEXT
 
         await websocket.send_text(
