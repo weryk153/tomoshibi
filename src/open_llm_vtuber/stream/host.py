@@ -79,13 +79,20 @@ class WebSocketStreamHost:
         return tuple(names)
 
     def turn_runner(self, history_uid: str):
-        async def run_turn(comment: Optional[ChatMessage]) -> TurnResult:
+        async def run_turn(
+            comment: Optional[ChatMessage], *, notes: tuple = ()
+        ) -> TurnResult:
             uid, context, socket = self._stage()
             if context is None or socket is None:
                 return "interrupted"
             context.history_uid = history_uid
             if comment is None:
-                metadata = {**proactive_turn_metadata(context, uid), "stream": True}
+                # notes 是遊戲事件的描述（agent 讀 metadata["notes"]）；冷場開口沒有。
+                metadata = {
+                    **proactive_turn_metadata(context, uid),
+                    "stream": True,
+                    **({"notes": list(notes)} if notes else {}),
+                }
                 user_input = PROACTIVE_TEXT
                 shown = {"type": "stream-comment", "author": "", "text": ""}
             else:
@@ -135,6 +142,15 @@ class WebSocketStreamHost:
             return "ok" if comment is None else "failed"
 
         return run_turn
+
+    def extra_runner(self, history_uid: str):
+        """第二個來源的事件走主動開口那條路，把事件的描述當每輪備註帶進去。"""
+        run = self.turn_runner(history_uid)
+
+        async def run_extra(item: Any) -> TurnResult:
+            return await run(None, notes=tuple(getattr(item, "notes", ())))
+
+        return run_extra
 
     @staticmethod
     def _tell_interrupted(context: Any) -> None:

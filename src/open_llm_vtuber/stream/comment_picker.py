@@ -99,8 +99,8 @@ class CommentPicker:
             self.dropped += 1
         return None
 
-    def pick(self, now: float) -> Optional[ChatMessage]:
-        """挑下一則並從隊伍拿掉；沒有能回的回 None。"""
+    def _candidate(self, now: float) -> Optional[ChatMessage]:
+        """下一則該回誰；過期的在這裡丟掉，但不動隊伍裡其他的、也不記回過誰。"""
         fresh = [m for m in self._queue if now - m.timestamp <= self.rules.max_age]
         self.dropped += len(self._queue) - len(fresh)
         self._queue = fresh
@@ -112,7 +112,7 @@ class CommentPicker:
         ]
         if not ready:
             return None
-        best = max(
+        return max(
             ready,
             key=lambda m: (
                 m.kind in _PRIORITY_KINDS,
@@ -121,6 +121,16 @@ class CommentPicker:
                 m.timestamp,
             ),
         )
+
+    def peek(self, now: float) -> Optional[ChatMessage]:
+        """看下一則會是誰，不拿掉。直播中要決定先回留言還是先講遊戲時用。"""
+        return self._candidate(now)
+
+    def pick(self, now: float) -> Optional[ChatMessage]:
+        """挑下一則並從隊伍拿掉；沒有能回的回 None。"""
+        best = self._candidate(now)
+        if best is None:
+            return None
         self._queue.remove(best)
         self._answered_at[best.author] = now
         return best

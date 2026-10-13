@@ -14,7 +14,7 @@ from __future__ import annotations
 import asyncio
 import dataclasses
 import time
-from typing import Awaitable, Callable, Literal, Optional
+from typing import Any, Awaitable, Callable, Literal, Optional
 
 from loguru import logger
 
@@ -40,6 +40,8 @@ class StreamSession:
         clock: Callable[[], float] = time.time,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         backoff: tuple[float, ...] = BACKOFF,
+        extra: Optional[Any] = None,
+        run_extra: Optional[Callable[[Any], Awaitable[TurnResult]]] = None,
     ):
         self.picker = picker
         self.stage_ready = asyncio.Event()
@@ -47,6 +49,11 @@ class StreamSession:
         self.last_error = ""
         # 直播中改設定（StreamController.apply_settings）會直接換掉這兩個。
         self.quiet_seconds = quiet_seconds
+        # 第二個講話的來源（遊戲事件）：pick(now, *, urgent_only=False) 回要講的東西或
+        # None。開播後才接上或拔掉都行，所以每一輪都重讀屬性。
+        self.extra = extra
+        self.run_extra = run_extra
+        self._last_was_comment = False
         self._source = source
         self._run_turn = run_turn
         self._failure_limit = failure_limit
@@ -134,8 +141,20 @@ class StreamSession:
                 if not self.stage_ready.is_set():
                     return "ended"
             now = self._clock()
-            comment = self.picker.pick(now)
-            if comment is None:
+            # 挑法：緊急的遊戲事件（死亡）最先；其次留言跟遊戲輪流，上一輪回了留言
+            # 這輪就先問遊戲；沒留言時也先問遊戲，都沒有才輪到冷場主動開口。
+            item = None
+            comment = None
+            extra = self.extra if self.run_extra is not None else None
+            if extra is not None:
+                item = extra.pick(now, urgent_only=True)
+            if item is None:
+                has_comment = self.picker.peek(now) is not None
+                if extra is not None and (not has_comment or self._last_was_comment):
+                    item = extra.pick(now)
+                if item is None and has_comment:
+                    comment = self.picker.pick(now)
+            if item is None and comment is None:
                 if self._ended:
                     return "ended"
                 if now - last_spoke < self.quiet_seconds:
@@ -143,7 +162,12 @@ class StreamSession:
                     continue
             self.current = comment
             try:
-                result = await self._run_turn(comment)
+                if item is not None:
+                    result = await self.run_extra(item)
+                    self._last_was_comment = False
+                else:
+                    result = await self._run_turn(comment)
+                    self._last_was_comment = comment is not None
             finally:
                 self.current = None
             last_spoke = self._clock()
