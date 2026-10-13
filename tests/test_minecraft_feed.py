@@ -98,11 +98,14 @@ def test_reset_idle_waits_for_a_fresh_idle_period():
     assert turn is not None and turn.kind == "idle"
 
 
-def test_idle_not_allowed_never_yields_idle_but_still_yields_events():
+def test_not_ready_blocks_idle_turns_but_not_events_and_resumes():
     feed = GameFeed(RULES)
+    ready = {"on": False}
+    feed.ready = lambda: ready["on"]
     feed.observe(IDLE, 0)
-    assert feed.pick(100, idle_allowed=False) is None
+    assert feed.pick(100) is None
     feed.offer(GameEvent("night", "天黑了"), 101)
-    turn = feed.pick(102, idle_allowed=False)
+    turn = feed.pick(102)
     assert turn is not None and turn.kind == "event"
+    ready["on"] = True
     assert feed.pick(103).kind == "idle"

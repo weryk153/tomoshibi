@@ -30,7 +30,6 @@ class MinecraftSession:
         rules: EventRules,
         stream_live: Callable[[], bool],
         failure_limit: int,
-        ready: Callable[[], bool] = lambda: True,
         clock: Callable[[], float] = time.time,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ):
@@ -41,7 +40,6 @@ class MinecraftSession:
         self._run_turn = run_turn
         self._stream_live = stream_live
         self._failure_limit = failure_limit
-        self._ready = ready
         self._clock = clock
         self._sleep = sleep
         self._failures = 0
@@ -84,7 +82,7 @@ class MinecraftSession:
             if self._stream_live():
                 await self._sleep(POLL_SECONDS)
                 continue
-            turn = self.feed.pick(self._clock(), idle_allowed=self._ready())
+            turn = self.feed.pick(self._clock())
             if turn is None:
                 await self._sleep(POLL_SECONDS)
                 continue

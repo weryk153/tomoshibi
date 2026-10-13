@@ -219,3 +219,23 @@ def test_a_failure_after_connect_closes_the_client():
         assert not c.live
 
     asyncio.run(go())
+
+
+def test_the_stream_path_gets_no_idle_turn_while_the_bot_is_out_of_game():
+    stream = FakeStream()
+    c = controller(None, stream)
+    idle = {"gameplay": {"health": 20}, "action": {"current": "Idle", "isIdle": True}}
+
+    async def go():
+        await c.start()
+        client = FakeClient.instances[-1]
+        feed = stream.attached[0]  # 直播流程拿到的就是這個 feed
+        client.on_state(idle)
+        client.in_game = False
+        assert feed.pick(1000.0) is None
+        client.in_game = True
+        turn = feed.pick(1000.0)
+        assert turn is not None and turn.kind == "idle"
+        await c.stop()
+
+    asyncio.run(go())

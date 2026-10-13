@@ -86,12 +86,12 @@ class MinecraftController:
             self._settings = settings
             self._client = client
             self._feed = GameFeed(self._feed_rules(settings))
+            self._feed.ready = lambda: bool(client.connected and client.in_game)
             self._session = MinecraftSession(
                 self._feed,
                 self._host.run_private_turn,
                 rules=EventRules(notable_items=tuple(settings.notable_items)),
                 stream_live=lambda: bool(self.stream is not None and self.stream.live),
-                ready=lambda: bool(client.connected and client.in_game),
                 failure_limit=settings.failure_limit,
                 **self._session_options,
             )

@@ -42,10 +42,10 @@ def make(clock, results=(), live=lambda: False, failure_limit=3, ready=lambda: T
         rules=EventRules(notable_items=("diamond",)),
         stream_live=live,
         failure_limit=failure_limit,
-        ready=ready,
         clock=clock,
         sleep=clock.sleep,
     )
+    feed.ready = ready
     return session, turns
 
 

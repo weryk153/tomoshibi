@@ -7,7 +7,7 @@ pick，同一時間只有一邊在 pick（直播中私聊迴圈不動）。
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
 
 from .events import GameEvent, GameState, state_summary
 
@@ -37,6 +37,9 @@ class GameTurn:
 class GameFeed:
     def __init__(self, rules: FeedRules):
         self.rules = rules
+        # 不在遊戲裡就不問她閒置目標。閘放在 feed 上，私聊迴圈和直播流程
+        # 都從這裡 pick，才不會有一邊漏掉；由控制器接上連線狀態。
+        self.ready: Callable[[], bool] = lambda: True
         self.latest: Optional[GameState] = None
         self._events: list[tuple[GameEvent, float]] = []
         self._last_kind_at: dict[str, float] = {}
@@ -79,9 +82,7 @@ class GameFeed:
             return False
         return now - self._last_idle_turn >= self.rules.idle_cooldown
 
-    def pick(
-        self, now: float, *, urgent_only: bool = False, idle_allowed: bool = True
-    ) -> Optional[GameTurn]:
+    def pick(self, now: float, *, urgent_only: bool = False) -> Optional[GameTurn]:
         urgent = any(event.urgent for event, _ in self._events)
         if urgent_only and not urgent:
             return None
@@ -91,7 +92,7 @@ class GameFeed:
             return GameTurn(
                 "event", self._with_state((EVENTS_HEADING + "\n" + lines,)), urgent, now
             )
-        if idle_allowed and self._idle_due(now):
+        if self.ready() and self._idle_due(now):
             self._last_idle_turn = now
             return GameTurn("idle", self._with_state(()) + (IDLE_NOTE,), False, now)
         return None
