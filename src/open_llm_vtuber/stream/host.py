@@ -20,6 +20,7 @@ from ..conversations.conversation_handler import (
     proactive_turn_metadata,
 )
 from ..conversations.single_conversation import process_single_conversation
+from ..minecraft.feed import game_turn_metadata
 from .chat_source import ChatMessage
 from .session import TurnResult
 
@@ -91,7 +92,7 @@ class WebSocketStreamHost:
                 metadata = {
                     **proactive_turn_metadata(context, uid),
                     "stream": True,
-                    **({"notes": list(notes)} if notes else {}),
+                    **(game_turn_metadata(notes) if notes else {}),
                 }
                 user_input = PROACTIVE_TEXT
                 shown = {"type": "stream-comment", "author": "", "text": ""}

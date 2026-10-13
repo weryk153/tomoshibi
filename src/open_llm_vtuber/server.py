@@ -184,6 +184,7 @@ class WebSocketServer:
         self.minecraft_controller = MinecraftController(
             minecraft_host, stream=self.stream_controller
         )
+        minecraft_host.controller = self.minecraft_controller
         ws_handler.minecraft = minecraft_host
         self.app.include_router(init_minecraft_route(self.minecraft_controller))
 

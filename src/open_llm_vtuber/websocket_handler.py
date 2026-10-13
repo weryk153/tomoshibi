@@ -939,8 +939,19 @@ class WebSocketHandler:
             )
             return
 
-        # Minecraft 模式開著時，這一輪的 agent 要有 minecraft_do（換角色會建新 agent）。
+        # Minecraft 模式開著時，她講話的時機由遊戲決定（事件、閒下來）；前端閒置計時器
+        # 的主動開口會讓她丟下遊戲聊別的，靜默略過。使用者打字、講話照常。
         minecraft = getattr(self, "minecraft", None)
+        if (
+            data.get("type") == "ai-speak-signal"
+            and minecraft is not None
+            and getattr(getattr(minecraft, "controller", None), "live", False)
+        ):
+            logger.debug(
+                "Ignoring ai-speak-signal: Minecraft mode decides when she speaks"
+            )
+            return
+        # Minecraft 模式開著時，這一輪的 agent 要有 minecraft_do（換角色會建新 agent）。
         if minecraft is not None:
             minecraft.ensure_tool(self.client_contexts[client_uid])
         await handle_conversation_trigger(

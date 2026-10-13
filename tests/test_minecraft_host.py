@@ -101,7 +101,11 @@ def test_private_turn_goes_to_most_recent_non_stage_window_with_notes():
     assert result == "ok"
     assert calls[0]["client_uid"] == "new"
     assert calls[0]["msg_type"] == "ai-speak-signal"
-    assert calls[0]["extra_metadata"] == {"notes": ["遊戲裡剛發生：\n- 天黑了"]}
+    meta = calls[0]["extra_metadata"]
+    assert meta["notes"] == ["遊戲裡剛發生：\n- 天黑了"]
+    # 遊戲那一輪不帶主動開口的題材（新聞、話題），指令也換成講遊戲的，不然她會聊別的。
+    assert meta["proactive_material"] == []
+    assert "Minecraft" in meta["proactive_instruction"]
     assert pushed == ["new"]
 
 

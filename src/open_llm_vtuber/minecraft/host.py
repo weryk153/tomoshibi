@@ -16,7 +16,7 @@ from typing import Any, Awaitable, Callable, Optional
 from loguru import logger
 
 from ..conversations.conversation_handler import handle_conversation_trigger
-from .feed import GameTurn
+from .feed import GameTurn, game_turn_metadata
 from .goal_tool import GOAL_TOOL
 from .session import TurnResult
 
@@ -113,7 +113,7 @@ class WebSocketMinecraftHost:
                 received_data_buffers=self._ws.received_data_buffers,
                 current_conversation_tasks=self._ws.current_conversation_tasks,
                 broadcast_to_group=self._ws.broadcast_to_group,
-                extra_metadata={"notes": list(turn.notes)},
+                extra_metadata=game_turn_metadata(turn.notes),
             )
         except Exception as error:
             logger.warning(f"[minecraft] could not start the turn: {error}")

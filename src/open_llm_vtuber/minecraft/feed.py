@@ -17,6 +17,21 @@ IDLE_NOTE = (
 )
 EVENTS_HEADING = "遊戲裡剛發生："
 STATE_HEADING = "你在遊戲裡目前的狀態："
+# 遊戲那一輪給引擎的指令，取代主動開口原本的（找話題、聊新聞）：不然她會丟下遊戲聊別的。
+GAME_TURN_INSTRUCTION = (
+    "你正在開 Minecraft 生存實況。備註是遊戲裡剛發生的事和你目前的狀態。像實況主一樣對著"
+    "看台講一到三句，只講備註裡真的有的事，不要換到別的話題。要讓身體做事就呼叫 "
+    "minecraft_do 工具，用一句英文交代。"
+)
+
+
+def game_turn_metadata(notes) -> dict:
+    """遊戲那一輪要合進主動開口 metadata 的東西：備註、清掉題材、換掉指令。"""
+    return {
+        "notes": list(notes),
+        "proactive_material": [],
+        "proactive_instruction": GAME_TURN_INSTRUCTION,
+    }
 
 
 @dataclass(frozen=True)
