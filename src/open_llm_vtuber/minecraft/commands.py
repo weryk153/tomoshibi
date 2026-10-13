@@ -22,7 +22,7 @@ def _n(match: re.Match, default: int) -> int:
 
 
 def compile_goal(goal: str) -> list[str]:
-    """回要依序送的指令；編不出來就回原句（交給 Andy-4.2）。"""
+    """回要依序送的指令；編不出來回空串列（不送）。"""
     g = goal.strip().lower()
     rules: list[tuple[str, callable]] = [
         (
@@ -80,6 +80,12 @@ def compile_goal(goal: str) -> list[str]:
             r"(?:go\s+)?(?:back\s+)?(?:to\s+)?(?:the\s+)?surface",
             lambda m: ["!goToSurface()"],
         ),
+        (r"\bstop\b|stay here|wait here", lambda m: ["!stop"]),
+        (r"follow (?:me|the player)", lambda m: ['!followPlayer("Player", 3)']),
+        (
+            r"come (?:here|to me|over)|go to (?:me|the player)",
+            lambda m: ['!goToPlayer("Player", 3)'],
+        ),
         (
             r"(?:eat|consume)\s+(?:some\s+|a\s+)?([a-z_]+)",
             lambda m: [f'!consume("{m.group(1)}")'],
@@ -101,4 +107,5 @@ def compile_goal(goal: str) -> list[str]:
         match = re.search(pattern, g)
         if match:
             return build(match)
-    return [goal.strip()]
+    # 認不出來就不送：交給 Andy-4.2 猜的話，它常回一個會中斷手上動作的怪指令。
+    return []

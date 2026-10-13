@@ -121,9 +121,13 @@ class MinecraftController:
                 # 編成 Mindcraft 指令（可能好幾步）；她的新目標蓋掉舊目標剩下的步驟。
                 # 身體在忙就排著，閒下來才一步一步送（送了 Mindcraft 會中斷手上的動作）。
                 steps = compile_goal(goal)
+                logger.info(
+                    f"[minecraft] goal {goal!r} -> {steps or '(not understood, dropped)'}"
+                )
+                if not steps:
+                    return
                 self._queue.clear()
                 self._queue.extend(steps)
-                logger.info(f"[minecraft] goal {goal!r} -> {steps}")
                 await self._pump()
 
             goal_text.sink = _send_text_goal

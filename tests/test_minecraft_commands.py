@@ -35,5 +35,12 @@ def test_survival_chain():
     ]
 
 
-def test_unknown_goal_passes_through():
-    assert compile_goal("follow the river east") == ["follow the river east"]
+def test_unknown_goal_is_dropped():
+    assert compile_goal("follow the river east") == []
+    assert compile_goal("look around") == []
+
+
+def test_player_requests():
+    assert compile_goal("follow me") == ['!followPlayer("Player", 3)']
+    assert compile_goal("come here") == ['!goToPlayer("Player", 3)']
+    assert compile_goal("stop") == ["!stop"]
