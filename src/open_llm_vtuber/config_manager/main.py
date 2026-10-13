@@ -6,6 +6,7 @@ from .system import SystemConfig
 from .character import CharacterConfig
 from .live import LiveConfig
 from .stream import StreamConfig
+from .minecraft import MinecraftConfig
 from .i18n import I18nMixin, Description
 
 
@@ -27,6 +28,16 @@ class Config(I18nMixin, BaseModel):
         # 直播設定寫錯不該讓整個程式開不起來。
         return StreamConfig.lenient(value)
 
+    minecraft_config: MinecraftConfig = Field(
+        default_factory=MinecraftConfig, alias="minecraft_config"
+    )
+
+    @field_validator("minecraft_config", mode="before")
+    @classmethod
+    def _lenient_minecraft_config(cls, value):
+        # Minecraft 設定寫錯同樣不該讓程式開不起來。
+        return MinecraftConfig.lenient(value)
+
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "system_config": Description(
             en="System configuration settings", zh="系统配置设置"
@@ -39,5 +50,8 @@ class Config(I18nMixin, BaseModel):
         ),
         "stream_config": Description(
             en="YouTube stream mode settings", zh="YouTube 直播模式設定"
+        ),
+        "minecraft_config": Description(
+            en="Minecraft mode settings", zh="Minecraft 模式設定"
         ),
     }

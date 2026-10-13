@@ -567,3 +567,22 @@ stream_config:
   same_viewer_cooldown_seconds: 120
   # 连续失败几轮就暂停
   failure_limit: 3
+
+# Minecraft 模式（设置页「Minecraft」分页会改这里）
+minecraft_config:
+  # Mindcraft 的 MindServer（必须跑在这台机器上，它只绑 localhost）
+  mindserver_url: 'http://127.0.0.1:8080'
+  # 她的 Mindcraft 机器人名字
+  bot_name: ''
+  # 闲多久算闲下来
+  idle_seconds: 15
+  # 两次决定目标至少隔多久
+  idle_cooldown_seconds: 60
+  # 同类事件多久内不重复
+  event_cooldown_seconds: 30
+  # 等 Mindcraft 回话多久
+  tool_timeout_seconds: 20
+  # 连续失败几轮就暂停
+  failure_limit: 3
+  # 背包多了什么值得讲
+  notable_items: ["diamond", "iron_ingot", "raw_iron", "gold_ingot", "raw_gold", "emerald", "ender_pearl", "blaze_rod", "bread", "cooked_beef", "cooked_porkchop"]
