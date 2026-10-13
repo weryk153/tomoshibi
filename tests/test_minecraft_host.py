@@ -141,3 +141,58 @@ def test_speaker_name():
     )
     assert WebSocketMinecraftHost(ws(u=context(name=""))).speaker_name() == "frieren"
     assert WebSocketMinecraftHost(ws()).speaker_name() == "Tomoshibi"
+
+
+def test_still_running_turn_after_timeout_skips_without_triggering(monkeypatch):
+    from src.open_llm_vtuber.minecraft import host as host_module
+
+    monkeypatch.setattr(host_module, "PRIVATE_TURN_WAIT_SECONDS", 0.01)
+    calls = []
+
+    async def trigger(**kwargs):
+        calls.append(kwargs)
+
+    u = context()
+    w = ws(u=u)
+    host = WebSocketMinecraftHost(w, trigger=trigger)
+
+    async def go():
+        stuck = asyncio.create_task(asyncio.sleep(30))
+        w.current_conversation_tasks["u"] = stuck
+        try:
+            return await host.run_private_turn(turn())
+        finally:
+            stuck.cancel()
+
+    assert asyncio.run(go()) == "interrupted"
+    assert calls == []
+
+
+def test_cancelling_host_does_not_cancel_the_conversation_task():
+    inner = {}
+
+    async def trigger(**kwargs):
+        async def speak():
+            await asyncio.sleep(0.05)
+            return "spoken"
+
+        inner["task"] = asyncio.create_task(speak())
+        kwargs["current_conversation_tasks"][kwargs["client_uid"]] = inner["task"]
+
+    w = ws(u=context())
+    host = WebSocketMinecraftHost(w, trigger=trigger)
+
+    async def go():
+        runner = asyncio.create_task(host.run_private_turn(turn()))
+        await asyncio.sleep(0.01)
+        runner.cancel()
+        try:
+            await runner
+        except asyncio.CancelledError:
+            cancelled = True
+        else:
+            cancelled = False
+        assert not inner["task"].cancelled()
+        return cancelled, await inner["task"]
+
+    assert asyncio.run(go()) == (True, "spoken")

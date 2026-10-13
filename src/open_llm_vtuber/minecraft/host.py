@@ -91,7 +91,14 @@ class WebSocketMinecraftHost:
             if task is not None and not task.done()
         ]
         if pending:
-            await asyncio.wait(pending, timeout=PRIVATE_TURN_WAIT_SECONDS)
+            _, still = await asyncio.wait(pending, timeout=PRIVATE_TURN_WAIT_SECONDS)
+            if still:
+                # 等了還沒講完就硬開下一輪，聲音會疊；若是她自己那個視窗的任務，
+                # 新任務還會蓋掉登記，使用者就再也打斷不了舊的那一輪。
+                logger.warning(
+                    "[minecraft] previous turn still running, skipping this one"
+                )
+                return "interrupted"
         self.ensure_tool(context)
         try:
             await self._trigger(
@@ -115,7 +122,9 @@ class WebSocketMinecraftHost:
         if task is None:
             return "interrupted"
         try:
-            await task
+            # shield：關閉模式取消的是這個協程，不該連帶把她正在講的話切掉；
+            # 使用者打斷是直接取消 task 本身，仍會走到下面的 interrupted。
+            await asyncio.shield(task)
         except asyncio.CancelledError:
             current = asyncio.current_task()
             if current is not None and current.cancelling():
