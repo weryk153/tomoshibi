@@ -13,17 +13,25 @@ from .events import GameEvent, GameState, state_summary
 
 IDLE_NOTE = (
     "你的身體在遊戲裡閒著沒事做。這一輪一定要替它決定下一件事：回覆的第一行就寫 "
-    "[minecraft_do: 一句英文]（例如 [minecraft_do: collect 10 oak logs]），然後才講話；"
-    "沒有這一行，身體會一直站著不動。"
+    "[minecraft_do: 一句英文]，然後講一句話就好；沒有這一行，身體會一直站著不動。"
+    "一次只寫一個目標，要具體、帶數量，照生存順序挑（木頭→工作台→木鎬→圓石→石鎬→煤→火把"
+    "→食物→天黑前的小屋）。好的例子：[minecraft_do: collect 10 oak logs]、"
+    "[minecraft_do: craft a crafting table]、[minecraft_do: craft a wooden pickaxe]、"
+    "[minecraft_do: collect 8 cobblestone]、[minecraft_do: craft a stone pickaxe]、"
+    "[minecraft_do: collect 5 coal]、[minecraft_do: craft 8 torches]、"
+    "[minecraft_do: kill a cow and collect the beef]、"
+    "[minecraft_do: dig into the hillside and make a small shelter]。"
+    "不要寫 look around、walk forward 這種沒有結果的事；背包有什麼就看狀態列，沒材料的東西先別合成。"
 )
 EVENTS_HEADING = "遊戲裡剛發生："
 STATE_HEADING = "你在遊戲裡目前的狀態："
 # 遊戲那一輪給引擎的指令，取代主動開口原本的（找話題、聊新聞）：不然她會丟下遊戲聊別的。
 GAME_TURN_INSTRUCTION = (
     "你正在開 Minecraft 生存實況。備註是遊戲裡剛發生的事和你目前的狀態。像實況主一樣對著"
-    "看台講一到三句，只講備註裡真的有的事；備註沒提到的（礦、動物、村莊、物品）就當沒看到，"
+    "看台講一句、最多兩句，動作比話重要，只講備註裡真的有的事；備註沒提到的（礦、動物、村莊、物品）就當沒看到，"
     "不要編，也不要換到別的話題。要讓身體做事，就在台詞裡"
-    "自己一行寫 [minecraft_do: 一句英文]，例如 [minecraft_do: craft a stone pickaxe]。"
+    "自己一行寫 [minecraft_do: 一句英文]，例如 [minecraft_do: craft a stone pickaxe]；"
+    "一輪最多一個目標，身體正在做事就不要再下。"
 )
 
 

@@ -22,6 +22,8 @@ GOAL_RE = re.compile(
 )
 
 sink: Optional[Callable[[str], Awaitable[None]]] = None
+_recent: dict[str, float] = {}
+REPEAT_WINDOW = 15.0  # 同一個目標幾秒內不重送（她常在一輪裡寫兩三次）
 
 
 def extract_goals(text: str) -> tuple[str, list[str]]:
@@ -35,7 +37,14 @@ def extract_goals(text: str) -> tuple[str, list[str]]:
 
 def dispatch(goals: list[str]) -> None:
     """送給身體（背景跑）；沒開 Minecraft 模式就只記一筆。"""
+    import time
+
+    now = time.monotonic()
     for goal in goals:
+        key = goal.lower()
+        if now - _recent.get(key, float("-inf")) < REPEAT_WINDOW:
+            continue
+        _recent[key] = now
         if sink is None:
             logger.debug(f"[minecraft] goal in text but mode is off: {goal}")
             continue

@@ -108,12 +108,12 @@ class MinecraftController:
             )
             if self.stream is not None:
                 self.stream.attach_extra(self._feed)
+
             # 她在台詞裡寫的 [minecraft_do: ...] 也送給身體（goal_text）；回話會從
             # bot-output 變成回報事件。
-            speaker = self._host.speaker_name()
-
             async def _send_text_goal(goal: str) -> None:
-                await client.send(speaker, goal)
+                # 名字每次現取：開始時主視窗可能還沒連上，那時會拿到預設名。
+                await client.send(self._host.speaker_name(), goal)
 
             goal_text.sink = _send_text_goal
             self.stopped_reason = None

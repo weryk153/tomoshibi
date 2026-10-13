@@ -31,6 +31,7 @@ def test_tag_only_sentence_becomes_empty():
 
 
 def test_dispatch_sends_through_sink_and_is_quiet_without_one():
+    goal_text._recent.clear()
     sent = []
 
     async def sink(goal):
@@ -46,3 +47,21 @@ def test_dispatch_sends_through_sink_and_is_quiet_without_one():
 
     asyncio.run(go())
     assert sent == ["collect wood", "craft planks"]
+
+
+def test_same_goal_is_not_resent_within_the_window():
+    goal_text._recent.clear()
+    sent = []
+
+    async def sink(goal):
+        sent.append(goal)
+
+    async def go():
+        goal_text.sink = sink
+        goal_text.dispatch(["collect 10 oak logs"])
+        goal_text.dispatch(["Collect 10 oak logs", "craft a crafting table"])
+        await asyncio.sleep(0)
+        goal_text.sink = None
+
+    asyncio.run(go())
+    assert sent == ["collect 10 oak logs", "craft a crafting table"]
