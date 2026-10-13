@@ -28,7 +28,7 @@ def test_defaults_when_block_missing():
     assert settings.idle_seconds == 15
     assert settings.idle_cooldown_seconds == 60
     assert settings.event_cooldown_seconds == 30
-    assert settings.tool_timeout_seconds == 20
+    assert settings.tool_timeout_seconds == 12
     assert settings.failure_limit == 3
     assert "diamond" in settings.notable_items
 

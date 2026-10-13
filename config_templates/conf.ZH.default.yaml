@@ -580,8 +580,8 @@ minecraft_config:
   idle_cooldown_seconds: 60
   # 同类事件多久内不重复
   event_cooldown_seconds: 30
-  # 等 Mindcraft 回话多久
-  tool_timeout_seconds: 20
+  # 等 Mindcraft 回话多久（要小于引擎的工具上限 15 秒）
+  tool_timeout_seconds: 12
   # 连续失败几轮就暂停
   failure_limit: 3
   # 背包多了什么值得讲

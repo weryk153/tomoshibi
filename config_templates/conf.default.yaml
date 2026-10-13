@@ -594,8 +594,8 @@ minecraft_config:
   idle_cooldown_seconds: 60
   # The same kind of event is not mentioned again within this many seconds
   event_cooldown_seconds: 30
-  # Seconds to wait for the bot's reply to a goal
-  tool_timeout_seconds: 20
+  # Seconds to wait for the bot's reply to a goal (must stay under the engine's 15 s tool limit)
+  tool_timeout_seconds: 12
   # Pause after this many failed turns in a row
   failure_limit: 3
   # Items worth mentioning when they appear in her inventory

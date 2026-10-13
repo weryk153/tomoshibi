@@ -34,7 +34,7 @@ class MinecraftConfig(I18nMixin):
     event_cooldown_seconds: int = Field(
         30, alias="event_cooldown_seconds", ge=0, le=600
     )
-    tool_timeout_seconds: int = Field(20, alias="tool_timeout_seconds", ge=1, le=120)
+    tool_timeout_seconds: int = Field(12, alias="tool_timeout_seconds", ge=1, le=14)
     failure_limit: int = Field(3, alias="failure_limit", ge=1, le=100)
     notable_items: List[str] = Field(
         default_factory=lambda: list(DEFAULT_NOTABLE_ITEMS), alias="notable_items"
@@ -93,8 +93,8 @@ class MinecraftConfig(I18nMixin):
             zh="同類事件多久內不重複",
         ),
         "tool_timeout_seconds": Description(
-            en="Seconds to wait for the bot's reply to a goal",
-            zh="等 Mindcraft 回話多久",
+            en="Seconds to wait for the bot's reply to a goal (must stay under the engine's 15 s tool limit)",
+            zh="等 Mindcraft 回話多久（要小於引擎的工具上限 15 秒）",
         ),
         "failure_limit": Description(
             en="Pause after this many failed turns in a row",
