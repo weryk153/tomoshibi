@@ -100,3 +100,6 @@ class MinecraftSession:
                 )
                 if self._failures >= self._failure_limit:
                     return "failures"
+            # 沒講成的那輪（沒視窗、被跳過）可能一個 await 都沒有；cooldown 設 0 時
+            # 不睡一下迴圈就不讓出事件迴圈，整個 server 會卡住。
+            await self._sleep(POLL_SECONDS if result != "ok" else 0)

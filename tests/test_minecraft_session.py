@@ -2,7 +2,7 @@
 
 import asyncio
 
-from src.open_llm_vtuber.minecraft.events import EventRules
+from src.open_llm_vtuber.minecraft.events import EventRules, GameState
 from src.open_llm_vtuber.minecraft.feed import FeedRules, GameFeed
 from src.open_llm_vtuber.minecraft.session import MinecraftSession
 
@@ -153,3 +153,42 @@ def test_malformed_state_creates_no_events():
     assert session.latest is not None and session.latest.health == 5
     session.handle_state(state(health=5, idle=False))
     assert session.feed.pending() == 0
+
+
+def test_turn_that_returns_without_awaiting_does_not_spin_the_loop():
+    """沒有視窗時 run_private_turn 立刻回 interrupted、不 await；cooldown 設 0 的話
+    迴圈一輪都不讓出事件迴圈，整個 server 會卡住。每輪結束都要睡一下。"""
+    clock = Clock()
+    turns = []
+
+    async def run_turn(turn):
+        turns.append(turn)
+        return "interrupted"
+
+    feed = GameFeed(FeedRules(idle_seconds=1, idle_cooldown=0, event_cooldown=0))
+    session = MinecraftSession(
+        feed,
+        run_turn,
+        rules=EventRules(),
+        stream_live=lambda: False,
+        failure_limit=3,
+        clock=clock,
+        sleep=clock.sleep,
+    )
+
+    async def go():
+        task = asyncio.create_task(session.run())
+        feed.observe(GameState(), 0)
+        clock.now = 1
+        for _ in range(20):
+            await asyncio.sleep(0)
+        task.cancel()
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
+
+    asyncio.run(go())
+    # 二十次讓出事件迴圈，若每輪都睡一下（假時鐘每次推進 0.5 秒），回合數一定有限且時間有前進。
+    assert 0 < len(turns) <= 20
+    assert clock.now > 1
