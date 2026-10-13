@@ -72,8 +72,10 @@ def test_events_come_before_idle():
     for t in range(0, 16):
         feed.observe(IDLE, t)
     feed.offer(GameEvent("night", "天黑了"), 16)
-    assert feed.pick(16).kind == "event"
-    assert feed.pick(17).kind == "idle"
+    turn = feed.pick(16)
+    # 事件先講，但身體閒著就順便問要做什麼；問過就不再另開一輪
+    assert turn.kind == "event" and IDLE_NOTE in turn.notes
+    assert feed.pick(17) is None
 
 
 def test_rules_can_be_swapped_while_running():
@@ -109,3 +111,15 @@ def test_not_ready_blocks_idle_turns_but_not_events_and_resumes():
     assert turn is not None and turn.kind == "event"
     ready["on"] = True
     assert feed.pick(103).kind == "idle"
+
+
+def test_event_turn_also_asks_for_a_goal_when_idle_is_due():
+    feed = GameFeed(RULES)
+    for t in range(0, 16):
+        feed.observe(IDLE, t)
+    feed.offer(GameEvent("night", "天黑了"), 16)
+    turn = feed.pick(16)
+    assert turn.kind == "event" and turn.notes[-1] == IDLE_NOTE
+    # 問過了就進冷卻，下一個事件輪不再問
+    feed.offer(GameEvent("hostile", "殭屍"), 17)
+    assert IDLE_NOTE not in feed.pick(17).notes

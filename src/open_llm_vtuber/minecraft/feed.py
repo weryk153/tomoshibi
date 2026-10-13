@@ -21,7 +21,8 @@ STATE_HEADING = "你在遊戲裡目前的狀態："
 # 遊戲那一輪給引擎的指令，取代主動開口原本的（找話題、聊新聞）：不然她會丟下遊戲聊別的。
 GAME_TURN_INSTRUCTION = (
     "你正在開 Minecraft 生存實況。備註是遊戲裡剛發生的事和你目前的狀態。像實況主一樣對著"
-    "看台講一到三句，只講備註裡真的有的事，不要換到別的話題。要讓身體做事，就在台詞裡"
+    "看台講一到三句，只講備註裡真的有的事；備註沒提到的（礦、動物、村莊、物品）就當沒看到，"
+    "不要編，也不要換到別的話題。要讓身體做事，就在台詞裡"
     "自己一行寫 [minecraft_do: 一句英文]，例如 [minecraft_do: craft a stone pickaxe]。"
 )
 
@@ -102,13 +103,18 @@ class GameFeed:
         urgent = any(event.urgent for event, _ in self._events)
         if urgent_only and not urgent:
             return None
+        # 身體閒著時，事件那一輪也一併問她要做什麼：事件每隔幾十秒就來一個，
+        # 不這樣做「閒下來、決定目標」永遠排不到，她會一直評論卻不動。
+        ask_idle = self.ready() and self._idle_due(now)
         if self._events:
             lines = "\n".join(f"- {event.text}" for event, _ in self._events)
             self._events.clear()
-            return GameTurn(
-                "event", self._with_state((EVENTS_HEADING + "\n" + lines,)), urgent, now
-            )
-        if self.ready() and self._idle_due(now):
+            notes = self._with_state((EVENTS_HEADING + "\n" + lines,))
+            if ask_idle:
+                self._last_idle_turn = now
+                notes = notes + (IDLE_NOTE,)
+            return GameTurn("event", notes, urgent, now)
+        if ask_idle:
             self._last_idle_turn = now
             return GameTurn("idle", self._with_state(()) + (IDLE_NOTE,), False, now)
         return None
