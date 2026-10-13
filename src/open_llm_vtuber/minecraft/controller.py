@@ -15,7 +15,7 @@ from loguru import logger
 
 from ..config_manager.minecraft import MinecraftConfig
 from .events import EventRules
-from .feed import FeedRules, GameFeed
+from .feed import FeedRules, GameFeed, suggest_goal
 from . import goal_text
 from .commands import compile_goal
 from .goal_tool import make_goal_handler
@@ -121,9 +121,16 @@ class MinecraftController:
                 # 編成 Mindcraft 指令（可能好幾步）；她的新目標蓋掉舊目標剩下的步驟。
                 # 身體在忙就排著，閒下來才一步一步送（送了 Mindcraft 會中斷手上的動作）。
                 steps = compile_goal(goal)
-                logger.info(
-                    f"[minecraft] goal {goal!r} -> {steps or '(not understood, dropped)'}"
-                )
+                if not steps:
+                    # 聽不懂她的目標就做程式算好的下一步，身體不能空著。
+                    latest = self._session.latest if self._session is not None else None
+                    fallback = suggest_goal(latest)
+                    steps = compile_goal(fallback)
+                    logger.info(
+                        f"[minecraft] goal {goal!r} not understood -> {fallback}"
+                    )
+                else:
+                    logger.info(f"[minecraft] goal {goal!r} -> {steps}")
                 if not steps:
                     return
                 self._queue.clear()

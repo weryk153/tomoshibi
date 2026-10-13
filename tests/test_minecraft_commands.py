@@ -44,3 +44,9 @@ def test_player_requests():
     assert compile_goal("follow me") == ['!followPlayer("Player", 3)']
     assert compile_goal("come here") == ['!goToPlayer("Player", 3)']
     assert compile_goal("stop") == ["!stop"]
+
+
+def test_danger_moves():
+    assert compile_goal("run away from zombie") == ["!moveAway(15)"]
+    assert compile_goal("attack the zombie") == ['!attack("zombie")']
+    assert compile_goal("go to bed") == ["!goToBed()"]

@@ -80,6 +80,15 @@ def compile_goal(goal: str) -> list[str]:
             r"(?:go\s+)?(?:back\s+)?(?:to\s+)?(?:the\s+)?surface",
             lambda m: ["!goToSurface()"],
         ),
+        (
+            r"run away|flee|escape|get away|avoid|hide from|back off|retreat",
+            lambda m: ["!moveAway(15)"],
+        ),
+        (
+            r"(?:fight|attack|kill|hit)\s+(?:the\s+|a\s+)?(zombie|skeleton|spider|creeper|phantom)",
+            lambda m: [f'!attack("{m.group(1)}")'],
+        ),
+        (r"go to bed|sleep", lambda m: ["!goToBed()"]),
         (r"\bstop\b|stay here|wait here", lambda m: ["!stop"]),
         (r"follow (?:me|the player)", lambda m: ['!followPlayer("Player", 3)']),
         (
