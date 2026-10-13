@@ -43,6 +43,7 @@ def dispatch(goals: list[str]) -> None:
         async def _send(goal: str = goal) -> None:
             try:
                 await sink(goal)  # type: ignore[misc]
+                logger.info(f"[minecraft] goal sent: {goal}")
             except Exception as error:
                 logger.warning(f"[minecraft] could not send goal {goal!r}: {error}")
 

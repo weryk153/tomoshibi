@@ -100,6 +100,12 @@ class WebSocketMinecraftHost:
                 )
                 return "interrupted"
         self.ensure_tool(context)
+        logger.info(
+            "[minecraft] {} turn -> {}: {}",
+            turn.kind,
+            uid,
+            " | ".join(note[:70].replace("\n", " ") for note in turn.notes),
+        )
         try:
             await self._trigger(
                 msg_type="ai-speak-signal",
