@@ -154,7 +154,7 @@ def diff_events(
         return []
     events: list[GameEvent] = []
     died = (prev.health > 0 and cur.health <= 0) or (
-        prev.health <= LOW_HEALTH
+        0 < prev.health <= LOW_HEALTH
         and cur.health >= 20
         and _distance(prev.position, cur.position) > RESPAWN_JUMP
     )

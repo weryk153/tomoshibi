@@ -78,6 +78,16 @@ def test_death_is_urgent_and_detected_two_ways():
     assert [e.kind for e in diff_events(prev, respawned, RULES)] == ["death"]
 
 
+def test_one_death_across_dead_tick_and_respawn_tick():
+    alive = parse_state(raw(gameplay__health=5))
+    dead = parse_state(raw(gameplay__health=0))
+    respawned = parse_state(
+        raw(gameplay__health=20, gameplay__position={"x": 300, "y": 70, "z": 300})
+    )
+    events = diff_events(alive, dead, RULES) + diff_events(dead, respawned, RULES)
+    assert [e.kind for e in events] == ["death"]
+
+
 def test_low_health_once_when_crossing_the_line():
     prev = parse_state(raw(gameplay__health=8))
     low = parse_state(raw(gameplay__health=6))
