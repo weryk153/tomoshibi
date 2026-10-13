@@ -26,7 +26,7 @@ def state(health=20, idle=True, action="Idle"):
     }
 
 
-def make(clock, results=(), live=lambda: False, failure_limit=3):
+def make(clock, results=(), live=lambda: False, failure_limit=3, ready=lambda: True):
     turns = []
     results = list(results)
 
@@ -42,6 +42,7 @@ def make(clock, results=(), live=lambda: False, failure_limit=3):
         rules=EventRules(notable_items=("diamond",)),
         stream_live=live,
         failure_limit=failure_limit,
+        ready=ready,
         clock=clock,
         sleep=clock.sleep,
     )
@@ -119,3 +120,36 @@ def test_disconnect_once_and_failures_stop():
 
     assert asyncio.run(go()) == "failures"
     assert len([t for t in turns if "連線" in t.notes[0]]) == 1
+
+
+def test_no_idle_turns_after_disconnect_until_ready_again():
+    clock = Clock()
+    ready = {"on": True}
+    session, turns = make(clock, ready=lambda: ready["on"])
+
+    async def go():
+        task = asyncio.create_task(session.run())
+        session.handle_state(state())
+        session.handle_disconnect()
+        ready["on"] = False
+        await tick(session, clock, 60, state)
+        # 斷線事件本身會講一輪，之後不該再有閒置輪
+        assert [t.kind for t in turns] == ["event"]
+        ready["on"] = True
+        await tick(session, clock, 20, state)
+        task.cancel()
+
+    asyncio.run(go())
+    assert "idle" in [t.kind for t in turns[1:]]
+
+
+def test_malformed_state_creates_no_events():
+    clock = Clock()
+    session, _ = make(clock)
+    session.handle_state(state(health=5, idle=False))
+    session.handle_state({"error": "x"})
+    session.handle_state("junk")
+    session.handle_state({"action": {}})
+    assert session.latest is not None and session.latest.health == 5
+    session.handle_state(state(health=5, idle=False))
+    assert session.feed.pending() == 0

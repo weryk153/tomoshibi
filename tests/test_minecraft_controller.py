@@ -153,3 +153,69 @@ def test_apply_settings_swaps_feed_rules_while_live():
 
 def test_stop_when_not_live_is_harmless():
     assert asyncio.run(controller().stop())["live"] is False
+
+
+def test_idle_turns_only_while_the_bot_is_in_game():
+    host = FakeHost()
+    now = {"t": 0.0}
+    settings = MinecraftConfig(
+        bot_name="frieren", idle_seconds=3, idle_cooldown_seconds=1000
+    )
+    c = MinecraftController(
+        host,
+        make_client=lambda url, name: FakeClient(url, name),
+        read_settings=lambda: settings,
+        write_settings=lambda changes: settings,
+        session_options={
+            "clock": lambda: now["t"],
+            "sleep": lambda s: asyncio.sleep(0),
+        },
+    )
+    idle = {"gameplay": {"health": 20}, "action": {"current": "Idle", "isIdle": True}}
+
+    async def go():
+        await c.start()
+        client = FakeClient.instances[-1]
+        client.in_game = False
+        client.on_state(idle)
+        now["t"] = 100.0
+        for _ in range(50):
+            await asyncio.sleep(0)
+        assert host.turns == []
+        client.in_game = True
+        await _until(lambda: host.turns)
+        assert host.turns[0].kind == "idle"
+        # 冷卻很長：只該有一輪，也避免空轉的迴圈餓死事件圈
+        await c.stop()
+
+    asyncio.run(go())
+
+
+def test_concurrent_starts_connect_only_one_client():
+    c = controller()
+    before = len(FakeClient.instances)
+
+    async def go():
+        results = await asyncio.gather(c.start(), c.start(), return_exceptions=True)
+        errors = [r for r in results if isinstance(r, MinecraftError)]
+        assert len(errors) == 1 and errors[0].reason == "already_live"
+        assert len(FakeClient.instances) == before + 1
+        await c.stop()
+
+    asyncio.run(go())
+
+
+def test_a_failure_after_connect_closes_the_client():
+    class BadHost(FakeHost):
+        def install_tool(self, handler):
+            raise RuntimeError("boom")
+
+    c = controller(BadHost())
+
+    async def go():
+        with pytest.raises(RuntimeError):
+            await c.start()
+        assert FakeClient.instances[-1].closed
+        assert not c.live
+
+    asyncio.run(go())

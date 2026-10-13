@@ -63,6 +63,14 @@ class GameFeed:
         if self._idle_since is None:
             self._idle_since = now
 
+    def reset_idle(self) -> None:
+        """斷線或機器人不在遊戲裡時清掉閒置起點；latest 留著，只給狀態顯示用。
+
+        MindServer 對不在遊戲裡的機器人不再送狀態，不清的話最後一筆「閒著」會一直
+        算下去，每個冷卻期就問她一次要做什麼。
+        """
+        self._idle_since = None
+
     def _idle_due(self, now: float) -> bool:
         """閒夠久、而且距離上次問她夠久。同一段閒置裡冷卻過了會再問一次。"""
         if self._idle_since is None:
@@ -71,7 +79,9 @@ class GameFeed:
             return False
         return now - self._last_idle_turn >= self.rules.idle_cooldown
 
-    def pick(self, now: float, *, urgent_only: bool = False) -> Optional[GameTurn]:
+    def pick(
+        self, now: float, *, urgent_only: bool = False, idle_allowed: bool = True
+    ) -> Optional[GameTurn]:
         urgent = any(event.urgent for event, _ in self._events)
         if urgent_only and not urgent:
             return None
@@ -81,7 +91,7 @@ class GameFeed:
             return GameTurn(
                 "event", self._with_state((EVENTS_HEADING + "\n" + lines,)), urgent, now
             )
-        if self._idle_due(now):
+        if idle_allowed and self._idle_due(now):
             self._last_idle_turn = now
             return GameTurn("idle", self._with_state(()) + (IDLE_NOTE,), False, now)
         return None

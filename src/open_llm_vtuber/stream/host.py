@@ -112,6 +112,12 @@ class WebSocketStreamHost:
             except Exception:
                 return "interrupted"
 
+            # 舞台 agent 常在 Start 之後才建（或換角色重建），而直播的輪次不走
+            # _handle_conversation_trigger，所以每輪都補一次，不然她拿不到 minecraft_do。
+            minecraft = getattr(self._ws, "minecraft", None)
+            if minecraft is not None:
+                minecraft.ensure_tool(context)
+
             task = asyncio.create_task(
                 self._process(
                     context=context,

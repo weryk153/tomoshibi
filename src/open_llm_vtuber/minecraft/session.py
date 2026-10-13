@@ -30,6 +30,7 @@ class MinecraftSession:
         rules: EventRules,
         stream_live: Callable[[], bool],
         failure_limit: int,
+        ready: Callable[[], bool] = lambda: True,
         clock: Callable[[], float] = time.time,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ):
@@ -40,12 +41,21 @@ class MinecraftSession:
         self._run_turn = run_turn
         self._stream_live = stream_live
         self._failure_limit = failure_limit
+        self._ready = ready
         self._clock = clock
         self._sleep = sleep
         self._failures = 0
         self._disconnected_told = False
 
     def handle_state(self, raw: object) -> None:
+        # Mindcraft 會回 {error: ...} 之類的東西；當成預設狀態去比會憑空生出
+        # 死亡、拿到物品的事件，所以不是正常狀態就整包忽略。
+        if (
+            not isinstance(raw, dict)
+            or "error" in raw
+            or not isinstance(raw.get("gameplay"), dict)
+        ):
+            return
         now = self._clock()
         state = parse_state(raw)
         for event in diff_events(self.latest, state, self.rules):
@@ -63,6 +73,7 @@ class MinecraftSession:
         if self._disconnected_told:
             return
         self._disconnected_told = True
+        self.feed.reset_idle()
         self.feed.offer(
             GameEvent("disconnected", "跟 Minecraft 的連線斷了，正在重連。"),
             self._clock(),
@@ -73,7 +84,7 @@ class MinecraftSession:
             if self._stream_live():
                 await self._sleep(POLL_SECONDS)
                 continue
-            turn = self.feed.pick(self._clock())
+            turn = self.feed.pick(self._clock(), idle_allowed=self._ready())
             if turn is None:
                 await self._sleep(POLL_SECONDS)
                 continue

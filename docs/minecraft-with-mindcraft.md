@@ -22,7 +22,7 @@ MindServer 只綁 localhost（埠 8080），所以 **Mindcraft 一定要跟 Tomo
 
 ### 2. 這台 Mac：Mindcraft
 
-Node 建議 18 或 20 LTS；22 實測可用；24 以上原生相依套件會出問題。
+Node 建議 18 或 20 LTS；22 預期可用（尚未實機驗證）；24 以上原生相依套件會出問題。
 
 ```bash
 git clone https://github.com/mindcraft-bots/mindcraft ~/dev/mindcraft
@@ -100,7 +100,7 @@ Andy-4 是 Sweaterdog 以 Llama 3.1 8B 微調、專為 Mindcraft 做的模型。
 | MindServer 網址 | `mindserver_url` | `http://127.0.0.1:8080` |
 | 機器人名字 | `bot_name` | 空 |
 | 閒置秒數 | `idle_seconds` | 15 |
-| 值得講的物品 | `notable_items` | 鑽石、鐵錠、麵包等 |
+| 值得講的物品 | `notable_items` | `diamond`、`iron_ingot`、`bread` 等（Minecraft 物品 id） |
 
 只在 `conf.yaml` 調的：`idle_cooldown_seconds`（兩次決定目標至少間隔，預設 60）、`event_cooldown_seconds`（同類事件不重複講，預設 30）、`failure_limit`（連續失敗幾輪就暫停，預設 3）、`tool_timeout_seconds`（她的目標工具等 Mindcraft 回覆的秒數，預設 12；要小於引擎的 15 秒工具上限，別調超過）。
 

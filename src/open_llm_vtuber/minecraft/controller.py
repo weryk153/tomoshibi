@@ -50,6 +50,8 @@ class MinecraftController:
         self._settings: MinecraftConfig = MinecraftConfig()
         self.stopped_reason: Optional[str] = None
         self.last_error = ""
+        # 兩個 start() 同時進來時，第二個要等第一個做完才看得到 live。
+        self._lock = asyncio.Lock()
 
     @property
     def live(self) -> bool:
@@ -64,6 +66,10 @@ class MinecraftController:
         )
 
     async def start(self) -> dict:
+        async with self._lock:
+            return await self._start()
+
+    async def _start(self) -> dict:
         if self.live:
             raise MinecraftError("already_live")
         settings = self._read_settings()
@@ -75,31 +81,38 @@ class MinecraftController:
         except ConnectionError as error:
             self.last_error = str(error)
             raise MinecraftError("not_running") from error
-        self._settings = settings
-        self._client = client
-        self._feed = GameFeed(self._feed_rules(settings))
-        self._session = MinecraftSession(
-            self._feed,
-            self._host.run_private_turn,
-            rules=EventRules(notable_items=tuple(settings.notable_items)),
-            stream_live=lambda: bool(self.stream is not None and self.stream.live),
-            failure_limit=settings.failure_limit,
-            **self._session_options,
-        )
-        client.on_state = self._session.handle_state
-        client.on_output = self._session.handle_output
-        client.on_disconnect = self._session.handle_disconnect
-        self._host.install_tool(
-            make_goal_handler(
-                client,
-                self._host.speaker_name(),
-                lambda: float(self._settings.tool_timeout_seconds),
+        # connect 之後任何一步丟錯，都不能留下連著卻沒人管的 client。
+        try:
+            self._settings = settings
+            self._client = client
+            self._feed = GameFeed(self._feed_rules(settings))
+            self._session = MinecraftSession(
+                self._feed,
+                self._host.run_private_turn,
+                rules=EventRules(notable_items=tuple(settings.notable_items)),
+                stream_live=lambda: bool(self.stream is not None and self.stream.live),
+                ready=lambda: bool(client.connected and client.in_game),
+                failure_limit=settings.failure_limit,
+                **self._session_options,
             )
-        )
-        if self.stream is not None:
-            self.stream.attach_extra(self._feed)
-        self.stopped_reason = None
-        self.last_error = ""
+            client.on_state = self._session.handle_state
+            client.on_output = self._session.handle_output
+            client.on_disconnect = self._session.handle_disconnect
+            self._host.install_tool(
+                make_goal_handler(
+                    client,
+                    self._host.speaker_name(),
+                    lambda: float(self._settings.tool_timeout_seconds),
+                )
+            )
+            if self.stream is not None:
+                self.stream.attach_extra(self._feed)
+            self.stopped_reason = None
+            self.last_error = ""
+        except BaseException:
+            self._client = None
+            await client.close()
+            raise
         self._task = asyncio.create_task(self._run(self._session))
         return self.status()
 
@@ -126,6 +139,10 @@ class MinecraftController:
             await client.close()
 
     async def stop(self) -> dict:
+        async with self._lock:
+            return await self._stop()
+
+    async def _stop(self) -> dict:
         task, self._task = self._task, None
         if task is not None and not task.done():
             task.cancel()

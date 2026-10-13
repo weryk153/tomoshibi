@@ -84,3 +84,25 @@ def test_rules_can_be_swapped_while_running():
     assert feed.pick(3) is not None
     feed.observe(IDLE, 4)
     assert feed.pick(4) is not None
+
+
+def test_reset_idle_waits_for_a_fresh_idle_period():
+    feed = GameFeed(RULES)
+    feed.observe(IDLE, 0)
+    feed.reset_idle()
+    assert feed.latest is IDLE
+    assert feed.pick(100) is None
+    feed.observe(IDLE, 100)
+    assert feed.pick(110) is None
+    turn = feed.pick(115)
+    assert turn is not None and turn.kind == "idle"
+
+
+def test_idle_not_allowed_never_yields_idle_but_still_yields_events():
+    feed = GameFeed(RULES)
+    feed.observe(IDLE, 0)
+    assert feed.pick(100, idle_allowed=False) is None
+    feed.offer(GameEvent("night", "天黑了"), 101)
+    turn = feed.pick(102, idle_allowed=False)
+    assert turn is not None and turn.kind == "event"
+    assert feed.pick(103).kind == "idle"
