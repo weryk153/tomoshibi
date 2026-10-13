@@ -12,9 +12,9 @@ from typing import Callable, Optional
 from .events import GameEvent, GameState, state_summary
 
 IDLE_NOTE = (
-    "你的身體在遊戲裡閒著沒事做。決定要做什麼，就在台詞裡自己一行寫 "
-    "[minecraft_do: 一句英文]（例如 [minecraft_do: collect 10 oak logs]），身體才會動；"
-    "也可以只聊聊再說。"
+    "你的身體在遊戲裡閒著沒事做。這一輪一定要替它決定下一件事：回覆的第一行就寫 "
+    "[minecraft_do: 一句英文]（例如 [minecraft_do: collect 10 oak logs]），然後才講話；"
+    "沒有這一行，身體會一直站著不動。"
 )
 EVENTS_HEADING = "遊戲裡剛發生："
 STATE_HEADING = "你在遊戲裡目前的狀態："
