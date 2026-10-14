@@ -149,6 +149,7 @@ class CharacterEngineAgent(AgentInterface):
         persona: str = "",
         mood_key: str = "",
         autonomous_silence: bool = False,
+        interaction_user_id: str = "",
     ):
         """companion 可以是 CharacterCompanion 本身，或是一個每次回傳「目前那一個」
         的函式。正式執行時給的是函式：設定變了引擎那一側會換一個，而舊的 agent
@@ -171,6 +172,7 @@ class CharacterEngineAgent(AgentInterface):
         self._persona = persona
         self._mood_key = mood_key
         self._autonomous_silence = autonomous_silence
+        self._interaction_user_id = interaction_user_id.strip()
         self._tools = self._tool_definitions(tool_manager) if use_mcpp else []
         self._tool_executor = tool_executor
         # 模式開著時才存在的工具（例如 Minecraft 的 minecraft_do）：隨時加減，
@@ -508,6 +510,14 @@ class CharacterEngineAgent(AgentInterface):
                     companion, take_back=conversation if redo else None
                 )
 
+            # Identity belongs to the host. Stream/group messages have no single
+            # partner; never infer one from a speaker label or a conversation id.
+            identity = {}
+            method = companion.speak_up if proactive else companion.reply
+            if (self._interaction_user_id and not metadata.get("stream")
+                    and not self._group_note
+                    and "user_id" in inspect.signature(method).parameters):
+                identity["user_id"] = self._interaction_user_id
             if proactive:
                 silence = {}
                 if (
@@ -523,6 +533,7 @@ class CharacterEngineAgent(AgentInterface):
                 call = companion.speak_up(
                     conversation,
                     **silence,
+                    **identity,
                     frames=frames,
                     on_text_delta=outputs.put_nowait,
                     # 一整則，不以 "- " 開頭：引擎把 "- " 開頭的備註當成「她知道的事」
@@ -554,6 +565,7 @@ class CharacterEngineAgent(AgentInterface):
                 call = companion.reply(
                     text,
                     conversation_id=conversation,
+                    **identity,
                     frames=frames,
                     on_text_delta=outputs.put_nowait,
                     skip_memory=bool(metadata.get("skip_memory")),

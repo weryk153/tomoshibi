@@ -1406,3 +1406,29 @@ def test_native_minecraft_tool_retains_its_own_sample_context(tmp_path, monkeypa
     for ref in expected:
         row = json.loads(open(ref.path).read())
         assert row["goals"] == ["collect 10 oak logs"]
+
+
+@pytest.mark.parametrize("identity,stream,group,expected", [
+    ("local-owner", False, False, "local-owner"),
+    ("local-owner", True, False, None),
+    ("local-owner", False, True, None),
+    ("", False, False, None),
+])
+def test_interaction_identity_is_explicit_and_private(tmp_path, identity, stream, group, expected):
+    async def run():
+        source = companion(tmp_path, EngineLLM())
+        seen = []
+        original = source.reply
+
+        async def capture(text, *, user_id=None, **kwargs):
+            seen.append(user_id)
+            return await original(text, **kwargs)
+
+        source.reply = capture
+        current = agent(source, interaction_user_id=identity)
+        if group:
+            current.start_group_conversation("You", ["Someone"])
+        await say(current, "嗨", stream=stream, history_uid="new-conversation")
+        assert seen == [expected]
+        await source.close()
+    asyncio.run(run())

@@ -385,10 +385,12 @@ def build_companion(
     settings = dict(settings or {})
     # Host-only choice; older engines must not receive it as a setting.
     silence_requested = settings.pop("autonomous_silence", False)
+    settings.pop("interaction_user_id", None)
     development_requested = settings.get("character_development", False)
     if (
         development_requested
-        and "character_development" not in {f.name for f in dataclasses.fields(CompanionSettings)}
+        and ("interaction_every" not in {f.name for f in dataclasses.fields(CompanionSettings)}
+             or "user_id" not in inspect.signature(CharacterCompanion.reply).parameters)
     ) or (
         silence_requested
         and "allow_silence" not in inspect.signature(CharacterCompanion.speak_up).parameters

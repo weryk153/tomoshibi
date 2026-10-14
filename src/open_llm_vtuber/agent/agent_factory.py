@@ -17,6 +17,8 @@ def _engine_settings(settings: dict, *, long_term_memory: bool) -> dict:
         "memory_every": 0,
         "memories_recalled": 0,
         "self_memory_every": 0,
+        "interaction_every": 0,
+        "interaction_topics_shown": 0,
         # 以前記過的也不再帶進對話：關掉之前，主機那一套兩份記憶都不注入。
         "self_memories_shown": 0,
     }
@@ -90,6 +92,9 @@ class AgentFactory:
                 system=system_prompt,
                 persona=persona,
                 mood_key=key,
+                interaction_user_id=str(
+                    (agent_settings.get("character_engine_agent") or {}).get("interaction_user_id", "")
+                ) if kwargs.get("long_term_memory_enabled", True) else "",
                 autonomous_silence=bool(
                     (agent_settings.get("character_engine_agent") or {}).get(
                         "autonomous_silence", False

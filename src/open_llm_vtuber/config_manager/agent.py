@@ -136,6 +136,9 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
     memory_every: int = Field(2, alias="memory_every", ge=0)
     self_memory_every: int = Field(2, alias="self_memory_every", ge=0)
     character_development: bool = Field(False, alias="character_development")
+    interaction_every: int = Field(1, ge=0)
+    interaction_topics_shown: int = Field(4, ge=0)
+    interaction_user_id: str = Field("")
     autonomous_silence: bool = Field(False, alias="autonomous_silence")
     # 她自己的心情（引擎 CompanionSettings.mood_every）；空檔的臉跟著它。
     mood_every: int = Field(2, alias="mood_every", ge=0)
@@ -169,6 +172,9 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
             en="Candidate: let experience revise tastes, habits and opinions with evidence",
             zh="候選功能：依實際經歷更新喜好、習慣與觀點，保留改變依據",
         ),
+        "interaction_every": Description(en="Learn from interaction feedback every N turns (0 disables)", zh="每幾輪讀取相處回饋（0 為停用）"),
+        "interaction_topics_shown": Description(en="Recent interaction topics shown to the character", zh="提供給角色的近期相處經驗主題數"),
+        "interaction_user_id": Description(en="Stable identity for this single-owner private chat installation; empty disables interaction learning", zh="單一使用者私人聊天的固定識別；留空不啟用相處學習"),
         "autonomous_silence": Description(
             en="Candidate: allow silence on private idle prompts",
             zh="候選功能：私人聊天閒置時，角色可以選擇不開口",

@@ -224,3 +224,61 @@ patch、模型原始請求／回應、診斷腳本仍保存在該目錄。當輪
 的確認流程，用四個實際錯誤提案重播及一個合成正例檢查。這些最後修正沒有重跑
 全部對話；HTML 附錄分開展示其原始提案、確認結果與全部模型請求／回應。
 目前仍是未啟用的候選功能，也未驗證完整背景認知、語音、表情或遊戲中的效果。
+
+## 從相處經驗學習（開發候選）
+
+引擎新增 `interaction` 背景工作，讀取角色上一句實際發言與這一輪對方的回饋，
+提出有原文依據的相處理解。協調器檢查引文、來源事件及使用者範圍後才保存。
+同一議題可以累積多次經驗，也可以被後來的明確回饋修正；舊的經驗仍保留。
+這些理解放在既有提示末尾，是可修正的解讀，不能當作固定反應規則或世界事實。
+月白的人設只留下三段初始性格，沒有把這些經驗回寫進 YAML。
+
+設定仍位於 `character_config.agent_config.agent_settings.character_engine_agent`：
+
+```yaml
+character_development: true
+interaction_every: 1
+interaction_topics_shown: 4
+interaction_user_id: local-owner
+```
+
+`interaction_user_id` 是此單一使用者安裝的固定識別，預設留空。由主機提供，不能
+從稱呼、聊天文字或歷史檔名推測；換聊天視窗時保留，換使用者時必須更換。直播、
+多人對話、未指定識別或關閉長期記憶時不讀寫這份相處經驗。這不是多使用者登入
+系統；共用同一安裝且需要分人時，宿主必須先接入可靠的身分來源。
+
+資料沿用角色的引擎記憶 JSONL，scope 為角色識別加使用者識別的 SHA-256。
+原文及原始識別仍存在記錄中，雜湊不是匿名化。引擎提供
+`interaction_experiences(user_id)` 檢視，以及
+`forget_interaction_experiences(user_id, record_ids)` 撤回指定理解。這些資料
+獨立於逐字聊天歷史，重啟、新對話可承接；不會帶給另一個使用者識別。
+
+目前專案安裝的 1.3.2 尚無此能力；未發行、未預設啟用。測試時明確選用旁邊
+的引擎 checkout：
+
+```sh
+PYTHONPATH=../ai-character-engine/src .venv/bin/python scripts/compare_interaction_learning.py
+```
+
+腳本使用月白、現有 Qwen3.5-9B 與 1234／1235 端點，三組雙邊各九輪完整對照。
+雙方採同一份初始人設，僅切換相處學習；第七輪前重啟並開新對話，第九輪換人。
+所有資料寫入隔離測試目錄，保留完整請求、回應、記憶及並排 HTML。
+引擎替身測試只證明機制；模型是否理解正確、對話是否自然，要另讀完整結果。
+
+修正版對照可重跑為新的目錄，或明確沿用同人設、同設定的原版完整對話：
+
+```sh
+PYTHONPATH=../ai-character-engine/src .venv/bin/python scripts/compare_interaction_learning.py \
+  --out docs/superpowers/eval/my-interaction-run \
+  --baseline-from docs/superpowers/eval/2026-10-14-interaction-v1
+```
+
+若之後要在 App 開發環境驗證，先於上述設定區塊明確啟用並填入私人使用者識別，
+再從專案根目錄執行 `PYTHONPATH=../ai-character-engine/src .venv/bin/python run_server.py`。
+本次沒有改動正在使用的 `conf.yaml`、安裝版引擎或正在執行的服務。
+
+此次三組完整閱讀紀錄保存在
+`docs/superpowers/eval/2026-10-14-interaction-v1/` 與 `2026-10-14-interaction-v2/`，
+各有 `comparison.html`、`assessment.md` 及模型原始請求／回應。修正版重啟後
+記得允許的稱呼，但仍混淆雙方名字、推論不存在的感受，日常對話也會無端轉題。
+因此目前的結論是**機制驗證通過，模型品質未通過**，繼續維持預設關閉。

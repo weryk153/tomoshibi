@@ -728,3 +728,14 @@ def test_her_background_persona_summary_does_not_change_her_conversation_prompt(
 
     assert with_background == without_background
     assert "Background:" not in with_background
+
+
+def test_interaction_candidate_refuses_an_engine_without_explicit_user_identity(monkeypatch):
+    async def old_reply(self, text, *, conversation_id=None):
+        pass
+
+    monkeypatch.setattr(CharacterCompanion, "reply", old_reply)
+    arguments = factory_arguments()
+    arguments["agent_settings"]["character_engine_agent"]["character_development"] = True
+    with pytest.raises(RuntimeError, match="目前安裝的版本尚不支援"):
+        AgentFactory.create_agent(**arguments)

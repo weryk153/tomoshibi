@@ -165,6 +165,8 @@ def test_turning_memory_off_also_stops_her_remembering_herself():
         "memory_every": 0,
         "memories_recalled": 0,
         "self_memory_every": 0,
+        "interaction_every": 0,
+        "interaction_topics_shown": 0,
         "self_memories_shown": 0,
     }
 
