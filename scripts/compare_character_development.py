@@ -182,7 +182,26 @@ summary{cursor:pointer;color:#506b80}p{white-space:pre-wrap}h2{margin-top:48px}<
     if args.growth_only:
         page += "<p><strong>本輪只比較成長狀態，不加入新的說話風格要求。第 7 輪前會重啟引擎並開一段全新對話，驗證觀點能否由長期狀態承接。</strong></p>"
     page += "<p>使用 Tomoshibi 實際系統提示組裝與模型設定、引擎前景／背景流程；未測語音、表情或遊戲。" + cadence + "。每輪等待背景完成，以便檢查累積效果。這是人讀比較，沒有自動品質分數。候選功能仍預設關閉。</p>"
-    page += "".join(sections) + "</html>"
+    page += "".join(sections)
+    verification = args.out / "final-verifier-replay.json"
+    if verification.exists():
+        page += (
+            '<h2 id="verification">完整對照之後：最終確認流程的針對性重播</h2>'
+            "<p>下列案例用修正後程式重播舊版的錯誤替換提案，並加一個明確改變偏好的合成控制案例。"
+            "這不是另一次完整對話；上方對話保留當時實際結果，沒有事後改寫。"
+            "前景提示已完成三組對照，後續確認流程修正只做這些重播及程式測試。</p>"
+            "<table><thead><tr><th>來源與角色原話</th><th>原提案</th><th>最終確認後</th></tr></thead><tbody>"
+        )
+        for case in json.loads(verification.read_text()):
+            source = {"case": case["case"], "earlier_views": case["earlier"], "character_lines": case["lines"]}
+            page += "<tr>" + "".join(
+                "<td><pre>" + esc(json.dumps(value, ensure_ascii=False, indent=2)) + "</pre></td>"
+                for value in (source, case["before"], case["after"])
+            ) + "</tr>"
+            page += ('<tr><td colspan="3"><details><summary>全部模型請求與回應</summary><pre>' +
+                     esc(json.dumps(case["calls"], ensure_ascii=False, indent=2)) + "</pre></details></td></tr>")
+        page += "</tbody></table>"
+    page += "</html>"
     (args.out / "comparison.html").write_text(page)
 
 
