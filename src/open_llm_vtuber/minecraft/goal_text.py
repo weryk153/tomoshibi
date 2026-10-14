@@ -15,6 +15,8 @@ from typing import Awaitable, Callable, Optional
 
 from loguru import logger
 
+from . import samples
+
 # 允許的寫法：[minecraft_do: goal]、minecraft_do: goal、[minecraft_do("goal")]；目標到右括號或行尾為止。
 GOAL_RE = re.compile(
     r"\[?\s*minecraft_do\s*(?:[:：]|\(\s*)\s*[\"“]?\s*([^\]\n\"”)]+)\s*[\"”]?\s*\)?\s*\]?",
@@ -40,23 +42,47 @@ def dispatch(goals: list[str]) -> None:
     """送給身體（背景跑）；沒開 Minecraft 模式就只記一筆。"""
     import time
 
+    samples.goals(goals)
     now = time.monotonic()
     for goal in goals:
         key = goal.lower()
         if now - _recent.get(key, float("-inf")) < REPEAT_WINDOW:
+            samples.event(
+                samples.current_ref(), "goal_suppressed", goal=goal, reason="repeat"
+            )
             continue
-        _recent[key] = now
+        target = sink
+        if target is not None:
+            _recent[key] = now
         global dispatched
         dispatched += 1
-        if sink is None:
+        if target is None:
+            samples.event(
+                samples.current_ref(), "goal_cancelled", goal=goal, reason="mode_off"
+            )
             logger.debug(f"[minecraft] goal in text but mode is off: {goal}")
             continue
 
-        async def _send(goal: str = goal) -> None:
+        async def _send(goal: str = goal, target=target) -> None:
             try:
-                await sink(goal)  # type: ignore[misc]
+                # 模式停掉或重開後，旧回覆留下的背景工作不能送進新的一場。
+                if sink is not target:
+                    samples.event(
+                        samples.current_ref(),
+                        "goal_cancelled",
+                        goal=goal,
+                        reason="mode_changed",
+                    )
+                    return
+                await target(goal)
                 logger.info(f"[minecraft] goal sent: {goal}")
             except Exception as error:
+                samples.event(
+                    samples.current_ref(),
+                    "goal_dispatch_failed",
+                    goal=goal,
+                    error=str(error),
+                )
                 logger.warning(f"[minecraft] could not send goal {goal!r}: {error}")
 
         asyncio.create_task(_send())

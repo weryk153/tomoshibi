@@ -1,26 +1,30 @@
-"""每一輪遊戲對話的樣本，之後拿去微調她的腦。
+"""遊戲輪次與動作紀錄。ContextVar 隔離並行對話；回報以明確的 sample/command id 關聯。
 
-一筆樣本要能單獨重現那一輪：她看到的東西（事件、狀態摘要、原始狀態、程式建議的下一步）、
-她原本寫的回覆（含 [minecraft_do: ...] 標記，在被清掉之前）、抓到的目標，以及身體事後
-回報了什麼。沒寫標記、或目標太虛的樣本也要留，那是之後要教它別這樣的負例。
-
-一行一筆 JSON，放在 chat_history/<conf_uid>/minecraft_samples.jsonl；身體的回報另外一行
-{"outcome_of": id, ...} 接在後面，讀的時候用 id 合併。
+raw_reply 是引擎輸出經斷句後、清標記前的文字，不是供應商原始 HTTP 回應。
+紀錄只供後續人工審核，不能把 wrote_goal 或傳送成功當成正確玩法標籤。
 """
 
 from __future__ import annotations
 
+from contextvars import ContextVar
+from copy import deepcopy
+from dataclasses import dataclass
+from datetime import datetime, timezone
 import json
 import os
-import time
-import uuid
-from typing import Any, Optional
+from typing import Any
+from uuid import uuid4
 
 from loguru import logger
 
-_current: Optional[dict[str, Any]] = None
-_last_path: Optional[str] = None
-_last_id: Optional[str] = None
+
+@dataclass(frozen=True)
+class SampleRef:
+    path: str
+    id: str
+
+
+_current: ContextVar[dict | None] = ContextVar("minecraft_sample", default=None)
 
 
 def path_for(conf_uid: str) -> str:
@@ -29,75 +33,87 @@ def path_for(conf_uid: str) -> str:
     )
 
 
+def now() -> str:
+    return datetime.now(timezone.utc).isoformat()
+
+
 def start(
-    conf_uid: str, kind: str, notes: list[str], state_raw: Any, suggested: str
-) -> None:
-    global _current
-    _current = {
-        "id": uuid.uuid4().hex[:12],
-        "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+    conf_uid: str,
+    kind: str,
+    notes: list[str],
+    state_raw: Any,
+    suggested: str = "",
+    *,
+    history_uid: str = "",
+    metadata: Any = None,
+):
+    # suggested 只保留舊格式相容性；目前流程不計算或推薦目標。
+    sample = {
+        "schema_version": 2,
+        "id": uuid4().hex,
+        "time": now(),
         "kind": kind,
+        "history_uid": history_uid,
         "notes": list(notes),
-        "state": _trim_state(state_raw),
+        "state": deepcopy(state_raw) if isinstance(state_raw, dict) else None,
+        "metadata": deepcopy(metadata),
         "suggested_goal": suggested,
         "raw_reply": "",
+        "raw_reply_source": "engine_sentences_before_tag_removal",
         "goals": [],
         "_path": path_for(conf_uid),
     }
+    return _current.set(sample)
+
+
+def current_ref() -> SampleRef | None:
+    sample = _current.get()
+    return SampleRef(sample["_path"], sample["id"]) if sample else None
 
 
 def raw_sentence(text: str) -> None:
-    """她回覆的每一句原文（標記還在）。"""
-    if _current is not None and text:
-        _current["raw_reply"] += text
+    sample = _current.get()
+    if sample is not None and text:
+        sample["raw_reply"] += text
 
 
 def goals(found: list[str]) -> None:
-    if _current is not None:
-        _current["goals"].extend(found)
+    sample = _current.get()
+    if sample is not None:
+        sample["goals"].extend(found)
 
 
-def finish(result: str) -> None:
-    """這一輪結束：寫檔。沒寫標記的也要留（負例）。"""
-    global _current, _last_path, _last_id
-    sample, _current = _current, None
+def finish(result: str, token=None) -> None:
+    sample = _current.get()
+    if token is not None:
+        _current.reset(token)
+    else:
+        _current.set(None)
     if sample is None:
         return
-    path = sample.pop("_path")
-    sample["result"] = result
-    sample["wrote_goal"] = bool(sample["goals"])
-    _write(path, sample)
-    _last_path, _last_id = path, sample["id"]
+    record = {k: v for k, v in sample.items() if k != "_path"}
+    record.update(result=result, wrote_goal=bool(sample["goals"]))
+    _write(sample["_path"], record)
 
 
-def outcome(text: str) -> None:
-    """身體事後回報的話，掛到最近那一筆。"""
-    if _last_path is None or not text:
-        return
-    _write(
-        _last_path,
-        {
-            "outcome_of": _last_id,
-            "time": time.strftime("%Y-%m-%d %H:%M:%S"),
-            "body_reply": text,
-        },
-    )
+def event(ref: SampleRef | None, kind: str, **details: Any) -> None:
+    if ref is not None:
+        _write(
+            ref.path, {"outcome_of": ref.id, "time": now(), "event": kind, **details}
+        )
 
 
-def _trim_state(raw: Any) -> Any:
-    if not isinstance(raw, dict):
-        return None
-    keep = {}
-    for key in ("gameplay", "action", "inventory", "nearby"):
-        if key in raw:
-            keep[key] = raw[key]
-    return keep
+def outcome(text: str, ref: SampleRef | None = None, **details: Any) -> None:
+    # 不再猜「最近一輪」；控制器必須傳入正在執行的指令所屬樣本。
+    if text:
+        event(ref, "body_output", body_reply=text, **details)
 
 
 def _write(path: str, record: dict[str, Any]) -> None:
     try:
+        line = json.dumps(record, ensure_ascii=False) + "\n"
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record, ensure_ascii=False) + "\n")
-    except OSError as error:
+            f.write(line)
+    except (OSError, TypeError, ValueError) as error:
         logger.warning(f"[minecraft] sample not saved: {error}")

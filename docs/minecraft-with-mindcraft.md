@@ -1,6 +1,8 @@
 # 用 Mindcraft 讓她玩 Minecraft
 
-Tomoshibi 的 Minecraft 模式不直接操作遊戲。她只決定「接下來要做什麼」，用 `minecraft_do` 工具把目標送給 [Mindcraft](https://github.com/mindcraft-bots/mindcraft) 的 MindServer（socket.io），由 Mindcraft 的機器人去執行；機器人的回報與遊戲事件再回到她這邊，由她開口講。
+Tomoshibi 的 Minecraft 模式不直接操作遊戲。她決定「接下來要做什麼」，目前主要在台詞裡寫 `[minecraft_do: 一句英文目標]`，也可以呼叫原生 `minecraft_do` 工具。兩個入口共用同一個佇列：`commands.py` 把認得的目標翻成指令，經 [Mindcraft](https://github.com/mindcraft-bots/mindcraft) 的 MindServer（socket.io）交給機器人執行；認不出的目標回報她重新表達。程式不計算生存下一步，也不在她沒下目標時代替決定。
+
+身體忙著時，新目標只取代尚未送出的步驟，等待新鮮的閒置狀態才送；說話本身不會送指令。斷線、停止模式會清掉未送出的步驟。停止模式只停止派發與追蹤，已在 Mindcraft 執行的動作不會因此被取消。
 
 ## 三台機器的配置
 
@@ -37,26 +39,28 @@ cp keys.example.json keys.json   # 用本地模型，不用填
 "host": "<PC名字>.local",   // 或 Tailscale 名；不要寫 IP
 "port": 55916,
 "auth": "offline",
-"profiles": ["./frieren.json"],
-"base_profile": "survival",
+"profiles": ["./yura.json"],
+"base_profile": "assistant",
 "only_chat_with": [],        // 要留空，不然 MindServer 收不到 bot-output
 "chat_ingame": false,        // 遊戲聊天欄不出現她身體的英文
 "language": "en",
 "allow_insecure_coding": false,
 "load_memory": false,
-"init_message": "Say hello in one short sentence.",
+"init_message": "",
 "auto_open_ui": false,
 ```
+
+`base_profile: "assistant"` 避免 survival 的自動生存目標與她的目標衝突；`init_message` 留空，避免開場問候觸發機器人自己聊天。
 
 `mindserver_port` 保持預設 8080（要改的話，Tomoshibi 的 MindServer 網址也要跟著改）。
 
 ### 3. 機器人的 profile
 
-`~/dev/mindcraft/frieren.json`，`name` 要跟 Tomoshibi 設定頁的「機器人名字」一模一樣：
+`~/dev/mindcraft/yura.json`，`name` 要跟 Tomoshibi 設定頁的「機器人名字」一模一樣：
 
 ```json
 {
-  "name": "frieren",
+  "name": "yura",
   "model": { "api": "ollama", "url": "http://127.0.0.1:1236", "model": "andy-4.2", "params": { "think": false, "temperature": 0.3 } },
   "conversing": "You are $NAME's body in Minecraft. $NAME herself talks elsewhere; you only carry out the goals she sends you, as a capable survival player. Reply in one short English sentence saying what you will do, then act with commands right away. Do not role-play a personality, do not ask questions back, do not refuse. $SELF_PROMPT $STATS $INVENTORY $COMMAND_DOCS $EXAMPLES Conversation: $CONVO"
 }
@@ -64,7 +68,7 @@ cp keys.example.json keys.json   # 用本地模型，不用填
 
 - `conversing` 裡的 `$NAME $SELF_PROMPT $STATS $INVENTORY $COMMAND_DOCS $EXAMPLES $CONVO` 要全留（對照 `profiles/defaults/_default.json`），漏掉機器人就看不到狀態或指令說明。
 - `url` 的 1236 是下面 tunnel 的本機端（worker 的 Ollama）；`params.think: false` 一定要有。
-- 實際裝好的檔在 `~/dev/mindcraft/frieren.json`，`conversing` 另外多了 `$MEMORY` 與「沒事就回一個 tab」那句（照 `_default.json`）。
+- 實際裝好的檔在 `~/dev/mindcraft/yura.json`，`conversing` 另外多了 `$MEMORY` 與「沒事就回一個 tab」那句（照 `_default.json`）。
 - 不需要 embedding 模型；Mindcraft 沒有時會退回用字詞重疊挑範例。
 
 ### 4. worker：Andy-4.2（Ollama）
@@ -99,7 +103,8 @@ Andy-4.2 是 Mindcraft-CE（Mindcraft 的社群分支）以 Qwen3.5 9B 微調、
    ```
 
    看到機器人進入世界再往下。（worker 的 Ollama 只綁迴環，一定要走 tunnel；`ServerAliveInterval` 不能省，不加會斷。翻譯用的 1235 tunnel 是另一條，照舊。）
-4. Tomoshibi 設定 → Minecraft：確認 MindServer 網址、機器人名字，按「開始」。要直播就照直播分頁開播，她會邊玩邊回留言。
+4. 確認ゆら的模型連線：目前 `characters/yura.yaml` 不再覆寫 `agent_config`，使用 `conf.yaml` 的本機 LM Studio `http://127.0.0.1:1234/v1`、`qwen/qwen3.5-9b`。舊的 `:1238` 是已關閉的診斷代理，不能沿用。這只修復連線，不代表 9B 的玩法能力已通過驗證。
+5. Tomoshibi 設定 → Minecraft：確認 MindServer 網址、機器人名字 `yura`，按「開始」。要直播就照直播分頁開播，她會邊玩邊回留言。
 
 設定頁欄位對應 `conf.yaml` 的 `minecraft_config`：
 
@@ -110,7 +115,20 @@ Andy-4.2 是 Mindcraft-CE（Mindcraft 的社群分支）以 Qwen3.5 9B 微調、
 | 閒置秒數 | `idle_seconds` | 15 |
 | 值得講的物品 | `notable_items` | `diamond`、`iron_ingot`、`bread` 等（Minecraft 物品 id） |
 
-只在 `conf.yaml` 調的：`idle_cooldown_seconds`（兩次決定目標至少間隔，預設 60）、`event_cooldown_seconds`（同類事件不重複講，預設 30）、`failure_limit`（連續失敗幾輪就暫停，預設 3）、`tool_timeout_seconds`（她的目標工具等 Mindcraft 回覆的秒數，預設 12；要小於引擎的 15 秒工具上限，別調超過）。
+只在 `conf.yaml` 調的：`idle_cooldown_seconds`（兩次決定目標至少間隔，預設 60）、`event_cooldown_seconds`（同類事件不重複講，預設 30）、`failure_limit`（連續失敗幾輪就暫停，預設 3）、`tool_timeout_seconds`（保留的舊工具設定，預設 12；目前統一佇列立即回覆接受／拒絕，不再用它等待身體回報）。
+
+本機 `conf.yaml` 目前覆寫為：`bot_name: yura`、`idle_seconds: 8`、`idle_cooldown_seconds: 30`、`event_cooldown_seconds: 60`；上表仍列程式預設。
+
+## 遊戲樣本紀錄
+
+主視窗與直播的遊戲事件／閒置輪次自動寫入 `chat_history/<conf_uid>/minecraft_samples.jsonl`。普通私聊或直播留言不會因此全部變成訓練樣本。
+
+- 輪次行有 `schema_version: 2`、唯一 `id`、UTC 時間、`history_uid`、事件與狀態備註、完整的當輪原始遊戲狀態、輪次 metadata、清標記前的 `raw_reply`、抽出的 `goals`、`result`。沒有目標、失敗、被打斷也保留。`raw_reply` 是引擎輸出經斷句後的文字，不是模型供應商的原始 HTTP 回應。
+- 動作行用 `outcome_of` 關聯輪次，另有 `goal_id`／`command_id`：包括目標接受或拒絕、實際編譯指令、傳送時狀態、傳送失敗、被新目標取代、斷線或停止時取消。
+- 身體回報在事件節流之前保存。MindServer 沒有 request id，因此 `body_output.association: active_command_at_receipt` 僅表示接收當時正在追蹤的指令；有其他玩家或 Mindcraft 自動行為時仍可能混入回報，不能當作精確因果標籤。
+- 同一輪的動作行可能先於輪次完成行寫入，讀取時要按 id 合併，不能靠相鄰行猜歸屬。`wrote_goal: true`、`result: ok` 或 `command_sent` 都不代表玩法正確或動作完成。
+
+這些是待審核的原始樣本。訓練前仍需依事件、狀態、回覆與回報人工檢查，另寫理想回答；此修正沒有啟動微調，也沒有修改人設或玩法提示。
 
 ## 安全
 
@@ -124,7 +142,8 @@ Andy-4.2 是 Mindcraft-CE（Mindcraft 的社群分支）以 Qwen3.5 9B 微調、
 |---|---|
 | 按開始回「Mindcraft 沒在跑」 | `node main.js` 沒起來，或 `mindserver_port` 不是 8080／Tomoshibi 的網址沒對上 |
 | 「機器人不在遊戲裡」 | PC 的世界沒開放，或 `host`／`port` 錯；`.local` 名字解析不到時改用 Tailscale 名 |
-| 她講話，但工具回 "No reply" | Andy-4.2 太慢（多半是 `think: false` 掉了）（超過 `tool_timeout_seconds`）或 tunnel 斷了；看 Mindcraft 終端。連線 refused 是 tunnel 沒開，timeout 是網路不通 |
+| 她講話但不動 | 檢查樣本中的 `goals` 和動作行：沒有目標、翻譯不支援、身體忙碌、沒有新鮮狀態、尚未進入世界，原因各不同；再對照 Mindcraft 終端 |
+| 模型連線指向 1238 而失敗 | ゆら的舊 Colab 診斷覆寫未清掉；本機模型應使用 `conf.yaml` 的 1234 |
 | 機器人動了但她沒反應 | `only_chat_with` 不是 `[]`，MindServer 收不到 `bot-output` |
 | worker 模型載不起來或翻譯回 400 | 9B 沒卸，GPU 超過 13312 MB |
 | 遊戲聊天欄出現一堆英文 | `chat_ingame` 沒設成 `false` |

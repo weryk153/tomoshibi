@@ -6,6 +6,7 @@ pick，同一時間只有一邊在 pick（直播中私聊迴圈不動）。
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -35,9 +36,20 @@ GAME_TURN_INSTRUCTION = (
 )
 
 
-def game_turn_metadata(notes) -> dict:
+def game_turn_metadata(notes, *, turn=None) -> dict:
     """遊戲那一輪要合進主動開口 metadata 的東西：備註、清掉題材、換掉指令。"""
     return {
+        **(
+            {
+                "minecraft_sample": {
+                    "kind": turn.kind,
+                    "state": turn.state_raw,
+                    "timestamp": turn.timestamp,
+                }
+            }
+            if turn is not None
+            else {}
+        ),
         "notes": list(notes),
         "proactive_material": [],
         # 事件和狀態直接接在指令後面（模型最看重最後那段），不然 27B 會丟著不講。
@@ -47,45 +59,6 @@ def game_turn_metadata(notes) -> dict:
         # 不要一直問觀眾「你們覺得呢」：引擎會把問句濾掉。
         "proactive_forbid_question": True,
     }
-
-
-def suggest_goal(state) -> str:
-    """照背包和時段算生存的下一步。27B 自己想的目標太虛（look around、punch tree），
-    給它一句能照抄的。"""
-    inv = state.inventory if state is not None else {}
-
-    def have(*names):
-        return sum(v for k, v in inv.items() if any(n in k for n in names))
-
-    logs = have("_log")
-    planks = have("_planks")
-    if state is not None and state.time_label == "Night" and have("torch") < 1:
-        return "dig into the hillside and make a small shelter"
-    if have("crafting_table") < 1 and logs + planks // 4 < 4:
-        return "collect 10 oak logs"
-    if have("crafting_table") < 1:
-        return "craft a crafting table"
-    if have("wooden_pickaxe", "stone_pickaxe", "iron_pickaxe") < 1:
-        if logs + planks // 4 < 2:
-            return "collect 6 oak logs"
-        return "craft a wooden pickaxe"
-    if have("stone_pickaxe", "iron_pickaxe") < 1:
-        if have("cobblestone") < 3:
-            return "collect 8 cobblestone"
-        return "craft a stone pickaxe"
-    if have("torch") < 4:
-        if have("coal") < 1:
-            return "collect 5 coal"
-        return "craft 8 torches"
-    if (
-        state is not None
-        and state.hunger < 12
-        and have("beef", "porkchop", "bread", "apple", "mutton", "chicken") < 1
-    ):
-        return "kill a cow and collect the beef"
-    if have("iron_ingot", "raw_iron") < 3:
-        return "mine 5 raw iron underground"
-    return "collect 10 oak logs"
 
 
 def idle_note(state) -> str:
@@ -105,7 +78,8 @@ class GameTurn:
     notes: tuple[str, ...]
     urgent: bool
     timestamp: float
-    suggested: str = ""  # 身體閒著時程式算好的下一步；她沒給具體目標就照這個做
+    suggested: str = ""  # 舊呼叫相容；不再計算推薦目標
+    state_raw: object = None
 
 
 class GameFeed:
@@ -115,6 +89,7 @@ class GameFeed:
         # 都從這裡 pick，才不會有一邊漏掉；由控制器接上連線狀態。
         self.ready: Callable[[], bool] = lambda: True
         self.latest: Optional[GameState] = None
+        self.state_raw: object = None
         self._events: list[tuple[GameEvent, float]] = []
         self._last_kind_at: dict[str, float] = {}
         self._idle_since: Optional[float] = None
@@ -170,11 +145,17 @@ class GameFeed:
             if ask_idle:
                 self._last_idle_turn = now
                 notes = notes + (idle_note(self.latest),)
-            return GameTurn("event", notes, urgent, now)
+            return GameTurn(
+                "event", notes, urgent, now, state_raw=deepcopy(self.state_raw)
+            )
         if ask_idle:
             self._last_idle_turn = now
             return GameTurn(
-                "idle", self._with_state(()) + (idle_note(self.latest),), False, now
+                "idle",
+                self._with_state(()) + (idle_note(self.latest),),
+                False,
+                now,
+                state_raw=deepcopy(self.state_raw),
             )
         return None
 

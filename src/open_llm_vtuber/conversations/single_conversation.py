@@ -16,6 +16,7 @@ from .conversation_utils import (
 from .types import WebSocketSend
 from .tts_manager import TTSTaskManager
 from .. import asr_repair
+from ..minecraft import samples
 from ..agent.input_types import TextSource
 from ..chat_history_manager import store_message
 from ..character_mood import send_character_mood
@@ -118,6 +119,18 @@ async def process_single_conversation(
     Returns:
         str: Complete response text
     """
+    sample_info = (metadata or {}).get("minecraft_sample")
+    sample_token = None
+    sample_result = "failed"
+    if sample_info is not None:
+        sample_token = samples.start(
+            context.character_config.conf_uid,
+            sample_info["kind"],
+            (metadata or {}).get("notes", []),
+            sample_info.get("state"),
+            history_uid=context.history_uid,
+            metadata=metadata,
+        )
     # Create TTSTaskManager for this conversation
     tts_manager = TTSTaskManager()
     full_response = ""  # Initialize full_response here
@@ -192,6 +205,7 @@ async def process_single_conversation(
         if images:
             logger.info(f"With {len(images)} images")
 
+        agent_failed = False
         try:
             # agent.chat yields Union[SentenceOutput, Dict[str, Any]]
             # 背景工作讓路到這一輪的語音合成完（翻譯與背景工作在 worker 共用一顆 GPU）。
@@ -258,6 +272,7 @@ async def process_single_conversation(
                     logger.debug(f"Unexpected item content: {output_item}")
 
         except Exception as e:
+            agent_failed = True
             logger.exception(
                 f"Error processing agent response stream: {e}"
             )  # Log with stack trace
@@ -346,9 +361,11 @@ async def process_single_conversation(
             except Exception as error:
                 logger.warning(f"Mentioned news not noted: {error}")
 
+        sample_result = "failed" if agent_failed else "ok"
         return full_response  # Return accumulated full_response
 
     except asyncio.CancelledError:
+        sample_result = "interrupted"
         logger.info(f"🤡👍 Conversation {session_emoji} cancelled because interrupted.")
         raise
     except Exception as e:
@@ -358,5 +375,10 @@ async def process_single_conversation(
         )
         raise
     finally:
+        if sample_token is not None:
+            # 對話層會把模型例外轉成前端錯誤訊息；遊戲主持人仍需知道這輪失敗，
+            # 否則 session 的連續失敗上限永遠不會累計。
+            sample_info["result"] = sample_result
+            samples.finish(sample_result, sample_token)
         _release_background(context)
         cleanup_conversation(tts_manager, session_emoji)

@@ -17,8 +17,9 @@ def test_sample_round_trip(tmp_path, monkeypatch):
     samples.raw_sentence("[minecraft_do: collect 10 oak logs] ")
     samples.raw_sentence("先把木頭收齊。")
     samples.goals(["collect 10 oak logs"])
+    ref = samples.current_ref()
     samples.finish("ok")
-    samples.outcome("On it! !collectBlocks(oak_log, 10)")
+    samples.outcome("On it! !collectBlocks(oak_log, 10)", ref)
     lines = [
         json.loads(line)
         for line in open(
@@ -33,7 +34,7 @@ def test_sample_round_trip(tmp_path, monkeypatch):
         sample["goals"] == ["collect 10 oak logs"]
         and sample["suggested_goal"] == "collect 10 oak logs"
     )
-    assert sample["state"] == {"gameplay": {"health": 20}}
+    assert sample["state"] == {"gameplay": {"health": 20}, "extra": 1}
     assert out["outcome_of"] == sample["id"] and "collectBlocks" in out["body_reply"]
 
 
@@ -66,3 +67,36 @@ def test_outside_a_turn_nothing_breaks(tmp_path, monkeypatch):
     samples.goals(["y"])
     samples.finish("ok")
     assert not (tmp_path / "chat_history").exists()
+
+
+def test_parallel_turns_are_isolated_and_outcomes_require_explicit_ref(
+    tmp_path, monkeypatch
+):
+    import asyncio
+
+    monkeypatch.chdir(tmp_path)
+
+    async def record(name):
+        state = {"gameplay": {"health": 1}}
+        token = samples.start(name, "event", [name], state)
+        state["gameplay"]["health"] = 20
+        ref = samples.current_ref()
+        await asyncio.sleep(0)
+        samples.raw_sentence(name)
+        samples.finish("interrupted", token)
+        return ref
+
+    async def go():
+        return await asyncio.gather(record("a"), record("b"))
+
+    a, b = asyncio.run(go())
+    samples.outcome("unattributed")
+    samples.outcome("late A", a)
+    for ref in (a, b):
+        rows = [json.loads(line) for line in open(ref.path)]
+        assert rows[0]["state"]["gameplay"]["health"] == 1
+        assert rows[0]["raw_reply"] == rows[0]["notes"][0]
+        assert rows[0]["result"] == "interrupted"
+    rows = [json.loads(line) for line in open(a.path)]
+    assert len(rows) == 2 and rows[1]["outcome_of"] == a.id
+    assert len(open(b.path).readlines()) == 1

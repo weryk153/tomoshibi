@@ -5,7 +5,6 @@ from src.open_llm_vtuber.minecraft.feed import (
     IDLE_NOTE,
     FeedRules,
     GameFeed,
-    suggest_goal,
 )
 
 RULES = FeedRules(idle_seconds=15, idle_cooldown=60, event_cooldown=30)
@@ -128,38 +127,3 @@ def test_event_turn_also_asks_for_a_goal_when_idle_is_due():
     # 問過了就進冷卻，下一個事件輪不再問
     feed.offer(GameEvent("hostile", "殭屍"), 17)
     assert not any(n.startswith(IDLE_NOTE) for n in feed.pick(17).notes)
-
-
-def test_suggest_goal_follows_the_survival_order():
-    assert suggest_goal(GameState()) == "collect 10 oak logs"
-    assert suggest_goal(GameState(inventory={"oak_log": 6})) == "craft a crafting table"
-    assert (
-        suggest_goal(GameState(inventory={"oak_log": 4, "crafting_table": 1}))
-        == "craft a wooden pickaxe"
-    )
-    assert (
-        suggest_goal(GameState(inventory={"crafting_table": 1, "wooden_pickaxe": 1}))
-        == "collect 8 cobblestone"
-    )
-    assert (
-        suggest_goal(
-            GameState(
-                inventory={"crafting_table": 1, "wooden_pickaxe": 1, "cobblestone": 5}
-            )
-        )
-        == "craft a stone pickaxe"
-    )
-    assert (
-        suggest_goal(GameState(inventory={"stone_pickaxe": 1, "crafting_table": 1}))
-        == "collect 5 coal"
-    )
-    assert (
-        suggest_goal(
-            GameState(inventory={"stone_pickaxe": 1, "crafting_table": 1, "coal": 3})
-        )
-        == "craft 8 torches"
-    )
-    assert (
-        suggest_goal(GameState(time_label="Night"))
-        == "dig into the hillside and make a small shelter"
-    )

@@ -106,6 +106,7 @@ class WebSocketMinecraftHost:
             uid,
             " | ".join(note[:70].replace("\n", " ") for note in turn.notes),
         )
+        metadata = game_turn_metadata(turn.notes, turn=turn)
         try:
             await self._trigger(
                 msg_type="ai-speak-signal",
@@ -119,7 +120,7 @@ class WebSocketMinecraftHost:
                 received_data_buffers=self._ws.received_data_buffers,
                 current_conversation_tasks=self._ws.current_conversation_tasks,
                 broadcast_to_group=self._ws.broadcast_to_group,
-                extra_metadata=game_turn_metadata(turn.notes),
+                extra_metadata=metadata,
             )
         except Exception as error:
             logger.warning(f"[minecraft] could not start the turn: {error}")
@@ -142,4 +143,4 @@ class WebSocketMinecraftHost:
         push = getattr(self._ws, "_push_history_to_peers", None)
         if push is not None:
             await push(uid)
-        return "ok"
+        return metadata["minecraft_sample"].get("result", "ok")

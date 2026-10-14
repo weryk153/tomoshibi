@@ -200,3 +200,17 @@ def test_cancelling_host_does_not_cancel_the_conversation_task():
         return cancelled, await inner["task"]
 
     assert asyncio.run(go()) == (True, "spoken")
+
+
+def test_model_failure_reported_by_conversation_is_not_counted_as_success():
+    async def trigger(**kwargs):
+        async def failed():
+            kwargs["extra_metadata"]["minecraft_sample"]["result"] = "failed"
+            return "partial reply"
+
+        kwargs["current_conversation_tasks"][kwargs["client_uid"]] = (
+            asyncio.create_task(failed())
+        )
+
+    host = WebSocketMinecraftHost(ws(u=context()), trigger=trigger)
+    assert asyncio.run(host.run_private_turn(turn())) == "failed"

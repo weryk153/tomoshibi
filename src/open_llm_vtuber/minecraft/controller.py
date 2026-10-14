@@ -9,6 +9,8 @@ from __future__ import annotations
 import asyncio
 import time
 from collections import deque
+from dataclasses import dataclass
+from uuid import uuid4
 from typing import Any, Callable, Optional
 
 from loguru import logger
@@ -16,12 +18,19 @@ from loguru import logger
 from ..config_manager.minecraft import MinecraftConfig
 from .events import EventRules
 from .feed import FeedRules, GameFeed
-from . import goal_text
+from . import goal_text, samples
 from .commands import compile_goal
-from .goal_tool import make_goal_handler
 from .mindserver import MindServerClient
 from .session import MinecraftSession
 from .settings import read_minecraft_settings, write_minecraft_settings
+
+
+@dataclass(frozen=True)
+class QueuedStep:
+    command: str
+    goal_id: str
+    command_id: str
+    sample: samples.SampleRef | None
 
 
 class MinecraftError(Exception):
@@ -51,7 +60,11 @@ class MinecraftController:
         self._feed: Optional[GameFeed] = None
         self._session: Optional[MinecraftSession] = None
         # 身體在忙時她下的目標先排著，閒下來才送：送了 Mindcraft 會中斷手上的動作。
-        self._queue: deque[str] = deque()
+        self._queue: deque[QueuedStep] = deque()
+        self._active: QueuedStep | None = None
+        self._pump_tasks: set[asyncio.Task] = set()
+        self._pump_lock = asyncio.Lock()
+        self._state_at = float("-inf")
         self._sent_at = float("-inf")
         self._task: Optional[asyncio.Task] = None
         self._settings: MinecraftConfig = MinecraftConfig()
@@ -103,43 +116,19 @@ class MinecraftController:
                 **self._session_options,
             )
             client.on_state = self._on_state
-            client.on_output = self._session.handle_output
-            client.on_disconnect = self._session.handle_disconnect
-            self._host.install_tool(
-                make_goal_handler(
-                    client,
-                    self._host.speaker_name(),
-                    lambda: float(self._settings.tool_timeout_seconds),
-                )
-            )
+            client.on_output = self._on_output
+            client.on_disconnect = self._on_disconnect
+            self._sent_at = self._state_at = float("-inf")
+            self._active = None
+            self._host.install_tool(self._tool_goal)
             if self.stream is not None:
                 self.stream.attach_extra(self._feed)
-
-            # 她在台詞裡寫的 [minecraft_do: ...] 也送給身體（goal_text）；回話會從
-            # bot-output 變成回報事件。
-            async def _send_text_goal(goal: str) -> None:
-                # 編成 Mindcraft 指令（可能好幾步）；她的新目標蓋掉舊目標剩下的步驟。
-                # 身體在忙就排著，閒下來才一步一步送（送了 Mindcraft 會中斷手上的動作）。
-                steps = compile_goal(goal)
-                if not steps:
-                    # 不替她決定：聽不懂就告訴她，讓她換個具體的說法。
-                    logger.info(f"[minecraft] goal {goal!r} not understood")
-                    if self._session is not None:
-                        self._session.handle_output(
-                            f"I don't understand '{goal}'. Tell me one concrete thing, like 'collect 10 oak logs' or 'craft a stone pickaxe'."
-                        )
-                    return
-                logger.info(f"[minecraft] goal {goal!r} -> {steps}")
-                self._queue.clear()
-                self._queue.extend(steps)
-                await self._pump()
-
-            goal_text.sink = _send_text_goal
+            goal_text._recent.clear()
+            goal_text.sink = self._submit_goal
             self.stopped_reason = None
             self.last_error = ""
         except BaseException:
-            self._client = None
-            await client.close()
+            await self._teardown()
             raise
         self._task = asyncio.create_task(self._run(self._session))
         return self.status()
@@ -160,7 +149,15 @@ class MinecraftController:
 
     async def _teardown(self) -> None:
         goal_text.sink = None
-        self._queue.clear()
+        self._clear_queue("mode_stopped")
+        if self._active is not None:
+            self._step_event(self._active, "tracking_stopped", reason="mode_stopped")
+        self._active = None
+        for task in self._pump_tasks:
+            task.cancel()
+        if self._pump_tasks:
+            await asyncio.gather(*self._pump_tasks, return_exceptions=True)
+        self._pump_tasks.clear()
         self._host.uninstall_tool()
         if self.stream is not None:
             self.stream.detach_extra()
@@ -194,29 +191,143 @@ class MinecraftController:
                 notable_items=tuple(settings.notable_items)
             )
 
+    async def _tool_goal(self, goal: str = "", **_: Any) -> str:
+        text = str(goal or "").strip()
+        if not text:
+            return "Say what to do: the goal was empty."
+        samples.goals([text])
+        return await self._submit_goal(text)
+
+    async def _submit_goal(self, goal: str) -> str:
+        ref = samples.current_ref()
+        goal_id = uuid4().hex
+        client = self._client
+        if client is None or not client.connected or not client.in_game:
+            samples.event(
+                ref, "goal_rejected", goal=goal, goal_id=goal_id, reason="not_in_game"
+            )
+            return "Your body is not connected to the game right now."
+        steps = compile_goal(goal)
+        if not steps:
+            reply = f"I don't understand '{goal}'. Tell me one concrete thing, like 'collect 10 oak logs' or 'craft a stone pickaxe'."
+            samples.event(
+                ref,
+                "goal_rejected",
+                goal=goal,
+                goal_id=goal_id,
+                reason="not_understood",
+                body_reply=reply,
+            )
+            if self._session is not None:
+                self._session.handle_output(reply)
+            return reply
+        logger.info(f"[minecraft] goal {goal!r} -> {steps}")
+        self._clear_queue("superseded")
+        self._queue.extend(
+            QueuedStep(step, goal_id, uuid4().hex, ref) for step in steps
+        )
+        samples.event(
+            ref,
+            "goal_queued",
+            goal=goal,
+            goal_id=goal_id,
+            commands=[
+                {"command": step.command, "command_id": step.command_id}
+                for step in self._queue
+            ],
+        )
+        await self._schedule_pump()
+        return "Goal accepted; queued steps run when your body is idle. This is not a completion report."
+
+    def _clear_queue(self, reason: str) -> None:
+        while self._queue:
+            step = self._queue.popleft()
+            self._step_event(step, "command_cancelled", reason=reason)
+
+    @staticmethod
+    def _step_event(step: QueuedStep, kind: str, **details: Any) -> None:
+        samples.event(
+            step.sample,
+            kind,
+            goal_id=step.goal_id,
+            command_id=step.command_id,
+            command=step.command,
+            **details,
+        )
+
+    def _on_output(self, text: str) -> None:
+        # MindServer 沒有 request id；保留接收當時的 active command，但不宣稱因果確定。
+        if self._active is not None:
+            self._step_event(
+                self._active,
+                "body_output",
+                body_reply=text,
+                association="active_command_at_receipt",
+            )
+        if self._session is not None:
+            self._session.handle_output(text)
+
+    def _on_disconnect(self) -> None:
+        self._clear_queue("disconnected")
+        if self._active is not None:
+            self._step_event(self._active, "command_interrupted", reason="disconnected")
+        self._active = None
+        self._state_at = float("-inf")
+        if self._session is not None:
+            self._session.handle_disconnect()
+
     def _on_state(self, raw: object) -> None:
         session = self._session
         if session is None:
             return
+        if (
+            not isinstance(raw, dict)
+            or "error" in raw
+            or not isinstance(raw.get("gameplay"), dict)
+        ):
+            return
+        self._state_at = time.monotonic()
         session.handle_state(raw)
         if self._queue:
-            asyncio.create_task(self._pump())
+            self._schedule_pump()
+
+    def _schedule_pump(self) -> asyncio.Task:
+        task = asyncio.create_task(self._pump())
+        self._pump_tasks.add(task)
+        task.add_done_callback(self._pump_tasks.discard)
+        return task
 
     async def _pump(self) -> None:
-        """身體閒著就送佇列的下一步；剛送的那步給它幾秒開始動，別一口氣全倒進去。"""
-        session, client = self._session, self._client
-        if session is None or client is None or not self._queue:
-            return
-        latest = session.latest
-        if latest is not None and not latest.is_idle:
-            return
-        if time.monotonic() - self._sent_at < 4.0:
-            return
-        step = self._queue.popleft()
-        self._sent_at = time.monotonic()
-        logger.info(f"[minecraft] -> body: {step} ({len(self._queue)} more queued)")
-        # 名字每次現取：開始時主視窗可能還沒連上，那時會拿到預設名。
-        await client.send(self._host.speaker_name(), step)
+        """只在有新鮮閒置狀態時送下一步；兩個入口共用，不搶掉正在做的動作。"""
+        async with self._pump_lock:
+            session, client = self._session, self._client
+            if session is None or client is None or not self._queue:
+                return
+            if not client.connected or not client.in_game:
+                return
+            latest = session.latest
+            now = time.monotonic()
+            if latest is None or not latest.is_idle or now - self._state_at > 5.0:
+                return
+            if now - self._sent_at < 4.0 or self._state_at < self._sent_at:
+                return
+            step = self._queue.popleft()
+            self._sent_at = now
+            self._active = step
+            self._step_event(step, "command_sending", state=session.feed.state_raw)
+            try:
+                await client.send(self._host.speaker_name(), step.command)
+            except Exception as error:
+                self.last_error = f"{type(error).__name__}: {error}"
+                self._step_event(step, "command_send_failed", error=self.last_error)
+                self._clear_queue("send_failed")
+                self._active = None
+                session.handle_output(f"Failed to send command: {error}")
+                return
+            self._step_event(step, "command_sent")
+            logger.info(
+                f"[minecraft] -> body: {step.command} ({len(self._queue)} more queued)"
+            )
 
     def status(self) -> dict:
         latest = self._session.latest if self._session is not None else None

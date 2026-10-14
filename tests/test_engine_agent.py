@@ -1298,3 +1298,85 @@ def test_opening_a_conversation_warms_up_her_model(tmp_path):
     assert len(warmed) == 1
     assert warmed[0][0].content == turn[0].content  # 系統提示跟這一輪的一樣
     assert "主機的系統提示" in warmed[0][0].content
+
+
+def test_minecraft_marker_survives_engine_pipeline_into_sample(tmp_path, monkeypatch):
+    from src.open_llm_vtuber.minecraft import goal_text, samples
+
+    monkeypatch.chdir(tmp_path)
+    goal_text._recent.clear()
+    sent = []
+
+    async def sink(goal):
+        sent.append(goal)
+
+    monkeypatch.setattr(goal_text, "sink", sink)
+    text = "[minecraft_do: collect 10 oak logs] 先收集木頭。"
+
+    async def scenario():
+        current = agent(companion(tmp_path, EngineLLM(text)))
+        token = samples.start("yura", "idle", [], {})
+        outputs = await say(current, "接著要做什麼？")
+        samples.finish("ok", token)
+        await asyncio.sleep(0)
+        return outputs
+
+    outputs = asyncio.run(scenario())
+    row = json.loads((tmp_path / samples.path_for("yura")).read_text())
+    assert "[minecraft_do: collect 10 oak logs]" in row["raw_reply"]
+    assert row["goals"] == ["collect 10 oak logs"]
+    assert sent == ["collect 10 oak logs"]
+    assert "minecraft_do" not in spoken(outputs)
+
+
+def test_native_minecraft_tool_retains_its_own_sample_context(tmp_path, monkeypatch):
+    from src.open_llm_vtuber.minecraft import samples
+    from src.open_llm_vtuber.minecraft.goal_tool import GOAL_TOOL
+
+    monkeypatch.chdir(tmp_path)
+    refs = []
+
+    class MinecraftLLM(EngineLLM):
+        async def stream_generate(self, messages, *, tools=None):
+            if messages[-1].role == "tool":
+                yield LLMStreamChunk(text="先收集木頭。")
+                yield LLMStreamChunk(
+                    final=True, response=LLMResponse(text="先收集木頭。", model="fake")
+                )
+            else:
+                yield LLMStreamChunk(
+                    final=True,
+                    response=LLMResponse(
+                        text="",
+                        model="fake",
+                        tool_calls=(
+                            ToolCall(
+                                "mc", "minecraft_do", {"goal": "collect 10 oak logs"}
+                            ),
+                        ),
+                    ),
+                )
+
+    async def tool(goal):
+        refs.append(samples.current_ref())
+        samples.goals([goal])
+        return "queued"
+
+    async def scenario():
+        current = agent(companion(tmp_path, MinecraftLLM()))
+        current.add_tool(GOAL_TOOL, tool)
+
+        async def record(name):
+            token = samples.start(name, "idle", [], {})
+            ref = samples.current_ref()
+            await say(current, "找木頭", history_uid=name)
+            samples.finish("ok", token)
+            return ref
+
+        return await asyncio.gather(record("a"), record("b"))
+
+    expected = asyncio.run(scenario())
+    assert set(refs) == set(expected)
+    for ref in expected:
+        row = json.loads(open(ref.path).read())
+        assert row["goals"] == ["collect 10 oak logs"]

@@ -65,3 +65,24 @@ def test_same_goal_is_not_resent_within_the_window():
 
     asyncio.run(go())
     assert sent == ["collect 10 oak logs", "craft a crafting table"]
+
+
+def test_pending_dispatch_does_not_cross_a_mode_restart():
+    goal_text._recent.clear()
+    sent = []
+
+    async def old(goal):
+        sent.append(("old", goal))
+
+    async def new(goal):
+        sent.append(("new", goal))
+
+    async def go():
+        goal_text.sink = old
+        goal_text.dispatch(["collect 10 oak logs"])
+        goal_text.sink = new
+        await asyncio.sleep(0)
+        goal_text.sink = None
+
+    asyncio.run(go())
+    assert sent == []

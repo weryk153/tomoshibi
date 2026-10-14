@@ -8,7 +8,7 @@ from ..config_manager import TTSPreprocessorConfig
 from ..utils.sentence_divider import SentenceDivider
 from ..utils.sentence_divider import SentenceWithTags, TagState
 from ..stage_director import extract_stage_performance
-from ..minecraft import goal_text
+from ..minecraft import goal_text, samples
 from loguru import logger
 import re
 
@@ -337,6 +337,7 @@ def display_processor():
                 ):
                     sentence, actions = item
                     text = sentence.text
+                    samples.raw_sentence(text)
                     # Handle think tag states
                     for tag in sentence.tags:
                         if tag.name == "think":
@@ -347,7 +348,7 @@ def display_processor():
 
                     # 她下給遊戲身體的目標也是 [標籤]（[minecraft_do: ...]），要在下面
                     # 整批清掉之前先抓出來送走，不然身體永遠收不到。
-                    _, goals = goal_text.extract_goals(text)
+                    text, goals = goal_text.extract_goals(text)
                     if goals:
                         goal_text.dispatch(goals)
                     # 去掉 [neutral]/[smirk] 等情緒標籤（表情已被 actions_extractor 提取，這裡只清字幕顯示）

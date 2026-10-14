@@ -81,7 +81,7 @@ class WebSocketStreamHost:
 
     def turn_runner(self, history_uid: str):
         async def run_turn(
-            comment: Optional[ChatMessage], *, notes: tuple = ()
+            comment: Optional[ChatMessage], *, notes: tuple = (), game_turn=None
         ) -> TurnResult:
             uid, context, socket = self._stage()
             if context is None or socket is None:
@@ -92,7 +92,7 @@ class WebSocketStreamHost:
                 metadata = {
                     **proactive_turn_metadata(context, uid),
                     "stream": True,
-                    **(game_turn_metadata(notes) if notes else {}),
+                    **(game_turn_metadata(notes, turn=game_turn) if notes else {}),
                 }
                 user_input = PROACTIVE_TEXT
                 shown = {"type": "stream-comment", "author": "", "text": ""}
@@ -143,6 +143,9 @@ class WebSocketStreamHost:
             except Exception as error:
                 logger.warning(f"[stream] turn failed: {type(error).__name__}: {error}")
                 return "failed"
+            game_result = metadata.get("minecraft_sample", {}).get("result")
+            if game_result in ("failed", "interrupted"):
+                return game_result
             if reply:
                 return "ok"
             # 冷場那輪的句子可能全被主機擋掉，那不是模型壞了；回留言卻什麼都沒有才算。
@@ -155,7 +158,9 @@ class WebSocketStreamHost:
         run = self.turn_runner(history_uid)
 
         async def run_extra(item: Any) -> TurnResult:
-            return await run(None, notes=tuple(getattr(item, "notes", ())))
+            return await run(
+                None, notes=tuple(getattr(item, "notes", ())), game_turn=item
+            )
 
         return run_extra
 

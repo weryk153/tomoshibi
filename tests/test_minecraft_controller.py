@@ -290,3 +290,148 @@ def test_text_goal_waits_until_the_body_is_idle():
         await c.stop()
 
     asyncio.run(go())
+
+
+def test_native_tool_queues_and_late_body_report_stays_with_earlier_round(
+    tmp_path, monkeypatch
+):
+    import json
+    from src.open_llm_vtuber.minecraft import samples
+
+    monkeypatch.chdir(tmp_path)
+    host = FakeHost()
+    c = controller(host)
+
+    async def go():
+        await c.start()
+        client = c._client
+        sent = []
+
+        async def send(name, message):
+            sent.append(message)
+
+        client.send = send
+        idle = {"gameplay": {"health": 20}, "action": {"isIdle": True}}
+        client.on_state(idle)
+        token = samples.start("yura", "idle", ["A"], idle)
+        a = samples.current_ref()
+        await host.installed(goal="collect 10 oak logs")
+        samples.finish("ok", token)
+        assert sent == ['!collectBlocks("oak_log", 10)']
+        client.on_state({"gameplay": {"health": 20}, "action": {"isIdle": False}})
+        token = samples.start("yura", "event", ["B"], idle)
+        b = samples.current_ref()
+        await host.installed(goal="craft a crafting table")
+        samples.finish("ok", token)
+        assert len(sent) == 1  # 原生工具不能搶掉 A
+        client.on_output("Collected 10 oak logs")
+        c._sent_at = float("-inf")
+        client.on_state(idle)
+        await asyncio.sleep(0)
+        client.on_output("Crafted oak planks")
+        await c.stop()
+        return a, b
+
+    a, b = asyncio.run(go())
+    rows = [json.loads(line) for line in open(a.path)]
+    reports = [row for row in rows if row.get("event") == "body_output"]
+    assert [row["outcome_of"] for row in reports] == [a.id, b.id]
+    assert all(
+        row["command_id"] and row["association"] == "active_command_at_receipt"
+        for row in reports
+    )
+    cancelled = [row for row in rows if row.get("event") == "command_cancelled"]
+    assert cancelled[0]["reason"] == "mode_stopped"
+
+
+def test_queue_needs_fresh_state_and_disconnect_discards_unsent_steps():
+    host = FakeHost()
+    c = controller(host)
+
+    async def go():
+        await c.start()
+        client = c._client
+        sent = []
+
+        async def send(*args):
+            sent.append(args)
+
+        client.send = send
+        await host.installed(goal="craft a crafting table")
+        assert not sent  # 尚未收到任何狀態
+        idle = {"gameplay": {"health": 20}, "action": {"isIdle": True}}
+        client.on_state(idle)
+        c._state_at -= 10
+        await asyncio.sleep(0)
+        assert not sent  # 舊狀態不能當成仍閒著
+        client.on_state(idle)
+        await asyncio.sleep(0)
+        assert len(sent) == 1
+        client.on_disconnect()
+        c._sent_at = float("-inf")
+        client.on_state(idle)
+        await asyncio.sleep(0)
+        assert len(sent) == 1 and not c._queue
+        await c.stop()
+
+    asyncio.run(go())
+
+
+def test_send_failure_is_recorded_and_remaining_recipe_steps_are_cancelled(
+    tmp_path, monkeypatch
+):
+    import json
+    from src.open_llm_vtuber.minecraft import samples
+
+    monkeypatch.chdir(tmp_path)
+    c = controller()
+
+    async def go():
+        await c.start()
+
+        async def fail(*args):
+            raise ConnectionError("socket gone")
+
+        c._client.send = fail
+        c._client.on_state({"gameplay": {}, "action": {"isIdle": True}})
+        token = samples.start("yura", "idle", [], {})
+        await c._host.installed(goal="craft a crafting table")
+        samples.finish("ok", token)
+        assert not c._queue
+        assert "socket gone" in c.last_error
+        await c.stop()
+
+    asyncio.run(go())
+    rows = [json.loads(line) for line in open(samples.path_for("yura"))]
+    assert any(row.get("event") == "command_send_failed" for row in rows)
+    assert any(row.get("reason") == "send_failed" for row in rows)
+
+
+def test_stop_cancels_a_sending_task_before_it_can_leak_into_restart():
+    host = FakeHost()
+    c = controller(host)
+
+    async def go():
+        await c.start()
+        started = asyncio.Event()
+        cancelled = asyncio.Event()
+
+        async def send(*args):
+            started.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+
+        c._client.send = send
+        c._client.on_state({"gameplay": {}, "action": {"isIdle": True}})
+        sending = asyncio.create_task(host.installed(goal="collect 10 oak logs"))
+        await started.wait()
+        await c.stop()
+        await asyncio.gather(sending, return_exceptions=True)
+        assert cancelled.is_set() and not c._pump_tasks
+        await c.start()
+        assert not c._queue and c._active is None
+        await c.stop()
+
+    asyncio.run(go())

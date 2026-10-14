@@ -8,6 +8,7 @@ MindServerClient 的回呼都接到這裡：每秒的狀態差分成事件丟進
 from __future__ import annotations
 
 import asyncio
+from copy import deepcopy
 import re
 import time
 from typing import Awaitable, Callable, Literal, Optional
@@ -64,6 +65,7 @@ class MinecraftSession:
         state = parse_state(raw)
         for event in diff_events(self.latest, state, self.rules):
             self.feed.offer(event, now)
+        self.feed.state_raw = deepcopy(raw)
         self.feed.observe(state, now)
         self.latest = state
         self._disconnected_told = False

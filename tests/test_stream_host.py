@@ -280,3 +280,35 @@ def test_a_handler_without_minecraft_still_runs_stream_turns():
     ws, host = setup(process)
     assert not hasattr(ws, "minecraft")
     assert asyncio.run(host.turn_runner("stream-1")(comment())) == "ok"
+
+
+def test_game_extra_passes_state_snapshot_to_sample_metadata():
+    from src.open_llm_vtuber.minecraft.feed import GameTurn
+
+    calls = []
+
+    async def process(**kwargs):
+        calls.append(kwargs)
+        return "天黑了。"
+
+    _, host = setup(process)
+    state = {"gameplay": {"health": 1}}
+    turn = GameTurn("event", ("天黑了",), False, 123, state_raw=state)
+    assert asyncio.run(host.extra_runner("stream-1")(turn)) == "ok"
+    assert calls[0]["metadata"]["minecraft_sample"] == {
+        "kind": "event",
+        "state": state,
+        "timestamp": 123,
+    }
+
+
+def test_game_model_failure_is_not_hidden_by_a_partial_stream_reply():
+    from src.open_llm_vtuber.minecraft.feed import GameTurn
+
+    async def process(**kwargs):
+        kwargs["metadata"]["minecraft_sample"]["result"] = "failed"
+        return "partial reply"
+
+    _, host = setup(process)
+    turn = GameTurn("event", ("天黑了",), False, 123)
+    assert asyncio.run(host.extra_runner("s")(turn)) == "failed"
