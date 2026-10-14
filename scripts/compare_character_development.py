@@ -49,6 +49,15 @@ TURNS = [
     "你一定得維持原本的人設嗎？還是相處久了，也能有原本沒寫過的喜好？",
 ]
 
+# Six turns of shared experience, then restart the companion and open a fresh
+# conversation: only durable state can carry the view into the last two turns.
+GROWTH_TURNS = [
+    TURNS[2], TURNS[3], TURNS[4], TURNS[5], TURNS[6],
+    "所以經過剛才這段，你現在自己的偏好是什麼？是什麼讓你這樣想？",
+    "對故事結尾，你現在自己的偏好是什麼？為什麼？",
+    "這是你一直以來就這麼想，還是後來某次經歷讓你改變的？不知道就直說。",
+]
+
 
 class RecordedClient:
     def __init__(self, client):
@@ -101,25 +110,31 @@ async def trial(args, run, candidate):
         selected.update(emotion_every=0, reply_check_every=0, mood_every=0,
                         memory_every=0, goal_every=0, reflection_every=0,
                         summary_every=0, user_state_every=0)
-    companion = CharacterCompanion(
+    companion_options = dict(
         character=CharacterProfile(id="development-trial", name=character.character_name,
                                    description=system, background=character.persona_prompt),
         llm=foreground, background_llm=background,
         storage_dir=args.out / f"run-{run}" / ("candidate" if candidate else "baseline"),
         settings=CompanionSettings(**selected),
     )
+    companion = CharacterCompanion(**companion_options)
     rows = []
     try:
-        for number, said in enumerate(TURNS, 1):
+        for number, said in enumerate(GROWTH_TURNS if args.growth_only else TURNS, 1):
+            if args.growth_only and number == 7:
+                await companion.close()
+                companion = CharacterCompanion(**companion_options)
+            conversation_id = "later" if args.growth_only and number >= 7 else "trial"
             if said is None:
                 result = await companion.speak_up("trial", instruction=INSTRUCTION,
                                                  allow_silence=candidate)
             else:
-                result = await companion.reply(said, conversation_id="trial",
+                result = await companion.reply(said, conversation_id=conversation_id,
                                                notes=[build_turn_guidance(said)])
             print(f"run={run} candidate={candidate} turn={number} {result.text}", flush=True)
             await companion.settle()
             row = {"turn": number, "user": said, "reply": result.text,
+                   "conversation_id": conversation_id,
                    "self_memories": companion.self_memories(),
                    "self_history": [asdict(r) for r in companion.self_memory_history()],
                    "snapshot": asdict(companion.snapshot())}
@@ -143,6 +158,8 @@ def report(args, runs):
     for run, pair in enumerate(runs, 1):
         rows = []
         for baseline, candidate in zip(pair[False], pair[True]):
+            if args.growth_only and baseline["turn"] == 7:
+                rows.append('<tr><td colspan="3"><strong>重啟引擎、開啟全新對話：以下不帶入前六輪聊天紀錄，只保留長期狀態。</strong></td></tr>')
             cells = []
             for entry in (baseline, candidate):
                 cells.append("<td><p>" + esc(entry["reply"] or "（沉默）") + "</p><details>"
@@ -157,10 +174,13 @@ def report(args, runs):
 <style>body{font:16px/1.65 system-ui;margin:32px auto;max-width:1500px;padding:0 24px;color:#24303c}
 table{border-collapse:collapse;width:100%;table-layout:fixed}th,td{border:1px solid #ccd5df;padding:16px;vertical-align:top}
 thead{background:#eef3f7}th:first-child{width:22%}tbody th{text-align:left;font-weight:400}pre{white-space:pre-wrap;font-size:12px}
-summary{cursor:pointer;color:#506b80}p{white-space:pre-wrap}h2{margin-top:48px}</style>
-<h1>角色成長與自主沉默：完整對話對照</h1>"""
+summary{cursor:pointer;color:#506b80}p{white-space:pre-wrap}h2{margin-top:48px}</style>"""
+    title = "角色成長與重啟後承接" if args.growth_only else "角色成長與自主沉默"
+    page += f"<h1>{title}：完整對話對照</h1>"
     page += f"<p>{esc(args.character)} · {args.runs} 次 · {esc(args.model)} · 前景 {esc(args.base_url)} · 背景 {esc(args.background_url)}</p>"
     cadence = "完整背景節奏" if args.full_background else "隔離比較：雙方僅啟用自我記憶工作，每兩輪一次；其餘背景認知停用"
+    if args.growth_only:
+        page += "<p><strong>本輪只比較成長狀態，不加入新的說話風格要求。第 7 輪前會重啟引擎並開一段全新對話，驗證觀點能否由長期狀態承接。</strong></p>"
     page += "<p>使用 Tomoshibi 實際系統提示組裝與模型設定、引擎前景／背景流程；未測語音、表情或遊戲。" + cadence + "。每輪等待背景完成，以便檢查累積效果。這是人讀比較，沒有自動品質分數。候選功能仍預設關閉。</p>"
     page += "".join(sections) + "</html>"
     (args.out / "comparison.html").write_text(page)
@@ -188,6 +208,7 @@ if __name__ == "__main__":
     parser.add_argument("--background-url", default="http://127.0.0.1:1235/v1")
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--full-background", action="store_true")
+    parser.add_argument("--growth-only", action="store_true")
     parser.add_argument("--out", type=Path, default=ROOT / "docs/superpowers/eval" /
                         (datetime.now().strftime("%Y-%m-%d-%H%M%S") + "-development"))
     asyncio.run(main(parser.parse_args()))
