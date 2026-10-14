@@ -31,6 +31,7 @@ from src.open_llm_vtuber.character_engine.factory import _clients, _known_settin
 from src.open_llm_vtuber.config_manager.utils import validate_config
 from src.open_llm_vtuber.conversation_quality import build_turn_guidance
 from src.open_llm_vtuber.news_topics import INSTRUCTION
+from src.open_llm_vtuber import reply_length
 from src.open_llm_vtuber.service_context import ServiceContext, deep_merge
 
 
@@ -58,6 +59,33 @@ GROWTH_TURNS = [
     "這是你一直以來就這麼想，還是後來某次經歷讓你改變的？不知道就直說。",
 ]
 
+EVERYDAY_SCENES = [
+    ("雨天的小書店", [
+        "今天下班錯過公車，乾脆走回家，結果半路下雨。",
+        "躲進巷口那家小書店，老闆還借我毛巾。",
+        "店裡有隻橘貓，直接睡在我包包上。我坐了半小時才走得了。",
+        "本來覺得今天很衰，現在反而有點想再去。",
+        "今天又繞去那家書店了。",
+        "那隻橘貓這次醒著，看到我就跑走。上次果然只是把我當床吧。",
+    ]),
+    ("失敗的早餐", [
+        "我剛把吐司烤焦了，現在整個房間都是那個味道。",
+        "刮掉黑的地方吃一口，算了，還是丟掉吧。",
+        "最後買了飯糰。便利商店救了我一命。",
+        "我以前老覺得休息日一定要做點什麼才划算，今天好像這樣也行。",
+        "今天早餐順利活下來了。",
+        "只是把飯糰放到盤子上，看起來就比較像有認真生活，哈哈。",
+    ]),
+    ("電影裡的公車站", [
+        "昨晚看電影，看到一半睡著了。醒來剛好片尾字幕。",
+        "朋友說結尾很好，但不肯劇透，害我現在更想補完。",
+        "我又從頭看了一次，結果最喜歡的反而是兩個人坐在公車站，什麼都沒講的那段。",
+        "沒有大和解，就是其中一個人把傘往另一邊挪了一點。",
+        "今天等公車時，又想到那把傘了。",
+        "旁邊真的有人忘了帶傘，可惜我今天也沒帶，兩個人一起淋雨。",
+    ]),
+]
+
 
 class RecordedClient:
     def __init__(self, client):
@@ -79,6 +107,10 @@ class RecordedClient:
 
 
 async def trial(args, run, candidate):
+    everyday = getattr(args, "everyday", False)
+    scenario, turns = EVERYDAY_SCENES[(run - 1) % len(EVERYDAY_SCENES)] if everyday else (
+        "成長對照", GROWTH_TURNS if args.growth_only else TURNS)
+    restart_before = 5 if everyday else (7 if args.growth_only else None)
     raw = yaml.safe_load((ROOT / "conf.yaml").read_text())
     alt = yaml.safe_load((ROOT / args.character).read_text())["character_config"]
     raw["character_config"] = deep_merge(raw["character_config"], alt)
@@ -110,6 +142,8 @@ async def trial(args, run, candidate):
         selected.update(emotion_every=0, reply_check_every=0, mood_every=0,
                         memory_every=0, goal_every=0, reflection_every=0,
                         summary_every=0, user_state_every=0)
+        if everyday:
+            selected.update(memory_every=2, self_memory_every=2)
     companion_options = dict(
         character=CharacterProfile(id="development-trial", name=character.character_name,
                                    description=system, background=character.persona_prompt),
@@ -120,17 +154,19 @@ async def trial(args, run, candidate):
     companion = CharacterCompanion(**companion_options)
     rows = []
     try:
-        for number, said in enumerate(GROWTH_TURNS if args.growth_only else TURNS, 1):
-            if args.growth_only and number == 7:
+        for number, said in enumerate(turns, 1):
+            if number == restart_before:
                 await companion.close()
                 companion = CharacterCompanion(**companion_options)
-            conversation_id = "later" if args.growth_only and number >= 7 else "trial"
+            conversation_id = "later" if args.growth_only and not everyday and number >= 7 else "trial"
             if said is None:
                 result = await companion.speak_up("trial", instruction=INSTRUCTION,
                                                  allow_silence=candidate)
             else:
-                result = await companion.reply(said, conversation_id=conversation_id,
-                                               notes=[build_turn_guidance(said)])
+                notes = [build_turn_guidance(said)]
+                if everyday:
+                    notes.append(reply_length.note())
+                result = await companion.reply(said, conversation_id=conversation_id, notes=notes)
             print(f"run={run} candidate={candidate} turn={number} {result.text}", flush=True)
             await companion.settle()
             row = {"turn": number, "user": said, "reply": result.text,
@@ -140,6 +176,7 @@ async def trial(args, run, candidate):
                    "snapshot": asdict(companion.snapshot())}
             rows.append(row)
             partial = {"run": run, "candidate": candidate, "system": system, "rows": rows,
+                       "scenario": scenario, "restart_before": restart_before,
                        "settings": selected,
                        "prompt_sha256": hashlib.sha256(system.encode()).hexdigest(),
                        "foreground": foreground.calls, "background": background.calls}
@@ -152,13 +189,16 @@ async def trial(args, run, candidate):
 
 
 def report(args, runs):
+    everyday = getattr(args, "everyday", False)
     def esc(value):
         return html.escape(str(value))
     sections = []
     for run, pair in enumerate(runs, 1):
         rows = []
         for baseline, candidate in zip(pair[False], pair[True]):
-            if args.growth_only and baseline["turn"] == 7:
+            if everyday and baseline["turn"] == 5:
+                rows.append('<tr><td colspan="3"><strong>重啟引擎，仍是同一位使用者；不帶入聊天逐字紀錄，保留使用者長期記憶與角色自身狀態。</strong></td></tr>')
+            elif args.growth_only and baseline["turn"] == 7:
                 rows.append('<tr><td colspan="3"><strong>重啟引擎、開啟全新對話：以下不帶入前六輪聊天紀錄，只保留長期狀態。</strong></td></tr>')
             cells = []
             for entry in (baseline, candidate):
@@ -168,7 +208,8 @@ def report(args, runs):
                              }, ensure_ascii=False, indent=2, default=str)) + "</pre></details></td>")
             rows.append("<tr><th>" + esc(baseline["turn"]) + "<p>" + esc(
                 baseline["user"] or "（閒置計時器觸發）") + "</p></th>" + "".join(cells) + "</tr>")
-        sections.append(f"<h2>第 {run} 次完整對話</h2><table><thead><tr><th>使用者／事件</th>"
+        scene = "：" + EVERYDAY_SCENES[(run - 1) % len(EVERYDAY_SCENES)][0] if everyday else ""
+        sections.append(f"<h2>第 {run} 次完整對話{scene}</h2><table><thead><tr><th>使用者／事件</th>"
                         "<th>原版</th><th>候選版</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>")
     page = """<!doctype html><html lang="zh-Hant"><meta charset="utf-8"><title>角色成長對照</title>
 <style>body{font:16px/1.65 system-ui;margin:32px auto;max-width:1500px;padding:0 24px;color:#24303c}
@@ -176,10 +217,15 @@ table{border-collapse:collapse;width:100%;table-layout:fixed}th,td{border:1px so
 thead{background:#eef3f7}th:first-child{width:22%}tbody th{text-align:left;font-weight:400}pre{white-space:pre-wrap;font-size:12px}
 summary{cursor:pointer;color:#506b80}p{white-space:pre-wrap}h2{margin-top:48px}</style>"""
     title = "角色成長與重啟後承接" if args.growth_only else "角色成長與自主沉默"
+    if everyday:
+        title = "日常聊天"
     page += f"<h1>{title}：完整對話對照</h1>"
     page += f"<p>{esc(args.character)} · {args.runs} 次 · {esc(args.model)} · 前景 {esc(args.base_url)} · 背景 {esc(args.background_url)}</p>"
     cadence = "完整背景節奏" if args.full_background else "隔離比較：雙方僅啟用自我記憶工作，每兩輪一次；其餘背景認知停用"
-    if args.growth_only:
+    if everyday:
+        cadence = "雙方每兩輪讀取使用者記憶及自我記憶；其餘背景認知停用" if not args.full_background else cadence
+        page += "<p><strong>不詢問角色是否改變想法，也不要求展示成長。沿用 App 現有回覆長度設定；第 5 輪前重啟，保留同一使用者的記憶範圍。這是固定日常話題的對照，不是自由互動，也不預設她應該改變。</strong></p>"
+    elif args.growth_only:
         page += "<p><strong>本輪只比較成長狀態，不加入新的說話風格要求。第 7 輪前會重啟引擎並開一段全新對話，驗證觀點能否由長期狀態承接。</strong></p>"
     page += "<p>使用 Tomoshibi 實際系統提示組裝與模型設定、引擎前景／背景流程；未測語音、表情或遊戲。" + cadence + "。每輪等待背景完成，以便檢查累積效果。這是人讀比較，沒有自動品質分數。候選功能仍預設關閉。</p>"
     page += "".join(sections)
@@ -227,7 +273,9 @@ if __name__ == "__main__":
     parser.add_argument("--background-url", default="http://127.0.0.1:1235/v1")
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--full-background", action="store_true")
-    parser.add_argument("--growth-only", action="store_true")
+    profile = parser.add_mutually_exclusive_group()
+    profile.add_argument("--growth-only", action="store_true")
+    profile.add_argument("--everyday", action="store_true")
     parser.add_argument("--out", type=Path, default=ROOT / "docs/superpowers/eval" /
                         (datetime.now().strftime("%Y-%m-%d-%H%M%S") + "-development"))
     asyncio.run(main(parser.parse_args()))
