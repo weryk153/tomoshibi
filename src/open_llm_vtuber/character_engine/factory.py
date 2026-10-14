@@ -383,6 +383,22 @@ def build_companion(
         raise RuntimeError(TOO_OLD)
 
     settings = dict(settings or {})
+    # Host-only choice; older engines must not receive it as a setting.
+    silence_requested = settings.pop("autonomous_silence", False)
+    development_requested = settings.get("character_development", False)
+    if (
+        development_requested
+        and "character_development" not in {f.name for f in dataclasses.fields(CompanionSettings)}
+    ) or (
+        silence_requested
+        and "allow_silence" not in inspect.signature(CharacterCompanion.speak_up).parameters
+    ):
+        raise RuntimeError(
+            "角色成長／自主沉默候選功能需要新版 AI Character Engine；"
+            "目前安裝的版本尚不支援。開發測試請明確使用引擎 checkout。"
+        )
+    if not development_requested:
+        settings.pop("character_development", None)
     background = {
         name: settings.pop(name) for name in BACKGROUND_KEYS if name in settings
     }

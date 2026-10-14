@@ -13,6 +13,7 @@
 
 import asyncio
 import contextvars
+import inspect
 import json
 import weakref
 from dataclasses import replace
@@ -147,6 +148,7 @@ class CharacterEngineAgent(AgentInterface):
         now: Callable[[], datetime] = datetime.now,
         persona: str = "",
         mood_key: str = "",
+        autonomous_silence: bool = False,
     ):
         """companion 可以是 CharacterCompanion 本身，或是一個每次回傳「目前那一個」
         的函式。正式執行時給的是函式：設定變了引擎那一側會換一個，而舊的 agent
@@ -168,6 +170,7 @@ class CharacterEngineAgent(AgentInterface):
         self._now = now
         self._persona = persona
         self._mood_key = mood_key
+        self._autonomous_silence = autonomous_silence
         self._tools = self._tool_definitions(tool_manager) if use_mcpp else []
         self._tool_executor = tool_executor
         # 模式開著時才存在的工具（例如 Minecraft 的 minecraft_do）：隨時加減，
@@ -506,11 +509,20 @@ class CharacterEngineAgent(AgentInterface):
                 )
 
             if proactive:
+                silence = {}
+                if (
+                    self._autonomous_silence
+                    and metadata.get("idle_opportunity")
+                    and not metadata.get("stream")
+                    and "allow_silence" in inspect.signature(companion.speak_up).parameters
+                ):
+                    silence["allow_silence"] = True
                 # 主動開口講什麼由引擎決定（她的目標、想法、還沒聊完的事），主機
                 # 那一大段指示不送，只送素材。說出口的那句主機過濾後才記
                 # （remember_remark），所以引擎不先記。
                 call = companion.speak_up(
                     conversation,
+                    **silence,
                     frames=frames,
                     on_text_delta=outputs.put_nowait,
                     # 一整則，不以 "- " 開頭：引擎把 "- " 開頭的備註當成「她知道的事」

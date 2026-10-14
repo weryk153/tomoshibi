@@ -90,6 +90,11 @@ class AgentFactory:
                 system=system_prompt,
                 persona=persona,
                 mood_key=key,
+                autonomous_silence=bool(
+                    (agent_settings.get("character_engine_agent") or {}).get(
+                        "autonomous_silence", False
+                    )
+                ),
                 live2d_model=live2d_model,
                 tts_preprocessor_config=tts_preprocessor_config,
                 faster_first_response=conversation.get("faster_first_response", True),

@@ -41,6 +41,20 @@ def test_the_speech_rules_open_the_system_prompt():
     assert prompt.count(SPEECH_RULES) == 1
 
 
+def test_development_candidate_only_appends_to_the_existing_system_prompt():
+    from src.open_llm_vtuber.conversation_quality import CHARACTER_DEVELOPMENT_PROMPT
+
+    context = _context()
+    before = asyncio.run(context.construct_system_prompt("PERSONA"))
+    context.character_config.agent_config = SimpleNamespace(
+        agent_settings=SimpleNamespace(
+            character_engine_agent=SimpleNamespace(character_development=True)
+        )
+    )
+    after = asyncio.run(context.construct_system_prompt("PERSONA"))
+    assert after == before + "\n\n" + CHARACTER_DEVELOPMENT_PROMPT
+
+
 def test_the_rules_say_what_the_persona_used_to_repeat():
     for rule in ("一到三句", "「嗯」", "好久不見", "「是。」", "「作品」"):
         assert rule in SPEECH_RULES

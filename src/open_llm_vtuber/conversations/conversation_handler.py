@@ -61,6 +61,7 @@ def proactive_turn_metadata(
     proactive_uid = proactive_context_uid(context.history_uid, client_uid)
     return {
         "proactive_speak": True,
+        "idle_opportunity": True,
         "skip_memory": True,
         "skip_history": True,
         "proactive_forbid_question": should_force_statement(

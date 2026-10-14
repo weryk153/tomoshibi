@@ -135,6 +135,8 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
     memory_conflicts: bool = Field(True, alias="memory_conflicts")
     memory_every: int = Field(2, alias="memory_every", ge=0)
     self_memory_every: int = Field(2, alias="self_memory_every", ge=0)
+    character_development: bool = Field(False, alias="character_development")
+    autonomous_silence: bool = Field(False, alias="autonomous_silence")
     # 她自己的心情（引擎 CompanionSettings.mood_every）；空檔的臉跟著它。
     mood_every: int = Field(2, alias="mood_every", ge=0)
     summary_every: int = Field(0, alias="summary_every", ge=0)
@@ -163,6 +165,14 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
     background_api_key: str = Field("", alias="background_api_key")
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
+        "character_development": Description(
+            en="Candidate: let experience revise tastes, habits and opinions with evidence",
+            zh="候選功能：依實際經歷更新喜好、習慣與觀點，保留改變依據",
+        ),
+        "autonomous_silence": Description(
+            en="Candidate: allow silence on private idle prompts",
+            zh="候選功能：私人聊天閒置時，角色可以選擇不開口",
+        ),
         "max_history_messages": Description(
             en="How many messages of the conversation are kept for the model",
             zh="對話最多留幾則給模型",

@@ -58,6 +58,17 @@ async def say(agent, text):
     return [output async for output in agent.chat(batch)]
 
 
+def test_explicit_silence_candidate_requires_an_engine_that_supports_it(monkeypatch):
+    async def old_speak_up(self, conversation_id=None):
+        pass
+
+    monkeypatch.setattr(CharacterCompanion, "speak_up", old_speak_up)
+    arguments = factory_arguments()
+    arguments["agent_settings"]["character_engine_agent"]["autonomous_silence"] = True
+    with pytest.raises(RuntimeError, match="目前安裝的版本尚不支援"):
+        AgentFactory.create_agent(**arguments)
+
+
 def test_her_state_lives_next_to_that_characters_chat_history(tmp_path):
     async def scenario():
         created = AgentFactory.create_agent(**factory_arguments())

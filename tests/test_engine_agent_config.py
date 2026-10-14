@@ -29,6 +29,8 @@ def test_defaults_match_what_was_measured_on_a_local_model():
         "memory_conflicts": True,
         "memory_every": 2,
         "self_memory_every": 2,
+        "character_development": False,
+        "autonomous_silence": False,
         "mood_every": 2,
         "summary_every": 0,
         "reflection_every": 6,

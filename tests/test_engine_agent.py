@@ -136,6 +136,32 @@ def spoken(outputs):
     )
 
 
+@pytest.mark.parametrize("enabled,idle,stream,expected", [
+    (True, True, False, True), (True, True, True, False),
+    (True, False, False, False), (False, True, False, False),
+])
+def test_only_an_opted_in_private_idle_turn_can_choose_silence(
+    tmp_path, enabled, idle, stream, expected
+):
+    async def scenario():
+        engine = companion(tmp_path, EngineLLM("窗外的雨好像停了。"))
+        original = engine.speak_up
+        received = []
+
+        async def speak_up(*args, allow_silence=False, **kwargs):
+            received.append(allow_silence)
+            return await original(*args, **kwargs)
+
+        engine.speak_up = speak_up
+        current = agent(engine, autonomous_silence=enabled)
+        await say(current, "（主動開口）", proactive_speak=True,
+                  idle_opportunity=idle, stream=stream)
+        await engine.close()
+        assert received == [expected]
+
+    asyncio.run(scenario())
+
+
 # --- 一輪對話 ---------------------------------------------------------------------
 
 

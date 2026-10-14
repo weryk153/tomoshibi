@@ -155,3 +155,34 @@ ssh -f -N -o ServerAliveInterval=15 -L 1235:127.0.0.1:1234 <帳號>@<那台電�
 - 模型不支援原生工具呼叫時沒有提示詞模式的退路。
 - 兩個連線同時講話時，引擎一次只跑一輪，後到的要等前一個講完。
 - 字幕翻譯也用同一顆模型，它不在「她回話時讓路」的機制裡。
+## 角色成長與自主沉默（候選功能）
+
+這版加入兩個預設關閉的設定，放在
+`character_config.agent_config.agent_settings.character_engine_agent`：
+
+```yaml
+character_development: false
+autonomous_silence: false
+```
+
+`character_development` 會在既有系統提示的末尾附加經驗與個性的說明，並讓新版引擎
+對角色說過的喜好、習慣與觀點建立修訂關係。舊觀點、替代它的新觀點，以及她說出
+改變原因的原話都保留；對話使用目前仍有效的觀點。這不修改角色人設檔，也不改寫
+姓名、身世或外觀。模型仍負責判斷一段話是否真的是觀點改變，不能把機制測試當成
+「角色已經像人」的品質證明。
+
+`autonomous_silence` 只用在私人聊天的閒置機會。角色選擇沉默時不會再問三次，
+也不會留下發言或增加未回應次數。直播、遊戲與其他主動事件沿用原流程。
+
+這兩項引擎能力尚未包含在本專案釘選的 PyPI 版本。開發測試要明確選用旁邊的引擎
+checkout，不要只改 YAML 就以為已生效：
+
+```sh
+PYTHONPATH=../ai-character-engine/src .venv/bin/python scripts/compare_character_development.py
+```
+
+對照預設使用本機 `1234` 的 Qwen3.5 9B 對話、經 SSH `1235` 通道連遠端 worker
+的同款模型做自我記憶，紅莉栖的現有人設、三次獨立的完整對話。雙方使用相同設定；
+為隔離本次變動，預設僅開自我記憶背景工作，`--full-background` 才使用完整背景節奏。
+輸出包含原始模型請求／回應、逐輪記憶與完整並排 HTML，寫在新的評估目錄；不改動
+現有聊天紀錄或啟用中的角色。採用前仍須人讀全文判斷，不能用詞頻或篇幅代替。

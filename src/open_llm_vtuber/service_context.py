@@ -1150,6 +1150,14 @@ class ServiceContext:
                 f"\n\n## About the player (applies to all characters)\n{player_prompt}"
             )
 
+        agent_config = getattr(target_character, "agent_config", None)
+        agent_settings = getattr(agent_config, "agent_settings", None)
+        cognition = getattr(agent_settings, "character_engine_agent", None)
+        if getattr(cognition, "character_development", False):
+            from .conversation_quality import CHARACTER_DEVELOPMENT_PROMPT
+
+            persona_prompt += f"\n\n{CHARACTER_DEVELOPMENT_PROMPT}"
+
         logger.debug("\n === System Prompt ===")
         logger.debug(persona_prompt)
 
