@@ -379,3 +379,8 @@ L4 27B 跑 47 案兩個 seed（12345、777）在 `docs/superpowers/eval/2026-10-
 `assessment.md` 與 `intersect.md`：合成反例兩輪 10/10，無據因果、說話者對調、run-2-review-9 的自創動機都兩輪擋下；
 代價是 lesson 變嚴，約 4 案在某個 seed 被過硬拒絕（有原話根據的 lesson 被說成推廣）。另發現 27B 有時把
 user_conditions 翻成英文、甚至補一條，條件比對就會漏掉真改寫；下一步可在提示補「逐字複製，不要翻譯」。
+
+審核改動的固定度量：`scripts/score_review_run.py <評測目錄>` 對照 `docs/superpowers/eval/review-labels-2026-10-15.json`
+（合成反例的預期＋27B v3e 兩 seed 交集，6 筆手判過硬的取寬鬆那邊），報 `over_strict`（該收卻擋的元件數）與
+`let_through`（該擋卻收的元件數）。目標 let_through 維持 0、over_strict 低於 27B seed 12345 的 6。
+之後改標準答案要在 labels 檔的 `note` 記原因與日期。
