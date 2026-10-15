@@ -393,3 +393,11 @@ user_conditions 翻成英文、甚至補一條，條件比對就會漏掉真改�
 抽取信心不能當過濾器（2026-10-15 量過 10/14 三顆模型的抽取回覆）：27B 與 31B 對候選一律給 0.95–1.0，
 回 null 的也給 0.9 以上；9B 候選 0.9–0.95、null 有時給 0.0。信心跟「該不該收」沒有關係，引擎的
 `min_confidence=0.80` 門檻維持原樣，不往上調。RoleLLM 式「丟掉信心最低 30%」在這裡丟不掉任何東西。
+
+2026-10-15 晚：依 `docs/superpowers/plans/2026-10-15-engine-optimization-roadmap.md` 做完程式部分（引擎 1.5.0 待發）：
+經驗帶 support 計數與投票（UPVOTE／DOWNVOTE／EDIT／NOOP，引文驗證）、審核可指到第三顆模型
+（`review_base_url`／`review_model`）、記憶依召回計數衰減（importance ≥ 0.8 不淡）。清單審核在 Gemma 12B
+跑到 19 案就停（exact 13/19、let_through 4），留在引擎但預設關、未驗證。評測工具：`scripts/score_review_run.py`、
+`scripts/measure_prompt_cache.py`（基線見 `docs/superpowers/eval/2026-10-15-cache-baseline.md`）、
+`scripts/run_longmem_mini.py`（題庫 `tests/data/longmem_mini_questions.json`）、`scripts/interview_stability.py`。
+opus 審查 4 個 Important 已修（退場不回退舊觀點、清單保留主題檢查、EDIT 走完整審核、只算命中的召回）。
