@@ -103,7 +103,7 @@ async def trial(run, enabled):
     system = await context.construct_system_prompt(character.persona_prompt)
     llm_config = character.agent_config.llm_configs.lmstudio_llm.model_dump()
     llm_config.update(base_url="http://127.0.0.1:1234/v1", model="qwen/qwen3.5-9b")
-    talk, think, _, _ = _clients(
+    talk, think, _, _, _ = _clients(
         "lmstudio_llm",
         llm_config,
         {

@@ -43,7 +43,7 @@ async def main():
         "base_url": "http://127.0.0.1:1234/v1",
         "model": "qwen/qwen3.5-9b",
     }
-    _, client, _, _ = _clients(
+    _, client, _, _, _ = _clients(
         "lmstudio_llm",
         config,
         {

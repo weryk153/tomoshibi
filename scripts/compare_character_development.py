@@ -128,7 +128,7 @@ async def trial(args, run, candidate):
     llm_config = character.agent_config.llm_configs.lmstudio_llm.model_dump()
     llm_config["base_url"] = args.base_url
     llm_config["model"] = args.model
-    talk, think, _, _ = _clients("lmstudio_llm", llm_config, {
+    talk, think, _, _, _ = _clients("lmstudio_llm", llm_config, {
         "background_base_url": args.background_url, "background_model": args.model,
     })
     foreground, background = RecordedClient(talk), RecordedClient(think)
