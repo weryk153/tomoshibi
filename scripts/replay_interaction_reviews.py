@@ -140,7 +140,9 @@ async def main():
             review = _parse_json_object(response.text)
         except ValueError as exc:
             review = {"parse_error": str(exc)}
-        accepted = experience_review_passed(review, case["source"]["feedback"])
+        accepted = experience_review_passed(
+            case["candidate"], review, case["source"]["feedback"]
+        )
         proof = experience_review_proof(
             case["candidate"], review, case["source"]["feedback"]
         )
