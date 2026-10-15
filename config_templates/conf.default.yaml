@@ -124,6 +124,9 @@ character_config:
         # Background jobs on another model, e.g. LM Studio on another computer; both empty = the model she talks with.
         background_base_url: ''
         background_model: ''
+        # Reviewing what she learned from your feedback (evidence review, condition comparison, votes) on a larger model, e.g. a 27B on another machine; both empty = the background model. Only matters with character_development on.
+        review_base_url: ''
+        review_model: ''
         max_rebase_turns: 3 # a result this many turns late is still used
         goal_max_age_days: 7 # goals untouched for this long leave the prompt
         goals_shown: 3 # how many goals (the most pressing) she keeps in mind

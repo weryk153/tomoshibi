@@ -65,7 +65,7 @@ EVERY_MAX = 99
 SWITCH_KEYS = ("memory_conflicts",)
 SWITCH_DEFAULTS = {"memory_conflicts": True}
 # 背景工作（情緒、記憶、目標…）另外用的端點與模型。空字串就是跟她講話用同一顆。
-TEXT_KEYS = ("background_base_url", "background_model")
+TEXT_KEYS = ("background_base_url", "background_model", "review_base_url", "review_model")
 TEXT_MAX = 300
 _URL = re.compile(r"^https?://[^\s'\"#]+$")
 
@@ -103,7 +103,7 @@ def _clean_text(key: str, value: Any) -> str | None:
     value = value.strip()
     if len(value) > TEXT_MAX or any(ch in value for ch in "\n\r'\"#"):
         return None
-    if key == "background_base_url" and value and not _URL.match(value):
+    if key in ("background_base_url", "review_base_url") and value and not _URL.match(value):
         return None
     return value
 

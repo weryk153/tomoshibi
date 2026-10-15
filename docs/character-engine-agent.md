@@ -120,6 +120,11 @@ background_model: 'qwen/qwen3.5-9b'
 ```
 
 兩個都填才會用；只填一個或都空著，就跟她講話用同一顆。看圖仍然用她講話那一顆。
+
+審核她從你的回饋學到的東西（證據審核、條件比對、投票）可以再指到第三顆更大的模型
+（引擎 1.5.0 起的 `review_llm`）：本機 9B 抽候選夠用，審核卻會放過改寫，27B 才擋得住。
+填 `review_base_url`／`review_model`，兩個都填才用，空著就跟背景模型同一顆。只在
+`character_development` 開著時有作用。
 對方的 LM Studio 只聽自己那台的 127.0.0.1 的話，先開一條 SSH 通道把它接到本機的
 1235（`ServerAliveInterval` 不加的話通道會斷）：
 

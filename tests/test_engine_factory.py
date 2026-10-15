@@ -739,3 +739,33 @@ def test_interaction_candidate_refuses_an_engine_without_explicit_user_identity(
     arguments["agent_settings"]["character_engine_agent"]["character_development"] = True
     with pytest.raises(RuntimeError, match="目前安裝的版本尚不支援"):
         AgentFactory.create_agent(**arguments)
+
+
+def test_her_interaction_reviews_can_run_on_a_third_model():
+    """審核她從回饋學到的東西（證據審核、條件比對、投票）可以交給另一顆更大的模型，
+    抽取仍用背景模型：本機 9B 抽得出候選，但審核要 27B 級才不會放過改寫。"""
+    arguments = factory_arguments()
+    arguments["agent_settings"]["character_engine_agent"] = {
+        "background_base_url": "http://127.0.0.1:1235/v1",
+        "background_model": "qwen/qwen3.5-9b",
+        "review_base_url": "http://127.0.0.1:18080/v1",
+        "review_model": "qwen3.8-27b-ud-q4_k_m",
+    }
+    agent = AgentFactory.create_agent(**arguments)
+    talking, thinking, picking, reviewing = Offline.built
+
+    assert reviewing.options["base_url"] == "http://127.0.0.1:18080/v1"
+    assert reviewing.options["model"] == "qwen3.8-27b-ud-q4_k_m"
+    assert reviewing.request_options == thinking.request_options
+    if "review_llm" in inspect.signature(CharacterCompanion).parameters:
+        assert agent._companion()._review_llm is reviewing
+
+
+def test_half_a_review_endpoint_is_not_used():
+    arguments = factory_arguments()
+    arguments["agent_settings"]["character_engine_agent"] = {
+        "review_base_url": "http://127.0.0.1:18080/v1",
+        "review_model": "",
+    }
+    AgentFactory.create_agent(**arguments)
+    assert len(Offline.built) == 3

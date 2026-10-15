@@ -54,6 +54,8 @@ def test_reading_gives_the_numbers_and_the_engine_is_always_on():
         "memory_conflicts": True,
         "background_base_url": "",
         "background_model": "",
+        "review_base_url": "",
+        "review_model": "",
     }
 
 
@@ -159,6 +161,8 @@ def test_a_conf_without_the_engine_block_gets_one(conf_file):
         "memory_conflicts": True,
         "background_base_url": "",
         "background_model": "",
+        "review_base_url": "",
+        "review_model": "",
     }
 
 

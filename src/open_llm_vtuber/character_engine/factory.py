@@ -73,7 +73,10 @@ TOO_OLD = (
     "做法：在專案目錄執行 uv sync 換回 pyproject.toml 釘的那一版。"
 )
 # 背景工作（情緒、記憶、目標…）另外用的端點。不是引擎的設定，先從設定裡拿出來。
-BACKGROUND_KEYS = ("background_base_url", "background_model", "background_api_key")
+BACKGROUND_KEYS = (
+    "background_base_url", "background_model", "background_api_key",
+    "review_base_url", "review_model", "review_api_key",
+)
 # conf.yaml 裡的名字 → 引擎的名字
 _RENAMED_SETTINGS = {
     "timeout_seconds": "call_timeout_seconds",
@@ -175,6 +178,20 @@ def _clients(
             api_key=str(background.get("background_api_key") or "")
             or shared["api_key"],
         )
+    # 審核她從回饋學到的東西：另一個端點、通常更大的模型（本機 9B 抽候選，27B 審）。
+    # 只填一半就不用；設定跟背景工作一樣（低溫、JSON）。
+    review_base = str(background.get("review_base_url") or "").strip()
+    review_model = str(background.get("review_model") or "").strip()
+    reviewing = (
+        {
+            **elsewhere,
+            "base_url": review_base,
+            "model": review_model,
+            "api_key": str(background.get("review_api_key") or "") or elsewhere["api_key"],
+        }
+        if review_base and review_model
+        else None
+    )
     return (
         _engine_client(
             **shared, timeout_seconds=REPLY_TIMEOUT_SECONDS, request_options=talking
@@ -186,6 +203,9 @@ def _clients(
         # 跟語音翻譯搶同一顆 GPU（每句翻譯 3→2 秒、挑得及的句子 38%→71%）。她講話
         # 的模型寫完回覆就閒著。逾時由引擎的 actions_timeout_seconds 管。
         _engine_client(**shared, timeout_seconds=None, request_options=picking),
+        None
+        if reviewing is None
+        else _engine_client(**reviewing, timeout_seconds=None, request_options=thinking),
     )
 
 
@@ -436,13 +456,16 @@ def build_companion(
         _fit_the_window(live)
         return key
 
-    talking, thinking, eyes, picking = _clients(provider, llm_config, background)
+    talking, thinking, eyes, picking, reviewing = _clients(provider, llm_config, background)
     # 引擎 1.3.0 起挑表情可以有自己的 client；更舊的沒有這個參數。
     extra = (
         {"actions_llm": picking}
         if "actions_llm" in inspect.signature(CharacterCompanion).parameters
         else {}
     )
+    # 引擎 1.5.0 起審核可以有自己的 client（review_llm）。
+    if reviewing is not None and "review_llm" in inspect.signature(CharacterCompanion).parameters:
+        extra["review_llm"] = reviewing
     if live:
         _let_go(live.companion)
     companion_settings = CompanionSettings(

@@ -166,6 +166,10 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
     background_base_url: str = Field("", alias="background_base_url")
     background_model: str = Field("", alias="background_model")
     background_api_key: str = Field("", alias="background_api_key")
+    # 審核她從回饋學到的東西（證據審核、條件比對、投票）另外用的端點與模型；兩個都有才用。
+    review_base_url: str = Field("", alias="review_base_url")
+    review_model: str = Field("", alias="review_model")
+    review_api_key: str = Field("", alias="review_api_key")
 
     DESCRIPTIONS: ClassVar[Dict[str, Description]] = {
         "character_development": Description(
@@ -234,6 +238,18 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
         "background_api_key": Description(
             en="API key for that endpoint (empty: the one she talks with)",
             zh="那個端點的 API 金鑰（空著就沿用她講話那一個）",
+        ),
+        "review_base_url": Description(
+            en="Endpoint for reviewing what she learned from your feedback (empty: the background one)",
+            zh="審核她從你的回饋學到的東西所用的端點（空著就跟背景工作同一個）",
+        ),
+        "review_model": Description(
+            en="The model at that endpoint, ideally larger than the background one (both must be set)",
+            zh="那個端點的模型，最好比背景模型大（兩個都填才會用）",
+        ),
+        "review_api_key": Description(
+            en="API key for that endpoint (empty: the background one)",
+            zh="那個端點的 API 金鑰（空著就沿用背景那一個）",
         ),
         "summary_every": Description(
             en="Summarise the conversation every N turns (0 disables)",

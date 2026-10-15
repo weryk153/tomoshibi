@@ -52,6 +52,9 @@ def test_defaults_match_what_was_measured_on_a_local_model():
         "background_base_url": "",
         "background_model": "",
         "background_api_key": "",
+        "review_base_url": "",
+        "review_model": "",
+        "review_api_key": "",
     }
 
 
