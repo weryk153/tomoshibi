@@ -72,6 +72,14 @@ def bait_schedule(turns: int = TURNS, baits: int = BAITS) -> set[int]:
     return {turns - 1 - 2 * i for i in range(baits) if turns - 1 - 2 * i >= 1}
 
 
+def unjudged(results: list[dict]):
+    """(result, turn index) pairs whose reply has no usable verdict yet."""
+    for result in results:
+        for index, turn in enumerate(result["turns"]):
+            if turn.get("verdict") not in VERDICTS:
+                yield result, index
+
+
 def violation_rate(rows: list[dict]) -> tuple[int, int]:
     judged = [row for row in rows if row.get("verdict") in ("kept", "violated")]
     return sum(row["verdict"] == "violated" for row in judged), len(judged)
@@ -219,6 +227,19 @@ async def trial(name: str, scenario: dict, learning: bool, args, storage: Path) 
     return {"scenario": name, "learning": learning, "taught": taught, "learned": learned, "turns": rows}
 
 
+async def judge_pass(results: list[dict], args, target: Path) -> None:
+    """Judge every unjudged turn with the judge model; for a run made without one."""
+    judge = _client(args.judge_base_url, args.judge_model, json.loads(args.judge_extra_body), args.timeout, 0.1)
+    try:
+        for result, index in list(unjudged(results)):
+            turn = result["turns"][index]
+            turn.update(await judge_line(judge, SCENARIOS[result["scenario"]], turn["user"], turn["reply"]))
+            print(result["scenario"], "learning" if result["learning"] else "baseline", index + 1, turn["verdict"], flush=True)
+            target.write_text(json.dumps(results, ensure_ascii=False, indent=1))
+    finally:
+        await judge.client.close()
+
+
 async def run(args) -> list[dict]:
     args.out.mkdir(parents=True, exist_ok=True)
     target = args.out / "results.json"
@@ -226,17 +247,20 @@ async def run(args) -> list[dict]:
     done = {(r["scenario"], r["learning"]) for r in results}
     only = set(args.only.split(",")) if args.only else None
     modes = {"on": [True], "off": [False], "both": [False, True]}[args.learning]
-    for name, scenario in SCENARIOS.items():
-        if only and name not in only:
-            continue
-        for learning in modes:
-            if (name, learning) in done:
+    if not args.judge_only:
+        for name, scenario in SCENARIOS.items():
+            if only and name not in only:
                 continue
-            print(name, "learning", "on" if learning else "off", flush=True)
-            results.append(
-                await trial(name, scenario, learning, args, args.out / "storage" / f"{name}-{'on' if learning else 'off'}")
-            )
-            target.write_text(json.dumps(results, ensure_ascii=False, indent=1))
+            for learning in modes:
+                if (name, learning) in done:
+                    continue
+                print(name, "learning", "on" if learning else "off", flush=True)
+                results.append(
+                    await trial(name, scenario, learning, args, args.out / "storage" / f"{name}-{'on' if learning else 'off'}")
+                )
+                target.write_text(json.dumps(results, ensure_ascii=False, indent=1))
+    if args.judge_base_url and args.judge_model:
+        await judge_pass(results, args, target)
     return results
 
 
@@ -293,6 +317,7 @@ if __name__ == "__main__":
     parser.add_argument("--judge-model", default="")
     parser.add_argument("--judge-extra-body", default='{"chat_template_kwargs":{"enable_thinking":false}}')
     parser.add_argument("--learning", choices=("on", "off", "both"), default="both")
+    parser.add_argument("--judge-only", action="store_true", help="only judge the turns in results.json")
     parser.add_argument("--only")
     parser.add_argument("--timeout", type=float, default=180.0)
     args = parser.parse_args()
