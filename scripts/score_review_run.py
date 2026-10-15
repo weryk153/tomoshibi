@@ -31,6 +31,7 @@ def summarize(rows: list[dict], labels: dict) -> dict:
     components accepted that the label rejects (let_through), plus the
     accept/reject confusion per component and the missed cases."""
     exact = 0
+    labeled = 0
     confusion = {c: Counter() for c in ("outcome", "lesson")}
     misses = []
     parse_errors = 0
@@ -38,6 +39,7 @@ def summarize(rows: list[dict], labels: dict) -> dict:
         label = labels.get(row["case_id"])
         if label is None:
             continue
+        labeled += 1
         got, want = decisions(row["new"]["accepted"] or []), decisions(label["accepted"])
         if got == want:
             exact += 1
@@ -52,6 +54,7 @@ def summarize(rows: list[dict], labels: dict) -> dict:
                 parse_errors += 1
     return {
         "exact": exact,
+        "labeled": labeled,
         "over_strict": sum(c[(True, False)] for c in confusion.values()),
         "let_through": sum(c[(False, True)] for c in confusion.values()),
         "confusion": confusion,
@@ -66,7 +69,7 @@ def score(run: Path, labels: dict) -> None:
     summary = summarize(rows, labels)
     exact, confusion, misses = summary["exact"], summary["confusion"], summary["misses"]
     print(
-        f"exact match {exact}/{len(rows)}   over_strict {summary['over_strict']}"
+        f"exact match {exact}/{summary['labeled']} labeled   over_strict {summary['over_strict']}"
         f"   let_through {summary['let_through']}   parse errors {summary['parse_errors']}"
     )
     for component, counts in confusion.items():

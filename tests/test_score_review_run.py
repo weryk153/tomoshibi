@@ -18,7 +18,9 @@ def test_over_strict_and_let_through_count_components_against_the_labels():
         row("b", ["outcome", "lesson"]),  # lesson let through
         row("c", []),  # right
     ]
+    rows.append(row("unlabeled", []))
     summary = summarize(rows, labels)
+    assert summary["labeled"] == 3
     assert summary["exact"] == 1
     assert summary["over_strict"] == 1
     assert summary["let_through"] == 1
