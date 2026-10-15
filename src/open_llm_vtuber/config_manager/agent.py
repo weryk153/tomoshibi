@@ -178,7 +178,7 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
         ),
         "interaction_every": Description(en="Learn from interaction feedback every N turns (0 disables)", zh="每幾輪讀取相處回饋（0 為停用）"),
         "interaction_topics_shown": Description(en="Recent interaction topics shown to the character", zh="提供給角色的近期相處經驗主題數"),
-        "interaction_user_id": Description(en="Stable identity for this single-owner private chat installation; empty disables interaction learning", zh="單一使用者私人聊天的固定識別；留空不啟用相處學習"),
+        "interaction_user_id": Description(en="Stable identity for this single-owner private chat installation; with it her memory of you follows you across chats (engine 1.5.1+) and interaction learning can run; empty keeps memory per chat", zh="單一使用者私人聊天的固定識別；填了她對你的記憶會跨聊天視窗（引擎 1.5.1 起）、相處學習也才會跑；留空記憶只留在各自的聊天裡"),
         "autonomous_silence": Description(
             en="Candidate: allow silence on private idle prompts",
             zh="候選功能：私人聊天閒置時，角色可以選擇不開口",
