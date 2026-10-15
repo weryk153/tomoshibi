@@ -1,0 +1,660 @@
+{
+  "note": "每題把 sessions 依序餵給角色（小燈）當作過去對話，再在新的一次對話裡問 question；評分看回答是否包含 expected 的要點、是否踩到 wrong_if；must_abstain 為 true 的題目，正確行為是承認不知道、不要編。",
+  "items": [
+    {
+      "id": "extraction-01",
+      "category": "extraction",
+      "sessions": [
+        {
+          "date": "2026-09-02",
+          "turns": [
+            {"role": "user", "content": "今天回家發現貓把衛生紙拆了一地。"},
+            {"role": "assistant", "content": "哇，整地都是？牠一定玩得很開心。你家貓叫什麼呀？"},
+            {"role": "user", "content": "牠叫麻糬，白色的，圓滾滾的，所以取這個名字。"},
+            {"role": "assistant", "content": "麻糬！名字跟樣子都很好捏的感覺。牠幾歲了？"},
+            {"role": "user", "content": "三歲多了，還是很愛拆家。"},
+            {"role": "assistant", "content": "三歲還這麼皮，那是永遠的小孩了。你要收好衛生紙喔。"}
+          ]
+        }
+      ],
+      "question": "欸，你還記得我家那隻貓叫什麼名字嗎？",
+      "expected": "叫麻糬，白色圓滾滾的貓。",
+      "must_abstain": false,
+      "wrong_if": "說不記得、或講出麻糬以外的名字。"
+    },
+    {
+      "id": "extraction-02",
+      "category": "extraction",
+      "sessions": [
+        {
+          "date": "2026-09-05",
+          "turns": [
+            {"role": "user", "content": "今天好累，有個小朋友哭了一整個下午。"},
+            {"role": "assistant", "content": "辛苦了。你是在哪裡顧小朋友啊？"},
+            {"role": "user", "content": "我是幼兒園老師啦，帶中班。"},
+            {"role": "assistant", "content": "中班！正是最愛問為什麼的年紀。難怪你一天下來會累成這樣。"},
+            {"role": "user", "content": "對啊，不過他們很可愛，下班就忘了累。"},
+            {"role": "assistant", "content": "聽起來你很喜歡這份工作，那就好。早點休息吧。"}
+          ]
+        }
+      ],
+      "question": "你記得我是做什麼工作的嗎？",
+      "expected": "幼兒園老師，帶中班。",
+      "must_abstain": false,
+      "wrong_if": "說成其他職業（例如國小老師、保母、上班族），或說不知道。"
+    },
+    {
+      "id": "extraction-03",
+      "category": "extraction",
+      "sessions": [
+        {
+          "date": "2026-09-08",
+          "turns": [
+            {"role": "user", "content": "中午去吃牛肉麵，結果上面灑了一堆香菜，整碗毀了。"},
+            {"role": "assistant", "content": "你這麼討厭香菜喔？"},
+            {"role": "user", "content": "超討厭，吃到一口整個人都不對了，我寧願不吃。"},
+            {"role": "assistant", "content": "好，記住了，香菜是你的天敵。下次點餐記得先講不要加。"},
+            {"role": "user", "content": "每次都忘記講，氣死。"},
+            {"role": "assistant", "content": "那我幫你記著，以後你要點東西我就提醒你。"}
+          ]
+        }
+      ],
+      "question": "我晚上想去吃越南河粉，你覺得點餐的時候我要注意什麼？",
+      "expected": "提醒他要講不要加香菜，因為他很討厭香菜。",
+      "must_abstain": false,
+      "wrong_if": "沒提到香菜，或把討厭的東西說成別的（例如蔥、辣）。"
+    },
+    {
+      "id": "extraction-04",
+      "category": "extraction",
+      "sessions": [
+        {
+          "date": "2026-09-10",
+          "turns": [
+            {"role": "user", "content": "週末要南下一趟，去看我弟。"},
+            {"role": "assistant", "content": "好久沒見了嗎？他在南部做什麼？"},
+            {"role": "user", "content": "阿凱在台南念大學，念成大，我們半年沒見了。"},
+            {"role": "assistant", "content": "半年！那他一定很期待。你要帶什麼下去給他？"},
+            {"role": "user", "content": "帶媽媽做的滷味，他最愛那個。"},
+            {"role": "assistant", "content": "有媽媽味道的滷味，比什麼都好。路上小心喔。"}
+          ]
+        }
+      ],
+      "question": "我弟現在在哪裡念書？",
+      "expected": "在台南念成大。",
+      "must_abstain": false,
+      "wrong_if": "講成別的城市或學校，或說不知道。"
+    },
+    {
+      "id": "extraction-05",
+      "category": "extraction",
+      "sessions": [
+        {
+          "date": "2026-09-12",
+          "turns": [
+            {"role": "user", "content": "早安，剛買了咖啡在等公車。"},
+            {"role": "assistant", "content": "早安。你都喝什麼咖啡啊？"},
+            {"role": "user", "content": "都點燕麥拿鐵，不加糖，固定的。"},
+            {"role": "assistant", "content": "燕麥拿鐵無糖，很有你的風格。每天都這杯不會膩嗎？"},
+            {"role": "user", "content": "不會欸，換別的反而不習慣。"},
+            {"role": "assistant", "content": "那是你的安心飲料。好好享受這杯，上班加油。"}
+          ]
+        }
+      ],
+      "question": "如果我請你幫我點咖啡，你會幫我點什麼？",
+      "expected": "燕麥拿鐵，不加糖。",
+      "must_abstain": false,
+      "wrong_if": "點成其他品項（例如美式、一般拿鐵）或加糖，或反問他要什麼而完全沒提燕麥拿鐵。"
+    },
+    {
+      "id": "multi_session-01",
+      "category": "multi_session",
+      "sessions": [
+        {
+          "date": "2026-08-20",
+          "turns": [
+            {"role": "user", "content": "每週三晚上都要去練團，今天又要晚回家了。"},
+            {"role": "assistant", "content": "你有樂團啊？你負責什麼？"},
+            {"role": "user", "content": "我彈吉他，練團室在中山站附近，每週三固定七點到十點。"},
+            {"role": "assistant", "content": "三個小時，很認真耶。那每個週三都是你的搖滾之夜了。"}
+          ]
+        },
+        {
+          "date": "2026-09-28",
+          "turns": [
+            {"role": "user", "content": "我今天把吉他賣掉了。"},
+            {"role": "assistant", "content": "咦？怎麼突然？"},
+            {"role": "user", "content": "樂團散了，主唱出國，大家也沒心情繼續。放著也是放著，就賣了。"},
+            {"role": "assistant", "content": "這樣啊。有點可惜，不過也算是個句點。你還好嗎？"},
+            {"role": "user", "content": "還好，反正晚上多出時間了。"},
+            {"role": "assistant", "content": "那就把多出來的時間留給自己吧。"}
+          ]
+        }
+      ],
+      "question": "下週三晚上我有空嗎？",
+      "expected": "應該有空，因為樂團已經散了、吉他也賣了，週三晚上不用再去練團。",
+      "must_abstain": false,
+      "wrong_if": "說他週三晚上要練團、沒空。"
+    },
+    {
+      "id": "multi_session-02",
+      "category": "multi_session",
+      "sessions": [
+        {
+          "date": "2026-08-25",
+          "turns": [
+            {"role": "user", "content": "去同事家一下下，回來眼睛腫到不行。"},
+            {"role": "assistant", "content": "怎麼了？他家有什麼嗎？"},
+            {"role": "user", "content": "他養貓，我對貓毛過敏很嚴重，碰到就打噴嚏流眼淚。"},
+            {"role": "assistant", "content": "那很辛苦耶。你去有貓的地方要先吃藥嗎？"},
+            {"role": "user", "content": "吃了也只是好一點，最好就是不要待太久。"},
+            {"role": "assistant", "content": "好，我記住了，有貓的地方你要小心。"}
+          ]
+        },
+        {
+          "date": "2026-10-03",
+          "turns": [
+            {"role": "user", "content": "阿哲約我下週去他家打電動順便過夜。"},
+            {"role": "assistant", "content": "聽起來很開心！他家怎麼樣？"},
+            {"role": "user", "content": "他家很大，剛搬的，養了三隻貓，說要給我看。"},
+            {"role": "assistant", "content": "三隻貓的大房子，聽起來很熱鬧。"}
+          ]
+        }
+      ],
+      "question": "你覺得我去阿哲家過夜，會有什麼要擔心的嗎？",
+      "expected": "他對貓毛嚴重過敏，而阿哲家養了三隻貓，過夜待太久會很難受，要先想辦法（吃藥、縮短時間或改地方）。",
+      "must_abstain": false,
+      "wrong_if": "沒提到貓毛過敏，只講一般的過夜注意事項。"
+    },
+    {
+      "id": "multi_session-03",
+      "category": "multi_session",
+      "sessions": [
+        {
+          "date": "2026-09-14",
+          "turns": [
+            {"role": "user", "content": "在想今年要送我媽什麼生日禮物。"},
+            {"role": "assistant", "content": "她生日快到了嗎？"},
+            {"role": "user", "content": "11月3號，每年都全家一起吃飯。"},
+            {"role": "assistant", "content": "11月3號，還有一個多月，可以慢慢想。她平常喜歡什麼？"},
+            {"role": "user", "content": "喜歡種花，我想送她一組盆栽工具。"},
+            {"role": "assistant", "content": "很貼心耶，她一定會用得很開心。"}
+          ]
+        },
+        {
+          "date": "2026-10-06",
+          "turns": [
+            {"role": "user", "content": "公司臨時派我出差，11月1號到11月5號要去東京。"},
+            {"role": "assistant", "content": "東京出差！五天欸，行程會很滿嗎？"},
+            {"role": "user", "content": "應該滿滿的，都是開會。"},
+            {"role": "assistant", "content": "那要記得吃飯，別只顧著開會。"}
+          ]
+        }
+      ],
+      "question": "我媽生日那天的家庭聚餐，我可以參加嗎？",
+      "expected": "不行，11月3號他人在東京出差（11月1號到5號），會錯過聚餐，可能要提前慶祝或改期。",
+      "must_abstain": false,
+      "wrong_if": "說可以參加，或沒把出差日期和生日對起來。"
+    },
+    {
+      "id": "multi_session-04",
+      "category": "multi_session",
+      "sessions": [
+        {
+          "date": "2026-09-16",
+          "turns": [
+            {"role": "user", "content": "我今天自己煮晚餐，結果又是咖哩。"},
+            {"role": "assistant", "content": "又？你很愛咖哩喔？"},
+            {"role": "user", "content": "不是愛，是我只會做這一道，其他都會失敗。"},
+            {"role": "assistant", "content": "哈哈，那咖哩就是你的看家本領。一道做到精也很厲害。"},
+            {"role": "user", "content": "我的咖哩都放很多豬肉，這樣才好吃。"},
+            {"role": "assistant", "content": "豬肉咖哩，聽起來就很下飯。"}
+          ]
+        },
+        {
+          "date": "2026-10-08",
+          "turns": [
+            {"role": "user", "content": "這週六我請同事小美來家裡吃飯。"},
+            {"role": "assistant", "content": "好有誠意！要自己煮嗎？"},
+            {"role": "user", "content": "對，不過她吃全素，連蛋奶都不吃。"},
+            {"role": "assistant", "content": "全素喔，那食材要小心挑。"}
+          ]
+        }
+      ],
+      "question": "週六要請小美吃飯，你幫我想一下我要煮什麼？",
+      "expected": "煮咖哩，因為他只會這一道，但小美吃全素，所以要做不放豬肉的素咖哩。",
+      "must_abstain": false,
+      "wrong_if": "推薦他做不會做的菜，或建議照原本的豬肉咖哩沒顧到小美吃素。"
+    },
+    {
+      "id": "multi_session-05",
+      "category": "multi_session",
+      "sessions": [
+        {
+          "date": "2026-09-18",
+          "turns": [
+            {"role": "user", "content": "今天差點遲到，還好室友把我搖醒。"},
+            {"role": "assistant", "content": "鬧鐘沒響嗎？"},
+            {"role": "user", "content": "有響，但我完全聽不到，每天都靠室友阿豪叫我起床。"},
+            {"role": "assistant", "content": "阿豪根本是你的人形鬧鐘耶。要好好謝謝他。"}
+          ]
+        },
+        {
+          "date": "2026-10-09",
+          "turns": [
+            {"role": "user", "content": "阿豪下週要搬出去了，他找到離公司近的房子。"},
+            {"role": "assistant", "content": "這樣啊，你們住一起多久了？"},
+            {"role": "user", "content": "兩年多。以後房間會安靜很多。"},
+            {"role": "assistant", "content": "會有點寂寞吧。不過換個角度，整個客廳都是你的了。"}
+          ]
+        }
+      ],
+      "question": "阿豪搬走之後，你覺得我早上會有什麼問題？",
+      "expected": "會起不來，因為他聽不到鬧鐘、一直靠阿豪叫他起床，之後要另外想辦法（換響的鬧鐘、請人打電話等）。",
+      "must_abstain": false,
+      "wrong_if": "只講寂寞、家事變多等，沒提到起床問題。"
+    },
+    {
+      "id": "temporal-01",
+      "category": "temporal",
+      "sessions": [
+        {
+          "date": "2026-08-10",
+          "turns": [
+            {"role": "user", "content": "我今天開始跑步了，第一次跑兩公里就喘到不行。"},
+            {"role": "assistant", "content": "第一天最難，你已經跨出去了。有目標嗎？"},
+            {"role": "user", "content": "想跑一場 10K。"},
+            {"role": "assistant", "content": "好，那我陪你數著，看你哪天跑到。"}
+          ]
+        },
+        {
+          "date": "2026-09-20",
+          "turns": [
+            {"role": "user", "content": "今天跑完人生第一場 10K，一小時零五分。"},
+            {"role": "assistant", "content": "做到了！真的做到了！你還好嗎？腳有沒有事？"},
+            {"role": "user", "content": "腿有點軟，但超開心。"},
+            {"role": "assistant", "content": "那是值得的軟腿。今天要好好吃一頓慶祝。"}
+          ]
+        }
+      ],
+      "question": "我從開始跑步到跑完第一場 10K，大概花了多久？",
+      "expected": "大約一個多月、接近六週（8月10日開始，9月20日完成）。",
+      "must_abstain": false,
+      "wrong_if": "說成好幾個月、一年，或一兩週這類明顯對不上日期的長度。"
+    },
+    {
+      "id": "temporal-02",
+      "category": "temporal",
+      "sessions": [
+        {
+          "date": "2026-07-05",
+          "turns": [
+            {"role": "user", "content": "新手機到了，螢幕好大好亮。"},
+            {"role": "assistant", "content": "換新機的那天最開心了。要貼保護貼嗎？"},
+            {"role": "user", "content": "懶得貼，應該沒事吧。"},
+            {"role": "assistant", "content": "嗯……小燈有點擔心，但你開心就好。"}
+          ]
+        },
+        {
+          "date": "2026-07-28",
+          "turns": [
+            {"role": "user", "content": "手機摔到地上，螢幕裂了。"},
+            {"role": "assistant", "content": "啊……我就說要貼保護貼。還能用嗎？"},
+            {"role": "user", "content": "能用，但裂痕很醜，要送修。"},
+            {"role": "assistant", "content": "早點送吧，裂開的螢幕越用越危險。"}
+          ]
+        },
+        {
+          "date": "2026-08-02",
+          "turns": [
+            {"role": "user", "content": "手機修好了，這次乖乖貼了保護貼。"},
+            {"role": "assistant", "content": "學乖了！這次會好好保護它了吧。"}
+          ]
+        }
+      ],
+      "question": "我手機摔到螢幕裂掉，是在換新手機之前還是之後的事？大概隔多久？",
+      "expected": "是換新手機之後，大約三週多（7月5日換新，7月28日摔到）。",
+      "must_abstain": false,
+      "wrong_if": "說成是舊手機摔壞才換新機，或把間隔講成幾個月。"
+    },
+    {
+      "id": "temporal-03",
+      "category": "temporal",
+      "sessions": [
+        {
+          "date": "2026-06-01",
+          "turns": [
+            {"role": "user", "content": "我今天帶了一隻倉鼠回家，取名叫 QQ。"},
+            {"role": "assistant", "content": "QQ！好可愛的名字。牠習慣新家了嗎？"},
+            {"role": "user", "content": "還在躲，不過有在吃東西。"},
+            {"role": "assistant", "content": "有吃就是好兆頭，給牠幾天就會熟了。"}
+          ]
+        },
+        {
+          "date": "2026-09-01",
+          "turns": [
+            {"role": "user", "content": "搬家完成了，累死，新家在新店。"},
+            {"role": "assistant", "content": "辛苦了！新店離山近，空氣應該不錯。QQ 搬家還好嗎？"},
+            {"role": "user", "content": "牠在車上超緊張，到新家又躲起來了。"},
+            {"role": "assistant", "content": "跟第一次來你家一樣，過幾天就好。"}
+          ]
+        }
+      ],
+      "question": "我是先養 QQ 還是先搬去新店？中間隔了多久？",
+      "expected": "先養 QQ（6月1日），三個月後才搬去新店（9月1日）。",
+      "must_abstain": false,
+      "wrong_if": "說先搬家才養倉鼠，或間隔講成幾週或一年以上。"
+    },
+    {
+      "id": "temporal-04",
+      "category": "temporal",
+      "sessions": [
+        {
+          "date": "2026-05-12",
+          "turns": [
+            {"role": "user", "content": "我從今天開始減醣，麵包飯都要少吃。"},
+            {"role": "assistant", "content": "有決心！不過先說好，不要餓到自己。"},
+            {"role": "user", "content": "知道啦，目標是撐到夏天結束。"},
+            {"role": "assistant", "content": "那我會盯著你，偷吃我會知道喔。"}
+          ]
+        },
+        {
+          "date": "2026-07-01",
+          "turns": [
+            {"role": "user", "content": "減醣到現在瘦了三公斤。"},
+            {"role": "assistant", "content": "好厲害，持續中的人最帥。"}
+          ]
+        },
+        {
+          "date": "2026-08-12",
+          "turns": [
+            {"role": "user", "content": "今天破戒，跟朋友吃了一整個披薩，減醣宣告結束。"},
+            {"role": "assistant", "content": "哈哈，一整個！那也撐得夠久了，給自己拍拍手。"},
+            {"role": "user", "content": "對啊，這幾個月也夠了，之後正常吃。"},
+            {"role": "assistant", "content": "好，那減醣期正式畢業。"}
+          ]
+        }
+      ],
+      "question": "我那次減醣總共撐了多久？",
+      "expected": "剛好三個月（5月12日開始，8月12日結束）。",
+      "must_abstain": false,
+      "wrong_if": "說成一個多月、半年以上，或說他還在減醣。"
+    },
+    {
+      "id": "temporal-05",
+      "category": "temporal",
+      "sessions": [
+        {
+          "date": "2026-09-01",
+          "turns": [
+            {"role": "user", "content": "我跟小芸吵架了，因為旅行費用的事，先不想理她。"},
+            {"role": "assistant", "content": "朋友吵架最難受了。那先放著冷靜幾天，我陪你。"}
+          ]
+        },
+        {
+          "date": "2026-09-15",
+          "turns": [
+            {"role": "user", "content": "跟小芸和好了，今天一起去吃火鍋。"},
+            {"role": "assistant", "content": "太好了！火鍋是最好的和解儀式。誰先開口的？"},
+            {"role": "user", "content": "她先傳訊息給我。"},
+            {"role": "assistant", "content": "那她也很在乎你呀。"}
+          ]
+        },
+        {
+          "date": "2026-10-01",
+          "turns": [
+            {"role": "user", "content": "小芸說她年底要搬去台中工作，有點難過，但也為她高興。"},
+            {"role": "assistant", "content": "這樣以後就不能常見面了。不過台中又不遠，高鐵一下就到了。"}
+          ]
+        }
+      ],
+      "question": "小芸說要搬去台中這件事，是在我們和好之前還是之後？",
+      "expected": "是和好之後，大約兩週後講的（9月15日和好，10月1日說要搬去台中）。",
+      "must_abstain": false,
+      "wrong_if": "說是吵架期間或和好之前講的，或把順序搞反。"
+    },
+    {
+      "id": "update-01",
+      "category": "update",
+      "sessions": [
+        {
+          "date": "2026-08-15",
+          "turns": [
+            {"role": "user", "content": "今天又跑了三個客戶，業績壓力好大。"},
+            {"role": "assistant", "content": "你是做業務的？"},
+            {"role": "user", "content": "對，在一間貿易公司當業務，天天在外面跑。"},
+            {"role": "assistant", "content": "外面跑一整天很耗體力，要記得喝水。"}
+          ]
+        },
+        {
+          "date": "2026-10-05",
+          "turns": [
+            {"role": "user", "content": "跟你說，我換工作了，今天第一天上班。"},
+            {"role": "assistant", "content": "真的？去哪裡？"},
+            {"role": "user", "content": "去一間遊戲公司做企劃，終於不用跑業務了。"},
+            {"role": "assistant", "content": "遊戲企劃！這很適合你耶，恭喜恭喜。"},
+            {"role": "user", "content": "謝啦，雖然薪水差不多但開心很多。"},
+            {"role": "assistant", "content": "開心最重要，第一天辛苦了。"}
+          ]
+        }
+      ],
+      "question": "我現在在哪裡上班、做什麼？",
+      "expected": "在遊戲公司做企劃（已經不是貿易公司的業務了）。",
+      "must_abstain": false,
+      "wrong_if": "說他還在貿易公司當業務。"
+    },
+    {
+      "id": "update-02",
+      "category": "update",
+      "sessions": [
+        {
+          "date": "2026-08-18",
+          "turns": [
+            {"role": "user", "content": "板橋今天好塞，回家花了一個小時。"},
+            {"role": "assistant", "content": "你住板橋啊？"},
+            {"role": "user", "content": "對，在府中站附近租了個小套房。"},
+            {"role": "assistant", "content": "府中附近很熱鬧，吃的很多。"}
+          ]
+        },
+        {
+          "date": "2026-10-02",
+          "turns": [
+            {"role": "user", "content": "搬家搬完了，整個人快散掉。"},
+            {"role": "assistant", "content": "搬去哪裡了？"},
+            {"role": "user", "content": "搬到中和，離公司近很多，以後不用再擠板橋那段了。"},
+            {"role": "assistant", "content": "中和！那以後通勤會輕鬆很多。好好休息。"}
+          ]
+        }
+      ],
+      "question": "我現在住哪裡？",
+      "expected": "中和（已經從板橋搬走了）。",
+      "must_abstain": false,
+      "wrong_if": "說他住板橋或府中附近。"
+    },
+    {
+      "id": "update-03",
+      "category": "update",
+      "sessions": [
+        {
+          "date": "2026-08-22",
+          "turns": [
+            {"role": "user", "content": "我們陳經理今天又在會議上念了半小時。"},
+            {"role": "assistant", "content": "陳經理是你的直屬主管？"},
+            {"role": "user", "content": "對，脾氣有點急，但人不壞。"},
+            {"role": "assistant", "content": "急性子的主管，跟他相處要抓好節奏。"}
+          ]
+        },
+        {
+          "date": "2026-09-30",
+          "turns": [
+            {"role": "user", "content": "部門換主管了，陳經理調去別的部門。"},
+            {"role": "assistant", "content": "那新主管是誰？"},
+            {"role": "user", "content": "新來的是林經理，從台中分公司調上來的，看起來比較溫和。"},
+            {"role": "assistant", "content": "溫和的主管，聽起來日子會好過一點。"}
+          ]
+        }
+      ],
+      "question": "我現在的直屬主管是誰？",
+      "expected": "林經理（陳經理已經調去別的部門）。",
+      "must_abstain": false,
+      "wrong_if": "說是陳經理。"
+    },
+    {
+      "id": "update-04",
+      "category": "update",
+      "sessions": [
+        {
+          "date": "2026-08-28",
+          "turns": [
+            {"role": "user", "content": "下午又買了一杯珍奶，一週第三杯了。"},
+            {"role": "assistant", "content": "珍奶是你的最愛喔？"},
+            {"role": "user", "content": "對，全糖珍奶，沒有它我撐不過下午。"},
+            {"role": "assistant", "content": "全糖！你的血糖還好嗎？"}
+          ]
+        },
+        {
+          "date": "2026-10-07",
+          "turns": [
+            {"role": "user", "content": "健檢報告出來，血糖偏高，我決定戒糖了。"},
+            {"role": "assistant", "content": "那珍奶怎麼辦？"},
+            {"role": "user", "content": "珍奶掰掰了，現在下午都改喝無糖綠茶。"},
+            {"role": "assistant", "content": "好，無糖綠茶，我會幫你守住這條線。"}
+          ]
+        }
+      ],
+      "question": "我下午想喝點東西，你幫我選一杯？",
+      "expected": "無糖綠茶（他已經戒糖，不再喝珍奶）。",
+      "must_abstain": false,
+      "wrong_if": "推薦珍奶或任何含糖飲料。"
+    },
+    {
+      "id": "update-05",
+      "category": "update",
+      "sessions": [
+        {
+          "date": "2026-09-03",
+          "turns": [
+            {"role": "user", "content": "12月的旅行決定了，要去北海道看雪。"},
+            {"role": "assistant", "content": "北海道的雪！好浪漫。要去幾天？"},
+            {"role": "user", "content": "五天，想去小樽。"},
+            {"role": "assistant", "content": "小樽的運河在雪裡一定很美。"}
+          ]
+        },
+        {
+          "date": "2026-10-10",
+          "turns": [
+            {"role": "user", "content": "北海道機票太貴了，我改去沖繩。"},
+            {"role": "assistant", "content": "咦，從雪國變成海邊了。"},
+            {"role": "user", "content": "對啊，12月的沖繩不冷，也便宜很多，就改了。"},
+            {"role": "assistant", "content": "那就換個方式放鬆，海邊也很好。"}
+          ]
+        }
+      ],
+      "question": "我12月的旅行要去哪？",
+      "expected": "沖繩（原本的北海道計畫已經改掉）。",
+      "must_abstain": false,
+      "wrong_if": "說要去北海道或小樽。"
+    },
+    {
+      "id": "abstain-01",
+      "category": "abstain",
+      "sessions": [
+        {
+          "date": "2026-09-06",
+          "turns": [
+            {"role": "user", "content": "我姊今天回家，帶了一堆土產。"},
+            {"role": "assistant", "content": "她住外地喔？"},
+            {"role": "user", "content": "對，在高雄工作，兩三個月才回來一次。"},
+            {"role": "assistant", "content": "那每次回來都像過節一樣。她帶了什麼好吃的？"},
+            {"role": "user", "content": "一堆蛋糕跟豬肉乾。"},
+            {"role": "assistant", "content": "豬肉乾！我也想吃。"}
+          ]
+        }
+      ],
+      "question": "我姊叫什麼名字？",
+      "expected": "說他沒有提過姊姊的名字，只知道她在高雄工作，請他告訴她。",
+      "must_abstain": true,
+      "wrong_if": "編出任何名字。"
+    },
+    {
+      "id": "abstain-02",
+      "category": "abstain",
+      "sessions": [
+        {
+          "date": "2026-09-09",
+          "turns": [
+            {"role": "user", "content": "剛帶狗去散步回來，牠又去追鴿子。"},
+            {"role": "assistant", "content": "追到了嗎？"},
+            {"role": "user", "content": "當然沒有，每次都撲空，然後很得意地回頭看我。"},
+            {"role": "assistant", "content": "好可愛，像是在說「你看我多厲害」。"},
+            {"role": "user", "content": "對，牠超愛表現。"},
+            {"role": "assistant", "content": "愛表現的狗狗最可愛了。"}
+          ]
+        }
+      ],
+      "question": "我家的狗是什麼品種？",
+      "expected": "說他沒有提過品種，只知道牠愛追鴿子、愛表現，請他說說看。",
+      "must_abstain": true,
+      "wrong_if": "猜出任何品種（柴犬、柯基、米克斯等）當作事實。"
+    },
+    {
+      "id": "abstain-03",
+      "category": "abstain",
+      "sessions": [
+        {
+          "date": "2026-09-11",
+          "turns": [
+            {"role": "user", "content": "今天發薪水了，終於可以還信用卡。"},
+            {"role": "assistant", "content": "發薪日是好日子。要犒賞自己嗎？"},
+            {"role": "user", "content": "還完卡費就沒剩多少了，先忍著。"},
+            {"role": "assistant", "content": "忍著也沒關係，下個月再好好犒賞。"}
+          ]
+        }
+      ],
+      "question": "你記得我的月薪是多少嗎？",
+      "expected": "說他沒有講過實際金額，只知道發薪水後要還卡費，不會亂猜。",
+      "must_abstain": true,
+      "wrong_if": "說出任何具體金額。"
+    },
+    {
+      "id": "abstain-04",
+      "category": "abstain",
+      "sessions": [
+        {
+          "date": "2026-09-13",
+          "turns": [
+            {"role": "user", "content": "昨天跟阿明去看演唱會，嗓子都喊啞了。"},
+            {"role": "assistant", "content": "喊到啞！一定很嗨。位置好嗎？"},
+            {"role": "user", "content": "搖滾區，前面第三排，超近。"},
+            {"role": "assistant", "content": "第三排耶，等於面對面了。"},
+            {"role": "user", "content": "對，今天上班完全沒聲音。"},
+            {"role": "assistant", "content": "值得啦，回憶比聲音重要。"}
+          ]
+        }
+      ],
+      "question": "上次我跟阿明去看的是哪個樂團的演唱會？",
+      "expected": "說他沒有講是哪個樂團，只記得是搖滾區第三排、喊到啞，請他告訴她。",
+      "must_abstain": true,
+      "wrong_if": "說出任何樂團或歌手名字。"
+    },
+    {
+      "id": "abstain-05",
+      "category": "abstain",
+      "sessions": [
+        {
+          "date": "2026-09-19",
+          "turns": [
+            {"role": "user", "content": "下個月生日，不知道要怎麼過。"},
+            {"role": "assistant", "content": "下個月生日！想要熱鬧還是安靜地過？"},
+            {"role": "user", "content": "安靜一點就好，去吃個好吃的。"},
+            {"role": "assistant", "content": "那就找間好餐廳，當作給自己的禮物。"}
+          ]
+        }
+      ],
+      "question": "我生日是幾月幾號？",
+      "expected": "說他只提過生日在下個月（10月），沒講確切日期，請他告訴她。",
+      "must_abstain": true,
+      "wrong_if": "說出具體的日期。"
+    }
+  ]
+}

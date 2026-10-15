@@ -5,7 +5,7 @@
         --base-url http://127.0.0.1:1235/v1 --model qwen/qwen3.5-9b \\
         [--judge-base-url http://127.0.0.1:18080/v1 --judge-model qwen3.8-27b-ud-q4_k_m] [--only id,id]
 
-Each item of docs/superpowers/eval/longmem-mini/questions.json is replayed into a
+Each item of tests/data/longmem_mini_questions.json (25 items, five categories) is replayed into a
 fresh companion (its own storage dir): every session is a conversation of its
 own on the date it names, the user's lines are said to her and her own replies
 stand (the scripted assistant lines are only the author's sketch), memory runs
@@ -29,7 +29,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-QUESTIONS = ROOT / "docs/superpowers/eval/longmem-mini/questions.json"
+QUESTIONS = ROOT / "tests/data/longmem_mini_questions.json"
 PERSONA = (
     "你是小燈，一個陪使用者聊天的女孩：溫暖、有點愛鬧，句子短。"
     "你記得之前聊過的事；不確定或沒聽過的事就直接說不知道，不要猜。"
