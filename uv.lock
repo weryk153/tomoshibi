@@ -14,15 +14,15 @@ resolution-markers = [
 
 [[package]]
 name = "ai-character-engine"
-version = "1.5.0"
+version = "1.5.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "openai" },
     { name = "python-dotenv" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/43/9c/f3e46171479baa67368783480994834d5e5299c407b38ce24c564f6a3102/ai_character_engine-1.5.0.tar.gz", hash = "sha256:3df51ded6eaad54d4fa510c511b457746985c3ae95417491eaa0c7e17ecea08b", size = 478061, upload-time = "2026-10-15T11:40:14.061Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d1/fb/b4d8aed549673cfceb1a92427a1adb94dc3e82e7dd34db4e4222b7511f25/ai_character_engine-1.5.1.tar.gz", hash = "sha256:b013ac2127c7dbf125b7dddf50ec799921eef789097359913c40a5126ba446d9", size = 479025, upload-time = "2026-10-15T17:12:05.035Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/1d/0a/18018ec0bbfbead77d575a0976899bd3c98fd4ad3f25fb243843041436f5/ai_character_engine-1.5.0-py3-none-any.whl", hash = "sha256:78f8ebfba7ddf6c3030fc69b7adc757acbda3b9f13c8da4777be28c321b6100b", size = 539891, upload-time = "2026-10-15T11:40:12.201Z" },
+    { url = "https://files.pythonhosted.org/packages/69/d2/b3c41a61958cfbbb2accddf6cd7003302a76c472459ee9b28d2b80ac519b/ai_character_engine-1.5.1-py3-none-any.whl", hash = "sha256:5e9fb1916aab5790333a5371abc3f4ec366cfe61c13e9744d887d98bbf0519ac", size = 540770, upload-time = "2026-10-15T17:12:03.071Z" },
 ]
 
 [[package]]
@@ -4844,7 +4844,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "ai-character-engine", specifier = "==1.5.0" },
+    { name = "ai-character-engine", specifier = "==1.5.1" },
     { name = "aiohttp", marker = "extra == 'bilibili'", specifier = ">=3.10.0" },
     { name = "anthropic", specifier = ">=0.40.0" },
     { name = "azure-cognitiveservices-speech", specifier = ">=1.41.1" },
