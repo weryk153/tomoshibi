@@ -253,8 +253,8 @@ interaction_user_id: local-owner
 `forget_interaction_experiences(user_id, record_ids)` 撤回指定理解。這些資料
 獨立於逐字聊天歷史，重啟、新對話可承接；不會帶給另一個使用者識別。
 
-目前專案安裝的 1.3.2 尚無此能力；未發行、未預設啟用。測試時明確選用旁邊
-的引擎 checkout：
+引擎 1.4.0（2026-10-15 發行）起內建此能力與 v3e 審核，專案已釘此版；仍未預設啟用。
+要測未發行的引擎改動時，明確選用旁邊的引擎 checkout：
 
 ```sh
 PYTHONPATH=../ai-character-engine/src .venv/bin/python scripts/compare_interaction_learning.py
