@@ -1219,6 +1219,9 @@ def test_speaking_up_again_unanswered_she_is_told_in_chinese(tmp_path):
         "不是對方問的" not in before.split("參考這些")[0] and "自己講了" not in before
     )
     assert "自己講了 1 次" in after and "照你自己的個性" in after
+    # 沒人回時她會一直繞著同一件事講、重問同一個問題（實測連續五次都在講同一張
+    # 雪景照片、三次問「你到家了嗎」）：要她別重問、換話題。
+    assert "不要再問一次" in after and "換一個話題" in after
     assert "可以聊的素材" not in after and "不是對方問的" in after
 
 
