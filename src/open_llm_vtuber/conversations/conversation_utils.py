@@ -218,6 +218,9 @@ async def process_agent_output(
     # 聲音的語言每則算一次就好，不必逐句算——它只跟角色設定有關。
     # 算不出來就不做語言判斷，原文唸出去。
     voice_lang = derive_voice_lang(character_config)
+    # 她回話用的語言是角色設定的：有設就照設定判斷翻不翻，不逐句猜。逐句猜會把
+    # 「我是三月なのか」這種夾了假名名字的中文當成日文（字幕被日翻中、語音沒翻）。
+    reply_lang = _normalize_lang(getattr(character_config, "reply_language", "") or "")
     # 口頭禪也是這個角色的設定：每則從正在用的角色讀，換角色後就是新角色的。
     catchphrases = dict(getattr(character_config, "catchphrases", None) or {})
     # 雙語字幕也是角色自己的開關（角色頁「語言」區）。
@@ -252,6 +255,7 @@ async def process_agent_output(
                 bilingual_subtitle=bilingual_subtitle,
                 translation_auditor=auditor,
                 expression_picker=picker,
+                reply_lang=reply_lang,
             )
         elif isinstance(output, AudioOutput):
             full_response = await handle_audio_output(output, websocket_send)
@@ -282,6 +286,7 @@ async def handle_sentence_output(
     bilingual_subtitle: bool = False,
     translation_auditor: Optional[Any] = None,
     expression_picker: Optional[Any] = None,
+    reply_lang: Optional[str] = None,
 ) -> str:
     """處理一句輸出：需要時翻譯，然後交給語音合成。
 
@@ -337,11 +342,11 @@ async def handle_sentence_output(
         model_translated = False
 
         if translate_engine:
-            # 逐句判斷：有實際內容、而且聲音的語言跟這句話的語言不同，才翻譯。
+            # 有實際內容、而且聲音的語言跟這句話的語言（角色設定的回覆語言，沒設才逐句判斷）不同，才翻譯。
             # 兩者相同時直接唸，省下一次往返。
             if len(re.sub(r'[\s.,!?，。！？\'"』」）】\s]+', "", tts_text)):
-                reply_lang = _detect_lang(tts_text)
-                translate_audio = voice_lang and reply_lang and reply_lang != voice_lang
+                said_lang = reply_lang or _detect_lang(tts_text)
+                translate_audio = voice_lang and said_lang and said_lang != voice_lang
                 if (
                     translate_audio
                     and catchphrases
@@ -376,12 +381,12 @@ async def handle_sentence_output(
                     else:
                         model_translated = True
                         logger.info(
-                            f"🏃 Audio translated (R={reply_lang} != V={voice_lang}): "
+                            f"🏃 Audio translated (R={said_lang} != V={voice_lang}): "
                             f"'''{tts_text}'''..."
                         )
                 else:
                     logger.debug(
-                        f"🚫 Audio translation skipped (R={reply_lang}, V={voice_lang}); "
+                        f"🚫 Audio translation skipped (R={said_lang}, V={voice_lang}); "
                         "speaking reply verbatim."
                     )
         else:
@@ -395,17 +400,17 @@ async def handle_sentence_output(
         subtitle_text = display_text.text
         if subtitle_translate_engine:
             if len(re.sub(r'[\s.,!?，。！？\'"』」）】\s]+', "", display_text.text)):
-                reply_lang = _detect_lang(display_text.text)
+                said_lang = reply_lang or _detect_lang(display_text.text)
                 subtitle_lang = _normalize_lang(
                     getattr(subtitle_translate_engine, "target_lang", None)
                 )
                 if catchphrases and only_catchphrases(display_text.text, catchphrases):
                     # 只有口頭禪：字幕原樣顯示，不讓模型音譯。
                     logger.debug("🚫 Subtitle is catchphrases only; kept as written.")
-                elif subtitle_lang and reply_lang == subtitle_lang:
+                elif subtitle_lang and said_lang == subtitle_lang:
                     logger.debug(
                         f"🚫 Subtitle translation skipped "
-                        f"(R={reply_lang}, target={subtitle_lang})."
+                        f"(R={said_lang}, target={subtitle_lang})."
                     )
                 else:
                     # Same reasoning as the audio-translate call above: keep the
