@@ -26,7 +26,9 @@ def test_each_choice_has_its_note(tmp_path, monkeypatch):
     write_conf(tmp_path / "conf.yaml", "  reply_length: 'medium'\n")
     assert "最多五句" in reply_length.note()
     write_conf(tmp_path / "conf.yaml", "  reply_length: 'free'\n")
-    assert reply_length.note() == ""
+    # 說話規則不再寫死「一到三句」，長度只由這裡決定：自由也要明說不限，
+    # 不然她照舊講得很短（2026-10-17：選了自由沒作用）。
+    assert "不限句數" in reply_length.note()
 
 
 def test_an_unknown_value_is_the_default(tmp_path, monkeypatch):

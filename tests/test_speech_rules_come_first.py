@@ -56,8 +56,15 @@ def test_development_candidate_only_appends_to_the_existing_system_prompt():
 
 
 def test_the_rules_say_what_the_persona_used_to_repeat():
-    for rule in ("一到三句", "「嗯」", "好久不見", "「是。」", "「作品」"):
+    for rule in ("「嗯」", "好久不見", "「是。」", "「作品」"):
         assert rule in SPEECH_RULES
+
+
+def test_how_long_she_replies_is_left_to_the_reply_length_setting():
+    # 長度只由回覆長度設定（每一輪的備註）決定；規則寫死「一到三句」的話，
+    # 設定選「自由」也蓋不過它。
+    assert "一到三句" not in SPEECH_RULES
+    assert "每一輪的指示" in SPEECH_RULES
 
 
 def test_the_rules_say_what_the_persona_used_to_repeat_without_actions():
