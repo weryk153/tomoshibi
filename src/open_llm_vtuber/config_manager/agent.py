@@ -138,6 +138,9 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
     character_development: bool = Field(False, alias="character_development")
     interaction_every: int = Field(1, ge=0)
     interaction_topics_shown: int = Field(4, ge=0)
+    # 引擎 1.6.0 起：審核她從回饋學到的教訓用哪一套。"" 是引擎預設（一次列問題）；
+    # "claims" 拆成主張、由程式核對原話與說話者；"checklist" 是六題是非題。
+    interaction_review_mode: Literal["", "checklist", "claims"] = Field("")
     interaction_user_id: str = Field("")
     autonomous_silence: bool = Field(False, alias="autonomous_silence")
     # 她自己的心情（引擎 CompanionSettings.mood_every）；空檔的臉跟著它。
@@ -178,6 +181,7 @@ class CharacterEngineAgentConfig(I18nMixin, BaseModel):
         ),
         "interaction_every": Description(en="Learn from interaction feedback every N turns (0 disables)", zh="每幾輪讀取相處回饋（0 為停用）"),
         "interaction_topics_shown": Description(en="Recent interaction topics shown to the character", zh="提供給角色的近期相處經驗主題數"),
+        "interaction_review_mode": Description(en="How lessons learned from feedback are reviewed (engine 1.6.0+): empty = engine default, \"claims\" = claims checked against quotes by code, \"checklist\" = six yes/no questions", zh="相處回饋教訓的審核方式（引擎 1.6.0 起）：空白為引擎預設，claims 為拆成主張由程式核對原話，checklist 為六題是非題"),
         "interaction_user_id": Description(en="Stable identity for this single-owner private chat installation; with it her memory of you follows you across chats (engine 1.5.1+) and interaction learning can run; empty keeps memory per chat", zh="單一使用者私人聊天的固定識別；填了她對你的記憶會跨聊天視窗（引擎 1.5.1 起）、相處學習也才會跑；留空記憶只留在各自的聊天裡"),
         "autonomous_silence": Description(
             en="Candidate: allow silence on private idle prompts",

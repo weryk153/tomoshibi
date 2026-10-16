@@ -32,6 +32,7 @@ def test_defaults_match_what_was_measured_on_a_local_model():
         "character_development": False,
         "interaction_every": 1,
         "interaction_topics_shown": 4,
+        "interaction_review_mode": "",
         "interaction_user_id": "",
         "autonomous_silence": False,
         "mood_every": 2,
@@ -95,3 +96,9 @@ def test_both_templates_accept_the_engine_agent_as_a_choice(template):
     chosen = config.character_config.agent_config
     assert chosen.conversation_agent_choice == "character_engine_agent"
     assert chosen.agent_settings.character_engine_agent.reflection_every == 6
+
+
+def test_the_interaction_review_mode_is_one_the_engine_knows():
+    assert CharacterEngineAgentConfig(interaction_review_mode="claims").interaction_review_mode == "claims"
+    with pytest.raises(ValidationError):
+        CharacterEngineAgentConfig(interaction_review_mode="claim")
