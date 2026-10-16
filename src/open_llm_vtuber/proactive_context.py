@@ -217,6 +217,23 @@ def breaks_what_the_host_knows(
     return any(phrase in normalized for phrase in proactive_only_phrases)
 
 
+# 去掉空白與標點後短於這個字數的句子不算照抄：「嘿嘿」「好喔」本來就會一再出現。
+_REPEAT_MIN_CHARS = 6
+_NOT_TEXT = re.compile(r"[\W_]+")
+
+
+def repeats_recent(sentence: str, recent: list[str]) -> bool:
+    """這句是不是她最近主動說過的話照抄（去掉空白與標點後是某句舊話的一段）。
+
+    提示叫她換話題，她還是會整句照抄自己前一次主動說的話（實測「嘿嘿，開個玩笑
+    啦。你要不要來看看？」隔一次又講一遍）。
+    """
+    core = _NOT_TEXT.sub("", sentence or "")
+    if len(core) < _REPEAT_MIN_CHARS:
+        return False
+    return any(core in _NOT_TEXT.sub("", line) for line in recent)
+
+
 def record_proactive_response(
     conf_uid: str,
     client_uid: str,

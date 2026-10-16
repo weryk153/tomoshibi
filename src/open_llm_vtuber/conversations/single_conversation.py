@@ -25,7 +25,9 @@ from ..translate import audit as translation_audit
 from ..conversation_quality import normalize_output_language_variant
 from ..proactive_context import (
     breaks_what_the_host_knows,
+    get_recent_proactive,
     record_proactive_response,
+    repeats_recent,
 )
 
 # Import necessary types from agent outputs
@@ -213,6 +215,15 @@ async def process_single_conversation(
             if hold is not None:
                 hold()
             agent_output_stream = context.agent_engine.chat(batch_input)
+            # 她最近主動說過的話：這次主動開口照抄其中一句就不說出口。
+            recent_proactive = (
+                get_recent_proactive(
+                    context.character_config.conf_uid,
+                    str((metadata or {}).get("proactive_context_uid") or client_uid),
+                )
+                if is_proactive
+                else []
+            )
 
             async for output_item in agent_output_stream:
                 if (
@@ -240,6 +251,19 @@ async def process_single_conversation(
                             output_language,
                             _protected(context),
                         )
+
+                    if (
+                        is_proactive
+                        and isinstance(output_item, SentenceOutput)
+                        and repeats_recent(
+                            output_item.display_text.text, recent_proactive
+                        )
+                    ):
+                        logger.info(
+                            "Suppressed proactive sentence repeating her recent words: "
+                            f"{output_item.display_text.text!r}"
+                        )
+                        continue
 
                     if (
                         is_proactive
