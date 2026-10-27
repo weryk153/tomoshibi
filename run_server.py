@@ -17,6 +17,7 @@ from upgrade_codes.upgrade_manager import UpgradeManager
 
 from src.open_llm_vtuber.server import WebSocketServer
 from src.open_llm_vtuber.config_manager import Config, read_yaml, validate_config
+from src.open_llm_vtuber.engine_logging import route_engine_logs
 
 os.environ["HF_HOME"] = str(Path(__file__).parent / "models")
 os.environ["MODELSCOPE_CACHE"] = str(Path(__file__).parent / "models")
@@ -50,6 +51,8 @@ def init_logger(console_log_level: str = "INFO") -> None:
         backtrace=True,
         diagnose=True,
     )
+    # 引擎的 warning（例如背景模型連不上）也寫進 logs/。
+    route_engine_logs()
 
 
 def check_frontend_submodule(lang=None):

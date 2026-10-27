@@ -10,11 +10,13 @@ import dataclasses
 import functools
 import inspect
 import json
+import socket
 import sys
 import weakref
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Mapping, Optional
+from urllib.parse import urlsplit
 
 from loguru import logger
 
@@ -101,6 +103,22 @@ def _known_settings(settings_class: Any, settings: Mapping[str, Any]) -> dict:
     return out
 
 
+def reachable(base_url: str, timeout: float = 1.0) -> bool:
+    """背景模型的端點連得上嗎；連不上就在啟動時說一聲。2026-10-17 往 worker 的
+    tunnel 斷了，背景工作一路失敗兩小時都沒人發現。只開 TCP 連線，不問模型。"""
+    parts = urlsplit(base_url)
+    port = parts.port or (443 if parts.scheme == "https" else 80)
+    try:
+        with socket.create_connection((parts.hostname or "", port), timeout=timeout):
+            return True
+    except OSError as exc:
+        logger.warning(
+            f"背景模型 {base_url} 連不上（{exc}）：她會記不住東西，直到它恢復。"
+            "用 tunnel 的話先確認 tunnel 還在。"
+        )
+        return False
+
+
 def _engine_client(**options):
     from ai_character_engine.llm.local import OpenAICompatibleChatClient
 
@@ -172,6 +190,7 @@ def _clients(
     base = str(background.get("background_base_url") or "").strip()
     other = str(background.get("background_model") or "").strip()
     if base and other:
+        reachable(base)
         elsewhere.update(
             base_url=base,
             model=other,
