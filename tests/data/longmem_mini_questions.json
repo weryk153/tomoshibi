@@ -655,6 +655,128 @@
       "expected": "說他只提過生日在下個月（10月），沒講確切日期，請他告訴她。",
       "must_abstain": true,
       "wrong_if": "說出具體的日期。"
+    },
+    {
+      "id": "done-01",
+      "category": "done",
+      "sessions": [
+        {
+          "date": "2026-09-20",
+          "turns": [
+            {"role": "user", "content": "下週六要去墾丁看海，好期待。"},
+            {"role": "assistant", "content": "墾丁！記得帶防曬。"}
+          ]
+        },
+        {
+          "date": "2026-09-27",
+          "turns": [
+            {"role": "user", "content": "到了！"},
+            {"role": "assistant", "content": "到了？哪裡哪裡？"},
+            {"role": "user", "content": "墾丁啊，海超藍。"},
+            {"role": "assistant", "content": "好羨慕，多拍幾張。"}
+          ]
+        }
+      ],
+      "question": "我去墾丁了沒？",
+      "expected": "去了，9月27日到墾丁看海。",
+      "must_abstain": false,
+      "wrong_if": "說還沒去、問什麼時候要去，或叫他準備出發。"
+    },
+    {
+      "id": "done-02",
+      "category": "done",
+      "sessions": [
+        {
+          "date": "2026-10-01",
+          "turns": [
+            {"role": "user", "content": "這週五要交期末報告，好緊張。"},
+            {"role": "assistant", "content": "加油，還有幾天可以衝。"}
+          ]
+        },
+        {
+          "date": "2026-10-04",
+          "turns": [
+            {"role": "user", "content": "報告交了，終於解脫。"},
+            {"role": "assistant", "content": "辛苦了！好好休息。"}
+          ]
+        }
+      ],
+      "question": "我那份期末報告現在怎樣了？",
+      "expected": "已經交了（10月4日說交了）。",
+      "must_abstain": false,
+      "wrong_if": "說還沒交、提醒他趕快寫或問寫到哪裡。"
+    },
+    {
+      "id": "done-03",
+      "category": "done",
+      "sessions": [
+        {
+          "date": "2026-09-01",
+          "turns": [
+            {"role": "user", "content": "月底要搬去新竹了。"},
+            {"role": "assistant", "content": "新竹風很大喔。"}
+          ]
+        },
+        {
+          "date": "2026-09-30",
+          "turns": [
+            {"role": "user", "content": "搬完了，箱子還沒拆。"},
+            {"role": "assistant", "content": "慢慢拆，先把床弄好。"}
+          ]
+        }
+      ],
+      "question": "你知道我現在住哪嗎？",
+      "expected": "新竹，9月底已經搬過去了。",
+      "must_abstain": false,
+      "wrong_if": "說他還沒搬、月底才要搬，或說不知道。"
+    },
+    {
+      "id": "done-04",
+      "category": "done",
+      "sessions": [
+        {
+          "date": "2026-10-01",
+          "turns": [
+            {"role": "user", "content": "11月2號要考多益，最近在念。"},
+            {"role": "assistant", "content": "念書辛苦了，要考幾分？"}
+          ]
+        },
+        {
+          "date": "2026-11-02",
+          "turns": [
+            {"role": "user", "content": "考完了！聽力好難。"},
+            {"role": "assistant", "content": "考完就好，先放鬆。"}
+          ]
+        }
+      ],
+      "question": "我多益考了沒？",
+      "expected": "考完了，11月2日考的，他說聽力很難。",
+      "must_abstain": false,
+      "wrong_if": "說還沒考、叫他加油準備或問考試是哪天。"
+    },
+    {
+      "id": "done-05",
+      "category": "done",
+      "sessions": [
+        {
+          "date": "2026-10-01",
+          "turns": [
+            {"role": "user", "content": "好想去京都看紅葉。"},
+            {"role": "assistant", "content": "11月的京都最漂亮了。"}
+          ]
+        },
+        {
+          "date": "2026-10-08",
+          "turns": [
+            {"role": "user", "content": "機票訂好了！11月中出發。"},
+            {"role": "assistant", "content": "真的要去了，好棒。"}
+          ]
+        }
+      ],
+      "question": "我去過京都了嗎？",
+      "expected": "還沒，只是訂好了機票，11月中才出發。",
+      "must_abstain": false,
+      "wrong_if": "說他已經去過京都、已經看過紅葉。"
     }
   ]
 }

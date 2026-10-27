@@ -34,7 +34,7 @@ def test_the_question_set_is_well_formed():
 
     items = json.loads(QUESTIONS.read_text())["items"]
     assert Counter(i["category"] for i in items) == {
-        "extraction": 5, "multi_session": 5, "temporal": 5, "update": 5, "abstain": 5
+        "extraction": 5, "multi_session": 5, "temporal": 5, "update": 5, "abstain": 5, "done": 5
     }
     for item in items:
         dates = [s["date"] for s in item["sessions"]]

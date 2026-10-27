@@ -35,6 +35,8 @@ PERSONA = (
     "你記得之前聊過的事；不確定或沒聽過的事就直接說不知道，不要猜。"
 )
 VERDICTS = ("correct", "wrong", "abstained")
+# One person across every session: memory follows a user_id, not a conversation.
+USER_ID = "longmem-user"
 
 
 def graded(item: dict, judgement: dict) -> bool:
@@ -140,7 +142,7 @@ async def replay(item: dict, args, storage: Path) -> dict:
                 if turn["role"] != "user":
                     continue
                 now["t"] += 60
-                result = await c.reply(turn["content"], conversation_id=conversation_id)
+                result = await c.reply(turn["content"], conversation_id=conversation_id, user_id=USER_ID)
                 transcript.append(
                     {"date": session["date"], "user": turn["content"], "assistant": result.text}
                 )
@@ -150,7 +152,7 @@ async def replay(item: dict, args, storage: Path) -> dict:
     now["t"] = _at(item["sessions"][-1]["date"], 12) + 86400
     c = companion()
     try:
-        result = await c.reply(item["question"], conversation_id="later")
+        result = await c.reply(item["question"], conversation_id="later", user_id=USER_ID)
         answer = result.text
         await c.settle()
     finally:
